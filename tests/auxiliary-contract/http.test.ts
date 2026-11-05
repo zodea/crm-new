@@ -149,7 +149,7 @@ describe('辅助合同原表单最小恢复', () => {
     await actions.hydrate(session, null)
     const original = f.session()
     f.setSession({ ...original, actorId: 'another-aux-owner' })
-    await expect(actions.saveForm(session, input, 'draft')).rejects.toThrow()
+    await expect(actions.saveForm(session, input, 'draft')).rejects.toMatchObject({ problem: { code: 'unavailable', message: '合同服务暂时不可用，请重试' } })
     expect(f.counts().writes).toBe(0)
     expect(f.values.size).toBe(1)
     await expect(actions.recover(session)).rejects.toThrow(/身份或权限/)

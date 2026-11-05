@@ -71,7 +71,7 @@ describe('中央工序库公开状态', () => {
 
   it('未读不能保存；从任意旧版复制使用已读同编码最高版及旧版来源凭据', async () => {
     const { state, repository } = harness()
-    await expect(state.saveVersion(draft)).rejects.toThrow()
+    await expect(state.saveVersion(draft)).rejects.toThrow('尚未读取当前来源及写入权限')
     expect(repository.execute).not.toHaveBeenCalled()
     await state.loadDetail('old')
     const baseline = state.readVersion.value
@@ -121,7 +121,7 @@ describe('中央工序库公开状态', () => {
     expect(state.libraries.value).toEqual([])
     expect(state.context.value?.origin).toBe('demo')
     expect(state.canWrite.value).toBe(false)
-    await expect(state.saveVersion(draft)).rejects.toThrow()
+    await expect(state.saveVersion(draft)).rejects.toThrow('尚未读取当前来源及写入权限')
     expect(repository.execute).not.toHaveBeenCalled()
   })
 
@@ -143,7 +143,7 @@ describe('中央工序库公开状态', () => {
     repository.list.mockRejectedValueOnce(processLibraryProblem('forbidden', '权限已撤销'))
     await expect(state.recheckSeries('interior', 'old')).rejects.toThrow('权限已撤销')
     expect(state.canWrite.value).toBe(false)
-    await expect(state.saveVersion(draft, baseline)).rejects.toThrow()
+    await expect(state.saveVersion(draft, baseline)).rejects.toThrow('尚未读取当前来源及写入权限')
     expect(repository.execute).not.toHaveBeenCalled()
   })
 

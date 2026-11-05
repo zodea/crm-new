@@ -96,8 +96,8 @@ describe('分供方中央 Repository contract', () => {
     expect(repeated.category).toHaveLength(2)
     expect(repeated.credentialStatus).toHaveLength(2)
     expect(parseSupplierListQuery(serializeSupplierListQuery(repeated))).toEqual(repeated)
-    expect(() => parseSupplierListQuery({ credentialStatus: value })).toThrow()
-    expect(() => parseSupplierListQuery({ columnFilters: { taxpayerType: value } })).toThrow()
+    expect(() => parseSupplierListQuery({ credentialStatus: value })).toThrow('分供方列筛选条件无效')
+    expect(() => parseSupplierListQuery({ columnFilters: { taxpayerType: value } })).toThrow('分供方列筛选条件无效')
   })
 
   it.each([false, true])('短敏感值在列表、详情和复制后查询保持一致（敏感权限：%s）', (canReadSensitive) => {
@@ -198,7 +198,7 @@ describe('分供方中央 Repository contract', () => {
     ]) {
       const malicious = structuredClone(detail)
       mutation(malicious)
-      expect(() => decodeSupplierDetailRead(malicious)).toThrow()
+      expect(() => decodeSupplierDetailRead(malicious)).toThrow(expect.objectContaining({ problem: expect.objectContaining({ code: 'internal-error' }) }))
     }
     const page = buildSupplierListPage({ ...input, query: parseSupplierListQuery({}) })
     for (const mutation of [
@@ -217,7 +217,7 @@ describe('分供方中央 Repository contract', () => {
     ]) {
       const malicious = structuredClone(page)
       mutation(malicious)
-      expect(() => decodeSupplierListPage(malicious)).toThrow()
+      expect(() => decodeSupplierListPage(malicious)).toThrow(expect.objectContaining({ problem: expect.objectContaining({ code: 'internal-error' }) }))
     }
   })
 
@@ -287,7 +287,7 @@ describe('分供方中央 Repository contract', () => {
     const oldPayload = structuredClone(noSource) as unknown as { items: Record<string, unknown>[] }
     delete oldPayload.items[0]!.laborScope
     expect(decodeSupplierListPage(oldPayload).items[0]?.laborScope).toBe('')
-    expect(() => parseSupplierListQuery({ columnFilters })).toThrow()
+    expect(() => parseSupplierListQuery({ columnFilters })).toThrow('分供方列筛选条件无效')
   })
 
   it('列表在中央侧筛选分页并只返回语义详情目标', () => {
@@ -528,9 +528,9 @@ describe('分供方中央 Repository contract', () => {
     expect(decodeSupplierDetailRead(detail)).toEqual(detail)
     const leaked = structuredClone(detail)
     Object.assign(leaked.invoices[0]!.project, { id: 'project-secret' })
-    expect(() => decodeSupplierDetailRead(leaked)).toThrow()
+    expect(() => decodeSupplierDetailRead(leaked)).toThrow('中央后台返回的分供方详情读模型无效')
     Object.assign(leaked.invoices[0]!.project, { id: null, legacyId: 'project-secret' })
-    expect(() => decodeSupplierDetailRead(leaked)).toThrow()
+    expect(() => decodeSupplierDetailRead(leaked)).toThrow('中央后台返回的分供方详情读模型无效')
   })
 
   it('关系来源不可用与没有记录分开；DTO不泄漏旧关系身份且导航不可连接', () => {
@@ -541,6 +541,6 @@ describe('分供方中央 Repository contract', () => {
     expect(decodeSupplierDetailRead(detail)).toEqual(detail)
     const malformed = structuredClone(detail)
     Object.assign(malformed.settlements[0]!.project, { id: 'private-project' })
-    expect(() => decodeSupplierDetailRead(malformed)).toThrow()
+    expect(() => decodeSupplierDetailRead(malformed)).toThrow('中央后台返回的分供方详情读模型无效')
   })
 })

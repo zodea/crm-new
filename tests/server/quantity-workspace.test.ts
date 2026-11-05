@@ -61,6 +61,7 @@ it('预算排队期间切换身份，旧命令回调不会开始', async () => {
     const consume = vi.fn(async () => 'should-not-run')
     const second = instance.withWorkspaceTransaction(consume)
     session.actorId = 'another'
+    // eslint-disable-next-line test/valid-expect -- 先绑定断言，触发异步完成后再等待，避免未处理拒绝。
     const assertions = Promise.all([expect(first).rejects.toMatchObject({ name: 'WorkspaceTransactionSessionChanged' }), expect(second).rejects.toMatchObject({ name: 'WorkspaceTransactionSessionChanged' })])
     release()
     await assertions

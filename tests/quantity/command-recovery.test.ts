@@ -17,6 +17,6 @@ it('工程量恢复只读匹配原project/unit/record，拒绝跨源或含糊URL
   for (const url of ['https://outside/subcontract/quantity/project/unit-a', '//outside/subcontract/quantity/project/unit-a', '/\\outside/subcontract/quantity/project/unit-a', '/subcontract/quantity/project/unit-a?origin=demo', '/subcontract/quantity/project/unit-a?origin=real&origin=real', '/subcontract/quantity/project/unit-a?project=other', '/subcontract/quantity/project/unit-a?project=project&pid=project', '/subcontract/quantity/project/unit%5Ca']) expect(quantityRouteRecoveryScopes(url)).toEqual([])
   expect(Object.entries(sessionStorage)).toEqual(before)
   sessionStorage.setItem(commandRecoveryKey(first), '{broken')
-  expect(() => readQuantityRecoveryForRoute('/subcontract/quantity/project/unit-a', identity, sessionStorage)).toThrow()
+  expect(() => readQuantityRecoveryForRoute('/subcontract/quantity/project/unit-a', identity, sessionStorage)).toThrow('无法可靠核对原提交编号')
   expect(sessionStorage.getItem(commandRecoveryKey(other))).not.toBeNull()
 })

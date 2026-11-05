@@ -79,6 +79,9 @@
     "vue-tsc": "^3.3.7"
   },
   "pnpm": {
+    "overrides": {
+      "@vitest/eslint-plugin": "1.6.28"
+    },
     "patchedDependencies": {
       "node-modules-tools@2.7.0": "patches/node-modules-tools@2.7.0.patch"
     }

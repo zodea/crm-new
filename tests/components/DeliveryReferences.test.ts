@@ -66,6 +66,7 @@ describe('送货处理区中央资料与独立别名保存', () => {
       resolve = done
     }))
     const pending = api.rememberSupplierAlias('s', '送货新抬头')
+    // eslint-disable-next-line test/valid-expect -- 先绑定断言，触发异步完成后再等待，避免未处理拒绝。
     const rejected = expect(pending).rejects.toThrow('来源')
     central.origin = 'demo'
     await flushPromises()

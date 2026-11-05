@@ -74,7 +74,7 @@ describe('aX05 其他支出结算中央命令', () => {
     const confirmed = await service.execute(command({ id: row.id, baseVersion: saved.version, action: 'confirm', commandId: 'confirm' }), session)
     expect(service.detail(row.id, {}, session).settlement.draft.status).toBe('confirmed')
     await expect(service.execute(command({ id: row.id, baseVersion: confirmed.version, commandId: 'locked' }), session)).rejects.toMatchObject({ problem: { code: 'conflict' } })
-    expect(() => service.detail(row.id, {}, { ...session, capabilities: [] })).toThrow()
+    expect(() => service.detail(row.id, {}, { ...session, capabilities: [] })).toThrow('无权访问其他支出结算')
     await expect(service.execute(command(), { ...session, capabilities: [] })).rejects.toMatchObject({ problem: { code: 'forbidden' } })
   })
   it('只按有效抵扣、申请及已确认支付计算，未知金额和多源支付不按比例猜测', () => {

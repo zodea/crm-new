@@ -42,7 +42,7 @@ describe('证照 HTTP 请求边界', () => {
   ])('识别仅接受当前证照身份和现有设置，人工确认仅接受候选身份及明确选择 / parseSupplierCredentialCommand：$case', ({ prepare }) => {
     const fixture = createCredentialRecognitionCommand()
     const { input } = prepare(fixture)
-    expect(() => parseSupplierCredentialCommand(input)).toThrow()
+    expect(() => parseSupplierCredentialCommand(input)).toThrow('证照命令格式无效')
   })
   it('明确携带主档及证照双版本，不接受人工凭证注入', () => {
     expect(parseSupplierCredentialCommand(command)).toEqual(command)
@@ -53,13 +53,13 @@ describe('证照 HTTP 请求边界', () => {
     { case: '{ ...command, draft: { ...command.draft, actorId: \'forged\' } }', input: { ...command, draft: { ...command.draft, actorId: 'forged' } } },
     { case: '{ ...command, baseSupplierVersion: null }', input: { ...command, baseSupplierVersion: null } },
   ])('明确携带主档及证照双版本，不接受人工凭证注入 / parseSupplierCredentialCommand：$case', ({ input }) => {
-    expect(() => parseSupplierCredentialCommand(input)).toThrow()
+    expect(() => parseSupplierCredentialCommand(input)).toThrow('证照命令格式无效')
   })
   it.each(['upload', 'edit', 'requirement', 'review', 'delete', 'restore'])('拒绝 %s 动作缺失其必要字段', (action) => {
-    expect(() => parseSupplierCredentialCommand({ ...command, action, draft: {} })).toThrow()
+    expect(() => parseSupplierCredentialCommand({ ...command, action, draft: {} })).toThrow('证照命令格式无效')
   })
   it.each([undefined, null, ['real'], ['demo'], 'local', 'REAL'])('拒绝不明确读取来源 %j', (origin) => {
-    expect(() => supplierCredentialOrigin({ origin })).toThrow()
+    expect(() => supplierCredentialOrigin({ origin })).toThrow('证照读取需要明确有效来源')
   })
   it.each([
     { case: '{ origin: \'real\' }', input: { origin: 'real' }, argument2: undefined, expected: 'real' },
@@ -70,10 +70,10 @@ describe('证照 HTTP 请求边界', () => {
   })
 
   it.each([
-    { case: '{ origin: \'demo\' }', input: { origin: 'demo' } },
-    { case: '{ origin: \'real\', credentialId: \'credential-1\' }', input: { origin: 'real', credentialId: 'credential-1' } },
-    { case: '{ origin: \'demo\', includeDemo: [\'true\'] }', input: { origin: 'demo', includeDemo: ['true'] } },
-  ])('演示必须显式启用，文件查询只允许追加明确证照身份 / supplierCredentialOrigin：$case', ({ input }) => {
-    expect(() => supplierCredentialOrigin(input)).toThrow()
+    { case: '{ origin: \'demo\' }', input: { origin: 'demo' }, expected: '请先明确开启演示数据' },
+    { case: '{ origin: \'real\', credentialId: \'credential-1\' }', input: { origin: 'real', credentialId: 'credential-1' }, expected: '证照读取需要明确有效来源' },
+    { case: '{ origin: \'demo\', includeDemo: [\'true\'] }', input: { origin: 'demo', includeDemo: ['true'] }, expected: '证照读取需要明确有效来源' },
+  ])('演示必须显式启用，文件查询只允许追加明确证照身份 / supplierCredentialOrigin：$case', ({ input, expected }) => {
+    expect(() => supplierCredentialOrigin(input)).toThrow(expected)
   })
 })

@@ -82,15 +82,15 @@ it('目录读取拒绝脱离核实历史的当前值、重复身份和失配读�
       change(value)
       return value
     }
-    for (const body of [
-      damaged((value) => { value.records[0]!.draft.name = '无核实历史的名称' }),
-      damaged((value) => { value.records[0]!.history = [] }),
-      damaged((value) => { value.records.push(structuredClone(value.records[0]!)) }),
-      damaged((value) => { value.asOf = '2026-01-01T00:00:00.000Z' }),
-      damaged((value) => { value.meta.dataOrigin = 'demo' }),
-      { ...original, actorId: '额外定位字段' },
+    for (const { body, message } of [
+      { body: damaged((value) => { value.records[0]!.draft.name = '无核实历史的名称' }), message: '主体当前资料与历史依据不一致' },
+      { body: damaged((value) => { value.records[0]!.history = [] }), message: '主体核实历史不完整' },
+      { body: damaged((value) => { value.records.push(structuredClone(value.records[0]!)) }), message: '我方主体目录存在重复身份' },
+      { body: damaged((value) => { value.asOf = '2026-01-01T00:00:00.000Z' }), message: '我方主体目录缺少本次真实读取依据' },
+      { body: damaged((value) => { value.meta.dataOrigin = 'demo' }), message: '我方主体目录缺少本次真实读取依据' },
+      { body: { ...original, actorId: '额外定位字段' }, message: '我方主体目录缺少本次真实读取依据' },
     ])
-      expect(() => decodeOurSignatoryList(body)).toThrow()
+      expect(() => decodeOurSignatoryList(body)).toThrow(message)
     for (const status of [401, 403]) {
       const repository = createOurSignatoryRepository(async () => {
         throw Object.assign(new Error('真实HTTP拒绝'), { status, data: { broken: true } })

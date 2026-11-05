@@ -90,7 +90,7 @@ describe('中央证照会话所有权和原提交恢复', () => {
     const { state, read, execute } = setup()
     await state.load()
     execute.mockRejectedValueOnce(credentialProblem('unavailable', '请求未送达'))
-    await expect(state.execute(action)).rejects.toThrow()
+    await expect(state.execute(action)).rejects.toThrow('请求未送达')
     const original = execute.mock.calls[0]![0]
     execute.mockRejectedValueOnce(new SupplierCredentialNotAppliedProblem(original.commandId, '收据不存在且版本已变化', 'conflict'))
     await expect(state.execute(action)).rejects.toThrow(/版本已变化/)

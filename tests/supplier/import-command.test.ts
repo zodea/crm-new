@@ -142,8 +142,14 @@ describe('分供方中央逐行导入', () => {
     await expect(getImportEntity('supplier')!.validateRow!({ name: ' ' })).resolves.toBe('公司全称不能为空')
   })
 
-  it.each(Array.from([{ id: 'other' }, { credentialStatus: 'qualified' }, { approvalStatus: 'approved' }, { taxpayerVerificationStatus: 'verified' }, { laborScope: [] }]).map(input => ({ input })))('hTTP 导入边界拒绝主档 ID、核验结论与畸形字段；空名称生成行级拒绝：输入组合 1 案例 %#', async ({ input: extra }) => {
+  it.each([
+    { label: '主档 ID', extra: { id: 'other' }, expected: '导入不能指定主档 ID 或核验结论' },
+    { label: '证照结论', extra: { credentialStatus: 'qualified' }, expected: '分供方命令内容无效' },
+    { label: '审批状态', extra: { approvalStatus: 'approved' }, expected: '导入不能指定主档 ID 或核验结论' },
+    { label: '税务核验结论', extra: { taxpayerVerificationStatus: 'verified' }, expected: '导入不能指定主档 ID 或核验结论' },
+    { label: '畸形业务范围', extra: { laborScope: [] }, expected: '分供方命令内容无效' },
+  ])('导入 HTTP 边界拒绝$label', ({ extra, expected }) => {
     const envelope = { workspaceId: session.workspaceId, actorId: session.actorId, requiredCapability: SUPPLIER_WRITE_CAPABILITY, commandId: 'invalid' }
-    expect(() => parseSupplierImportCommandRequest({ ...envelope, draft: { name: '拒绝伪造', ...extra } })).toThrow()
+    expect(() => parseSupplierImportCommandRequest({ ...envelope, draft: { name: '拒绝伪造', ...extra } })).toThrow(expected)
   })
 })

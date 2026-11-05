@@ -5,7 +5,7 @@ import { mkdir, mkdtemp } from 'node:fs/promises'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { createPinia, setActivePinia } from 'pinia'
-import { afterAll, expect, it, vi } from 'vitest'
+import { afterAll, beforeAll, expect, it, vi } from 'vitest'
 import { migrations, runMigrations } from '../../app/lib/db/migrations'
 import { FINANCE_FAMILIES } from '../../app/lib/finance/central-contract'
 import { createFinanceRepository } from '../../app/lib/finance/http-repository'
@@ -89,7 +89,7 @@ async function engineering(f: Awaited<ReturnType<typeof fixture>>) {
   return { id: main.id, projectId: f.project.id, basis: main.basis }
 }
 
-async function nativeSource(targetVersion?: number) {
+async function buildNativeSource(targetVersion?: number) {
   const native = await createMemoryDb()
   await runMigrations(native, targetVersion ? migrations.filter(migration => migration.version <= targetVersion) : migrations)
   await native.execute('PRAGMA foreign_keys=ON')
@@ -113,6 +113,37 @@ async function nativeSource(targetVersion?: number) {
   }
   const bytes = native.raw.export()
   return { native, audit, source: { sha256: createHash('sha256').update(bytes).digest('hex'), payloadBase64: Buffer.from(bytes).toString('base64') } }
+}
+
+const nativeSnapshots = new Map<number | undefined, {
+  bytes: Uint8Array
+  foreignKeys: number
+  audit: Awaited<ReturnType<typeof buildNativeSource>>['audit']
+  source: Awaited<ReturnType<typeof buildNativeSource>>['source']
+}>()
+
+beforeAll(async () => {
+  // 每个来源版本仍从空库真实迁移；同版本案例克隆字节，避免重复建立相同旧事实。
+  for (const version of [59, 60, undefined]) {
+    const original = await buildNativeSource(version)
+    try {
+      const bytes = original.native.raw.export()
+      if (createHash('sha256').update(bytes).digest('hex') !== original.source.sha256)
+        throw new Error('财务旧库快照字节与原来源不一致')
+      const [state] = await original.native.select<{ foreign_keys: number }>('PRAGMA foreign_keys')
+      nativeSnapshots.set(version, { bytes, foreignKeys: state!.foreign_keys, audit: original.audit, source: original.source })
+    }
+    finally { original.native.close() }
+  }
+})
+
+async function nativeSource(targetVersion?: number) {
+  const snapshot = nativeSnapshots.get(targetVersion)
+  if (!snapshot)
+    throw new Error('财务旧库来源版本未准备')
+  const native = await createMemoryDb(snapshot.bytes)
+  await native.execute(`PRAGMA foreign_keys = ${snapshot.foreignKeys ? 'ON' : 'OFF'}`)
+  return { native, audit: structuredClone(snapshot.audit), source: structuredClone(snapshot.source) }
 }
 
 it.each([
@@ -322,7 +353,7 @@ it.each([59, 60])('完整Native v%s字节迁入保稳定ID、原文、历史批�
       const damaged = new DatabaseSync(missingBodyPath)
       damaged.exec('DELETE FROM file_payloads WHERE file_ref_id=\'native-file\'')
       damaged.close()
-      await expect(inspectProductionBackup(missingBodyPath)).rejects.toThrow()
+      await expect(inspectProductionBackup(missingBodyPath)).rejects.toThrow('财务事实、原件、原命令、冻结历史或迁入依据不完整。')
     }
     await f.storage.close()
     expect(await f.service.importSnapshot(request, f.session)).toEqual(result)
@@ -451,12 +482,12 @@ it('正式原费guard损坏时journal与备份读取拒绝，不修复原库且�
     await expect(validateFinanceJournal(f.storage, f.actor)).rejects.toThrow('原费用引用与冻结保护结构损坏')
     const staging = join(f.options.directory, 'finance-guard-backup')
     await mkdir(staging)
-    await expect(createLocalBackup(f.storage, staging, `backup-${randomUUID()}`, () => '2026-10-05T01:00:00.000Z')).rejects.toThrow()
+    await expect(createLocalBackup(f.storage, staging, `backup-${randomUUID()}`, () => '2026-10-05T01:00:00.000Z')).rejects.toThrow('正式数据库结构或历史保护不完整（expense_referenced_source_update）')
     expect(await f.storage.select('SELECT * FROM current_transactions WHERE id=?', [saved.id])).toEqual(original)
     expect(await f.storage.select('SELECT * FROM sqlite_schema WHERE name=\'expense_referenced_source_update\'')).toEqual([])
     await f.storage.close()
     closed = true
-    await expect(f.storage.select('SELECT * FROM current_transactions')).rejects.toThrow()
+    await expect(f.storage.select('SELECT * FROM current_transactions')).rejects.toThrow('正式数据库结构或历史保护不完整（expense_referenced_source_update）')
     const raw = new DatabaseSync(join(f.options.directory, 'ruihang.sqlite'), { readOnly: true })
     try {
       expect(raw.prepare('SELECT * FROM sqlite_schema WHERE name=\'expense_referenced_source_update\'').all()).toEqual([])

@@ -51,7 +51,7 @@ describe('分供方证照迁移候选与恢复', () => {
     expect(prepareSupplierCredentialMigration(migrated, snapshot(graph), now)).toEqual({ aggregates: migrated, changed: false })
     expect(prepareSupplierCredentialMigration(migrated, rollback, now)).toEqual({ aggregates: [], changed: true })
     migrated[0]!.changedAfterMigration = true
-    expect(() => prepareSupplierCredentialMigration(migrated, rollback, now)).toThrow()
+    expect(() => prepareSupplierCredentialMigration(migrated, rollback, now)).toThrow('已阻止恢复')
   })
   it('完整 SQLite 图映射到唯一中央供应商并保原件字节、OCR 两份事实和未知人工操作者', () => {
     const result = prepareSupplierCredentialMigration([], snapshot(), now)
@@ -149,7 +149,10 @@ describe('分供方证照迁移候选与恢复', () => {
     if (kind === 'duplicate')
       source.entities.push(structuredClone(source.entities[1]!))
     const current = [emptySupplierCredentialAggregate('independent')]
-    expect(() => prepareSupplierCredentialMigration(current, source, now)).toThrow()
+    const expected = kind === 'batch' || kind === 'duplicate'
+      ? '证照批次、供应商或来源身份重复/无效'
+      : '供应商稳定身份、来源名称、批次或删除边界错配'
+    expect(() => prepareSupplierCredentialMigration(current, source, now)).toThrow(expected)
     expect(current).toEqual([emptySupplierCredentialAggregate('independent')])
   })
 

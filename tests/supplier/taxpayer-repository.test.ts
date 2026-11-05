@@ -12,8 +12,13 @@ describe('税务核验 HTTP 回包', () => {
     expect(await repository.recordTaxpayerVerification(command)).toEqual(result)
     expect(fetcher).toHaveBeenCalledWith('/api/commands/suppliers/supplier%2Fa/taxpayer-verification', { method: 'POST', body: command })
   })
-  it.each([{ supplierId: 'another' }, { commandId: 'another' }, { verification: { ...result.verification, taxpayerType: '小规模纳税人' } }, { verification: { ...result.verification, taxpayerVerifiedAt: 'fake' } }])('拒绝错主体、错提交或矛盾结果 %j', async (patch) => {
+  it.each([
+    { label: '错主体', patch: { supplierId: 'another' }, expected: '中央税务核验结果身份或版本无效' },
+    { label: '错提交', patch: { commandId: 'another' }, expected: '中央税务核验结果身份或版本无效' },
+    { label: '矛盾类型', patch: { verification: { ...result.verification, taxpayerType: '小规模纳税人' } }, expected: '中央税务核验结果与本次人工输入不一致' },
+    { label: '无效核验时间', patch: { verification: { ...result.verification, taxpayerVerifiedAt: 'fake' } }, expected: '中央税务核验凭证不完整' },
+  ])('拒绝$label', async ({ patch, expected }) => {
     const repository = createHttpSupplierCommandRepository({ fetcher: async () => ({ ...result, ...patch }) })
-    await expect(repository.recordTaxpayerVerification(command)).rejects.toThrow()
+    await expect(repository.recordTaxpayerVerification(command)).rejects.toThrow(expected)
   })
 })

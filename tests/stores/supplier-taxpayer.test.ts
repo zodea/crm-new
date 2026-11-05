@@ -64,7 +64,7 @@ describe('每表单税务提交身份', () => {
   it('未确认税务提交不能被普通保存绕过，明确业务冲突后允许重读', async () => {
     const { store, session } = await setup()
     execute.mockRejectedValueOnce(credentialProblem('unavailable', '响应丢失'))
-    await expect(store.recordTaxpayerVerification(session, input)).rejects.toThrow()
+    await expect(store.recordTaxpayerVerification(session, input)).rejects.toThrow('响应丢失')
     await expect(store.saveForm(session, { id: 'supplier-a' }, 'save')).rejects.toThrow('恢复')
     execute.mockRejectedValueOnce(credentialProblem('conflict', '主档版本变化'))
     await expect(store.recordTaxpayerVerification(session, input)).rejects.toThrow('版本变化')

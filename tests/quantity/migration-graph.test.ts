@@ -27,7 +27,7 @@ it.each([
   { case: '\'2026-02-30 00:00:00\' / \'创建\'', input: '2026-02-30 00:00:00', argument2: '创建' },
   { case: '\'09/11/2026\' / \'创建\'', input: '09/11/2026', argument2: '创建' },
 ])('迁移时间不把不存在的日期滚动到下一月，也不接收含糊时间格式 / quantityMigrationTimestamp：$case', ({ input, argument2 }) => {
-  expect(() => quantityMigrationTimestamp(input, argument2)).toThrow()
+  expect(() => quantityMigrationTimestamp(input, argument2)).toThrow('创建时间格式无效')
 })
 
 it('真实SQLite工程量源保留三量空零、稳定区域模板与删除边界，空项目不造数据', async () => {
@@ -42,35 +42,35 @@ it('真实SQLite工程量源保留三量空零、稳定区域模板与删除边�
 
 it('跨项目父关系、未知列和重复身份均显式拒绝，不按名称猜接', async () => {
   const graph = (await readQuantityMigrationGraphs(memory))[0]!.graph
-  const mutate = (change: (copy: typeof graph) => void) => {
+  const mutate = (change: (copy: typeof graph) => void, expected: string) => {
     const copy = structuredClone(graph)
     change(copy)
-    expect(() => parseQuantityMigrationGraph(copy)).toThrow()
+    expect(() => parseQuantityMigrationGraph(copy)).toThrow(expected)
   }
   mutate((copy) => {
     copy.tables.units[0]!.floor_id = '其他楼层'
-  })
+  }, '找不到 floors 的显式父 ID')
   mutate((copy) => {
     copy.tables.items[0]!.project_id = 'other'
-  })
+  }, 'items跨项目引用')
   mutate((copy) => {
     copy.tables.items[0]!.unexpected = '不可悄悄吞掉'
-  })
+  }, 'items字段缺失或包含未识别字段')
   mutate((copy) => {
     copy.tables.units.push(copy.tables.units[0]!)
-  })
+  }, 'units存在空或重复稳定 ID')
   await memory.execute('PRAGMA foreign_keys = OFF')
   await memory.execute('UPDATE floors SET building_id = ? WHERE id = ?', ['不存在楼栋', 'f'])
   await expect(readQuantityMigrationGraphs(memory)).rejects.toMatchObject({ problem: { code: 'relationship-mismatch' } })
 })
 
 it.each([
-  (copy: ReturnType<typeof parseQuantityMigrationGraph>) => { copy.tables.construction_stage_items[0]!.is_reporting_stage = null },
-  (copy: ReturnType<typeof parseQuantityMigrationGraph>) => { copy.tables.file_payloads[0]!.content = 'AQIE=' },
-  (copy: ReturnType<typeof parseQuantityMigrationGraph>) => { copy.tables.file_refs[0]!.file_size = 4 },
-  (copy: ReturnType<typeof parseQuantityMigrationGraph>) => { copy.tables.file_refs[0]!.mime_type = 'application/pdf' },
-  (copy: ReturnType<typeof parseQuantityMigrationGraph>) => { copy.tables.operation_logs[0]!.action = 'execute-sql' },
-])('区域、责任、完成、照片和审计快照按稳定旧ID整体映射，重复映射确定且原稿不变：输入案例 %#', async (change) => {
+  { label: '缺少报量标记', change: (copy: ReturnType<typeof parseQuantityMigrationGraph>) => { copy.tables.construction_stage_items[0]!.is_reporting_stage = null }, expected: '阶段映射的工种、计量模式或报量标记无效' },
+  { label: '照片正文编码无效', change: (copy: ReturnType<typeof parseQuantityMigrationGraph>) => { copy.tables.file_payloads[0]!.content = 'AQIE=' }, expected: '验收照片名称、类型、大小或正文不符' },
+  { label: '照片大小不符', change: (copy: ReturnType<typeof parseQuantityMigrationGraph>) => { copy.tables.file_refs[0]!.file_size = 4 }, expected: '验收照片名称、类型、大小或正文不符' },
+  { label: '照片类型不符', change: (copy: ReturnType<typeof parseQuantityMigrationGraph>) => { copy.tables.file_refs[0]!.mime_type = 'application/pdf' }, expected: '验收照片名称、类型、大小或正文不符' },
+  { label: '审计动作无效', change: (copy: ReturnType<typeof parseQuantityMigrationGraph>) => { copy.tables.operation_logs[0]!.action = 'execute-sql' }, expected: '审计操作类型无效' },
+])('区域、责任、完成、照片和审计快照按稳定旧ID整体映射；拒绝$label', async ({ change, expected }) => {
   await memory.execute('INSERT INTO crews (id, name, trade) VALUES (?, ?, ?)', ['crew', '原班组', '油漆工'])
   await memory.execute('INSERT INTO construction_stages (id, project_id, code, name, trade) VALUES (?, ?, ?, ?, ?)', ['stage', 'p', 'S', '腻子', '油漆工'])
   await memory.execute('INSERT INTO construction_stage_items (id, stage_id, item_id, is_reporting_stage) VALUES (?, ?, ?, ?)', ['mapping', 'stage', 'i', 1])
@@ -105,7 +105,7 @@ it.each([
 
   const copy = structuredClone(source)
   change(copy)
-  expect(() => parseQuantityMigrationGraph(copy)).toThrow()
+  expect(() => parseQuantityMigrationGraph(copy)).toThrow(expected)
   const noBody = structuredClone(source)
   noBody.tables.file_payloads = []
   expect(parseQuantityMigrationGraph(noBody).tables.file_refs).toHaveLength(1)

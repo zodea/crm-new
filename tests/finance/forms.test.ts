@@ -1045,12 +1045,13 @@ describe('支付事实确认与撤回', () => {
     await expect(store.saveForm('payment_record', {
       no: 'ZF-DUP',
       payeeName: '另一个收款方',
+      supplierId: 'supplier-finance',
       paymentDate: '2026-07-20',
       amount: 1,
       voucherNo: 'V-DUP',
       bankSerialNo: 'BANK-DRAFT',
       applicationAllocations: [],
-    }, 'submit')).rejects.toThrow()
+    }, 'submit')).rejects.toThrow('UNIQUE constraint failed: payment_records.bank_serial_no')
     expect(await mem.select(`
       SELECT id FROM payment_records WHERE no = 'ZF-DUP'
     `)).toEqual([])

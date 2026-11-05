@@ -92,6 +92,7 @@ describe('空鼓来源原件与事务边界', () => {
       })
       await ready
       const first = f.service.executeHollow(command)
+      // eslint-disable-next-line test/valid-expect -- 先绑定断言，触发异步完成后再等待，避免未处理拒绝。
       const failed = expect(first).rejects.toMatchObject({ problem: { code: 'forbidden' } })
       f.setSession({ ...f.session(), actorId: 'replacement-actor' })
       release()

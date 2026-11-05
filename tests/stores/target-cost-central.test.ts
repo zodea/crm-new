@@ -41,9 +41,9 @@ describe('预算固定页面快照与原提交恢复', () => {
   it('列表只展示当前身份与可见版本的原提交，删除或恢复失响应仍可核对', async () => {
     const store = useTargetCostStore()
     repo.execute.mockRejectedValue(new Error('响应丢失'))
-    await expect(store.remove(read('a'))).rejects.toThrow()
-    await expect(store.restore(read('b'))).rejects.toThrow()
-    await expect(store.saveForm(read(null), {}, 'draft')).rejects.toThrow()
+    await expect(store.remove(read('a'))).rejects.toThrow('响应丢失')
+    await expect(store.restore(read('b'))).rejects.toThrow('响应丢失')
+    await expect(store.saveForm(read(null), {}, 'draft')).rejects.toThrow('响应丢失')
     const listing: TargetCostListRead = { context: read().context, rows: [{ id: 'a' }] as TargetCostListRead['rows'] }
     expect(store.getPendingForList(listing).map(row => [row.descriptor.targetId, row.descriptor.action, row.state])).toEqual([['a', 'delete', 'unknown']])
     expect(store.getPendingForList({ ...listing, context: { ...listing.context, actorId: 'different' } })).toEqual([])
@@ -84,13 +84,13 @@ describe('预算固定页面快照与原提交恢复', () => {
     const store = useTargetCostStore()
     const original = read()
     repo.execute.mockRejectedValueOnce(targetCostProblem('unavailable', '失响应'))
-    await expect(store.saveForm(original, {}, 'draft')).rejects.toThrow()
+    await expect(store.saveForm(original, {}, 'draft')).rejects.toThrow('失响应')
     const pending = store.getPending(original)!
     repo.resolve.mockRejectedValueOnce(targetCostProblem('stale-source', '后续来源变化'))
-    await expect(store.recover(pending)).rejects.toThrow()
+    await expect(store.recover(pending)).rejects.toThrow('后续来源变化')
     expect(store.getPending(original)?.descriptor.commandId).toBe(pending.descriptor.commandId)
     repo.resolve.mockResolvedValueOnce({ outcome: 'not-applied', commandId: pending.descriptor.commandId })
-    await expect(store.recover(pending)).rejects.toThrow()
+    await expect(store.recover(pending)).rejects.toThrow('未应用')
     expect(store.getPending(original)).toBeNull()
   })
   it.each([

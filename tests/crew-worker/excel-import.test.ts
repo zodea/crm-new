@@ -40,8 +40,8 @@ it('预览重复、明确替换并保持未映射字段，变更后拒绝旧版�
 })
 
 it('拒绝伪造身份字段、无权限预览及负补贴，缺省比例不伪造数值', async () => {
-  expect(() => parseCrewExcelPreview({ drafts: [{ name: '合成班组', id: 'forged' }] })).toThrow()
-  expect(() => parseCrewExcelImport({ workspaceId: actor.workspaceId, actorId: actor.actorId, requiredCapability: 'crew:write', commandId: 'forged-command', draft: { name: '合成班组' }, decision: { kind: 'create', fingerprint: 'a'.repeat(64), id: 'forged' } })).toThrow()
+  expect(() => parseCrewExcelPreview({ drafts: [{ name: '合成班组', id: 'forged' }] })).toThrow('班组导入请求无效')
+  expect(() => parseCrewExcelImport({ workspaceId: actor.workspaceId, actorId: actor.actorId, requiredCapability: 'crew:write', commandId: 'forged-command', draft: { name: '合成班组' }, decision: { kind: 'create', fingerprint: 'a'.repeat(64), id: 'forged' } })).toThrow('班组导入请求无效')
   const service = createCrewWorkerCommandService({ createId: () => 'missing-ratio' })
   expect(() => service.previewCrewExcel([{ name: '合成班组' }], { ...actor, capabilities: ['crew:write'] })).toThrow('权限')
   const invalid = { name: '合成班组', rentSubsidyPrice: -1 }

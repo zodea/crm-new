@@ -26,6 +26,6 @@ it('本actor marker损坏时保原存储停止恢复，不忽略它或清掉另�
   const marker = { ...identity, family: 'boq', commandId: 'boq-kept-original', action: 'patch-line', scopeId: 'project-one:contract-one', targetId: 'boq-line-one' }
   codec.remember(commandRecoveryKey(marker), marker)
   sessionStorage.setItem(commandRecoveryKey(marker), '{broken')
-  expect(() => readBoqRecoveryForRoute('/contract/boq?project=project-one', identity, sessionStorage)).toThrow()
+  expect(() => readBoqRecoveryForRoute('/contract/boq?project=project-one', identity, sessionStorage)).toThrow('无法可靠核对原提交编号')
   expect(sessionStorage.getItem(commandRecoveryKey(marker))).toBe('{broken')
 })

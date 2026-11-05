@@ -326,7 +326,7 @@ describe('v22 F3 资金表单与票款分摊迁移', () => {
         id, payment_application_id, invoice_id, allocated_amount
       )
       VALUES ('bad-negative', 'application-a', 'invoice-f3', -1)
-    `)).rejects.toThrow()
+    `)).rejects.toThrow('CHECK constraint failed: allocated_amount > 0')
     await db.execute(`
       INSERT INTO payment_application_invoice_allocations (
         id, payment_application_id, invoice_id, allocated_amount
@@ -359,7 +359,7 @@ describe('v22 F3 资金表单与票款分摊迁移', () => {
         'payment-b', 'ZF-B', '2026-07-06', 10, '收款方', 'V-B',
         'BANK-F3', 'needs_review'
       )
-    `)).rejects.toThrow()
+    `)).rejects.toThrow('UNIQUE constraint failed: payment_records.bank_serial_no')
     db.close()
   })
 })

@@ -49,8 +49,12 @@ describe.each(domains)('$kind 采用真实我方签约主体', (domain) => {
 
   it('未核实、错版本或不存在主体均不产生合同/附件，草稿可以明确未选', async () => {
     const { owner, request } = await setup()
-    for (const patch of [{ ourSignatoryId: null, ourSignatoryVersion: null }, { ourSignatoryVersion: '999' }, { ourSignatoryId: 'our-unknown' }]) {
-      await expect(owner.execute({ ...request, commandId: crypto.randomUUID(), draft: { ...request.draft, ...patch } }, actor)).rejects.toBeDefined()
+    for (const { patch, message } of [
+      { patch: { ourSignatoryId: null, ourSignatoryVersion: null }, message: '请选择实际我方签约主体' },
+      { patch: { ourSignatoryVersion: '999' }, message: '我方主体资料已变化' },
+      { patch: { ourSignatoryId: 'our-unknown' }, message: '所选我方主体不存在或已停用' },
+    ]) {
+      await expect(owner.execute({ ...request, commandId: crypto.randomUUID(), draft: { ...request.draft, ...patch } }, actor)).rejects.toThrow(message)
       expect(owner.rows()).toEqual([])
     }
     const saved = await owner.execute({ ...request, commandId: 'unselected-draft', action: 'draft', draft: { ...request.draft, ourSignatoryId: null, ourSignatoryVersion: null, ourSignatorySnapshot: { name: '伪造' } } }, actor)
@@ -67,7 +71,7 @@ describe.each(domains)('$kind 采用真实我方签约主体', (domain) => {
     await Promise.resolve()
     expect(owner.resolve(request.commandId, actor)).toEqual({ outcome: 'not-applied', commandId: request.commandId })
     finish(null)
-    await expect(pending).rejects.toBeDefined()
+    await expect(pending).rejects.toThrow('原命令已封存为未应用，迟到请求不能继续保存')
     expect(owner.rows()).toEqual([])
   })
 })

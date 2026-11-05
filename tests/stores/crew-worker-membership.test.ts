@@ -290,14 +290,18 @@ describe('班组成员关系 command store', () => {
     expect(repositories.crewWorkerCommands.executeWorker).not.toHaveBeenCalled()
   })
 
-  it.each(['wrong-command', 'wrong-worker', 'old-version'])('原回执或重读对象不一致不能清理恢复定位 %s', async (fault) => {
+  it.each([
+    { fault: 'wrong-command', error: '原回执与工人或编号不一致' },
+    { fault: 'wrong-worker', error: '原回执与工人或编号不一致' },
+    { fault: 'old-version', error: '已保存待刷新' },
+  ])('原回执或重读对象不一致不能清理恢复定位 $fault', async ({ fault, error }) => {
     const descriptor = preserveDescriptor({ scopeId: 'crew-original' })
     const before = [...recovery.entries()]
     const result = { id: fault === 'wrong-worker' ? 'worker-other' : 'worker-legacy', commandId: fault === 'wrong-command' ? 'command-other' : descriptor.commandId, version: '8', updatedAt: '2026-10-04T00:00:00.000Z', attachmentIds: [] }
     repositories.crewWorkerCommands.resolveWorker.mockResolvedValue({ outcome: 'applied', result })
     repositories.crewWorkerCommands.loadWorkerForm.mockResolvedValue({ draft: { id: 'worker-legacy' }, version: fault === 'old-version' ? '7' : '8' })
     const store = useCrewWorkerCommandStore()
-    await expect(store.recoverMembership(store.createMembershipSession(), 'crew-original', descriptor)).rejects.toThrow()
+    await expect(store.recoverMembership(store.createMembershipSession(), 'crew-original', descriptor)).rejects.toThrow(error)
     expect([...recovery.entries()]).toEqual(before)
     expect(repositories.crewWorkerCommands.executeWorker).not.toHaveBeenCalled()
   })

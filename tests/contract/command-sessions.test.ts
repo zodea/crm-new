@@ -117,7 +117,7 @@ describe.each(cases)('%s 合同表单会话', (kind, useStore) => {
       throw new Error('network')
     })
     const input = f2FormDefaults(kind)
-    await expect(store.saveForm(session, input, 'save')).rejects.toThrow()
+    await expect(store.saveForm(session, input, 'save')).rejects.toMatchObject({ problem: { code: 'unavailable' } })
     const original = repository.execute.mock.calls[0]![0].commandId
     await expect(store.saveForm(session, { ...input, name: '不同内容' }, 'save')).rejects.toThrow(/原提交/)
     const recovered = await store.recover(session)
@@ -186,7 +186,7 @@ describe.each(cases)('%s 合同表单会话', (kind, useStore) => {
       await execute(request)
       throw new Error('lost')
     })
-    await expect(store.saveForm(session, { ...f2FormDefaults(kind), note: '不应持久化的正文' }, 'save')).rejects.toThrow()
+    await expect(store.saveForm(session, { ...f2FormDefaults(kind), note: '不应持久化的正文' }, 'save')).rejects.toMatchObject({ problem: { code: 'unavailable' } })
     const storage = window.sessionStorage as unknown as ReturnType<typeof memoryStorage>
     const saved = [...storage.values.values()][0]!
     expect(JSON.parse(saved)).toEqual({ commandId: repository.execute.mock.calls[0]![0].commandId, workspaceId: 'w', actorId: 'u', family: `${kind}-contract`, targetId: null, action: 'save' })
@@ -209,7 +209,7 @@ describe.each(cases)('%s 合同表单会话', (kind, useStore) => {
     expect(repository.execute).not.toHaveBeenCalled()
     storage.setItem = set
     repository.execute.mockRejectedValueOnce(new Error('unknown'))
-    await expect(store.saveForm(session, f2FormDefaults(kind), 'save')).rejects.toThrow()
+    await expect(store.saveForm(session, f2FormDefaults(kind), 'save')).rejects.toMatchObject({ problem: { code: 'unavailable' } })
     const previous = repository.execute.mock.calls[0]![0].commandId
     expect((await store.recover(session)).outcome).toBe('not-applied')
     await store.saveForm(session, f2FormDefaults(kind), 'save')
@@ -246,7 +246,7 @@ describe.each(cases)('%s 合同表单会话', (kind, useStore) => {
     const { store, session, repository, context } = fixture()
     await store.hydrate(session, null)
     repository.execute.mockRejectedValueOnce(new Error('lost'))
-    await expect(store.saveForm(session, f2FormDefaults(kind), 'save')).rejects.toThrow()
+    await expect(store.saveForm(session, f2FormDefaults(kind), 'save')).rejects.toMatchObject({ problem: { code: 'unavailable' } })
     context.actorId = 'other'
     await expect(store.recover(session)).rejects.toThrow(/身份/)
     expect(session.pending).not.toBeNull()
@@ -262,6 +262,7 @@ describe.each(cases)('%s 合同表单会话', (kind, useStore) => {
     let release!: (value: typeof context) => void
     repository.context.mockImplementationOnce(() => new Promise(resolve => release = resolve))
     const writing = store.saveForm(session, f2FormDefaults(kind), 'save')
+    // eslint-disable-next-line test/valid-expect -- 先绑定断言，触发异步完成后再等待，避免未处理拒绝。
     const rejected = expect(writing).rejects.toThrow(/原提交/)
     expect(session.pending).not.toBeNull()
     store.invalidate(session)
@@ -282,6 +283,7 @@ describe.each(cases)('%s 合同表单会话', (kind, useStore) => {
     let release!: (value: Awaited<ReturnType<typeof repository.loadForm>>) => void
     repository.loadForm.mockImplementationOnce(() => new Promise(resolve => release = resolve))
     const writing = store.saveForm(session, { ...f2FormDefaults(kind), id: 'a' }, 'save')
+    // eslint-disable-next-line test/valid-expect -- 先绑定断言，触发异步完成后再等待，避免未处理拒绝。
     const rejected = expect(writing).rejects.toThrow(/页面目标/)
     await vi.waitFor(() => expect(release).toBeTypeOf('function'))
     store.invalidate(session)

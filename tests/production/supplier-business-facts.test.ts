@@ -299,7 +299,7 @@ it('other仅显示实际服务supplier的当前结算，可证小计保零和未
     expect(privateRead.meta.sources.find(source => source.key === 'settlements')?.state).toBe('forbidden')
     const forged = structuredClone(detail)
     forged.meta.sources = forged.meta.sources.filter(source => source.key !== 'other-settlements')
-    expect(() => decodeSupplierDetailRead(forged)).toThrow()
+    expect(() => decodeSupplierDetailRead(forged)).toThrow('中央后台返回的分供方详情读模型无效')
   }
   finally { await f.storage.close() }
 })

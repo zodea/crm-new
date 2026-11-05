@@ -14,6 +14,7 @@ describe('恢复等待边界', () => {
         finish = resolve
       })
     }, undefined, 10)
+    // eslint-disable-next-line test/valid-expect -- 先绑定断言，触发异步完成后再等待，避免未处理拒绝。
     const failure = expect(request).rejects.toThrow('超时')
     await vi.advanceTimersByTimeAsync(10)
     await failure
@@ -27,6 +28,7 @@ describe('恢复等待边界', () => {
     const controller = new AbortController()
     const read = vi.fn(() => new Promise<string>(() => {}))
     const request = withTabRestoreDeadline(read, controller.signal)
+    // eslint-disable-next-line test/valid-expect -- 先绑定断言，触发异步完成后再等待，避免未处理拒绝。
     const failure = expect(request).rejects.toMatchObject({ name: 'AbortError' })
     controller.abort()
     await failure

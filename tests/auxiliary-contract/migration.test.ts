@@ -34,7 +34,7 @@ describe('aX04 受控迁移', () => {
     expect(() => instance.detail(entity.id, { kind: 'company_expense' }, session)).toThrow(/不存在/)
     commit()
     expect(instance.detail(entity.id, { kind: 'company_expense' }, session).contract).toMatchObject({ id: entity.id, project: null, audit: { createdBy: null, createdAt: null } })
-    expect(() => instance.prepareMigrationSnapshot({ ...snapshot, entities: [{ ...entity, attributes: { ...entity.attributes, kind: 'invalid' } }] })).toThrow()
+    expect(() => instance.prepareMigrationSnapshot({ ...snapshot, entities: [{ ...entity, attributes: { ...entity.attributes, kind: 'invalid' } }] })).toThrow('合同类型不匹配')
     expect(instance.list({ kind: 'company_expense' }, session).pagination.total).toBe(1)
     instance.prepareMigrationSnapshot({ authority: 'local', activeBatchId: null, entities: [] })()
     expect(instance.list({ kind: 'company_expense' }, session).pagination.total).toBe(0)

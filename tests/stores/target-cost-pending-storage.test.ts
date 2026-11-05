@@ -90,9 +90,9 @@ it('已保存后读失败保原编号，恢复只重读；新输入保留，撤�
 it('两个新建草稿的最小编号独立，旧完整pending先安全接续再清正文', async () => {
   const store = useTargetCostStore()
   repo.execute.mockRejectedValue(new Error('未知结果'))
-  await expect(store.saveForm(read, { name: 'A私密' }, 'draft')).rejects.toThrow()
+  await expect(store.saveForm(read, { name: 'A私密' }, 'draft')).rejects.toThrow('未知结果')
   const other = { ...read, draftKey: 'other-draft' }
-  await expect(store.saveForm(other, { name: 'B私密' }, 'draft')).rejects.toThrow()
+  await expect(store.saveForm(other, { name: 'B私密' }, 'draft')).rejects.toThrow('未知结果')
   expect(store.getPending(read)?.descriptor.commandId).not.toBe(store.getPending(other)?.descriptor.commandId)
   expect(store.getPending({ ...read, context: { ...read.context, origin: 'demo' } })).toBeNull()
   const old = store.getPending(read)!.command!

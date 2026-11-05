@@ -46,10 +46,10 @@ it('真实公开检查及整改导出保原 JSON，typed 映射保指纹并拒�
     expect(mapped.hollow.tables.quantity_hollow_command_receipts[0]!.command_id).not.toBe(graph.hollow.tables.quantity_hollow_command_receipts[0]!.command_id)
     const missing = structuredClone(mapped.hollow)
     missing.origins = []
-    await expect(proveQuantityHollowMigrationGraph(missing)).rejects.toThrow()
+    await expect(proveQuantityHollowMigrationGraph(missing)).rejects.toThrow('原件映射缺失、重复或无所属原件')
     const changed = structuredClone(mapped.hollow)
-    changed.tables.quantity_hollow_rectifications[0]!.count = 0
-    await expect(proveQuantityHollowMigrationGraph(changed)).rejects.toThrow()
+    changed.tables.quantity_hollow_rectifications[0]!.count = 5
+    await expect(proveQuantityHollowMigrationGraph(changed)).rejects.toThrow('映射后的物理行与原件不一致')
   }
   finally { await f.close() }
 })
@@ -66,8 +66,8 @@ it('新来源五表完整时输出独立 v2 子图，旧 v1 仍拒绝额外新�
     if (current.version !== 2)
       throw new Error('新图未携带空鼓来源')
     expect(current.hollow.origins).toEqual([])
-    expect(() => parseQuantityMigrationGraph({ ...old, hollow: current.hollow })).toThrow()
-    expect(() => parseQuantityMigrationGraph({ ...current, hollow: { ...current.hollow, surprise: [] } })).toThrow()
+    expect(() => parseQuantityMigrationGraph({ ...old, hollow: current.hollow })).toThrow('项目、版本或表结构无效')
+    expect(() => parseQuantityMigrationGraph({ ...current, hollow: { ...current.hollow, surprise: [] } })).toThrow('子图必须具备五表、扁平原件、映射及逐行归属')
     expect(isQuantitySourceIdentity('core-quantity_projects-123456789012345678901234:quantity_hollow_records:old%3Aid', 'quantity_hollow_records')).toBe(true)
     expect(isQuantitySourceIdentity('core-quantity_projects-123456789012345678901234:quantity_hollow_records:old%3Aid', 'quantity_hollow_revisions')).toBe(false)
     expect(isQuantitySourceIdentity('core-quantity_projects-123456789012345678901234:quantity_hollow_records:old-id', 'quantity_hollow_revisions')).toBe(false)

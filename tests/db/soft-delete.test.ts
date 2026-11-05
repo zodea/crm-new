@@ -35,7 +35,7 @@ it('显式owner可见图复用祖先和自引用算法，不改Native全局父�
   expect(formal.visibleCond('schedule_tasks', 'task')).toContain('task."group_id" NOT IN (SELECT id FROM hidden_schedule_groups)')
   expect(hiddenCtes('schedule_tasks')).toBe(native)
   expect(native).toContain('hidden_contracts')
-  expect(() => createVisibilitySql({ 'unsafe; SQL': [] })).toThrow()
+  expect(() => createVisibilitySql({ 'unsafe; SQL': [] })).toThrow('非法标识符')
   expect(() => createVisibilitySql({ child: [{ column: 'parent_id', table: 'unregistered' }] })).toThrow('未登记')
 })
 
@@ -213,7 +213,7 @@ describe('软删除:删除不再执行 DELETE,restore 恢复', () => {
 
   it('softDelete 拒绝未登记的表名', async () => {
     const db = await dbWithProject()
-    await expect(softDelete(db, 'evil; DROP TABLE projects', 'p1')).rejects.toThrow()
+    await expect(softDelete(db, 'evil; DROP TABLE projects', 'p1')).rejects.toThrow('未登记的业务表')
     db.close()
   })
 })

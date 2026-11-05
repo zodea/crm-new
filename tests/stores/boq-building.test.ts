@@ -77,7 +77,7 @@ describe('楼栋证据中央命令状态', () => {
     repository.execute.mockImplementationOnce(async (command) => {
       throw new ProjectRepositoryProblem({ ...projectProblem('stale-source', '旧版本'), commandId: command.commandId, commandOutcome: 'not-applied' })
     })
-    await expect(store.save(value, 'line', 'building', '核对原件')).rejects.toThrow()
+    await expect(store.save(value, 'line', 'building', '核对原件')).rejects.toThrow('旧版本')
     expect(store.pendingCommand).toBeNull()
     repository.read.mockRejectedValueOnce(new Error('写后回读失败'))
     await expect(store.save(value, 'line', 'building', '核对原件')).rejects.toThrow('写后回读失败')

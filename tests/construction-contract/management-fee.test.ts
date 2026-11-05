@@ -38,15 +38,15 @@ describe('总合同管理费配置与真实成本独立', () => {
 
   it('配置严格限定总合同，拒绝负值/非有限数、未知字段和篡改当前采用历史', () => {
     expect(decodeConstructionContractDraft({ managementFeeAmount: null, managementFeeBasis: '' })).toMatchObject({ managementFeeAmount: null })
-    expect(() => decodeConstructionContractDraft({ managementFeeAmount: -1 })).toThrow()
-    expect(() => decodeConstructionContractDraft({ managementFeeAmount: Number.NaN })).toThrow()
-    expect(() => decodeConstructionContractDraft({ managementFeeRate: 0.05 })).toThrow()
+    expect(() => decodeConstructionContractDraft({ managementFeeAmount: -1 })).toThrow('总合同管理费金额不能为负数')
+    expect(() => decodeConstructionContractDraft({ managementFeeAmount: Number.NaN })).toThrow('managementFeeAmount 必须是有限数值或 null')
+    expect(() => decodeConstructionContractDraft({ managementFeeRate: 0.05 })).toThrow('未知施工合同字段或表单无效')
     expect(() => decodeMaterialContractDraft({ managementFeeAmount: 0 })).toThrow('施工主合同')
     expect(() => decodeConstructionContractDraft({ isSupplement: true, managementFeeAmount: 0 })).toThrow('施工主合同')
     const current = adoptConstructionManagementFee(emptyConstructionManagementFee(), { managementFeeAmount: 0 }, evidence('1'))
-    expect(() => decodeConstructionManagementFee({ ...current, amount: 1 })).toThrow()
-    expect(() => decodeConstructionManagementFee({ ...current, history: [current.history[0], current.history[0]] })).toThrow()
-    expect(() => decodeConstructionManagementFee({ ...current, extra: true })).toThrow()
+    expect(() => decodeConstructionManagementFee({ ...current, amount: 1 })).toThrow('总合同管理费配置或冻结历史无效')
+    expect(() => decodeConstructionManagementFee({ ...current, history: [current.history[0], current.history[0]] })).toThrow('总合同管理费配置或冻结历史无效')
+    expect(() => decodeConstructionManagementFee({ ...current, extra: true })).toThrow('总合同管理费配置或冻结历史无效')
   })
 
   it('原命令未知后核对回执只采用一次，旧版本不覆盖，配置变更不改主合同金额/原件', async () => {

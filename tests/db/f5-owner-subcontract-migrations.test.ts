@@ -227,7 +227,7 @@ describe('v24 F5 甲方/分包单据迁移', () => {
         'bad-document-type', 'project-f5', 'contract-owner-f5',
         'BQ-BAD', '错误类型', 'qty', 'qty'
       )
-    `)).rejects.toThrow()
+    `)).rejects.toThrow(/CHECK constraint failed:[\s\S]*document_type IN/)
 
     await expect(db.execute(`
       INSERT INTO owner_penalties (
@@ -236,11 +236,11 @@ describe('v24 F5 甲方/分包单据迁移', () => {
       VALUES (
         'bad-owner-penalty', 'project-f5', -1, '2026-07-26', '错误金额'
       )
-    `)).rejects.toThrow()
+    `)).rejects.toThrow('CHECK constraint failed: amount >= 0')
     await expect(db.execute(`
       INSERT INTO project_acceptances (id, status)
       VALUES ('bad-acceptance-status', 'unknown')
-    `)).rejects.toThrow()
+    `)).rejects.toThrow(/CHECK constraint failed:[\s\S]*status IN/)
 
     await db.execute(`
       INSERT INTO expenditure_settlements (
@@ -276,7 +276,7 @@ describe('v24 F5 甲方/分包单据迁移', () => {
       VALUES (
         'deduction-f5-b', 'penalty-f5', 'settlement-f5', 1
       )
-    `)).rejects.toThrow()
+    `)).rejects.toThrow('UNIQUE constraint failed: penalty_settlement_deductions.penalty_id, penalty_settlement_deductions.settlement_id')
     db.close()
   })
 })

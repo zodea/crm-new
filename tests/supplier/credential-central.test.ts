@@ -81,8 +81,8 @@ describe('中央证照与主档同一事务旅程', () => {
 
   it('固定必需不可降级，条件资料设为必需才要求原因；仅原因更正保留人工结论', async () => {
     const state = await setup()
-    expect(() => state.execute({ action: 'requirement', draft: { category: '营业执照', requirement: 'optional', reason: '不能绕过固定要求' } })).toThrow()
-    expect(() => state.execute({ action: 'requirement', draft: { category: '资质证书', requirement: 'required', reason: '' } })).toThrow()
+    expect(() => state.execute({ action: 'requirement', draft: { category: '营业执照', requirement: 'optional', reason: '不能绕过固定要求' } })).toThrow('固定必需资料，不能降级')
+    expect(() => state.execute({ action: 'requirement', draft: { category: '资质证书', requirement: 'required', reason: '' } })).toThrow('请说明当前项目或合同要求提供这项条件资料的原因')
     state.execute({ action: 'requirement', draft: { category: '资质证书', requirement: 'optional', reason: '' } })
     state.complete()
     state.execute({ action: 'review', draft: { decision: 'qualified', note: '' } })

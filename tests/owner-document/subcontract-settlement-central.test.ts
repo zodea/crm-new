@@ -71,6 +71,6 @@ describe('aX02 分包结算中央事实', () => {
     expect(detail.document).toMatchObject({ kind: 'sub_settlement', status: 'confirmed', source: { type: 'expenditure_settlement', id: saved.id }, amounts: { kind: 'sub_settlement', total: '18000.00' } })
     expect(detail.documentNavigation).toMatchObject({ subject: { entity: 'subcontract-document', id: saved.id }, variant: 'settlement' })
     await expect(commands.execute(request({ commandId: 'stale-328', id: saved.id, baseVersion: saved.version }), session)).rejects.toMatchObject({ problem: { code: 'conflict' } })
-    await expect(commands.execute(request({ commandId: 'locked-328', id: saved.id, baseVersion: confirmed.version }), session)).rejects.toThrow()
+    await expect(commands.execute(request({ commandId: 'locked-328', id: saved.id, baseVersion: confirmed.version }), session)).rejects.toThrow('只有草稿或已退回甲方商务单据可以编辑')
   })
 })

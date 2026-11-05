@@ -111,7 +111,7 @@ describe('中央暂估绑定冻结比较与原子确认', () => {
     const read = await service.binding(query, groupId, 'c')
     expect(read.preview!.items).toContainEqual(expect.objectContaining({ id: 'wall', unit: '㎡', provisional: expect.objectContaining({ knownValue: 8, missingCount: 1 }), floorPlanIds: before.floorPlans.map(row => row.id) }))
     expect((await service.read(query)).snapshot.groups[0]!.tasks[0]!.floorPlans).toHaveLength(1)
-    await expect(quantities.withSchedule(query, db => db.execute('DELETE FROM items WHERE id = ?', ['wall']))).rejects.toThrow()
+    await expect(quantities.withSchedule(query, db => db.execute('DELETE FROM items WHERE id = ?', ['wall']))).rejects.toMatchObject({ problem: { code: 'unavailable' }, cause: { message: 'FOREIGN KEY constraint failed' } })
   })
   it.each(['task', 'floor'] as const)('%s及其祖先隐藏后冻结楼层不再进入当前比较', async (parent) => {
     const first = (await service.read(query)).snapshot.groups[0]!.tasks[0]!
@@ -131,7 +131,7 @@ describe('中央暂估绑定冻结比较与原子确认', () => {
   it('绑定审计中途失败整笔回滚，两个同版本确认只有一次成功且同键不重复', async () => {
     const command = await bindCommand()
     await quantities.withSchedule(query, db => db.execute('CREATE TRIGGER fail_binding BEFORE INSERT ON operation_logs WHEN NEW.operator = \'schedule:bind-contract\' BEGIN SELECT RAISE(ABORT, \'binding audit failure\'); END'))
-    await expect(service.execute(command)).rejects.toThrow()
+    await expect(service.execute(command)).rejects.toMatchObject({ problem: { code: 'unavailable' }, cause: { message: 'binding audit failure' } })
     expect((await service.binding(query, groupId)).state).toBe('unbound')
     expect(await quantities.withSchedule(query, db => db.select('SELECT command_id FROM schedule_command_receipts WHERE command_id = \'bind\''))).toEqual([])
     await quantities.withSchedule(query, db => db.execute('DROP TRIGGER fail_binding'))
@@ -195,7 +195,7 @@ describe('中央暂估绑定冻结比较与原子确认', () => {
       })
       const preview = await repository.binding(query, groupId, 'c')
       const command = { ...(await bindCommand()), sourceVersion: preview.sourceVersion }
-      await expect(repository.execute(command)).rejects.toThrow()
+      await expect(repository.execute(command)).rejects.toMatchObject({ problem: { code: 'unavailable', retryable: true } })
       const recovered = await repository.execute(command)
       const cold = await repository.binding(query, groupId)
       expect(cold.binding).toEqual((recovered.value as { binding: unknown }).binding)
@@ -284,6 +284,7 @@ describe('中央暂估绑定冻结比较与原子确认', () => {
       current = { ...session, actorId: 'other-actor' }
     else
       sources.version = 'changed-during-confirmation'
+    // eslint-disable-next-line test/valid-expect -- 先绑定断言，触发异步完成后再等待，避免未处理拒绝。
     const rejected = expect(submitted).rejects.toMatchObject({ problem: { code: change === 'source' ? 'stale-source' : 'forbidden' } })
     release()
     await rejected
@@ -299,6 +300,7 @@ describe('中央暂估绑定冻结比较与原子确认', () => {
     const submitted = service.execute(command).finally(() => {
       settled = true
     })
+    // eslint-disable-next-line test/valid-expect -- 先绑定断言，触发异步完成后再等待，避免未处理拒绝。
     const rejected = finish === 'commit' ? expect(submitted).rejects.toMatchObject({ problem: { code: 'stale-source' } }) : null
     await new Promise<void>(resolve => setImmediate(resolve))
     expect(settled).toBe(false)

@@ -47,7 +47,7 @@ it('sQL失败之前不发布原表、审计或回执', async () => {
       await db.execute('CREATE TRIGGER reject_source_read BEFORE UPDATE ON projects BEGIN SELECT RAISE(ABORT, \'source unavailable\'); END')
     })
     const command = { ...query, commandId: 'sql-failure', workspaceId: before.workspaceId, actorId: before.actorId, requiredCapability: 'owner-document:write' as const, sourceVersion: before.sourceVersion, lineId: 'q-boq', buildingId: before.buildings.find(row => row.code === 'B2')!.id, reason: '失败时不能先写入' }
-    await expect(service.execute(command)).rejects.toThrow()
+    await expect(service.execute(command)).rejects.toMatchObject({ problem: { code: 'unavailable' }, cause: { message: 'source unavailable' } })
     expect(owner.quantityBoqFacts(query.projectId)).toEqual(facts)
     expect(owner.hasBoqBuildingCommand(command.commandId)).toBe(false)
   }

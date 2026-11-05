@@ -66,8 +66,8 @@ it('敏感资料及项目目录越权、伪造关系和无效日期均拒绝', (
   const restricted = { ...actor, capabilities: actor.capabilities.filter(item => item !== 'worker:sensitive:read') }
   expect(() => service.previewWorkerExcel([{ name: '合成人员' }], restricted)).toThrow('权限')
   expect(() => service.previewWorkerExcel([{ name: '合成人员', projectName: '合成项目' }], { ...actor, capabilities: actor.capabilities.filter(item => item !== 'project:list:read') })).toThrow('项目目录权限')
-  expect(() => parseWorkerExcelPreview({ drafts: [{ name: '合成人员', crewId: 'forged' }] })).toThrow()
-  expect(() => parseWorkerExcelPreview({ drafts: [{ name: '合成人员', entryDate: '2026-02-31' }] })).toThrow()
+  expect(() => parseWorkerExcelPreview({ drafts: [{ name: '合成人员', crewId: 'forged' }] })).toThrow('工人导入请求无效')
+  expect(() => parseWorkerExcelPreview({ drafts: [{ name: '合成人员', entryDate: '2026-02-31' }] })).toThrow('工人导入请求无效')
 })
 
 it('正式磁盘冷打开可核对原提交并保留未映射私密字段', async () => {

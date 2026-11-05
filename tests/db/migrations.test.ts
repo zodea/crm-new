@@ -451,7 +451,7 @@ describe('迁移机制：存量表 ALTER 补列', () => {
       INSERT INTO file_refs
         (id, owner_type, owner_id, file_name, category)
       VALUES ('file-source-2', 'delivery_record', 'del-legacy', '原件二.pdf', 'source')
-    `)).rejects.toThrow()
+    `)).rejects.toThrow('UNIQUE constraint failed: file_refs.owner_type, file_refs.owner_id, file_refs.category')
     db.close()
   })
 
@@ -473,7 +473,7 @@ describe('迁移机制：存量表 ALTER 补列', () => {
     await db.execute(`INSERT INTO suppliers (id, name, external_ref) VALUES ('sup-a', '甲', 'OLD-001')`)
     await expect(db.execute(
       `INSERT INTO suppliers (id, name, external_ref) VALUES ('sup-b', '乙', 'OLD-001')`,
-    )).rejects.toThrow()
+    )).rejects.toThrow('UNIQUE constraint failed: suppliers.external_ref')
     db.close()
   })
 

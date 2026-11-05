@@ -1,10 +1,16 @@
 import { mkdir, mkdtemp, readFile, rename } from 'node:fs/promises'
 import { join } from 'node:path'
-import { afterAll, expect, it } from 'vitest'
+import { afterAll, beforeAll, expect, it } from 'vitest'
 import { createProductionBackupService } from '../../server/utils/production-backup-service'
 import { createProductionStorage } from '../../server/utils/production-storage'
+import { createProductionSeedCache, createSeededProductionStorage } from '../helpers/production-storage-seed'
 import { cleanupTestTempRoot, testTempRoot } from '../helpers/test-temp-root'
 
+const identity = { workspaceId: 'service-workspace', ownerId: 'service-owner', purpose: 'verification' as const }
+
+beforeAll(async () => {
+  await createProductionSeedCache().seedFile({ ...identity, directory: testTempRoot('opt02-backup-tests') })
+})
 afterAll(cleanupTestTempRoot)
 
 async function fixture() {
@@ -13,8 +19,7 @@ async function fixture() {
   const directory = await mkdtemp(`${base}/service-`)
   const locations = Object.fromEntries(['source', 'staging', 'nas', 'offline', 'restore'].map(name => [name, join(directory, name)]))
   for (const path of Object.values(locations)) await mkdir(path)
-  const identity = { workspaceId: 'service-workspace', ownerId: 'service-owner', purpose: 'verification' as const }
-  const storage = createProductionStorage({ ...identity, directory: locations.source! })
+  const storage = await createSeededProductionStorage({ ...identity, directory: locations.source! })
   const config = { stagingDirectory: locations.staging!, primaryDirectory: locations.nas!, offlineDirectory: locations.offline!, restoreDirectory: locations.restore!, intervalHours: 12, dailyCopies: 30, monthlyCopies: 12 }
   const session = () => ({ workspaceId: identity.workspaceId, actorId: identity.ownerId, capabilities: [] })
   return { identity, storage, config, session, directory, locations }
@@ -24,6 +29,7 @@ it('计划补跑、原键回执、介质失败保上份、离线时点和隔离�
   const f = await fixture()
   let now = '2026-09-22T00:00:00.000Z'
   const service = createProductionBackupService(f.storage, f.config, () => now)
+  let storageClosed = false
   try {
     expect((await service.status(f.session)).protection).toBe('never')
     const first = await service.scheduled()
@@ -49,6 +55,7 @@ it('计划补跑、原键回执、介质失败保上份、离线时点和隔离�
     await rename(`${f.config.primaryDirectory}-disconnected`, f.config.primaryDirectory)
     expect((await readFile(join(f.config.primaryDirectory, first!.packageId!, 'data.sqlite'))).equals(original)).toBe(true)
     await f.storage.close()
+    storageClosed = true
     const cold = createProductionStorage({ ...f.identity, directory: f.locations.source! })
     try {
       const reopened = createProductionBackupService(cold, f.config, () => now)
@@ -60,7 +67,10 @@ it('计划补跑、原键回执、介质失败保上份、离线时点和隔离�
     }
     finally { await cold.close() }
   }
-  finally { await f.storage.close() }
+  finally {
+    if (!storageClosed)
+      await f.storage.close()
+  }
 })
 
 it('失效会话不能确认成功；中断回执冷启动标明未确认，不自动放开正式写入', async () => {

@@ -134,6 +134,7 @@ it('外层权限读取先占代次，迟到客户 A 不能覆盖已读取的客�
   const store = useCustomerCommandStore()
   const session = store.createSession()
   const first = store.hydrate(session, 'customer-a')
+  // eslint-disable-next-line test/valid-expect -- 先绑定断言，触发异步完成后再等待，避免未处理拒绝。
   const rejected = expect(first).rejects.toThrow('当前客户页面')
   const second = await store.hydrate(session, 'customer-b')
   release(context)

@@ -124,6 +124,7 @@ describe('owner document store list state', () => {
     let failOld!: (cause: Error) => void
     ownerDocumentStoreMocks.listResponses.push(() => new Promise((_resolve, reject) => failOld = reject))
     const oldLoad = store.loadKind('acceptance', query('warranty'))
+    // eslint-disable-next-line test/valid-expect -- 先绑定断言，触发异步完成后再等待，避免未处理拒绝。
     const oldResult = expect(oldLoad).rejects.toThrow('旧请求权限错误')
     expect(store.recordsFor('acceptance')).toEqual([])
     expect(store.hasListSnapshot('acceptance', 'warranty')).toBe(false)

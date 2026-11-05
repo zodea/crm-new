@@ -96,7 +96,7 @@ it('迟到原号恢复不能把另一当前project/Main页面切回原页', asyn
       return read(options.query.projectId, options.query.contractId)
     throw new Error('lost response')
   })
-  await expect(store.execute({ kind: 'patch-line', lineId: 'boq-line-one', version: 'line-actual', patch: { qty: 0 } })).rejects.toThrow()
+  await expect(store.execute({ kind: 'patch-line', lineId: 'boq-line-one', version: 'line-actual', patch: { qty: 0 } })).rejects.toThrow('lost response')
   const descriptor = store.pending[0]!
   let resolved: (value: unknown) => void = () => {}
   fetcher.mockImplementation(async (url, options) => {

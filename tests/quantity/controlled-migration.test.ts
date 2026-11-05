@@ -100,7 +100,7 @@ it('dry-run 已发现量域内部的缺失责任身份，不等实际确认才�
     source.sourceHash = createHash('sha256').update(coreMigrationSourceHashInput(source)).digest('hex')
     const batch = await dryRun(source)
     expect(batch.issues).toEqual(expect.arrayContaining([expect.objectContaining({ entityType: 'quantity_projects', field: 'graphJson', metricKey: 'apply-failed', reason: expect.stringContaining('班组') })]))
-    await expect(coreMigrationTestInstance.importBatch({ ...envelope('quantity-import'), batchId: batch.batchId }, session)).rejects.toThrow()
+    await expect(coreMigrationTestInstance.importBatch({ ...envelope('quantity-import'), batchId: batch.batchId }, session)).rejects.toThrow('dry-run 存在阻断问题，不能导入')
     expect(coreMigrationTestInstance.snapshot(session).authority).toBe('local')
   }
   finally { db.close() }

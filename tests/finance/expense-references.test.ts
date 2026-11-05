@@ -114,7 +114,7 @@ describe('既有费用原身份引用及迁移保全', () => {
     expect(await originalExpenseReference(db, 'clearance-line')).toBeNull()
     await expect(insert('cross-project', 'other-project-owner', 'expense-original')).rejects.toThrow('同归属')
     await expect(insert('missing-source', 'clearance-owner', 'missing')).rejects.toThrow('原费用引用')
-    await expect(insert('self-reference', 'clearance-owner', 'self-reference')).rejects.toThrow()
+    await expect(insert('self-reference', 'clearance-owner', 'self-reference')).rejects.toThrow('原费用引用必须为同归属的已确认独立费用')
     await expect(insert('chain-reference', 'clearance-owner', 'clearance-line')).rejects.toThrow('原费用引用')
     await expect(insert('same-owner', 'expense-owner', 'expense-original')).rejects.toThrow('独立费用')
     await db.execute(`INSERT INTO expense_reimbursement_lines(id,reimbursement_id,expense_item,amount,original_expense_line_id)

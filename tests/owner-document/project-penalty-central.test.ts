@@ -68,17 +68,27 @@ describe('aX03 项目罚扣中央链', () => {
     const penalty = await commands.execute(request(), session)
     const settlement = await commands.execute(request({ kind: 'sub_settlement', commandId: 'settlement-safety', draft: { projectId: 'p329', supplierId: 's329', contractId: 'c329', name: '安全结算', totalAmount: 50, settlementDate: '2026-09-05' } }), session)
     const action = { action: 'deduct-penalty', id: penalty.id, baseVersion: penalty.version, settlementId: settlement.id, settlementVersion: settlement.version, amount: 10, note: '' }
-    await expect(commands.execute(request({ ...action, commandId: 'no-capability' }), { ...session, capabilities: [] })).rejects.toBeDefined()
+    await expect(commands.execute(request({ ...action, commandId: 'no-capability' }), { ...session, capabilities: [] })).rejects.toThrow('无甲方商务单据写入权限')
     expect(commands.rows().find(row => row.id === penalty.id)?.penaltyDeductions).toEqual([])
     expect(commands.form('project_penalty', penalty.id, session).version).toBe(penalty.version)
   })
 
-  it.each(Array.from([{ amount: 0 }, { amount: -1 }, { amount: 0.001 }, { amount: 51 }, { settlementVersion: 'stale' }, { settlementId: 'missing' }, { actorId: 'spoof' }, { workspaceId: 'another' }].entries()))('拒绝无权限、伪造身份、缺失目标、错误来源及过期结算版本，失败不落抵扣：输入组合 1 案例 %#', async (index, override) => {
+  it.each([
+    { label: '零金额', override: { amount: 0 }, expected: '抵扣金额须大于 0 且最多两位小数' },
+    { label: '负金额', override: { amount: -1 }, expected: '抵扣金额须大于 0 且最多两位小数' },
+    { label: '金额精度超限', override: { amount: 0.001 }, expected: '抵扣金额须大于 0 且最多两位小数' },
+    { label: '超过结算余额', override: { amount: 51 }, expected: '抵扣金额超过结算剩余可抵扣金额' },
+    { label: '过期结算版本', override: { settlementVersion: 'stale' }, expected: '甲方商务单据已被其他操作更新' },
+    { label: '不存在的结算', override: { settlementId: 'missing' }, expected: '必须选择真实、已确认且来源合同或分供方一致的分包结算' },
+    { label: '伪造操作者', override: { actorId: 'spoof' }, expected: '无甲方商务单据写入权限' },
+    { label: '伪造工作区', override: { workspaceId: 'another' }, expected: '无甲方商务单据写入权限' },
+  ])('拒绝$label，失败不落抵扣', async ({ label, override, expected }) => {
     const commands = instance()
     const penalty = await commands.execute(request(), session)
     const settlement = await commands.execute(request({ kind: 'sub_settlement', commandId: 'settlement-safety', draft: { projectId: 'p329', supplierId: 's329', contractId: 'c329', name: '安全结算', totalAmount: 50, settlementDate: '2026-09-05' } }), session)
     const action = { action: 'deduct-penalty', id: penalty.id, baseVersion: penalty.version, settlementId: settlement.id, settlementVersion: settlement.version, amount: 10, note: '' }
-    await expect(commands.execute(request({ ...action, commandId: `invalid-${index}`, ...override }), session)).rejects.toBeDefined()
+    await expect(commands.execute(request({ ...action, commandId: `invalid-${label}`, ...override }), session)).rejects.toThrow(expected)
+    expect(commands.rows().find(row => row.id === penalty.id)?.penaltyDeductions).toEqual([])
   })
   it('班组候选随中央来源替换，删除的旧身份不能继续选择', () => {
     let rows = [{ id: 'old-crew', name: '责任班组' }]

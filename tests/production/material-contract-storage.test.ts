@@ -385,7 +385,12 @@ it('缺字节新上传拒绝，已存原件损坏后停止读取，不能降格�
   finally { await f.storage.close() }
 })
 
-it.each(['claim', 'signatory-history', 'signatory-command', 'snapshot'])('完整备份拒绝%s坏归属或原事实，不因目录/占号参与者已登记而恢复坏图', async (part) => {
+it.each([
+  { part: 'claim', reason: '我方主体核实历史、原提交或合同编号证据不完整。' },
+  { part: 'signatory-history', reason: '我方主体核实历史、原提交或合同编号证据不完整。' },
+  { part: 'signatory-command', reason: '我方主体核实历史、原提交或合同编号证据不完整。' },
+  { part: 'snapshot', reason: '我方主体核实历史、原提交或合同编号证据不完整。' },
+])('完整备份拒绝 $part 坏归属或原事实，不因目录/占号参与者已登记而恢复坏图', async ({ part, reason }) => {
   const f = await fixture()
   try {
     await f.service.execute({ ...f.command, draft: { ...f.command.draft, no: 'BACKUP-OWN-NUMBER' } }, f.session)
@@ -398,8 +403,11 @@ it.each(['claim', 'signatory-history', 'signatory-command', 'snapshot'])('完整
         tampered.exec('UPDATE contract_number_claims SET contract_id=\'orphan-contract\'')
       }
       else if (part === 'signatory-history') {
+        const guard = tampered.prepare('SELECT sql FROM sqlite_schema WHERE type=\'trigger\' AND name=\'our_signatory_history_update_guard\'').get()
+        expect(guard?.sql).toBeTypeOf('string')
         tampered.exec('DROP TRIGGER our_signatory_history_update_guard')
         tampered.exec('UPDATE our_signatory_history SET actor_id=\'other-actor\'')
+        tampered.exec(String(guard!.sql))
       }
       else if (part === 'signatory-command') {
         tampered.exec('UPDATE our_signatory_commands SET fingerprint=\'replaced\'')
@@ -412,7 +420,7 @@ it.each(['claim', 'signatory-history', 'signatory-command', 'snapshot'])('完整
       }
     }
     finally { tampered.close() }
-    await expect(inspectProductionBackup(path)).rejects.toThrow()
+    await expect(inspectProductionBackup(path)).rejects.toThrow(reason)
     expect((await f.service.list({}, f.session)).pagination.total).toBe(1)
   }
   finally { await f.storage.close() }

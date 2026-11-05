@@ -574,7 +574,7 @@ describe('发票中央原件 owner（隔离内存）', () => {
     await expect(f.service.execute({ ...replace, commandId: 'replace-linked', baseVersion: imported.version, source: { ...source, rowNumber: 6 } }, f.session)).rejects.toMatchObject({ problem: { code: 'conflict' } })
     const [sourceRow] = await f.storage.select<{ source_json: string }>('SELECT source_json FROM invoice_import_sources WHERE invoice_id=? ORDER BY rowid', [imported.invoiceId])
     expect(JSON.parse(sourceRow!.source_json)).toEqual(request.source)
-    await expect(f.storage.execute('DELETE FROM invoice_import_sources')).rejects.toThrow()
+    await expect(f.storage.execute('DELETE FROM invoice_import_sources')).rejects.toThrow('invoice import source is immutable')
     await expect(validateProductionInvoiceJournal(f.storage, f.actor)).resolves.toBeUndefined()
   })
 
@@ -669,11 +669,11 @@ describe('发票中央原件 owner（隔离内存）', () => {
     const row = f.sql.prepare('SELECT f.*,p.content,p.sha256 FROM file_refs f LEFT JOIN file_payloads p ON p.file_ref_id=f.id WHERE f.id=?').get(created.originalId!)!
     expect(() => verifyInvoiceOriginalReferences(f.sql)).not.toThrow()
     expect(() => verifyBackupOriginalOwner(f.sql, row, new Set())).not.toThrow()
-    expect(() => verifyBackupOriginalOwner(f.sql, { ...row, owner_id: 'wrong-owner' }, new Set())).toThrow()
-    expect(() => verifyBackupOriginalOwner(f.sql, { ...row, category: 'other' }, new Set())).toThrow()
-    expect(() => verifyBackupOriginalOwner(f.sql, row, new Set([created.originalId!]))).toThrow()
+    expect(() => verifyBackupOriginalOwner(f.sql, { ...row, owner_id: 'wrong-owner' }, new Set())).toThrow('发票原件与发票、稳定文件身份或正文归属不一致。')
+    expect(() => verifyBackupOriginalOwner(f.sql, { ...row, category: 'other' }, new Set())).toThrow('发票原件与发票、稳定文件身份或正文归属不一致。')
+    expect(() => verifyBackupOriginalOwner(f.sql, row, new Set([created.originalId!]))).toThrow('发票原件与发票、稳定文件身份或正文归属不一致。')
     await f.storage.execute('DELETE FROM file_payloads WHERE file_ref_id=?', [created.originalId!])
-    expect(() => verifyInvoiceOriginalReferences(f.sql)).toThrow()
+    expect(() => verifyInvoiceOriginalReferences(f.sql)).toThrow('发票备份缺少对应的原件或正文。')
   })
 
   it('中央分页读取给出完整计数与一致来源版本，不截断数据或暴露正文', async () => {
@@ -722,7 +722,7 @@ describe('发票中央原件 owner（隔离内存）', () => {
     const second = await f.service.execute({ ...f.upload, commandId: 'second-invoice' }, f.session)
     await f.service.execute({ ...request, commandId: 'recognize-duplicate', invoiceId: second.invoiceId, baseVersion: second.version, textPages: ['第一页合成文本', '第二页合成文本'], unrecognizedPageIndexes: [] }, f.session)
     expect((await f.service.get(second.invoiceId, f.session)).duplicateStatus).toBe('duplicate')
-    await expect(f.storage.execute('UPDATE invoice_recognitions SET result_json=\'{}\'')).rejects.toThrow()
+    await expect(f.storage.execute('UPDATE invoice_recognitions SET result_json=\'{}\'')).rejects.toThrow('invoice recognition is immutable')
   })
 
   it('人工修改保留原识别记录，校对后再次修改须重新确认，过期版本不能覆盖', async () => {
@@ -803,7 +803,7 @@ describe('发票中央原件 owner（隔离内存）', () => {
     await expect(f.service.get(created.invoiceId, withoutProjectRead)).rejects.toMatchObject({ problem: { code: 'forbidden' } })
     const [evidence] = await f.storage.select<{ evidence_json: string }>('SELECT evidence_json FROM invoice_archive_evidence WHERE invoice_id=?', [created.invoiceId])
     expect(JSON.parse(evidence!.evidence_json)).toMatchObject({ source: { fields }, ownerKind: 'project', projectId: 'synthetic-project', originalRecognition: [{ fields }] })
-    await expect(f.storage.execute('DELETE FROM invoice_archive_evidence')).rejects.toThrow()
+    await expect(f.storage.execute('DELETE FROM invoice_archive_evidence')).rejects.toThrow('invoice archive evidence is immutable')
     await f.storage.execute('INSERT INTO payment_application_invoice_allocations(id,invoice_id,deleted_at) VALUES(?,?,?)', ['synthetic-allocation', created.invoiceId, '2026-01-02T00:00:00.000Z'])
     await expect(f.service.execute({ ...base, action: 'discard', commandId: 'discard-archived', baseVersion: archived.version }, withProjectRead)).rejects.toMatchObject({ problem: { code: 'conflict' } })
     await expect(f.service.execute({ ...base, action: 'edit-archived', commandId: 'edit-referenced', baseVersion: archived.version, fields, items: [], ownerKind: 'project', projectId: 'synthetic-project', supplierId: null, confirmed: true }, withProjectRead)).rejects.toMatchObject({ problem: { code: 'conflict' } })

@@ -58,6 +58,6 @@ describe('班组工人多选查询', () => {
     expect(page.summary.projectStatuses).toHaveLength(2)
     expect(buildWorkerListPage({ ...input, query: { ...query, trade: [], status: [], projectStatus: [] } }).pagination.total).toBe(6)
     expect(buildWorkerListPage({ ...input, query: { ...query, trade: '电工', status: 'active' } }).items).toHaveLength(1)
-    expect(() => parseWorkerListQuery({ projectStatus: [false] })).toThrow()
+    expect(() => parseWorkerListQuery({ projectStatus: [false] })).toThrow('班组或工人列表选项筛选无效')
   })
 })

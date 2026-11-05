@@ -94,7 +94,15 @@ describe('工序库迁入候选与恢复', () => {
       entity.attributes.graphJson = '{'
     if (kind === 'reference')
       entity.references.projectId = 'project'
-    expect(() => prepareProcessLibraryMigration([], candidate)).toThrow()
+    const expected = {
+      batch: '批次、库身份无效或重复',
+      legacy: '库版本的身份、编码、版本号或默认状态无效',
+      name: '库头名称、删除边界或全局归属与迁移节点错配',
+      delete: '库头名称、删除边界或全局归属与迁移节点错配',
+      json: '图 JSON 无效',
+      reference: '库头名称、删除边界或全局归属与迁移节点错配',
+    }[kind]
+    expect(() => prepareProcessLibraryMigration([], candidate)).toThrow(expected)
   })
 
   function createInvalidProcessTaskGraph() {

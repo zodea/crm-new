@@ -71,8 +71,8 @@ describe('分供方导入预览和确认', () => {
     expect(() => service.previewImport([{ name: '不同名称', taxNo: 'synthetic' }], restricted)).toThrow('敏感资料查看权限')
     expect(() => service.previewImport([{ name: '不同名称', uniqueCode: 'synthetic' }], restricted)).toThrow('敏感资料查看权限')
     await expect(service.importRow(command('restricted-write', { name: '不同名称', taxNo: 'synthetic' }), restricted)).rejects.toThrow('敏感资料查看权限')
-    expect(() => parseSupplierImportPreviewRequest({ drafts: [{ name: '合成', id: 'other' }] })).toThrow()
-    expect(() => command('forged', { name: '合成' }, { kind: 'replace', fingerprint: '0'.repeat(64), id: 'supplier-1', version: '0' })).toThrow()
+    expect(() => parseSupplierImportPreviewRequest({ drafts: [{ name: '合成', id: 'other' }] })).toThrow('导入不能指定主档 ID 或核验结论')
+    expect(() => command('forged', { name: '合成' }, { kind: 'replace', fingerprint: '0'.repeat(64), id: 'supplier-1', version: '0' })).toThrow('分供方导入确认内容无效')
   })
 
   it('预览响应绑定可信会话与逐行身份，缺行或伪造字段不能进入确认界面', async () => {

@@ -22,7 +22,7 @@ describe('分包合同中央 HTTP Repository', () => {
       await expect(repository.resolve('original-command')).rejects.toMatchObject({ problem: { code: 'internal-error' } })
     }
     fetcher.mockRejectedValue({ statusCode: 404 })
-    await expect(repository.resolve('original-command')).rejects.toBeDefined()
+    await expect(repository.resolve('original-command')).rejects.toMatchObject({ problem: { code: 'unavailable' } })
   })
   it('序列化分包专属筛选并解码中央列表', async () => {
     const query = parseSubcontractContractListQuery({

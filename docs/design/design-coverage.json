@@ -6,12 +6,12 @@
     "designNavGroups": 9,
     "designNavLeaves": 53,
     "designMountedScreens": 123,
-    "trackedPageFiles": 172,
+    "trackedPageFiles": 174,
     "devPageFiles": 5,
-    "appPageFiles": 167,
+    "appPageFiles": 169,
     "appNavLeaves": 53,
     "covered": 167,
-    "designPending": 0,
+    "designPending": 2,
     "retired": 0,
     "navTitleVariants": 7
   },
@@ -271,9 +271,23 @@
       "status": "covered"
     },
     {
+      "appRoute": "/finance/invoice/correction/:invoiceId",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "独立发票更正单为已确认业务流程，现有设计稿没有对应独立页面。",
+      "issue": 413
+    },
+    {
       "appRoute": "/finance/invoice/factor",
       "designRoute": "factor",
       "status": "covered"
+    },
+    {
+      "appRoute": "/finance/invoice/manual-new",
+      "designRoute": null,
+      "status": "design-pending",
+      "reason": "手工新建发票采用独立录入页，现有设计稿没有对应的新建页面。",
+      "issue": 413
     },
     {
       "appRoute": "/finance/ledger",

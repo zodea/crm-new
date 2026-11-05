@@ -23,7 +23,7 @@ describe('aX05 结算迁移来源', () => {
     await service.preflight({ ...envelope, commandId: 'preflight-331', source, backup: null }, session)
     const batch = await service.dryRun({ ...envelope, commandId: 'dry-331', source, backup: { backupId: `core-migration-${source.sourceHash}-${'b'.repeat(64)}`, sourceHash: source.sourceHash, sourceVersion: source.sourceVersion, snapshotSha256: 'b'.repeat(64), byteLength: 4096, createdAt: '2026-09-08T01:00:00.000Z', immutable: true } }, session)
     expect(batch.issues).toContainEqual(expect.objectContaining({ entityType: 'other_settlements', metricKey: 'missing-relation' }))
-    await expect(service.importBatch({ ...envelope, commandId: 'import-331', batchId: batch.batchId }, session)).rejects.toThrow()
+    await expect(service.importBatch({ ...envelope, commandId: 'import-331', batchId: batch.batchId }, session)).rejects.toThrow('dry-run 存在阻断问题，不能导入')
   })
   it.each(['project', 'inspection', 'owner_notice', 'acceptance'])('%s 来源：完整迁移统一结算与真实罚扣、申请和支付源单', async (penaltyOrigin) => {
     const db = await createMigratedMemoryDb()
@@ -81,7 +81,7 @@ describe('aX05 结算迁移来源', () => {
         expect(document.fields.find(f => f.label === '罚扣来源')?.value).toBe(({ project: '项目罚扣', inspection: '巡检', owner_notice: '甲方通知', acceptance: '验收' } as Record<string, string>)[penaltyOrigin])
       expect(document.allocations.some(a => a.targetId === (fact.kind === 'payment' ? fact.parentId : row.id))).toBe(true)
     }
-    expect(() => settlements.source(row.id, 'unrelated-source', session)).toThrow()
+    expect(() => settlements.source(row.id, 'unrelated-source', session)).toThrow('当前结算不包含该源单关系')
     ownerDocuments.reset()
     expect(settlements.detail(row.id, {}, session).settlement.amounts.deductions).toBeNull()
     await migration.rollback({ ...envelope, commandId: 'rollback', batchId: batch.batchId }, session)
@@ -97,7 +97,7 @@ describe('aX05 结算迁移来源', () => {
     expect(instance.list({}, session).pagination.total).toBe(0)
     commit()
     expect(instance.detail(entity.id, {}, session).settlement.amounts.total).toBe('0.00')
-    expect(() => instance.prepareMigrationSnapshot({ ...snapshot, entities: [{ ...contract, attributes: { ...contract.attributes, kind: 'company_expense' } }, entity] })).toThrow()
+    expect(() => instance.prepareMigrationSnapshot({ ...snapshot, entities: [{ ...contract, attributes: { ...contract.attributes, kind: 'company_expense' } }, entity] })).toThrow('迁移结算源合同类型、状态或项目/分供方不匹配')
     instance.prepareMigrationSnapshot({ authority: 'local', activeBatchId: null, entities: [] })()
     expect(instance.list({}, session).pagination.total).toBe(0)
   })

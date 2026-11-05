@@ -25,8 +25,11 @@ export default withNuxt(
     files: ['tests/**/*.test.{js,jsx,ts,tsx}'],
     rules: {
       // 只约束 Vitest 测试，不把 Playwright 的断言语义混进来。
+      'test/valid-expect': ['error', { maxArgs: 2 }],
       'test/valid-expect-in-promise': 'error',
       'test/expect-expect': 'error',
+      'test/require-to-throw-message': 'error',
+      'test/no-restricted-matchers': ['error', { 'rejects.toBeDefined': '请断言具体的拒绝原因或错误码' }],
     },
   },
   ...[

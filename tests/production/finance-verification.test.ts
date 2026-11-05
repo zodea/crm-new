@@ -312,7 +312,7 @@ it('实际v13核验版本进入备份与冷恢复，原件、可信核验人与�
       const corrupt = createProductionStorage({ ...f.options, directory: corruptDirectory })
       try {
         await corrupt.execute('UPDATE payment_applications SET contract_id=?,contract_domain=?,contract_version=? WHERE id=?', ['synthetic-id', 'material', '1', f.native.ids.application])
-        await expect(validateFinanceJournal(corrupt, f.actor)).rejects.toThrow()
+        await expect(validateFinanceJournal(corrupt, f.actor)).rejects.toThrow('财务版本、原命令、冻结记录、原件或迁入证据损坏')
         expect((await f.financeService(corrupt).form('payment_application', f.native.ids.application, f.session)).draft.paymentVerification).toMatchObject({ status: 'stale', proof: null })
       }
       finally { await corrupt.close() }
@@ -363,7 +363,7 @@ it.each(['conclusion', 'source', 'recomputed-source', 'missing-proof', 'original
     }
     finally { db.close() }
     const bytes = await readFile(path)
-    await expect(inspectProductionBackup(path)).rejects.toThrow()
+    await expect(inspectProductionBackup(path)).rejects.toThrow('财务事实、原件、原命令、冻结历史或迁入依据不完整。')
     expect((await readFile(path)).equals(bytes)).toBe(true)
     expect((await f.finance.form('payment_application', f.native.ids.application, f.session)).draft.paymentVerification).toMatchObject({ required: true, status: 'verified' })
   }

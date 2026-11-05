@@ -195,6 +195,7 @@ it('识别等待不锁正式主档，迟到结果在并发更正后拒绝，原�
         complete = resolve
       })
     })
+    // eslint-disable-next-line test/valid-expect -- 先绑定断言，触发异步完成后再等待，避免未处理拒绝。
     const rejected = expect(pending).rejects.toMatchObject({ problem: { code: 'conflict' } })
     await began
     const form = await state.service.form(state.created.id, session)
@@ -227,6 +228,7 @@ it('识别完成前撤销权限时不落候选、审计或回执，原件不变'
         complete = resolve
       })
     })
+    // eslint-disable-next-line test/valid-expect -- 先绑定断言，触发异步完成后再等待，避免未处理拒绝。
     const rejected = expect(pending).rejects.toMatchObject({ problem: { code: 'forbidden' } })
     await began
     allowed = false
@@ -293,6 +295,7 @@ it('识别在外部等待时封存原键，迟到候选被拒绝且不会新增�
         complete = resolve
       })
     })
+    // eslint-disable-next-line test/valid-expect -- 先绑定断言，触发异步完成后再等待，避免未处理拒绝。
     const rejected = expect(pending).rejects.toMatchObject({ problem: { code: 'conflict' } })
     await began
     expect(await state.service.resolveCommand(command.commandId, session)).toMatchObject({ outcome: 'not-applied' })

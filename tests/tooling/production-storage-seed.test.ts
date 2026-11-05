@@ -5,7 +5,7 @@ import { PRODUCTION_STORAGE_VERSION } from '../../server/utils/production-storag
 import { createProductionSeedCache, createSeededProductionStorage, verifyProductionSeed } from '../helpers/production-storage-seed'
 import { testTempRoot } from '../helpers/test-temp-root'
 
-it('独立并发生成种子并冷核身份、结构及完整性，旧内容与现有目标均保留', async () => {
+it('独立并发生成种子并冷核身份、结构及完整性，旧内容保留', async () => {
   const root = testTempRoot('seed-cache')
   const options = { directory: testTempRoot('unused'), workspaceId: 'seed-test-workspace', ownerId: 'seed-test-owner', purpose: 'verification' as const }
   await mkdir(root, { recursive: true })
@@ -35,7 +35,10 @@ it('独立并发生成种子并冷核身份、结构及完整性，旧内容与�
   expect(await readFile(unknown, 'utf8')).toBe('旧内容')
   const cached = await first.seedFile(options)
   expect([one, two]).toContain(cached)
+})
 
+it('种子库可供正式存储使用，已有目标拒绝覆盖并保留原字节', async () => {
+  const options = { directory: testTempRoot('unused'), workspaceId: 'seed-test-workspace', ownerId: 'seed-test-owner', purpose: 'verification' as const }
   const target = testTempRoot('seed-target')
   await mkdir(target)
   const storage = await createSeededProductionStorage({ ...options, directory: target })

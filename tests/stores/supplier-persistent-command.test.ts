@@ -81,6 +81,7 @@ it('停用页取消税务旧代忙态，保原号且不让迟到响应采用到�
   const first = deferred<never>()
   f.commands.recordTaxpayerVerification.mockImplementationOnce(() => first.promise)
   const old = f.store.recordTaxpayerVerification(f.session, { supplierId: 'supplier-a', origin: 'real', expectedTaxNo: 'SYNTHETIC-TAX', baseSupplierVersion: '1', draft: { status: 'not_found', taxpayerType: '未核验', note: '原输入' } })
+  // eslint-disable-next-line test/valid-expect -- 先绑定断言，触发异步完成后再等待，避免未处理拒绝。
   const rejected = expect(old).rejects.toMatchObject({ name: 'AbortError' })
   await vi.waitFor(() => expect(f.commands.recordTaxpayerVerification).toHaveBeenCalledOnce())
   const original = f.session.pendingTaxpayerCommand!
@@ -99,6 +100,7 @@ it('外层身份读取先占代次，迟到的 A 不能重新 hydrate 或覆盖�
   f.commands.context.mockImplementationOnce(() => first.promise)
   f.commands.loadForm.mockImplementation(async (id: string) => ({ ...structuredClone(f.form()), draft: { ...f.form().draft, id } }))
   const old = f.store.hydrate(f.session, 'supplier-a')
+  // eslint-disable-next-line test/valid-expect -- 先绑定断言，触发异步完成后再等待，避免未处理拒绝。
   const rejected = expect(old).rejects.toMatchObject({ name: 'AbortError' })
   const newer = await f.store.hydrate(f.session, 'supplier-b')
   first.resolve(structuredClone(f.context))
@@ -117,6 +119,7 @@ it('税务冷恢复迟到不能清理 A 原编号、覆盖 B 或清 B 正在执�
   f.resolve.mockImplementationOnce(() => first.promise)
   f.commands.loadForm.mockImplementation(async (id: string) => ({ ...structuredClone(f.form()), draft: { ...f.form().draft, id } }))
   const old = f.store.hydrate(f.session, 'supplier-a')
+  // eslint-disable-next-line test/valid-expect -- 先绑定断言，触发异步完成后再等待，避免未处理拒绝。
   const rejected = expect(old).rejects.toMatchObject({ name: 'AbortError' })
   await vi.waitFor(() => expect(f.resolve).toHaveBeenCalledWith('old-taxpayer-command'))
   await f.store.hydrate(f.session, 'supplier-b')
@@ -134,6 +137,7 @@ it('税务写响应跨页面迟到仅保 A 原编号，不撤 B 正在执行的�
   const first = deferred<never>()
   f.commands.recordTaxpayerVerification.mockImplementationOnce(() => first.promise)
   const old = f.store.recordTaxpayerVerification(f.session, { supplierId: 'supplier-a', origin: 'real', expectedTaxNo: 'SYNTHETIC-TAX', baseSupplierVersion: '1', draft: { status: 'not_found', taxpayerType: '未核验', note: '原核验输入' } })
+  // eslint-disable-next-line test/valid-expect -- 先绑定断言，触发异步完成后再等待，避免未处理拒绝。
   const rejected = expect(old).rejects.toMatchObject({ name: 'AbortError' })
   await vi.waitFor(() => expect(f.commands.recordTaxpayerVerification).toHaveBeenCalledTimes(1))
   const original = f.session.pendingTaxpayerCommand!
@@ -178,7 +182,7 @@ it('结果未知在新表单旧键中只存原编号，冷刷新恢复原命令�
     await execute(command)
     throw new Error('合成响应丢失')
   })
-  await expect(f.store.saveForm(f.session, { name: '私人输入不要缓存', supplierCategory: '其他', contact: '私人联系人' }, 'save')).rejects.toThrow()
+  await expect(f.store.saveForm(f.session, { name: '私人输入不要缓存', supplierCategory: '其他', contact: '私人联系人' }, 'save')).rejects.toThrow('分供方中央服务暂时不可用')
   const original = f.commands.execute.mock.calls[0]![0].commandId
   expect(sessionStorage.getItem(f.key(null))).toBe(original)
   expect(JSON.stringify(sessionStorage)).not.toContain('私人输入')
@@ -212,7 +216,10 @@ it.each(['wrong-target', 'stale-version', 'actor-switch', 'persistent-withdrawn'
   const command = f.commands.execute.mock.calls[0]![0]
   const originalKey = supplierPendingKey(command, 'form:supplier-a')
   expect(sessionStorage.getItem(originalKey)).toBe(command.commandId)
-  await expect(f.store.saveForm(f.session, loaded.draft!, 'save')).rejects.toThrow()
+  const authorityLost = reason === 'actor-switch' || reason === 'persistent-withdrawn'
+  await expect(f.store.saveForm(f.session, loaded.draft!, 'save')).rejects.toThrow(authorityLost ? '当前表单与写入目标不一致' : '只核对原提交')
+  if (authorityLost)
+    expect(f.session.formal.context).toBeNull()
   expect(f.commands.execute).toHaveBeenCalledTimes(1)
 })
 
@@ -221,7 +228,7 @@ it('已知未保存封存只撤原编号，保当前输入和旧base，随后才
   const loaded = await f.store.hydrate(f.session, 'supplier-a')
   f.commands.execute.mockRejectedValueOnce(new Error('合成结果未知'))
   const draft = { ...loaded.draft!, name: '当前输入保留' }
-  await expect(f.store.saveForm(f.session, draft, 'save')).rejects.toThrow()
+  await expect(f.store.saveForm(f.session, draft, 'save')).rejects.toThrow('分供方中央服务暂时不可用')
   const original = f.commands.execute.mock.calls[0]![0].commandId
   expect(await f.store.recover(f.session)).toMatchObject({ outcome: 'not-applied' })
   expect(f.resolve).toHaveBeenCalledWith(original)

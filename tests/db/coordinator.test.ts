@@ -190,6 +190,7 @@ describe('数据库连接协调器', () => {
     })
     await entered.promise
     const backup = coordinator.backupTo('protected.sqlite')
+    // eslint-disable-next-line test/valid-expect -- 先绑定断言，触发异步完成后再等待，避免未处理拒绝。
     const rejectedBackup = expect(backup).rejects.toThrow('备份校验失败')
     await Promise.resolve()
     expect(events).toEqual(['execute:BEGIN', 'execute:WRITE'])

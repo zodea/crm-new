@@ -45,7 +45,7 @@ it('发票v28升级保全原事实和旧清单，冲突时整批回滚并保留�
     db.close()
     const storage = createProductionStorage({ ...identity, directory })
     if (conflict) {
-      await expect(storage.status()).rejects.toThrow()
+      await expect(storage.status()).rejects.toThrow('正式数据库无法初始化或读取')
       const preserved = new DatabaseSync(file, { readOnly: true })
       try {
         expect(preserved.prepare('SELECT schema_version FROM production_metadata').get()?.schema_version).toBe(28)

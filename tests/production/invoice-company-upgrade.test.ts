@@ -79,7 +79,7 @@ it.each([
   try {
     db.exec(sql)
     const before = state(db)
-    expect(() => upgrade(db)).toThrow()
+    expect(() => upgrade(db)).toThrow('CHECK constraint failed: ok=1')
     expect(state(db)).toEqual(before)
   }
   finally { db.close() }
@@ -96,7 +96,7 @@ it.each([
     const before = state(db)
     expect(PRODUCTION_INVOICE_COMPANY_UPGRADE).toContain(marker)
     const failed = PRODUCTION_INVOICE_COMPANY_UPGRADE.replace(marker, `SELECT * FROM deliberately_missing_table;\n${marker}`)
-    expect(() => upgrade(db, failed)).toThrow()
+    expect(() => upgrade(db, failed)).toThrow('no such table: deliberately_missing_table')
     expect(state(db)).toEqual(before)
   }
   finally { db.close() }
@@ -110,11 +110,11 @@ it('公司草稿不虚构项目，归档必须使用公司合同并选分供方'
     const insert = db.prepare(`INSERT INTO invoices(id,source_kind,ocr_status,review_status,account_status,owner_kind,project_id,supplier_id,contract_domain,contract_id,contract_version,version,created_at,updated_at)
       VALUES(?,'manual','pending','unreviewed',?,?,?,?,?,?,?,1,'t','t')`)
     insert.run('draft', 'none', 'company', null, null, null, null, null)
-    expect(() => insert.run('project', 'none', 'company', 'p', null, null, null, null)).toThrow()
-    expect(() => insert.run('missing-contract', 'archived', 'company', null, 's', null, null, null)).toThrow()
-    expect(() => insert.run('missing-supplier', 'archived', 'company', null, null, 'company', 'c', '1')).toThrow()
-    expect(() => insert.run('other-domain', 'archived', 'company', null, 's', 'auxiliary', 'c', '1')).toThrow()
-    expect(() => insert.run('wrong-owner', 'archived', 'personal', null, 's', 'company', 'c', '1')).toThrow()
+    expect(() => insert.run('project', 'none', 'company', 'p', null, null, null, null)).toThrow('owner_kind IN (\'personal\',\'company\') AND project_id IS NULL')
+    expect(() => insert.run('missing-contract', 'archived', 'company', null, 's', null, null, null)).toThrow('owner_kind IS NOT \'company\' OR')
+    expect(() => insert.run('missing-supplier', 'archived', 'company', null, null, 'company', 'c', '1')).toThrow('owner_kind IS NOT \'company\' OR')
+    expect(() => insert.run('other-domain', 'archived', 'company', null, 's', 'auxiliary', 'c', '1')).toThrow('owner_kind IS NOT \'company\' OR')
+    expect(() => insert.run('wrong-owner', 'archived', 'personal', null, 's', 'company', 'c', '1')).toThrow('contract_domain IS NOT \'company\' OR owner_kind IS \'company\'')
     insert.run('company', 'archived', 'company', null, 's', 'company', 'c', '1')
     expect(db.prepare('SELECT owner_kind,project_id,contract_domain,contract_id FROM invoices WHERE id=\'company\'').get()).toEqual({ owner_kind: 'company', project_id: null, contract_domain: 'company', contract_id: 'c' })
   }

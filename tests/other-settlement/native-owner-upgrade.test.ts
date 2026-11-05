@@ -109,7 +109,13 @@ it.each(['partial', 'guard', 'foreign-key', 'committed-foreign-key'])('坏图 %s
     }
     const before = await d.select('SELECT * FROM expenditure_settlements')
     const version = await d.select('SELECT MAX(version) v FROM schema_migrations')
-    await expect(migrateExpenditureSettlementOwner(d)).rejects.toThrow()
+    const expected = {
+      'partial': '支出结算迁移图部分缺失',
+      'guard': '支出结算结构或历史保护不完整',
+      'foreign-key': '结算迁移后原关系核验失败',
+      'committed-foreign-key': '结算迁移现有原关系核验失败',
+    }[fault]
+    await expect(migrateExpenditureSettlementOwner(d)).rejects.toThrow(expected)
     expect(await d.select('SELECT * FROM expenditure_settlements')).toEqual(before)
     expect(await d.select('SELECT MAX(version) v FROM schema_migrations')).toEqual(version)
   }

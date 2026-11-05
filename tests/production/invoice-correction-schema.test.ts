@@ -46,7 +46,7 @@ it('更正命令、版本和附件正文受外键及不可变保护，失败整�
       expect(() => db.exec(sql)).toThrow('immutable')
     db.exec('BEGIN IMMEDIATE')
     db.prepare('INSERT INTO invoice_correction_receipts VALUES(?,?,?,?,?,?,?,?,?)').run('command-two', 'workspace', 'actor', 'correction-one', 'submit', 'c'.repeat(64), '{}', '{}', 't2')
-    expect(() => db.exec(`INSERT INTO invoice_correction_versions VALUES('missing',2,'command-two','actor','{}','t2')`)).toThrow()
+    expect(() => db.exec(`INSERT INTO invoice_correction_versions VALUES('missing',2,'command-two','actor','{}','t2')`)).toThrow('FOREIGN KEY constraint failed')
     db.exec('ROLLBACK')
     expect(db.prepare('SELECT command_id FROM invoice_correction_receipts ORDER BY command_id').all()).toEqual([{ command_id: 'command-one' }])
     expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([])

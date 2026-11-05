@@ -32,11 +32,11 @@ it('中央预算原件真实保存读取；缺件明确，跨预算不能读写�
 })
 
 it.each([
-  { add: [{ fileName: '旧路径', fileSize: 0, mimeType: '', payloadBase64: '', filePath: 'C:/secret' }] },
-  { add: [{ fileName: '伪造经办人', fileSize: 0, mimeType: '', payloadBase64: '', uploader: 'another' }] },
-  { removeIds: ['same'], restoreIds: ['same'] },
-])('附件命令边界拒绝路径/身份注入或矛盾变更 %#', (changes) => {
-  expect(() => parseBudgetFileChanges(changes)).toThrow()
+  { label: '旧路径', changes: { add: [{ fileName: '旧路径', fileSize: 0, mimeType: '', payloadBase64: '', filePath: 'C:/secret' }] }, error: '新增附件包含未知字段或本地路径' },
+  { label: '伪造经办人', changes: { add: [{ fileName: '伪造经办人', fileSize: 0, mimeType: '', payloadBase64: '', uploader: 'another' }] }, error: '新增附件包含未知字段或本地路径' },
+  { label: '同时移除和恢复', changes: { removeIds: ['same'], restoreIds: ['same'] }, error: '同一附件不能同时移除和恢复' },
+])('附件命令边界拒绝$label', ({ changes, error }) => {
+  expect(() => parseBudgetFileChanges(changes)).toThrow(error)
 })
 
 it('旧附件未知大小保持null，真实正文仍可读；损坏正文不能伪报缺件', async () => {

@@ -102,7 +102,7 @@ it.each([
         db.exec(guardSql)
     }
     finally { db.close() }
-    await expect(inspectProductionBackup(backup)).rejects.toThrow()
+    await expect(inspectProductionBackup(backup)).rejects.toThrow('报价原明细、冻结历史、采用原件或原回执证据不完整。')
     expect((await f.owner.read(() => f.actor)).records[0]?.draft.lines[0]?.unitPrice).toBe(0)
   }
   finally { await f.storage.close() }
