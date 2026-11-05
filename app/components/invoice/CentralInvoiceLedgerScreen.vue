@@ -17,7 +17,7 @@ import InvoicePrintLayout from './InvoicePrintLayout.vue'
 
 type Workspace = ReturnType<typeof createCentralInvoiceWorkspace>
 interface ReferenceOption { id: string, label: string, sourceVersion?: string }
-const props = defineProps<{ workspace: Workspace, projects: readonly ReferenceOption[], verifyProjects?: () => Promise<readonly ReferenceOption[]> }>()
+const props = withDefaults(defineProps<{ workspace: Workspace, projects: readonly ReferenceOption[], projectsReadable?: boolean, verifyProjects?: () => Promise<readonly ReferenceOption[]> }>(), { projectsReadable: true })
 const emit = defineEmits<{ open: [id: string] }>()
 const { confirm, exportFile, undoToast } = useKitUI()
 const busy = shallowRef(false)
@@ -47,8 +47,28 @@ const exportRows = shallowRef<InvoiceLedgerExportRow[]>([])
 const exportVersions = shallowRef<Array<{ id: string, version: string }>>([])
 const exportProjects = shallowRef<Array<{ id: string, label: string, sourceVersion: string }> | null>([])
 const exportName = shallowRef('')
+const readableProjects = computed(() => props.projectsReadable ? props.projects : [])
 const exportTotal = computed(() => invoiceLedgerTotal(exportRows.value))
 const cachedRecords = shallowRef<CentralInvoiceRecord[]>([])
+function expireExport(reason: string) {
+  exportOpen.value = false
+  exportRows.value = []
+  exportVersions.value = []
+  exportProjects.value = []
+  error.value = reason
+  const generation = authorityGeneration
+  void nextTick(() => {
+    if (active && generation === authorityGeneration)
+      errorRef.value?.focus()
+  })
+}
+watch([() => props.projectsReadable, () => props.projects], ([readable, projects]) => {
+  const snapshot = exportProjects.value
+  if (!exportOpen.value || !snapshot?.length)
+    return
+  if (!readable || snapshot.some(expected => !projects.some(project => project.id === expected.id && project.label === expected.label && project.sourceVersion === expected.sourceVersion)))
+    expireExport('项目目录已变化或不可读，请重新读取并打开预览。')
+}, { flush: 'sync' })
 function invalidatePresentation() {
   authorityGeneration++
   clearConfirmationFocus()
@@ -226,13 +246,13 @@ function prepareExport(rows: CentralInvoiceRecord[]) {
     seller: record.fields.seller,
     invoiceType: record.fields.invoiceType,
     totalAmount: record.fields.totalAmount,
-    projectName: record.ownerKind === 'personal' ? '个人开支' : record.ownerKind === 'company' ? '公司开销' : props.projects.find(project => project.id === record.projectId)?.label ?? '项目来源不可用',
+    projectName: record.ownerKind === 'personal' ? '个人开支' : record.ownerKind === 'company' ? '公司开销' : record.ownerKind === null ? '未归属' : !record.projectId ? '项目身份待核实' : readableProjects.value.find(project => project.id === record.projectId)?.label ?? '项目来源不可用',
     source: centralInvoiceSourceLabel(record),
     remark: record.fields.remark,
   }))
   exportVersions.value = rows.map(record => ({ id: record.id, version: record.version }))
   const projectIds = [...new Set(rows.flatMap(record => record.ownerKind === 'project' && record.projectId ? [record.projectId] : []))]
-  const selectedProjects = projectIds.map(id => props.projects.find(project => project.id === id))
+  const selectedProjects = projectIds.map(id => readableProjects.value.find(project => project.id === id))
   exportProjects.value = rows.every(record => record.ownerKind !== 'project' || !!record.projectId) && selectedProjects.every(project => !!project?.sourceVersion)
     ? selectedProjects.map(project => ({ id: project!.id, label: project!.label, sourceVersion: project!.sourceVersion! }))
     : null
@@ -243,34 +263,53 @@ function prepareExport(rows: CentralInvoiceRecord[]) {
 async function confirmExport(style: InvoiceXlsxStyleConfig) {
   if (exportSaving.value || !exportRows.value.length || props.workspace.readState.value !== 'ready')
     return
+  const sourceWorkspace = props.workspace
+  const generation = authorityGeneration
+  const rows = exportRows.value
+  const versions = exportVersions.value
+  const projects = exportProjects.value
+  const verifyProjects = props.verifyProjects
+  const currentSession = () => active && exportOpen.value && generation === authorityGeneration && props.workspace === sourceWorkspace
+    && sourceWorkspace.readState.value === 'ready' && exportRows.value === rows && exportVersions.value === versions
+    && exportProjects.value === projects && rows.length > 0 && versions.length === rows.length
   exportSaving.value = true
   exportError.value = ''
   let projectReadFailed = false
+  let previewStale = false
   try {
-    await props.workspace.load()
-    if (exportVersions.value.some(item => !props.workspace.records.value.some(record => record.id === item.id && record.version === item.version && record.accountStatus === 'archived' && record.deletedAt === null)))
+    await sourceWorkspace.load()
+    if (!currentSession())
+      return
+    if (versions.some(item => !sourceWorkspace.records.value.some(record => record.id === item.id && record.version === item.version && record.accountStatus === 'archived' && record.deletedAt === null))) {
+      previewStale = true
       throw new Error('导出预览中的发票已变化，请关闭预览并重新选择。')
-    if (exportProjects.value === null || (exportProjects.value.length && !props.verifyProjects))
+    }
+    if (projects === null || (projects.length && !verifyProjects))
       throw new Error('项目目录尚未可靠读取，不能导出项目名称。')
-    if (exportProjects.value.length) {
-      const currentProjects = await props.verifyProjects!().catch((cause) => {
+    if (projects.length) {
+      const currentProjects = await verifyProjects!().catch((cause) => {
         projectReadFailed = true
         throw cause
       })
-      if (exportProjects.value.some(expected => !currentProjects.some(project => project.id === expected.id && project.label === expected.label && project.sourceVersion === expected.sourceVersion)))
+      if (!currentSession())
+        return
+      if (projects.some(expected => !currentProjects.some(project => project.id === expected.id && project.label === expected.label && project.sourceVersion === expected.sourceVersion))) {
+        previewStale = true
         throw new Error('项目目录已变化，请关闭预览并重新读取。')
+      }
     }
-    await exportFile({ data: createInvoiceLedgerXlsxFromRows(exportRows.value, style), defaultName: exportName.value, mimeType: INVOICE_XLSX_MIME })
-    exportOpen.value = false
+    if (!currentSession())
+      return
+    await exportFile({ data: createInvoiceLedgerXlsxFromRows(rows, style), defaultName: exportName.value, mimeType: INVOICE_XLSX_MIME })
+    if (currentSession())
+      exportOpen.value = false
   }
   catch (cause) {
+    if (!currentSession())
+      return
     exportError.value = message(cause)
-    if (sourceUnavailable() || projectReadFailed) {
-      error.value = exportError.value
-      exportOpen.value = false
-      exportRows.value = []
-      exportVersions.value = []
-      exportProjects.value = []
+    if (sourceUnavailable() || projectReadFailed || previewStale) {
+      expireExport(exportError.value)
     }
   }
   finally { exportSaving.value = false }
@@ -426,7 +465,7 @@ async function discard(id: string) {
     <p v-if="printMode && busy && workspace.readState.value === 'ready'" role="status" class="p-3 text-sm text-ink-soft print:hidden">
       正在处理打印，请稍候。
     </p>
-    <CentralInvoiceLedgerView v-show="workspace.readState.value === 'ready' && !printMode" class="min-h-0 flex-1 print:hidden" :records="displayedRecords" :projects="projects" :busy="busy || recoveryPending" @open="emit('open', $event)" @discard="discard" @prepare-print="preparePrint" @export="prepareExport" />
+    <CentralInvoiceLedgerView v-show="workspace.readState.value === 'ready' && !printMode" class="min-h-0 flex-1 print:hidden" :records="displayedRecords" :projects="readableProjects" :projects-readable="projectsReadable" :busy="busy || recoveryPending" @open="emit('open', $event)" @discard="discard" @prepare-print="preparePrint" @export="prepareExport" />
     <div v-if="printMode" v-show="workspace.readState.value === 'ready'" :class="{ 'central-print-unverified': !printAuthorized }" :inert="busy" :aria-busy="busy" class="min-h-0 flex-1 overflow-auto print:overflow-visible">
       <section v-if="printSkipped.length" aria-label="不能打印的发票" class="mb-3 rounded border border-warn/35 bg-warn-soft p-3 text-sm text-warn-ink print:hidden">
         <p role="status">

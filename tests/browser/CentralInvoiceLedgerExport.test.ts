@@ -58,7 +58,7 @@ it('导出弹层在各视口可键盘操作，保存样式可重新读取，并�
   const verifyProjects = async () => [{ id: 'project-browser', label: '合成项目', sourceVersion: projectVersion }]
   const props = { workspace: workspace as never, projects: [{ id: 'project-browser', label: '合成项目', sourceVersion: 'projects:1' }], verifyProjects }
   const first = await render(CentralInvoiceLedgerScreen, { props, global: { plugins: [createPinia()], components } })
-  const owner = page.getByLabelText('归属')
+  const owner = page.getByLabelText('搜索发票')
   const start = page.getByLabelText('开票开始日期')
   const end = page.getByLabelText('开票结束日期')
   ;(owner.element() as HTMLElement).focus()
@@ -104,7 +104,10 @@ it('导出弹层在各视口可键盘操作，保存样式可重新读取，并�
   await expect.element(alert).toHaveTextContent('项目目录已变化')
   await expect.element(alert).toHaveFocus()
   expect(fake.exportFile).not.toHaveBeenCalled()
+  await expect.element(page.getByRole('dialog')).not.toBeInTheDocument()
   projectVersion = 'projects:1'
+  await page.getByRole('button', { name: '导出 Excel' }).click()
+  await expect.element(page.getByRole('spinbutton', { name: '冻结行数' })).toHaveValue(5)
   await expect.element(confirm).toBeEnabled()
   for (let count = 0; count < 100 && document.activeElement !== confirm.element(); count++)
     await userEvent.tab()

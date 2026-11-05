@@ -63,3 +63,57 @@ it('只在完整可读且身份一致时展示我方主体的真实版本', asyn
   expect(wrapper.findComponent(stub).props('signatories')).toEqual([{ id: 'buyer-one', label: '合成购方', version: '2' }])
   wrapper.unmount()
 })
+
+it('台账区分项目目录不可读与空目录，并在重读失败时撤下旧项目', async () => {
+  const actor = { workspaceId: 'workspace-one', actorId: 'actor-one', capabilities: ['finance-invoice:read', 'project:list:read'] }
+  vi.stubGlobal('useRuntimeConfig', () => ({ app: { baseURL: '/' } }))
+  vi.stubGlobal('$fetch', async () => actor)
+  mocks.signatories.mockRejectedValue(new Error('无权限'))
+  let denied = true
+  mocks.load.mockImplementation(async ([key]: [string]) => {
+    if (key === 'projects' && denied)
+      throw new Error('项目目录无权限')
+    return { projects: key === 'projects' ? [{ id: 'project-one', label: '真实项目', version: '1', sourceVersion: 'projects:1' }] : [], suppliers: [], contracts: [] }
+  })
+  const stub = defineComponent({ name: 'LedgerStub', props: ['workspace', 'projects', 'projectsReadable', 'verifyProjects'], template: '<div>台账已加载</div>' })
+  const wrapper = mount(CentralInvoiceEntry, { props: { mode: 'ledger' }, global: { stubs: { CentralInvoiceLedgerScreen: stub } } })
+  await vi.waitFor(() => expect(wrapper.text()).toContain('台账已加载'))
+  expect(wrapper.findComponent(stub).props('projectsReadable')).toBe(false)
+  expect(wrapper.findComponent(stub).props('projects')).toEqual([])
+  expect(wrapper.text()).toContain('项目')
+  denied = false
+  await wrapper.findComponent(stub).props('verifyProjects')()
+  await nextTick()
+  expect(wrapper.findComponent(stub).props('projectsReadable')).toBe(true)
+  expect(wrapper.findComponent(stub).props('projects')).toMatchObject([{ id: 'project-one', label: '真实项目' }])
+  denied = true
+  await expect(wrapper.findComponent(stub).props('verifyProjects')()).rejects.toThrow('项目目录无权限')
+  await nextTick()
+  expect(wrapper.findComponent(stub).props('projectsReadable')).toBe(false)
+  expect(wrapper.findComponent(stub).props('projects')).toEqual([])
+  wrapper.unmount()
+})
+
+it('项目目录重读期间身份变化时，迟到结果不能恢复旧台账', async () => {
+  const actor = { workspaceId: 'workspace-one', actorId: 'actor-one', capabilities: ['finance-invoice:read', 'project:list:read'] }
+  vi.stubGlobal('useRuntimeConfig', () => ({ app: { baseURL: '/' } }))
+  vi.stubGlobal('$fetch', async () => actor)
+  mocks.signatories.mockRejectedValue(new Error('无权限'))
+  mocks.load.mockResolvedValue({ projects: [], suppliers: [], contracts: [] })
+  const stub = defineComponent({ name: 'LedgerStub', props: ['workspace', 'projects', 'projectsReadable', 'verifyProjects'], template: '<div>台账已加载</div>' })
+  const wrapper = mount(CentralInvoiceEntry, { props: { mode: 'ledger' }, global: { stubs: { CentralInvoiceLedgerScreen: stub } } })
+  await vi.waitFor(() => expect(wrapper.text()).toContain('台账已加载'))
+  let release!: (value: { projects: unknown[], suppliers: unknown[], contracts: unknown[] }) => void
+  mocks.load.mockImplementationOnce(() => new Promise<{ projects: unknown[], suppliers: unknown[], contracts: unknown[] }>((resolve) => {
+    release = resolve
+  }))
+  const pending = wrapper.findComponent(stub).props('verifyProjects')()
+  mocks.authority?.({ message: '身份已变化' })
+  await nextTick()
+  release({ projects: [{ id: 'project-one', label: '旧项目', version: '1', sourceVersion: 'projects:1' }], suppliers: [], contracts: [] })
+  await expect(pending).rejects.toThrow('项目目录来源已变化')
+  expect(wrapper.text()).toContain('身份已变化')
+  expect(wrapper.text()).not.toContain('台账已加载')
+  expect(wrapper.text()).not.toContain('旧项目')
+  wrapper.unmount()
+})
