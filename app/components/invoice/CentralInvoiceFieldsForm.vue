@@ -3,7 +3,7 @@ import type { CentralInvoiceFields, CentralInvoiceItem, CentralInvoiceRecord } f
 import type { CentralInvoiceFormSnapshot } from '~/lib/invoice/central-form-snapshot'
 import { reactive, ref, shallowRef, watch } from 'vue'
 
-const props = defineProps<{ record: CentralInvoiceRecord, baseline?: CentralInvoiceRecord | null, baselineSnapshot?: CentralInvoiceFormSnapshot | null, restoredSnapshot?: CentralInvoiceFormSnapshot | null, busy?: boolean, lockActions?: boolean, disableSave?: boolean, correctionMode?: boolean, locationKeys?: readonly string[] }>()
+const props = defineProps<{ record: CentralInvoiceRecord, baseline?: CentralInvoiceRecord | null, baselineSnapshot?: CentralInvoiceFormSnapshot | null, restoredSnapshot?: CentralInvoiceFormSnapshot | null, busy?: boolean, lockActions?: boolean, disableSave?: boolean, readOnly?: boolean, correctionMode?: boolean, locationKeys?: readonly string[] }>()
 const emit = defineEmits<{
   save: [payload: { invoiceId: string, baseVersion: string, fields: CentralInvoiceFields, items: CentralInvoiceItem[] }]
   review: [manualCompletion: boolean]
@@ -129,6 +129,8 @@ function original(key: keyof CentralInvoiceFields) {
   return value === null || value === undefined || value === '' ? '未填写' : String(value)
 }
 function save() {
+  if (props.readOnly)
+    return
   if (stale.value) {
     error.value = '发票已在其他位置更新，请先核对最新版本；当前输入仍保留。'
     return
@@ -164,11 +166,11 @@ function addItem() {
     <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <label v-for="[key, label] in textFields" :key="key" class="flex min-w-0 flex-col gap-1 text-sm">
         <span>{{ label }} <small v-if="mark(key)" class="text-warn-ink">{{ mark(key) }}（原值：{{ original(key) }}）</small></span>
-        <input v-model="fields[key]" :type="key === 'invoiceDate' ? 'date' : 'text'" :disabled="busy" :aria-description="locationKeys ? (locationKeys.includes(key) ? '原图可定位' : '原图未定位') : undefined" class="min-w-0 border border-line rounded bg-surface px-2 py-1" :class="mark(key) ? 'border-warn!' : ''" @input="markChanged" @focus="emit('locate', key)" @blur="emit('release', key)" @mouseenter="emit('preview', key)" @mouseleave="emit('preview', null)">
+        <input v-model="fields[key]" :type="key === 'invoiceDate' ? 'date' : 'text'" :disabled="busy" :readonly="readOnly" :aria-description="locationKeys ? (locationKeys.includes(key) ? '原图可定位' : '原图未定位') : undefined" class="min-w-0 border border-line rounded bg-surface px-2 py-1" :class="mark(key) ? 'border-warn!' : ''" @input="markChanged" @focus="emit('locate', key)" @blur="emit('release', key)" @mouseenter="emit('preview', key)" @mouseleave="emit('preview', null)">
       </label>
       <label v-for="[key, label] in moneyFields" :key="key" class="flex min-w-0 flex-col gap-1 text-sm">
         <span>{{ label }} <small v-if="mark(key)" class="text-warn-ink">{{ mark(key) }}（原值：{{ original(key) }}）</small></span>
-        <input v-model="money[key]" type="text" inputmode="decimal" :disabled="busy" :aria-description="locationKeys ? (locationKeys.includes(key) ? '原图可定位' : '原图未定位') : undefined" placeholder="未填写" class="min-w-0 border border-line rounded bg-surface px-2 py-1" :class="mark(key) ? 'border-warn!' : ''" @input="markChanged" @focus="emit('locate', key)" @blur="emit('release', key)" @mouseenter="emit('preview', key)" @mouseleave="emit('preview', null)">
+        <input v-model="money[key]" type="text" inputmode="decimal" :disabled="busy" :readonly="readOnly" :aria-description="locationKeys ? (locationKeys.includes(key) ? '原图可定位' : '原图未定位') : undefined" placeholder="未填写" class="min-w-0 border border-line rounded bg-surface px-2 py-1" :class="mark(key) ? 'border-warn!' : ''" @input="markChanged" @focus="emit('locate', key)" @blur="emit('release', key)" @mouseenter="emit('preview', key)" @mouseleave="emit('preview', null)">
       </label>
     </div>
     <details class="mt-4">
@@ -179,18 +181,18 @@ function addItem() {
         <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <label v-for="[key, label] in [['name', '名称'], ['spec', '规格'], ['unit', '单位'], ['taxRate', '税率']] as const" :key="key" class="flex flex-col gap-1 text-sm">
             <span>第 {{ index + 1 }} 行{{ label }}</span>
-            <input v-model="item[key]" :disabled="busy" class="min-w-0 border border-line rounded bg-surface px-2 py-1" @input="markChanged">
+            <input v-model="item[key]" :disabled="busy" :readonly="readOnly" class="min-w-0 border border-line rounded bg-surface px-2 py-1" @input="markChanged">
           </label>
           <label v-for="[key, label] in itemNumberFields" :key="key" class="flex flex-col gap-1 text-sm">
             <span>第 {{ index + 1 }} 行{{ label }}</span>
-            <input v-model="item[key]" type="text" inputmode="decimal" :disabled="busy" placeholder="未填写" class="min-w-0 border border-line rounded bg-surface px-2 py-1" @input="markChanged">
+            <input v-model="item[key]" type="text" inputmode="decimal" :disabled="busy" :readonly="readOnly" placeholder="未填写" class="min-w-0 border border-line rounded bg-surface px-2 py-1" @input="markChanged">
           </label>
         </div>
-        <button type="button" :disabled="busy" class="mt-2 text-danger" @click="items.splice(index, 1); markChanged()">
+        <button type="button" :disabled="busy || readOnly" class="mt-2 text-danger" @click="items.splice(index, 1); markChanged()">
           删除第 {{ index + 1 }} 行
         </button>
       </div>
-      <button type="button" :disabled="busy" class="mt-3 text-brand" @click="addItem">
+      <button type="button" :disabled="busy || readOnly" class="mt-3 text-brand" @click="addItem">
         添加明细
       </button>
     </details>
@@ -198,7 +200,7 @@ function addItem() {
       {{ error }}
     </p>
     <div class="mt-4 flex flex-wrap gap-2">
-      <button type="button" :disabled="busy || disableSave || !changed || stale" class="border border-line rounded px-3 py-1" @click="save">
+      <button type="button" :disabled="busy || disableSave || readOnly || !changed || stale" class="border border-line rounded px-3 py-1" @click="save">
         {{ correctionMode ? '应用票面修改' : '保存修改' }}
       </button>
       <button v-if="record.reviewStatus === 'unreviewed'" type="button" :disabled="busy || changed || lockActions" class="border border-line rounded px-3 py-1" @click="emit('review', record.ocrStatus !== 'done')">
