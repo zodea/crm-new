@@ -8,6 +8,8 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
+| [tests/invoice/central-migration-bootstrap.test.ts](../../../tests/invoice/central-migration-bootstrap.test.ts) | 单元／服务／状态 | 迁入目录的身份、权限与来源版本 |
+| [tests/invoice/central-migration-pending.test.ts](../../../tests/invoice/central-migration-pending.test.ts) | 单元／状态 | 迁入原编号发现、身份隔离及损坏存储阻断 |
 | [tests/invoice/correction-contract.test.ts](../../../tests/invoice/correction-contract.test.ts) | 单元／服务／状态 | 更正差异、未知和真实零 |
 | [tests/invoice/correction-http.test.ts](../../../tests/invoice/correction-http.test.ts) | 单元／服务／状态 | 更正读取与回执身份、权限、版本 |
 | [tests/invoice/correction-session.test.ts](../../../tests/invoice/correction-session.test.ts) | 单元／服务／状态 | 更正未知结果及回读失败保留原编号 |
@@ -27,9 +29,12 @@
 | [tests/production/invoice-migration-backup.test.ts](../../../tests/production/invoice-migration-backup.test.ts) | 隔离 SQLite／备份 | 迁入证据、原件与原回执冷恢复 |
 | [tests/production/invoice-migration-catalog.test.ts](../../../tests/production/invoice-migration-catalog.test.ts) | 隔离 SQLite／服务 | 迁入目标目录编排和来源缺口 |
 | [tests/production/invoice-migration-correction-number.test.ts](../../../tests/production/invoice-migration-correction-number.test.ts) | 隔离 SQLite／服务 | 迁入与普通发票命令族各自恢复 |
+| [tests/production/invoice-migration-preview.test.ts](../../../tests/production/invoice-migration-preview.test.ts) | 单元／客户端 | 预检来源与权限变化 |
+| [tests/production/invoice-migration-session.test.ts](../../../tests/production/invoice-migration-session.test.ts) | 单元／客户端 | 旧库摘要不符时保留原编号 |
 | [tests/production/invoice-migration-publish.test.ts](../../../tests/production/invoice-migration-publish.test.ts) | 隔离 SQLite／服务 | 完整旧库原子发布、原证据及原号恢复 |
 | [tests/production/invoice-migration-source.test.ts](../../../tests/production/invoice-migration-source.test.ts) | 合成旧库／预检 | 旧来源和公司合同引用保护 |
 | [tests/server/invoice-migration-catalog-route.test.ts](../../../tests/server/invoice-migration-catalog-route.test.ts) | 路由／服务 | 发票迁入目录请求与鉴权 |
+| [tests/tabs/invoice-migration-startup.test.ts](../../../tests/tabs/invoice-migration-startup.test.ts) | 单元／状态 | 迁入未决命令的启动恢复 |
 | [tests/composables/useInvoiceRegionTarget.test.ts](../../../tests/composables/useInvoiceRegionTarget.test.ts) | 单元／服务／状态 | 原图强调目标：宽屏失焦撤框、悬停临时覆盖；窄屏切到原件面板恢复最近一次定位（含先换面板后失焦），切回后按新焦点更新，reset 不恢复旧定位 |
 | [tests/db/invoice-ledger.test.ts](../../../tests/db/invoice-ledger.test.ts) | 单元／服务／状态 | checkReviewed:归档前置——未校对一律拒绝(DATABASE.md §2.4「核对完成是归档唯一前置」) |
 | [tests/finance/factor-combination.test.ts](../../../tests/finance/factor-combination.test.ts) | 单元／服务／状态 | solveFactorCombinations：精确整数组合 |
@@ -59,6 +64,9 @@
 | [tests/components/CentralInvoiceCorrectionRoute.test.ts](../../../tests/components/CentralInvoiceCorrectionRoute.test.ts) | 组件（jsdom） | 同路由切票的未保存输入保护 |
 | [tests/components/CentralInvoiceCorrectionScreen.test.ts](../../../tests/components/CentralInvoiceCorrectionScreen.test.ts) | 组件（jsdom） | 更正草稿、提交、打印阻断及原编号 |
 | [tests/components/CentralInvoiceFieldsForm.test.ts](../../../tests/components/CentralInvoiceFieldsForm.test.ts) | 组件（jsdom） | 票面零与未知、版本冲突及识别草稿 |
+| [tests/components/InvoiceMigrationPanel.test.ts](../../../tests/components/InvoiceMigrationPanel.test.ts) | 组件（jsdom） | 旧票映射、公司主体及预检缺口 |
+| [tests/components/InvoiceMigrationPendingReadFailure.test.ts](../../../tests/components/InvoiceMigrationPendingReadFailure.test.ts) | 组件及隔离服务 | 发布或恢复后批次读取失败，重进后保留并核对原编号 |
+| [tests/components/InvoiceMigrationRecoveryFlow.test.ts](../../../tests/components/InvoiceMigrationRecoveryFlow.test.ts) | 组件（jsdom） | 迁入断线后原编号核对 |
 | [tests/components/FactorSolverState.test.ts](../../../tests/components/FactorSolverState.test.ts) | 组件（jsdom） | 因子工具保存配置兼容 |
 | [tests/components/FactorTaxCalculator.test.ts](../../../tests/components/FactorTaxCalculator.test.ts) | 组件（jsdom） | 共用金额税额栏 |
 | [tests/components/InvoiceEditPage.test.ts](../../../tests/components/InvoiceEditPage.test.ts) | 组件（jsdom） | 编辑页重新识别草稿：只填表单不写库、保存二次确认（取消不写库）、字段角标与读屏原值、放弃恢复、离开保护、失败保留输入；原图比对框、“原图未定位”、聚焦/悬停强调与旋转换算；平时显示原件，无原文件时说明“原件不在本次会话中”且不显示示意图；首次识别聚焦字段临时框出、失焦撤框 |
@@ -74,11 +82,14 @@
 | [tests/browser/CentralInvoiceCorrection.test.ts](../../../tests/browser/CentralInvoiceCorrection.test.ts) | 真实组件／模拟来源 | 更正票面与归属的多视口操作 |
 | [tests/browser/CentralInvoiceCorrectionAuthority.test.ts](../../../tests/browser/CentralInvoiceCorrectionAuthority.test.ts) | 真实组件／模拟来源 | 失权隐藏与同身份草稿恢复 |
 | [tests/browser/CentralInvoiceCorrectionNavigation.test.ts](../../../tests/browser/CentralInvoiceCorrectionNavigation.test.ts) | 真实组件／模拟来源 | 键盘切票和离开保护 |
+| [tests/browser/InvoiceMigrationPendingReadFailure.test.ts](../../../tests/browser/InvoiceMigrationPendingReadFailure.test.ts) | 真实组件／模拟来源 | 读取失败时原编号提示、撤权和多视口 |
+| [tests/browser/InvoiceMigrationPanel.test.ts](../../../tests/browser/InvoiceMigrationPanel.test.ts) | 真实组件／模拟来源 | 迁入映射和原编号多视口操作 |
 
 ## Playwright E2E
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
+| [e2e/production-invoice-migration.spec.ts](../../../e2e/production-invoice-migration.spec.ts) | 隔离服务／合成数据 | 项目和公司旧票发布、原件及断线原编号恢复 |
 | [e2e/production-invoice-correction.spec.ts](../../../e2e/production-invoice-correction.spec.ts) | 隔离服务／合成数据 | 更正草稿、断线原编号恢复与打印阻断 |
 | [e2e/factor-solver.spec.ts](../../../e2e/factor-solver.spec.ts) | Playwright E2E | 精确因子组合工作台 |
 | [e2e/invoice-export-borders.spec.ts](../../../e2e/invoice-export-borders.spec.ts) | Playwright E2E | Issue #437 发票 Excel 分组边框 |

@@ -6,7 +6,7 @@ import { defineStore } from 'pinia'
 import { effectScope, onScopeDispose, shallowRef, watch } from 'vue'
 import { readBoqRecoveryForRoute, readBoqSourceImportRecoveryForRoute } from '~/lib/boq/command-recovery'
 import { readConstructionScopeStartupDescriptors } from '~/lib/construction-scope/startup-recovery'
-import { commandRecoveryKey, commandRecoveryRouteTargets, commandRecoveryStorageForFamily } from '~/lib/forms/command-recovery'
+import { commandRecoveryKey, commandRecoveryRouteTargets, commandRecoveryStorageForFamily, hasInvoiceMigrationStartupRecovery } from '~/lib/forms/command-recovery'
 import { readPayrollStartupDescriptors } from '~/lib/payroll/startup-recovery'
 import { readQuantityRecoveryForRoute } from '~/lib/quantity/command-recovery'
 import { isQuantityHollowWorkPath } from '~/lib/quantity/hollow-navigation'
@@ -192,6 +192,8 @@ export const useTabSessionStore = defineStore('tab-session', () => {
     if (browserReload && isQuantityHollowWorkPath(fullPath))
       return fullPath
     if (browserReload) {
+      if (hasInvoiceMigrationStartupRecovery(fullPath, snapshot.scope, globalThis.sessionStorage))
+        return fullPath
       if (readConstructionScopeStartupDescriptors(fullPath, snapshot.scope, globalThis.sessionStorage).length)
         return fullPath
       if (readBoqRecoveryForRoute(fullPath, snapshot.scope, globalThis.sessionStorage).length)
