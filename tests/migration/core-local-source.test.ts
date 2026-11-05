@@ -17,6 +17,7 @@ import { PAYROLL_CENTRAL_MIGRATION_TABLES } from '~/lib/migration/payroll-centra
 import { createCoreMigrationTestInstance } from '../../server/utils/core-migration-test-instance'
 import { createOwnerCommercialDocumentCommandTestInstance } from '../../server/utils/owner-commercial-document-command-test-instance'
 import { createMigratedMemoryDb } from '../helpers/memory-db'
+import { seedQuantityNativeRows } from '../helpers/quantity-migration-source'
 
 function sourceRows(sql: string): Record<string, unknown>[] {
   // 最新版本的替身包含已安装但尚无业务事实的独立报价 owner；未知查询仍拒绝。
@@ -590,6 +591,65 @@ describe('core migration local source', () => {
     finally {
       db.close()
     }
+  })
+
+  it('旧库月度工程量按期次及合同清单保留缺量、真实零和已知数量', async () => {
+    const db = await createMigratedMemoryDb()
+    try {
+      await seedQuantityNativeRows(db)
+      await db.execute('INSERT INTO contracts (id, name, kind, project_id, customer_id) VALUES (?, ?, ?, ?, ?)', ['q-other-contract', '另一施工合同', '施工', 'q-project', 'q-customer'])
+      await db.execute('INSERT INTO boq_files (id, contract_id, file_name) VALUES (?, ?, ?)', ['q-other-source', 'q-other-contract', '另一清单.xlsx'])
+      const lines = [
+        { suffix: 'zero', contract: 'q-contract', file: 'q-source', quantity: 0, deleted: null },
+        { suffix: 'positive', contract: 'q-contract', file: 'q-source', quantity: 2.5, deleted: null },
+        { suffix: 'other', contract: 'q-other-contract', file: 'q-other-source', quantity: 7, deleted: null },
+        { suffix: 'deleted', contract: 'q-contract', file: 'q-source', quantity: 99, deleted: '2026-09-12 00:00:00' },
+      ]
+      for (const line of lines) {
+        await db.execute('INSERT INTO boq_lines (id, boq_file_id, project_id, contract_id, item_name, deleted_at) VALUES (?, ?, ?, ?, ?, ?)', [`q-boq-${line.suffix}`, line.file, 'q-project', line.contract, line.suffix, line.deleted])
+        await db.execute('INSERT INTO items (id, project_id, code, name, trade, unit) VALUES (?, ?, ?, ?, ?, ?)', [`q-item-${line.suffix}`, 'q-project', line.suffix, line.suffix, '油漆工', '㎡'])
+        await db.execute('INSERT INTO house_type_template_items (id, room_id, item_id, boq_line_id, field_qty, updated_at) VALUES (?, ?, ?, ?, ?, ?)', [`q-line-${line.suffix}`, 'q-room', `q-item-${line.suffix}`, `q-boq-${line.suffix}`, line.quantity, '2026-09-01 00:00:00'])
+        await db.execute('INSERT INTO construction_stage_items (id, stage_id, item_id, is_reporting_stage) VALUES (?, ?, ?, 1)', [`q-map-${line.suffix}`, 'q-stage', `q-item-${line.suffix}`])
+      }
+      await db.execute('UPDATE house_type_template_items SET updated_at = ? WHERE id = ?', ['2026-09-01 00:00:00', 'q-line'])
+      await db.execute('UPDATE unit_stage_completions SET updated_at = ? WHERE id = ?', ['2026-09-02 00:00:00', 'q-done'])
+      for (const suffix of ['october', 'draft', 'deleted']) {
+        await db.execute('INSERT INTO units (id, floor_id, house_type_template_id, code) VALUES (?, ?, ?, ?)', [`q-unit-${suffix}`, 'q-floor', 'q-template', suffix])
+        await db.execute('INSERT INTO unit_assignments (id, unit_id, trade, crew_id) VALUES (?, ?, ?, ?)', [`q-assignment-${suffix}`, `q-unit-${suffix}`, '油漆工', 'q-crew'])
+        await db.execute('INSERT INTO unit_stage_completions (id, unit_id, stage_id, assignment_id, status, completed_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', [`q-done-${suffix}`, `q-unit-${suffix}`, 'q-stage', `q-assignment-${suffix}`, suffix === 'draft' ? 'draft' : 'completed', '2026-10-11', '2026-09-02 00:00:00', suffix === 'deleted' ? '2026-09-12 00:00:00' : null])
+      }
+
+      const result = await createCoreMigrationLocalSource(dependencies({ select: (sql, params) => db.select(sql, params) })).readSource()
+      const factsFor = (contractId: string) => {
+        const contract = result.entities.construction_contracts.find(row => row.legacyId === contractId)
+        expect(contract).toBeDefined()
+        return JSON.parse(String(contract?.attributes?.monthlyQuantityFactsJson)) as Array<Record<string, unknown>>
+      }
+      const expected = (periodNo: string, boqLineId: string, autoQty: number, missingQtyCount: number) => ({
+        periodNo,
+        boqLineId,
+        autoQty,
+        missingQtyCount,
+        quantityBasis: 'field',
+        sourceVersion: `migration-field:${periodNo}:2026-09-02 00:00:00`,
+        sourceUpdatedAt: '2026-09-02T00:00:00.000Z',
+      })
+      const mainFacts = factsFor('q-contract')
+      expect(mainFacts).toHaveLength(6)
+      expect(mainFacts).toEqual(expect.arrayContaining([
+        expected('2026-09', 'q-boq', 0, 1),
+        expected('2026-09', 'q-boq-zero', 0, 0),
+        expected('2026-09', 'q-boq-positive', 2.5, 0),
+        expected('2026-10', 'q-boq', 0, 1),
+        expected('2026-10', 'q-boq-zero', 0, 0),
+        expected('2026-10', 'q-boq-positive', 2.5, 0),
+      ]))
+      expect(factsFor('q-other-contract')).toEqual([
+        expected('2026-09', 'q-boq-other', 7, 0),
+        expected('2026-10', 'q-boq-other', 7, 0),
+      ])
+    }
+    finally { db.close() }
   })
 
   it('旧 SQLite 未建中央工资表时省略扩展，仍完整导出原工资金额与原文', async () => {
