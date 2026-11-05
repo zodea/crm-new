@@ -13,6 +13,7 @@
 | [tests/delivery/controlled-migration.test.ts](../../../tests/delivery/controlled-migration.test.ts) | 合成 SQLite 与中央测试实例 | 送货受控迁移、历史原件隔离与修订后回滚保护；同批不同原件列出冲突并阻止确认切换，旧库正文不变。备份证明为模拟，不覆盖生产持久化或独立进程重启 |
 | [tests/delivery/export.test.ts](../../../tests/delivery/export.test.ts) | 单元／服务／状态 | 送货单 Excel 导出 |
 | [tests/delivery/legacy-history.test.ts](../../../tests/delivery/legacy-history.test.ts) | 单元／服务／状态 | 可证明的旧送货历史恢复 |
+| [tests/delivery/price-revision-history.test.ts](../../../tests/delivery/price-revision-history.test.ts) | 合成内存服务 | 多行改价、撤回与重做、备注修订和删行重加的身份及历史；不推断 OCR 原值或价格展示 |
 | [tests/delivery/match.test.ts](../../../tests/delivery/match.test.ts) | 单元／服务／状态 | 分供方及送货项目名称匹配，包含独立来源与歧义边界 |
 | [tests/delivery/material-contracts.test.ts](../../../tests/delivery/material-contracts.test.ts) | 单元／服务／状态 | 送货既有材采合同来源 |
 | [tests/delivery/migration-source.test.ts](../../../tests/delivery/migration-source.test.ts) | 单元／服务／状态 | 送货旧库完整迁移来源 |
