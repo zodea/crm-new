@@ -99,6 +99,8 @@ jobs:
         run: pnpm test
 
       - name: Generate static frontend
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
         run: pnpm generate
 
   e2e:
@@ -138,14 +140,22 @@ jobs:
         shell: bash
         env:
           E2E_TARGETS: ${{ inputs.e2e_targets }}
+          NODE_OPTIONS: --max-old-space-size=4096
         run: |
-          if [[ -z "$E2E_TARGETS" ]]; then
-            pnpm exec playwright test --project=chromium --project=chromium-b
-            exit 0
+          targets=()
+          if [[ -n "$E2E_TARGETS" ]]; then
+            read -r -a targets <<< "$E2E_TARGETS"
           fi
 
-          read -r -a targets <<< "$E2E_TARGETS"
-          pnpm exec playwright test --project=chromium --project=chromium-b "${targets[@]}"
+          # Reject an empty overall selection before allowing an empty individual group.
+          pnpm exec playwright test --list --project=chromium --project=chromium-b "${targets[@]}"
+          result=0
+          for project in chromium chromium-b; do
+            if ! pnpm exec playwright test --project="$project" --pass-with-no-tests --output="test-results/e2e-$project" "${targets[@]}"; then
+              result=1
+            fi
+          done
+          exit "$result"
 
       - name: Upload Playwright diagnostics
         if: ${{ !cancelled() }}
@@ -181,6 +191,8 @@ jobs:
       - name: Install Chromium
         run: pnpm exec playwright install --with-deps chromium
       - name: Build production application
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
         run: pnpm build
       - name: Run production acceptance
         env:
@@ -226,6 +238,8 @@ jobs:
         run: pnpm exec playwright install chromium
 
       - name: Visual and interaction regression
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
         run: pnpm test:visual
 
       - name: Upload visual diagnostics
