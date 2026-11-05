@@ -21,6 +21,7 @@
 | [tests/production/finance-storage.test.ts](../../../tests/production/finance-storage.test.ts) | 单元／服务／状态 | F3 单库事务、原费用不重复计成本、实付确认与撤回、原件与冷启动原键，工作台实付权限／来源版本及失权迟到响应；付款采用发票期间撤权回滚 |
 | [tests/production/finance-verification.test.ts](../../../tests/production/finance-verification.test.ts) | 实际 SQLite 及正式参与者 | 旧 v12/v13 备份、v30 升级历史冻结及原件冷恢复；损坏依据拒绝、未知原键与可靠后读、撤权和版本冲突 |
 | [tests/production/crew-worker-storage.test.ts](../../../tests/production/crew-worker-storage.test.ts) | 单元／服务／状态 | 全局工人稳定身份、跨项目候选、隐私与权限边界、同库冷读取及损坏来源拒绝 |
+| [tests/production/supplier-credential-delete-restart.test.ts](../../../tests/production/supplier-credential-delete-restart.test.ts) | 合成数据库、本机 HTTP 与独立进程 | 证照两次删除之间撤回，重启后以最新版本拒绝旧撤回凭证、核对无副作用，并以当前凭证恢复同一原件；使用合成服务，不覆盖完整 Nuxt 或浏览器 |
 | [tests/production/notification-restart.test.ts](../../../tests/production/notification-restart.test.ts) | 单元／服务／状态 | 消息原键与已读事实冷重启保全 |
 | [tests/production/notification-storage.test.ts](../../../tests/production/notification-storage.test.ts) | 单元／服务／状态 | 消息事件、原命令及已读事实同库持久化 |
 | [tests/production/auth.test.ts](../../../tests/production/auth.test.ts) | 单元／服务／状态 | 单人正式访问保护 |
