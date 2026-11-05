@@ -6,6 +6,16 @@ import { computed, readonly, shallowRef } from 'vue'
 import { ProjectRepositoryProblem } from '../project/repository'
 import { deliveryProblem } from './contract'
 
+export type DeliveryPrintSnapshot = Pick<DeliveryCentralRecord, 'id' | 'dataOrigin' | 'version' | 'assetId' | 'projectId' | 'supplierId'>
+
+function assertPrintSnapshot(record: DeliveryCentralRecord, expected: DeliveryPrintSnapshot) {
+  if (record.id !== expected.id || record.dataOrigin !== expected.dataOrigin || record.version !== expected.version
+    || record.assetId !== expected.assetId || record.projectId !== expected.projectId || record.supplierId !== expected.supplierId
+    || !record.assetId || !record.hasSourceFile || !record.archived || record.deletedAt !== null || record.printDisposition !== 'pending') {
+    throw deliveryProblem('conflict', '待打印送货单或当前原件已变化，请重新读取队列')
+  }
+}
+
 function aborted(signal: AbortSignal) {
   if (signal.aborted)
     throw new DOMException('送货读取已取消', 'AbortError')
@@ -188,21 +198,51 @@ export function createDeliveryRecordState(repository: DeliveryRepository, origin
     confirmPrintReceipt: (id: string) => print([id], 'printed'),
     confirmManyPrintReceipts: (ids: readonly string[]) => print(ids, 'printed'),
     history: (id: string, options?: { signal?: AbortSignal }) => repository.history(id, originFor(), options),
-    async loadSourceFile(id: string, options?: { signal?: AbortSignal, assetId?: string | null }) {
+    async loadSourceFile(id: string, options?: { signal?: AbortSignal, assetId?: string | null, expectedPrint?: DeliveryPrintSnapshot }) {
       const origin = originFor()
       const assertCurrent = () => {
         if (options?.signal?.aborted || origin !== originFor())
           throw new DOMException('送货原件读取已取消或来源已变化', 'AbortError')
       }
       assertCurrent()
-      const record = await repository.detail(id, origin, options)
+      const record = await repository.detail(id, origin, { signal: options?.signal })
       assertCurrent()
+      if (options?.expectedPrint)
+        assertPrintSnapshot(record, options.expectedPrint)
       const assetId = options?.assetId === undefined ? record.assetId : options.assetId
+      if (options?.expectedPrint && assetId !== options.expectedPrint.assetId)
+        throw deliveryProblem('conflict', '待打印送货单或当前原件已变化，请重新读取队列')
       if (!assetId)
         return null
-      const source = await repository.fileContent({ id, assetId, origin, projectId: record.projectId, supplierId: record.supplierId }, options)
+      const source = await repository.fileContent({ id, assetId, origin, projectId: record.projectId, supplierId: record.supplierId, ...(options?.expectedPrint ? { expectedVersion: options.expectedPrint.version } : {}) }, { signal: options?.signal })
       assertCurrent()
+      if (options?.expectedPrint) {
+        const after = await repository.detail(id, origin, { signal: options.signal })
+        assertCurrent()
+        assertPrintSnapshot(after, options.expectedPrint)
+      }
       return source
+    },
+    async verifyPrintRecords(expected: readonly DeliveryPrintSnapshot[], identity: Pick<DeliveryContext, 'workspaceId' | 'actorId'>, options?: { signal?: AbortSignal }) {
+      const origin = originFor()
+      const assertCurrent = () => {
+        if (options?.signal?.aborted || origin !== originFor())
+          throw new DOMException('送货原件读取已取消或来源已变化', 'AbortError')
+      }
+      const verifyContext = async () => {
+        const current = await repository.context(origin, options)
+        assertCurrent()
+        if (current.workspaceId !== identity.workspaceId || current.actorId !== identity.actorId || !current.capabilities.includes('delivery:read'))
+          throw deliveryProblem('forbidden', '送货读取身份或权限已变化，请重新读取队列')
+      }
+      assertCurrent()
+      await verifyContext()
+      for (const snapshot of expected) {
+        const record = await repository.detail(snapshot.id, origin, options)
+        assertCurrent()
+        assertPrintSnapshot(record, snapshot)
+      }
+      await verifyContext()
     },
     async saveSourceFile(id: string, file: File, reason = '', baseVersion?: string) {
       const identity = await existing(id, baseVersion)

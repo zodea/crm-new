@@ -2,8 +2,10 @@ import type { DeliveryCommand, DeliveryContext } from '~/lib/delivery-record/con
 import type { DeliveryRepository } from '~/lib/delivery-record/repository'
 import { describe, expect, it, vi } from 'vitest'
 import { watchEffect } from 'vue'
+import { createDeliveryRepository } from '~/lib/delivery-record/repository'
 import { createDeliveryRecordState } from '~/lib/delivery-record/state'
 import { createDeliveryCommandService } from '../../server/utils/delivery-command-service'
+import { createDeliveryReadService } from '../../server/utils/delivery-read-service'
 
 const session = { workspaceId: 'w', actorId: 'a', capabilities: ['delivery:read', 'delivery:write', 'project:list:read', 'supplier:list:read'] }
 const input = { projectId: 'p', supplierId: 's', orderNo: 'D-1', deliveryDate: '2026-09-11', note: '', lines: [{ materialName: '材料', spec: '', unit: '吨', qty: 1, unitPrice: 2, amount: 2, note: '' }] }
@@ -66,6 +68,86 @@ describe('送货浏览器中央状态', () => {
     origin = 'demo'
     resolve({ assetId: 'asset', fileName: 'a.pdf', mimeType: 'application/pdf', fileSize: 1, sha256: '', bytes: new Uint8Array([1]) })
     await expect(pending.then(() => undefined)).rejects.toThrow('来源')
+  })
+
+  it('打印正文到达前若当前资产、版本、归属或待打印状态变化，拒绝返回旧原件', async () => {
+    const { state, repository } = setup()
+    const id = await state.add(input)
+    const initial = { ...state.byId(id)!, assetId: 'asset', hasSourceFile: true }
+    const snapshot = { id, dataOrigin: initial.dataOrigin, version: initial.version, assetId: initial.assetId, projectId: initial.projectId, supplierId: initial.supplierId }
+    for (const patch of [
+      { assetId: 'replacement' },
+      { version: String(Number(initial.version) + 1) },
+      { projectId: 'other-project' },
+      { supplierId: 'other-supplier' },
+      { printDisposition: 'printed' as const },
+      { deletedAt: '2026-11-05T00:00:00.000Z' },
+    ]) {
+      let current = initial
+      let finish!: (value: Awaited<ReturnType<DeliveryRepository['fileContent']>>) => void
+      vi.mocked(repository.detail).mockImplementation(async () => current)
+      vi.mocked(repository.fileContent).mockImplementationOnce(() => new Promise(resolve => finish = resolve))
+      const pending = state.loadSourceFile(id, { assetId: 'asset', expectedPrint: snapshot })
+      await vi.waitFor(() => expect(finish).toBeTypeOf('function'))
+      current = { ...initial, ...patch }
+      finish({ assetId: 'asset', fileName: '原件.pdf', mimeType: 'application/pdf', fileSize: 1, sha256: '', bytes: new Uint8Array([1]) })
+      await expect(pending).rejects.toThrow('变化')
+    }
+    expect(repository.fileContent).toHaveBeenCalledWith(expect.objectContaining({ id, assetId: 'asset', expectedVersion: initial.version, projectId: 'p', supplierId: 's' }), expect.anything())
+  })
+
+  it('打印前的当前记录已改变时不请求旧正文', async () => {
+    const { state, repository } = setup()
+    const id = await state.add(input)
+    const initial = { ...state.byId(id)!, assetId: 'asset', hasSourceFile: true }
+    const snapshot = { id, dataOrigin: initial.dataOrigin, version: initial.version, assetId: initial.assetId, projectId: initial.projectId, supplierId: initial.supplierId }
+    vi.mocked(repository.detail).mockResolvedValue({ ...initial, assetId: 'replacement', version: String(Number(initial.version) + 1) })
+    await expect(state.loadSourceFile(id, { assetId: 'asset', expectedPrint: snapshot })).rejects.toThrow('变化')
+    expect(repository.fileContent).not.toHaveBeenCalled()
+  })
+
+  it('正文请求期间真实来源替换时，拒绝打印旧原件但保留历史读取', async () => {
+    const { state, service, repository } = setup()
+    const text = '%PDF-1.7\noriginal\n%%EOF'
+    const id = await state.add(input, new File([text], '原件.pdf', { type: 'application/pdf' }))
+    const initial = state.byId(id)!
+    const oldAssetId = initial.assetId!
+    const snapshot = { id, dataOrigin: initial.dataOrigin, version: initial.version, assetId: oldAssetId, projectId: initial.projectId, supplierId: initial.supplierId }
+    const reads = createDeliveryReadService(service, () => session)
+    const http = createDeliveryRepository(async (_url, options) => reads.fileContent(id, oldAssetId, options?.query ?? {}))
+    vi.mocked(repository.fileContent).mockImplementationOnce(async (query, options) => {
+      const replacement = '%PDF-1.7\nreplacement\n%%EOF'
+      service.execute({ action: 'source', workspaceId: 'w', actorId: 'a', requiredCapability: 'delivery:write', commandId: 'replace-while-printing', origin: 'real', id, baseVersion: initial.version, reason: '更正原件', source: { fileName: '更正.pdf', mimeType: 'application/pdf', fileSize: replacement.length, payloadBase64: btoa(replacement) } }, session)
+      return http.fileContent(query, options)
+    })
+    await expect(state.loadSourceFile(id, { assetId: oldAssetId, expectedPrint: snapshot })).rejects.toThrow('原件')
+    expect(service.detail(id, session).assetId).not.toBe(oldAssetId)
+    vi.mocked(repository.fileContent).mockImplementation((query, options) => http.fileContent(query, options))
+    const historical = await state.loadSourceFile(id, { assetId: oldAssetId })
+    expect(new TextDecoder().decode(historical!.bytes)).toBe(text)
+  })
+
+  it('打印整批最终检查逐条重读，并拒绝身份或读取权限变化', async () => {
+    const { state, repository } = setup()
+    const id = await state.add(input)
+    const initial = { ...state.byId(id)!, assetId: 'asset', hasSourceFile: true }
+    const another = { ...initial, id: 'other' }
+    const snapshots = [initial, another].map(record => ({ id: record.id, dataOrigin: record.dataOrigin, version: record.version, assetId: record.assetId, projectId: record.projectId, supplierId: record.supplierId }))
+    vi.mocked(repository.detail).mockImplementation(async recordId => recordId === id ? initial : another)
+    await expect(state.verifyPrintRecords(snapshots, session)).resolves.toBeUndefined()
+    expect(repository.detail).toHaveBeenCalledWith(id, 'real', undefined)
+    expect(repository.detail).toHaveBeenCalledWith('other', 'real', undefined)
+    vi.mocked(repository.detail).mockImplementation(async recordId => recordId === id ? initial : { ...another, printDisposition: 'excluded' as const })
+    await expect(state.verifyPrintRecords(snapshots, session)).rejects.toThrow('变化')
+    vi.mocked(repository.context).mockResolvedValueOnce({ ...session, actorId: 'other-actor', projects: [], suppliers: [] })
+    await expect(state.verifyPrintRecords(snapshots, session)).rejects.toThrow('身份或权限')
+    vi.mocked(repository.context).mockResolvedValueOnce({ ...session, capabilities: ['project:list:read'], projects: [], suppliers: [] })
+    await expect(state.verifyPrintRecords(snapshots, session)).rejects.toThrow('身份或权限')
+    vi.mocked(repository.detail).mockImplementation(async recordId => recordId === id ? initial : another)
+    vi.mocked(repository.context)
+      .mockResolvedValueOnce({ ...session, projects: [], suppliers: [] })
+      .mockResolvedValueOnce({ ...session, capabilities: ['project:list:read'], projects: [], suppliers: [] })
+    await expect(state.verifyPrintRecords(snapshots, session)).rejects.toThrow('身份或权限')
   })
 
   it('归档后列表、历史、修订与撤回使用同一中央身份', async () => {

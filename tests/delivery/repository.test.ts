@@ -43,6 +43,18 @@ describe('送货 HTTP Repository 边界', () => {
     expect(fetcher.mock.calls[0]![1]).toMatchObject({ signal: controller.signal })
   })
 
+  it('打印请求核对正文所属的当前版本，历史原件读取保持原有语义', async () => {
+    const { record, content } = setup()
+    const fetcher = vi.fn().mockResolvedValue({ ...content, sourceVersion: String(Number(record.version) + 1) })
+    const repository = createDeliveryRepository(fetcher)
+    const query = { id: record.id, assetId: record.assetId!, origin: 'real' as const, projectId: 'p', supplierId: 's' }
+    await expect(repository.fileContent({ ...query, expectedVersion: record.version })).rejects.toThrow('原件')
+    expect((await repository.fileContent(query)).bytes).toEqual(Uint8Array.from(atob(payloadBase64), character => character.charCodeAt(0)))
+    fetcher.mockResolvedValue(content)
+    expect((await repository.fileContent({ ...query, expectedVersion: record.version })).bytes).toEqual(Uint8Array.from(atob(payloadBase64), character => character.charCodeAt(0)))
+    expect(fetcher.mock.calls[0]![1]!.query).not.toHaveProperty('expectedVersion')
+  })
+
   it('列表/详情拒绝含正文和错误记录身份的响应，不回退本机', async () => {
     const { record } = setup()
     const fetcher = vi.fn().mockResolvedValue({ ...record, payloadBase64 })

@@ -9,13 +9,13 @@ vi.mock('~/stores/delivery-record', () => ({ useDeliveryRecordStore: () => runti
 vi.mock('~/stores/ocr-settings', () => ({ useOcrSettingsStore: () => ({ loaded: true }) }))
 
 function record(id: string, assetId: string | null = 'asset'): DeliveryRecord {
-  return { id, assetId, dataOrigin: 'real', projectId: 'p', supplierId: 's', fileName: '完整原件.pdf', orderNo: id, printBatchId: 'upload', printDisposition: 'pending', hasSourceFile: !!assetId, archived: true, lines: [] } as unknown as DeliveryRecord
+  return { id, assetId, version: '1', dataOrigin: 'real', projectId: 'p', supplierId: 's', fileName: '完整原件.pdf', orderNo: id, printBatchId: 'upload', printDisposition: 'pending', hasSourceFile: !!assetId, archived: true, deletedAt: null, lines: [] } as unknown as DeliveryRecord
 }
 const bytes = new TextEncoder().encode('%PDF-1.7\ncomplete original\n%%EOF')
 const original = { assetId: 'asset', fileName: '完整原件.pdf', mimeType: 'application/pdf', fileSize: bytes.length, sha256: 'hash', bytes }
 beforeEach(() => {
   setActivePinia(createPinia())
-  runtime.archive = reactive({ origin: 'real', list: [record('a'), record('b')], pendingPrintRecords: [record('a'), record('b')], load: vi.fn().mockResolvedValue(undefined), loadSourceFile: vi.fn().mockResolvedValue(original) })
+  runtime.archive = reactive({ origin: 'real', context: { workspaceId: 'w', actorId: 'a', capabilities: ['delivery:read'] }, list: [record('a'), record('b')], pendingPrintRecords: [record('a'), record('b')], load: vi.fn().mockResolvedValue(undefined), loadSourceFile: vi.fn().mockResolvedValue(original), verifyPrintRecords: vi.fn().mockResolvedValue(undefined), confirmManyPrintReceipts: vi.fn().mockResolvedValue(undefined) })
 })
 
 describe('中央送货打印原件', () => {
@@ -45,8 +45,22 @@ describe('中央送货打印原件', () => {
     const id = store.files.filter(file => file.printDisposition === 'pending')[0]!.id
     expect([...new Uint8Array(await (await store.loadFileForPrint(id)).arrayBuffer())]).toEqual([...bytes])
     expect(runtime.archive.loadSourceFile).toHaveBeenCalledTimes(2)
+    expect(runtime.archive.loadSourceFile).toHaveBeenCalledWith('a', expect.objectContaining({ assetId: 'asset', expectedPrint: expect.objectContaining({ id: 'a', version: '1', assetId: 'asset', projectId: 'p', supplierId: 's' }) }))
+    expect(runtime.archive.loadSourceFile).toHaveBeenCalledWith('b', expect.objectContaining({ assetId: 'asset', expectedPrint: expect.objectContaining({ id: 'b', version: '1', assetId: 'asset' }) }))
+    expect(runtime.archive.verifyPrintRecords).toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({ id: 'a' }), expect.objectContaining({ id: 'b' })]), { workspaceId: 'w', actorId: 'a' }, undefined)
     runtime.archive.loadSourceFile.mockRejectedValueOnce(new Error('权限已撤销'))
     await expect(store.loadFileForPrint(id)).rejects.toThrow('权限已撤销')
+  })
+
+  it('整批末次核验失败不返回原件，独立登记已打印仍可使用', async () => {
+    const store = useDeliveryStore()
+    await store.loadPendingPrintQueue()
+    const id = store.files.find(file => file.printDisposition === 'pending')!.id
+    runtime.archive.verifyPrintRecords.mockRejectedValueOnce(new Error('原件已变化'))
+    await expect(store.loadFileForPrint(id)).rejects.toThrow('原件已变化')
+    expect(store.byId(id)?.printDisposition).toBe('pending')
+    await store.confirmFilePrintReceipt(id)
+    expect(runtime.archive.confirmManyPrintReceipts).toHaveBeenCalledWith(['a', 'b'])
   })
 
   it('同上传批次引用不同资产或缺原件时分别进入队列，不借相邻原件打印', async () => {

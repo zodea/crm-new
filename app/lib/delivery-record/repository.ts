@@ -6,7 +6,7 @@ import { deliveryProblem } from './contract'
 
 export interface DeliveryFetchOptions { method?: 'POST', body?: DeliveryCommand, query?: Record<string, unknown>, signal?: AbortSignal }
 export type DeliveryFetcher = (url: string, options?: DeliveryFetchOptions) => Promise<unknown>
-export interface DeliveryFileQuery { id: string, assetId: string, origin: DataOriginDTO, projectId: string, supplierId: string | null }
+export interface DeliveryFileQuery { id: string, assetId: string, origin: DataOriginDTO, projectId: string, supplierId: string | null, expectedVersion?: string }
 export interface DeliveryOriginal { assetId: string, fileName: string, mimeType: string, fileSize: number, sha256: string, bytes: Uint8Array }
 
 function originQuery(origin: DataOriginDTO) {
@@ -124,7 +124,8 @@ export function createDeliveryRepository(fetcher: DeliveryFetcher) {
       if (!object(value) || value.recordId !== query.id || value.id !== query.assetId || value.origin !== query.origin
         || value.ownerType !== 'delivery_record' || value.projectId !== query.projectId || value.supplierId !== query.supplierId
         || typeof value.fileName !== 'string' || !value.fileName || !['application/pdf', 'image/png', 'image/jpeg'].includes(String(value.mimeType))
-        || typeof value.sourceVersion !== 'string' || typeof value.sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(value.sha256)
+        || typeof value.sourceVersion !== 'string' || (query.expectedVersion !== undefined && value.sourceVersion !== query.expectedVersion)
+        || typeof value.sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(value.sha256)
         || typeof value.payloadBase64 !== 'string' || value.payloadBase64.length % 4 !== 0 || !/^[A-Z0-9+/]*={0,2}$/i.test(value.payloadBase64)
         || !Number.isSafeInteger(value.fileSize) || Number(value.fileSize) <= 0) {
         invalidOriginal()

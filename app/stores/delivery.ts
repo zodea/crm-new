@@ -1,3 +1,4 @@
+import type { DeliveryPrintSnapshot } from '~/lib/delivery-record/state'
 import type { DeliveryAmountSource, DeliveryReviewConfirmations } from '~/lib/delivery/review'
 import type { ParsedDeliveryItem } from '~/lib/recognize/delivery-parse'
 import type { DeliveryPrintDisposition, DeliveryRecordSourceFile } from '~/stores/delivery-record'
@@ -658,34 +659,51 @@ export const useDeliveryStore = defineStore('delivery', () => {
     const file = byId(fileId)
     if (!file || file.printDisposition !== 'pending')
       throw new Error('待打印送货单不存在')
+    const recordIds = [...file.archivedRecordIds]
+    if (!recordIds.length || new Set(recordIds).size !== recordIds.length)
+      throw new Error('待打印记录不完整，请重新读取队列')
     const recordStore = useDeliveryRecordStore()
     const origin = recordStore.origin
     const assertActive = () => {
       if (origin !== recordStore.origin || options?.signal?.aborted)
         throw new DOMException('送货来源已变化或原件读取已取消', 'AbortError')
+      const current = byId(fileId)
+      if (!current || current.printDisposition !== 'pending' || current.archivedRecordIds.length !== recordIds.length
+        || current.archivedRecordIds.some((id, index) => id !== recordIds[index])) {
+        throw new Error('待打印队列已变化，请重新读取队列')
+      }
     }
     assertActive()
     await recordStore.load()
     assertActive()
-    let original: DeliveryRecordSourceFile | null = null
-    let assetId: string | null = null
-    for (const id of file.archivedRecordIds) {
+    const context = recordStore.context
+    if (!context || !context.capabilities.includes('delivery:read'))
+      throw new Error('当前无送货读取权限，请重新读取队列')
+    const identity = { workspaceId: context.workspaceId, actorId: context.actorId }
+    const snapshots: DeliveryPrintSnapshot[] = recordIds.map((id) => {
       const record = recordStore.list.find(row => row.id === id && row.dataOrigin === origin)
-      if (!record || record.printDisposition !== 'pending')
+      if (!record || record.printDisposition !== 'pending' || !record.archived || record.deletedAt !== null)
         throw new Error('待打印记录已变化，请重新读取队列')
       if (!record.assetId || !record.hasSourceFile)
         throw new Error('该送货单未保存原件，无法打开打印')
-      const source = await recordStore.loadSourceFile(id, { ...options, assetId: record.assetId })
+      return { id: record.id, dataOrigin: record.dataOrigin, version: record.version, assetId: record.assetId, projectId: record.projectId, supplierId: record.supplierId }
+    })
+    let original: DeliveryRecordSourceFile | null = null
+    let assetId: string | null = null
+    for (const snapshot of snapshots) {
+      const source = await recordStore.loadSourceFile(snapshot.id, { ...options, assetId: snapshot.assetId, expectedPrint: snapshot })
       assertActive()
       if (!source)
         throw new Error('该送货单缺少原件，请重新读取')
-      if (original && (assetId !== record.assetId || original.fileName !== source.fileName || original.mimeType !== source.mimeType || original.bytes.length !== source.bytes.length || original.bytes.some((byte, index) => byte !== source.bytes[index])))
+      if (original && (assetId !== snapshot.assetId || original.fileName !== source.fileName || original.mimeType !== source.mimeType || original.bytes.length !== source.bytes.length || original.bytes.some((byte, index) => byte !== source.bytes[index])))
         throw new Error('待打印记录的原件已分开或发生冲突，请重新读取队列')
       original = source
-      assetId = record.assetId
+      assetId = snapshot.assetId
     }
     if (!original)
       throw new Error('待打印送货单缺少归档原件')
+    await recordStore.verifyPrintRecords(snapshots, identity, options)
+    assertActive()
     return new File([Uint8Array.from(original.bytes)], original.fileName, { type: original.mimeType })
   }
 
