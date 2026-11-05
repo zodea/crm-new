@@ -191,7 +191,7 @@ it('实际v12旧17表备份可只读核验、离线复制及隔离恢复，不�
   finally { await f.storage.close() }
 })
 
-it('实际v13核验版本进入备份与冷恢复，原件、可信核验人与结论保真且只增加确认现金', { timeout: 20000 }, async () => {
+async function historicalVerificationFixture() {
   const f = await fixture()
   try {
     const request = await f.verify('pay08-backup-verification')
@@ -234,47 +234,18 @@ it('实际v13核验版本进入备份与冷恢复，原件、可信核验人与�
       }
       finally { await oldStorage.close() }
     })()
+    return { f, request, staging, offline, restore, backup, historicalPath, result, actualRead, frozenHistory, frozenCommands, frozenProof }
+  }
+  catch (cause) {
+    await f.storage.close()
+    throw cause
+  }
+}
+
+it('实际v13核验版本进入备份与冷恢复，原件、可信核验人与结论保真且只增加确认现金', { timeout: 20000 }, async () => {
+  const { f, request, staging, offline, restore, backup, historicalPath, result, actualRead, frozenHistory, frozenCommands, frozenProof } = await historicalVerificationFixture()
+  try {
     const before = actualRead.draft.paymentVerification!
-    const v30Directory = join(f.directory, 'v30-synthetic-copy')
-    await mkdir(v30Directory)
-    const v30Path = join(v30Directory, 'ruihang.sqlite')
-    await copyFile(historicalPath, v30Path, constants.COPYFILE_EXCL)
-    const v30 = new DatabaseSync(v30Path, { enableForeignKeyConstraints: true })
-    try {
-      v30.exec('BEGIN')
-      try {
-        for (const step of PRODUCTION_STORAGE_UPGRADES.filter(step => step.from >= 13 && step.to <= 30)) {
-          v30.exec(step.sql)
-          v30.prepare('UPDATE production_metadata SET schema_version=? WHERE singleton=1').run(step.to)
-        }
-        v30.exec('COMMIT')
-      }
-      catch (error) {
-        v30.exec('ROLLBACK')
-        throw error
-      }
-    }
-    finally { v30.close() }
-    expect((await inspectProductionBackup(v30Path)).schemaVersion).toBe(30)
-    const upgradedV30 = createProductionStorage({ ...f.options, directory: v30Directory })
-    try {
-      const upgradedService = f.financeService(upgradedV30)
-      expect(await upgradedService.execute(request, f.session)).toEqual(result)
-      await expect(upgradedService.execute({ ...request, draft: { id: f.native.ids.application, verificationEdit: { ...f.edit, basis: '同编号不同依据' } } }, f.session)).rejects.toMatchObject({ problem: { code: 'conflict' } })
-      expect(await upgradedV30.select('SELECT * FROM finance_history ORDER BY kind,id,version')).toEqual(frozenHistory)
-      expect(await upgradedV30.select('SELECT * FROM finance_commands ORDER BY command_id')).toEqual(frozenCommands)
-      expect(await upgradedV30.select('SELECT * FROM finance_payment_verifications ORDER BY id')).toEqual(frozenProof)
-      await expect(validateFinanceJournal(upgradedV30, f.actor)).resolves.toBeDefined()
-      const current = await upgradedService.form('payment_application', f.native.ids.application, f.session)
-      await upgradedService.execute({ ...request, commandId: 'v30-later-verification', baseVersion: current.version, draft: { id: f.native.ids.application, verificationEdit: { ...f.edit, basis: '升级后重新核验' } } }, f.session)
-      const afterHistory = await upgradedV30.select<{ kind: string, id: string, version: number, snapshot_json: string }>('SELECT * FROM finance_history ORDER BY kind,id,version')
-      for (const old of frozenHistory as { kind: string, id: string, version: number }[])
-        expect(afterHistory.find(row => row.kind === old.kind && row.id === old.id && row.version === old.version)).toEqual(old)
-      const latest = afterHistory.filter(row => row.kind === 'payment_application' && row.id === f.native.ids.application).at(-1)!
-      expect(JSON.parse(latest.snapshot_json).head).toMatchObject({ contract_domain: null, contract_version: null })
-      await expect(validateFinanceJournal(upgradedV30, f.actor)).resolves.toBeDefined()
-    }
-    finally { await upgradedV30.close() }
     expect((await createFinanceRepository(async () => actualRead).form('payment_application', f.native.ids.application)).draft.paymentVerification).toEqual(before)
     const invalidActor = structuredClone(actualRead)
     invalidActor.draft.paymentVerification!.proof!.actorId = 'another-pay08-owner'
@@ -328,6 +299,53 @@ it('实际v13核验版本进入备份与冷恢复，原件、可信核验人与�
     const script = `const {registerHooks}=require('node:module'),{pathToFileURL}=require('node:url'),path=require('node:path');registerHooks({resolve(s,c,n){if(s.startsWith('~/'))s=pathToFileURL(path.resolve('app',s.slice(2))).href;try{return n(s,c)}catch(e){if((s.startsWith('.')||s.startsWith('file:'))&&e.code==='ERR_MODULE_NOT_FOUND')return n(s+'.ts',c);throw e}}});(async()=>{const {createProductionStorage}=await import('./server/utils/production-storage.ts');const {validateFinanceJournal}=await import('./server/utils/production-finance-journal.ts');const [directory,actorJson]=process.argv.slice(1);const actor=JSON.parse(actorJson);const storage=createProductionStorage({directory,workspaceId:actor.workspaceId,ownerId:actor.actorId,purpose:'verification'});await validateFinanceJournal(storage,actor);const proof=await storage.select('SELECT * FROM finance_payment_verifications ORDER BY id');process.stdout.write(JSON.stringify(proof));await storage.close()})().catch(e=>{process.stderr.write(String(e));process.exitCode=1})`
     const coldProof = JSON.parse(execFileSync(process.execPath, ['--experimental-transform-types', '-e', script, restored.directory, JSON.stringify(f.actor)], { cwd: process.cwd(), encoding: 'utf8' }))
     expect(coldProof).toEqual(frozenProof)
+  }
+  finally { await f.storage.close() }
+})
+
+it('实际v13核验版本升级至v30后保留原回执和冻结历史，后续核验追加而不覆盖', { timeout: 20000 }, async () => {
+  const { f, request, historicalPath, result, frozenHistory, frozenCommands, frozenProof } = await historicalVerificationFixture()
+  try {
+    const v30Directory = join(f.directory, 'v30-synthetic-copy')
+    await mkdir(v30Directory)
+    const v30Path = join(v30Directory, 'ruihang.sqlite')
+    await copyFile(historicalPath, v30Path, constants.COPYFILE_EXCL)
+    const v30 = new DatabaseSync(v30Path, { enableForeignKeyConstraints: true })
+    try {
+      v30.exec('BEGIN')
+      try {
+        for (const step of PRODUCTION_STORAGE_UPGRADES.filter(step => step.from >= 13 && step.to <= 30)) {
+          v30.exec(step.sql)
+          v30.prepare('UPDATE production_metadata SET schema_version=? WHERE singleton=1').run(step.to)
+        }
+        v30.exec('COMMIT')
+      }
+      catch (error) {
+        v30.exec('ROLLBACK')
+        throw error
+      }
+    }
+    finally { v30.close() }
+    expect((await inspectProductionBackup(v30Path)).schemaVersion).toBe(30)
+    const upgradedV30 = createProductionStorage({ ...f.options, directory: v30Directory })
+    try {
+      const upgradedService = f.financeService(upgradedV30)
+      expect(await upgradedService.execute(request, f.session)).toEqual(result)
+      await expect(upgradedService.execute({ ...request, draft: { id: f.native.ids.application, verificationEdit: { ...f.edit, basis: '同编号不同依据' } } }, f.session)).rejects.toMatchObject({ problem: { code: 'conflict' } })
+      expect(await upgradedV30.select('SELECT * FROM finance_history ORDER BY kind,id,version')).toEqual(frozenHistory)
+      expect(await upgradedV30.select('SELECT * FROM finance_commands ORDER BY command_id')).toEqual(frozenCommands)
+      expect(await upgradedV30.select('SELECT * FROM finance_payment_verifications ORDER BY id')).toEqual(frozenProof)
+      await expect(validateFinanceJournal(upgradedV30, f.actor)).resolves.toBeDefined()
+      const current = await upgradedService.form('payment_application', f.native.ids.application, f.session)
+      await upgradedService.execute({ ...request, commandId: 'v30-later-verification', baseVersion: current.version, draft: { id: f.native.ids.application, verificationEdit: { ...f.edit, basis: '升级后重新核验' } } }, f.session)
+      const afterHistory = await upgradedV30.select<{ kind: string, id: string, version: number, snapshot_json: string }>('SELECT * FROM finance_history ORDER BY kind,id,version')
+      for (const old of frozenHistory as { kind: string, id: string, version: number }[])
+        expect(afterHistory.find(row => row.kind === old.kind && row.id === old.id && row.version === old.version)).toEqual(old)
+      const latest = afterHistory.filter(row => row.kind === 'payment_application' && row.id === f.native.ids.application).at(-1)!
+      expect(JSON.parse(latest.snapshot_json).head).toMatchObject({ contract_domain: null, contract_version: null })
+      await expect(validateFinanceJournal(upgradedV30, f.actor)).resolves.toBeDefined()
+    }
+    finally { await upgradedV30.close() }
   }
   finally { await f.storage.close() }
 })
