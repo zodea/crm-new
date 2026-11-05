@@ -913,8 +913,13 @@ export async function readInvoiceWorkbookStyleReadback(
   }
 }
 
+/** SheetJS 空白占位可能含补出的 0；它不能作为公式缓存证据。 */
+function isUnverifiedFormulaStub(cell: XLSX.CellObject | undefined): boolean {
+  return !!cell?.f && cell.t === 'z'
+}
+
 function displayCellValue(cell: XLSX.CellObject | undefined): string {
-  if (!cell || cell.v == null)
+  if (!cell || isUnverifiedFormulaStub(cell) || cell.v == null)
     return ''
   return cell.w ?? String(cell.v)
 }
@@ -922,6 +927,8 @@ function displayCellValue(cell: XLSX.CellObject | undefined): string {
 function formulaStatus(cell: XLSX.CellObject | undefined, displayValue: string): InvoiceFormulaStatus {
   if (!cell?.f)
     return 'none'
+  if (isUnverifiedFormulaStub(cell))
+    return 'missing-cache'
   if (cell.t === 'e' || FORMULA_ERROR_PATTERN.test(displayValue))
     return 'invalid'
   if (cell.v == null || displayValue === '')
@@ -929,8 +936,9 @@ function formulaStatus(cell: XLSX.CellObject | undefined, displayValue: string):
   return 'resolved'
 }
 
-function sheetMatrix(ws: XLSX.WorkSheet, range: XLSX.Range): string[][] {
+function sheetMatrix(ws: XLSX.WorkSheet, range: XLSX.Range): { values: string[][], inheritedFormulaIssues: Map<string, { anchor: string, status: 'missing-cache' | 'invalid' }> } {
   const matrix: string[][] = []
+  const inheritedFormulaIssues = new Map<string, { anchor: string, status: 'missing-cache' | 'invalid' }>()
   for (let row = range.s.r; row <= range.e.r; row++) {
     const values: string[] = []
     for (let column = range.s.c; column <= range.e.c; column++) {
@@ -943,17 +951,23 @@ function sheetMatrix(ws: XLSX.WorkSheet, range: XLSX.Range): string[][] {
     const endRow = merge.e.r - range.s.r
     const startColumn = merge.s.c - range.s.c
     const endColumn = merge.e.c - range.s.c
+    const anchorAddress = cellAddress(merge.s.r, merge.s.c)
     const value = matrix[startRow]?.[startColumn] ?? ''
-    if (!value)
+    const status = formulaStatus(ws[anchorAddress], value)
+    const anchorUnverified = status === 'missing-cache' || status === 'invalid'
+    if (!value && !anchorUnverified)
       continue
     for (let row = startRow; row <= endRow; row++) {
       for (let column = startColumn; column <= endColumn; column++) {
-        if (matrix[row]?.[column] === '')
+        const address = cellAddress(row + range.s.r, column + range.s.c)
+        if (anchorUnverified && address !== anchorAddress && matrix[row]?.[column] === '')
+          inheritedFormulaIssues.set(address, { anchor: anchorAddress, status })
+        if (value && matrix[row]?.[column] === '' && !isUnverifiedFormulaStub(ws[address]))
           matrix[row]![column] = value
       }
     }
   }
-  return matrix
+  return { values: matrix, inheritedFormulaIssues }
 }
 
 function invoiceHeaderScore(row: readonly string[]): number {
@@ -1022,7 +1036,7 @@ function readInvoiceSheet(
     throw new Error(`工作表不存在：${sheetName}`)
 
   const range = XLSX.utils.decode_range(worksheet['!ref'] ?? 'A1')
-  const matrix = sheetMatrix(worksheet, range)
+  const { values: matrix, inheritedFormulaIssues } = sheetMatrix(worksheet, range)
   const nonEmptyCells = matrix.some(row => !isBlankRow(row))
   const headerRow = nonEmptyCells ? detectInvoiceHeaderRow(matrix) : 0
   const headerValues = matrix[headerRow] ?? []
@@ -1052,10 +1066,10 @@ function readInvoiceSheet(
         address,
         columnIndex: column.index,
         columnName: column.name,
-        rawValue: cell?.v,
+        rawValue: isUnverifiedFormulaStub(cell) ? undefined : cell?.v,
         displayValue,
         formula: cell?.f ?? null,
-        cachedValue: cell?.f ? cell.v : undefined,
+        cachedValue: cell?.f && !isUnverifiedFormulaStub(cell) ? cell.v : undefined,
         formulaStatus: formulaStatus(cell, displayValue),
         styleId: cellStyle?.styleId ?? null,
         style: cellStyle,
@@ -1067,11 +1081,18 @@ function readInvoiceSheet(
     const formulaIssues = formulaCells
       .filter(cell => cell.formulaStatus === 'missing-cache' || cell.formulaStatus === 'invalid')
       .map(cell => `${cell.columnName}（${cell.address}）：${cell.formulaStatus === 'missing-cache' ? '缺少缓存值' : '缓存值异常'}`)
+    for (const cell of cells) {
+      const inherited = inheritedFormulaIssues.get(cell.address)
+      if (inherited)
+        formulaIssues.push(`${cell.columnName}（${cell.address}）：合并来源 ${inherited.anchor} 的公式${inherited.status === 'missing-cache' ? '缺少缓存值' : '缓存值异常'}`)
+    }
     const rowNumber = absoluteRow + 1
     const rowStyleIssues = styleIssues
       .filter(issue => issue.sourceRow == null || issue.sourceRow === rowNumber || (issue.address != null && cells.some(cell => cell.address === issue.address)))
       .map(issue => issue.reason)
-    const rowKind = sourceRowKind(rowValues, sheetKind)
+    const classifiedRow = sourceRowKind(rowValues, sheetKind)
+    const hasUnverifiedFormula = formulaIssues.length > 0
+    const rowKind = classifiedRow === 'blank' && sheetKind === 'data' && hasUnverifiedFormula ? 'data' : classifiedRow
     const sourceRow: InvoiceSourceRow = {
       sheetName,
       sourceRow: rowNumber,

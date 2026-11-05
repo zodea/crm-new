@@ -234,16 +234,19 @@ describe('发票 Excel 导入/回读来源证据', () => {
   })
 
   it.each([
-    { rowIndex: 0, expected: { formula: 'SUM(C2:C2)', formulaStatus: 'resolved' } },
-    { rowIndex: 1, expected: { formula: 'SUM(C3:C3)', formulaStatus: 'invalid' } },
+    { rowIndex: 0, expected: { address: 'B2', formula: 'SUM(C2:C2)', cachedValue: 2, formulaStatus: 'resolved' } },
+    { rowIndex: 1, expected: { address: 'B3', formula: 'SUM(C3:C3)', cachedValue: 0x0F, formulaStatus: 'invalid' } },
+    { rowIndex: 2, expected: { address: 'B4', formula: 'SUM(C4:C4)', cachedValue: 0, formulaStatus: 'resolved' } },
   ])('公式行 $rowIndex 保留原文和复核状态', async ({ rowIndex, expected }) => {
     const worksheet = XLSX.utils.aoa_to_sheet([
       ['发票号码', '价税合计'],
       ['000000000000000099', undefined],
       ['000000000000000100', undefined],
+      ['000000000000000101', undefined],
     ])
-    worksheet.B2 = { t: 'n', f: 'SUM(C2:C2)' }
-    worksheet.B3 = { t: 'e', f: 'SUM(C3:C3)', v: '#VALUE!', w: '#VALUE!' }
+    worksheet.B2 = { t: 'n', f: 'SUM(C2:C2)', v: 2 }
+    worksheet.B3 = { t: 'e', f: 'SUM(C3:C3)', v: 0x0F, w: '#VALUE!' }
+    worksheet.B4 = { t: 'n', f: 'SUM(C4:C4)', v: 0 }
     const workbook = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(workbook, worksheet, '公式异常')
 
@@ -252,8 +255,10 @@ describe('发票 Excel 导入/回读来源证据', () => {
       '公式异常.xlsx',
     )
     const rows = parsed.sheets[0]!.rows
-    expect(rows).toHaveLength(2)
-    expect(getInvoiceImportSourceMeta(rows[rowIndex]!)?.formulaCells[0]).toMatchObject(expected)
+    expect(rows).toHaveLength(3)
+    const source = getInvoiceImportSourceMeta(rows[rowIndex]!)!
+    expect(source.sourceRow).toBe(rowIndex + 2)
+    expect(source.formulaCells[0]).toMatchObject(expected)
   })
 
   it('缺少发票号码的真实业务行保留来源键并进入逐行复核，明确合计行才忽略', async () => {
