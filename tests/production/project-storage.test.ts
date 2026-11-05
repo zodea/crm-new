@@ -1,9 +1,11 @@
 import type { ProjectCommandRequestDTO } from '../../app/lib/project/command-contract'
 import { mkdir, mkdtemp } from 'node:fs/promises'
+import process from 'node:process'
 import { afterAll, expect, it } from 'vitest'
 import { createProductionCustomerService } from '../../server/utils/production-customer-service'
 import { createProductionProjectService } from '../../server/utils/production-project-service'
 import { createProductionStorage } from '../../server/utils/production-storage'
+import { runColdProcess } from '../helpers/cold-process'
 import { createSeededProductionStorage } from '../helpers/production-storage-seed'
 import { cleanupTestTempRoot, testTempRoot } from '../helpers/test-temp-root'
 
@@ -59,6 +61,41 @@ it('正式项目合同金额的真实零和未知值各自持久化，冷开及�
 
     await assertAmounts(f.service)
     await f.storage.close()
+    const { stdout } = await runColdProcess('production-project-cold', [testTempRoot(), f.options.directory, zero.id, unknown.id], {
+      timeout: 20_000,
+      env: { SystemRoot: process.env.SystemRoot, WINDIR: process.env.WINDIR, TEMP: f.options.directory, TMP: f.options.directory },
+    })
+    const cold = JSON.parse(stdout)
+    expect(Number.isSafeInteger(cold.pid)).toBe(true)
+    expect(cold.pid).toBeGreaterThan(0)
+    expect(cold.pid).not.toBe(process.pid)
+    expect(cold.items).toHaveLength(2)
+    expect(cold.items).toContainEqual(expect.objectContaining({
+      dataOrigin: 'real',
+      project: expect.objectContaining({ id: zero.id, label: '合成零额项目' }),
+      contractAmount: '0.00',
+    }))
+    expect(cold.items).toContainEqual(expect.objectContaining({
+      dataOrigin: 'real',
+      project: expect.objectContaining({ id: unknown.id, label: '合成未知金额项目' }),
+      contractAmount: null,
+    }))
+    expect(cold.zero).toEqual({ id: zero.id, version: '1', amount: 0 })
+    expect(cold.unknown).toEqual({ id: unknown.id, version: '1', amount: null })
+    expect(cold.restricted).toHaveLength(2)
+    expect(cold.restricted).toContainEqual(expect.objectContaining({
+      project: expect.objectContaining({ id: zero.id }),
+      contractAmount: '0.00',
+      customer: { state: 'forbidden', entity: 'customer', id: null, label: null, reason: 'permission-denied' },
+    }))
+    expect(cold.restricted).toContainEqual(expect.objectContaining({
+      project: expect.objectContaining({ id: unknown.id }),
+      contractAmount: null,
+      customer: { state: 'forbidden', entity: 'customer', id: null, label: null, reason: 'permission-denied' },
+    }))
+    expect(JSON.stringify(cold.restricted)).not.toContain(f.customer.id)
+    expect(JSON.stringify(cold.restricted)).not.toContain('正式客户')
+    expect(cold.denied).toMatchObject({ code: 'forbidden' })
     const service = createProductionProjectService(reopened)
     await assertAmounts(service)
 
@@ -96,7 +133,7 @@ it('正式项目合同金额的真实零和未知值各自持久化，冷开及�
     await f.storage.close()
     await reopened.close()
   }
-})
+}, 30_000)
 
 it('项目与原件同库冷回读，客户改名沿原 ID、未知指标不归零、删除恢复保留原件', async () => {
   const f = await fixture()

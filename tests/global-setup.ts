@@ -19,6 +19,7 @@ export const COLD_ENTRIES = [
   'production-payroll-cold-process',
   'production-payroll-history-cold-process',
   'production-process-library-server',
+  'production-project-cold',
   'production-quantity-cold-process',
   'production-quantity-import-cold-process',
   'production-subcontract-cold',
