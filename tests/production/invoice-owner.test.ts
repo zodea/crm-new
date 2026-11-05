@@ -297,6 +297,57 @@ describe('发票中央原件 owner（隔离内存）', () => {
     expect(candidate.fields).not.toHaveProperty('balanced')
   })
 
+  it('打印登记重核原件正文，损坏时整批不写入且已成功回执仍可重放', async () => {
+    const f = fixture()
+    const base = { workspaceId: f.actor.workspaceId, actorId: f.actor.actorId, requiredCapability: INVOICE_WRITE_CAPABILITY }
+    const targets: Array<{ invoiceId: string, baseVersion: string, rotation: 0 }> = []
+    const originalIds: string[] = []
+    const originalBytes = [f.bytes, Buffer.concat([f.bytes, Buffer.alloc(256 * 1024, 0x20)])]
+    for (let index = 0; index < 2; index++) {
+      const bytes = originalBytes[index]!
+      const created = await f.service.execute({ ...f.upload, original: { ...f.upload.original, fileSize: bytes.length, contentBase64: bytes.toString('base64') }, commandId: `print-integrity-upload-${index}` }, f.session)
+      const fields = { invoiceNumber: `8765432${index}`, invoiceDate: '2026-01-01', invoiceType: '', buyer: '', buyerTaxNo: '', seller: '合成销售方', sellerTaxNo: '', amount: null, taxAmount: 0, totalAmount: 100, taxRate: '', remark: '' }
+      const recognized = await f.service.execute({ ...base, action: 'recognize', invoiceId: created.invoiceId, baseVersion: created.version, commandId: `print-integrity-ocr-${index}`, fields, items: [], source: 'local', textPages: ['合成文本'], unrecognizedPageIndexes: [] }, f.session)
+      const reviewed = await f.service.execute({ ...base, action: 'review', invoiceId: created.invoiceId, baseVersion: recognized.version, commandId: `print-integrity-review-${index}`, manualCompletion: false }, f.session)
+      originalIds.push(created.originalId!)
+      targets.push({ invoiceId: created.invoiceId, baseVersion: reviewed.version, rotation: 0 })
+      expect(Buffer.from((await f.service.original(created.invoiceId, created.originalId!, f.session)).bytes)).toEqual(bytes)
+    }
+    const request = { ...base, action: 'record-printed', commandId: 'print-integrity-batch', targets }
+    const damaged = Buffer.from(originalBytes[1]!)
+    damaged[damaged.length - 1] = damaged[damaged.length - 1]! ^ 1
+    const sha256 = createHash('sha256').update(originalBytes[1]!).digest('hex')
+    for (const corruption of ['digest', 'length', 'missing', 'owner'] as const) {
+      if (corruption === 'digest' || corruption === 'length')
+        await f.storage.execute('UPDATE file_payloads SET content=? WHERE file_ref_id=?', [corruption === 'digest' ? damaged : originalBytes[1]!.subarray(1), originalIds[1]!])
+      else if (corruption === 'missing')
+        await f.storage.execute('DELETE FROM file_payloads WHERE file_ref_id=?', [originalIds[1]!])
+      else
+        await f.storage.execute('UPDATE file_refs SET owner_id=? WHERE id=?', ['wrong-owner', originalIds[1]!])
+      await expect(f.service.recordPrinted(request, f.session)).rejects.toMatchObject({ problem: { code: 'unavailable' } })
+      expect(await f.storage.select('SELECT id,version,print_count FROM invoices ORDER BY id')).toEqual(
+        [...targets].sort((a, b) => a.invoiceId.localeCompare(b.invoiceId)).map(target => ({ id: target.invoiceId, version: Number(target.baseVersion), print_count: 0 })),
+      )
+      expect(await f.storage.select('SELECT command_id FROM invoice_print_receipts')).toEqual([])
+      expect(await f.storage.select('SELECT command_id FROM invoice_print_lines')).toEqual([])
+      if (corruption === 'missing')
+        await f.storage.execute('INSERT INTO file_payloads(file_ref_id,content,sha256) VALUES(?,?,?)', [originalIds[1]!, originalBytes[1]!, sha256])
+      else if (corruption === 'owner')
+        await f.storage.execute('UPDATE file_refs SET owner_id=? WHERE id=?', [targets[1]!.invoiceId, originalIds[1]!])
+      else
+        await f.storage.execute('UPDATE file_payloads SET content=? WHERE file_ref_id=?', [originalBytes[1]!, originalIds[1]!])
+    }
+    const result = await f.service.recordPrinted(request, f.session)
+    await f.storage.execute('UPDATE file_payloads SET content=? WHERE file_ref_id=?', [damaged, originalIds[1]!])
+    expect(await f.service.recordPrinted(request, f.session)).toEqual(result)
+    expect(await f.service.resolvePrinted(request.commandId, f.session)).toEqual({ outcome: 'applied', result })
+    const next = { ...request, commandId: 'print-integrity-next', targets: result.records.map(record => ({ invoiceId: record.invoiceId, baseVersion: record.version, rotation: 0 })) }
+    await expect(f.service.recordPrinted(next, f.session)).rejects.toMatchObject({ problem: { code: 'unavailable' } })
+    expect((await f.storage.select<{ print_count: number }>('SELECT print_count FROM invoices')).map(row => row.print_count)).toEqual([1, 1])
+    expect(await f.storage.select('SELECT command_id FROM invoice_print_receipts')).toEqual([{ command_id: request.commandId }])
+    expect(await f.storage.select('SELECT command_id FROM invoice_print_lines')).toHaveLength(2)
+  })
+
   it('打印确认整批原子提交，重复请求只计一次，版本冲突不留下部分计数', async () => {
     const f = fixture()
     const base = { workspaceId: f.actor.workspaceId, actorId: f.actor.actorId, requiredCapability: INVOICE_WRITE_CAPABILITY }

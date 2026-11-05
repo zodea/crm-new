@@ -374,6 +374,27 @@ const SELECT_RECORD = `SELECT i.*, f.id AS file_id, f.file_name, f.file_size, f.
   FROM invoices i LEFT JOIN file_refs f ON f.id=i.original_file_id AND f.owner_type='invoice' AND f.owner_id=i.id AND f.deleted_at IS NULL
   LEFT JOIN file_payloads p ON p.file_ref_id=f.id`
 
+/** 打印登记时逐块核验当前事务中的原件，避免一次物化整批正文。 */
+async function verifyPrintOriginal(tx: TransactionDb, invoice: CentralInvoiceRecord) {
+  const original = invoice.original
+  if (!original)
+    return fail('unavailable', '发票原件正文或摘要不完整，不能登记打印。')
+  const [metadata] = await tx.select<{ size: number, type: string }>('SELECT length(content) AS size,typeof(content) AS type FROM file_payloads WHERE file_ref_id=?', [original.id])
+  if (metadata?.type !== 'blob' || metadata.size !== original.fileSize)
+    return fail('unavailable', '发票原件正文或摘要不完整，不能登记打印。')
+  const hash = createHash('sha256')
+  const chunkSize = 256 * 1024
+  for (let offset = 0; offset < original.fileSize; offset += chunkSize) {
+    const size = Math.min(chunkSize, original.fileSize - offset)
+    const [row] = await tx.select<{ content: Uint8Array }>('SELECT substr(content,?,?) AS content FROM file_payloads WHERE file_ref_id=?', [offset + 1, size, original.id])
+    if (!(row?.content instanceof Uint8Array) || row.content.length !== size)
+      return fail('unavailable', '发票原件正文或摘要不完整，不能登记打印。')
+    hash.update(row.content)
+  }
+  if (hash.digest('hex') !== original.sha256)
+    return fail('unavailable', '发票原件正文或摘要不完整，不能登记打印。')
+}
+
 /** 仅供已经授权的同一事务捕获与核验发票事实。 */
 export async function readProductionInvoiceFact(tx: Pick<TransactionDb, 'select'>, invoiceId: string): Promise<CentralInvoiceRecord> {
   const [row] = await tx.select<Row>(`${SELECT_RECORD} WHERE i.id=?`, [invoiceId])
@@ -1412,6 +1433,7 @@ export function createProductionInvoiceService(storage: ProductionStorage, optio
           }
           if (!Number.isSafeInteger(Number(invoice.version) + 1) || !Number.isSafeInteger(invoice.printCount + 1))
             fail('unavailable', '发票版本或打印次数无法可靠递增。')
+          await verifyPrintOriginal(tx, invoice)
           before.push(invoice)
         }
         const now = new Date().toISOString()
