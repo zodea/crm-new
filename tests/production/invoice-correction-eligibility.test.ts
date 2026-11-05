@@ -1,9 +1,7 @@
 import { Buffer } from 'node:buffer'
-import { execFileSync } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import { mkdir, mkdtemp } from 'node:fs/promises'
 import { join } from 'node:path'
-import process from 'node:process'
 import { afterAll, expect, it } from 'vitest'
 import { INVOICE_READ_CAPABILITY, INVOICE_WRITE_CAPABILITY } from '../../app/lib/invoice/central-contract'
 import { createProductionAuxiliaryContractService } from '../../server/utils/production-auxiliary-contract-service'
@@ -18,6 +16,7 @@ import { createProductionInvoiceMigration } from '../../server/utils/production-
 import { createProductionInvoiceService } from '../../server/utils/production-invoice-service'
 import { createProductionStorage } from '../../server/utils/production-storage'
 import { createProductionSupplierService } from '../../server/utils/production-supplier-service'
+import { runColdProcess } from '../helpers/cold-process'
 import { createMigratedMemoryDb } from '../helpers/memory-db'
 import { createSubcontractFixture } from '../helpers/production-subcontract-fixture'
 import { cleanupTestTempRoot, testTempRoot } from '../helpers/test-temp-root'
@@ -204,8 +203,8 @@ it('明确提交更正单原子更新原票和双重回执，原件、历史及�
       expect((await recovered.select<{ content: Uint8Array }>('SELECT content FROM file_payloads WHERE file_ref_id=?', [correction.attachments[0]!.id]))[0]!.content).toEqual(new Uint8Array(Buffer.from('abc')))
     }
     finally { await recovered.close() }
-    const script = `const {registerHooks}=require('node:module'),{pathToFileURL}=require('node:url'),path=require('node:path');registerHooks({resolve(s,c,n){if(s.startsWith('~/'))s=pathToFileURL(path.resolve('app',s.slice(2))).href;try{return n(s,c)}catch(e){if((s.startsWith('.')||s.startsWith('file:'))&&e.code==='ERR_MODULE_NOT_FOUND')return n(s+'.ts',c);throw e}}});(async()=>{const {createProductionStorage}=await import('./server/utils/production-storage.ts');const {createProductionInvoiceService}=await import('./server/utils/production-invoice-service.ts');const {createProductionInvoiceCorrectionService}=await import('./server/utils/production-invoice-correction-service.ts');const [directory,correctionId,actorJson]=process.argv.slice(1);const actor=JSON.parse(actorJson);const storage=createProductionStorage({directory,workspaceId:actor.workspaceId,ownerId:actor.actorId,purpose:'verification'});const invoices=createProductionInvoiceService(storage);const service=createProductionInvoiceCorrectionService(storage,{invoice:invoices.correctionPort});const correction=await service.get(correctionId,()=>actor);const invoice=await invoices.get(correction.invoiceId,()=>actor);process.stdout.write(JSON.stringify({correction,invoice}));await storage.close()})().catch(e=>{process.stderr.write(String(e));process.exitCode=1})`
-    const cold = JSON.parse(execFileSync(process.execPath, ['--experimental-transform-types', '-e', script, restored.directory, draft.correctionId, JSON.stringify(f.actor)], { cwd: process.cwd(), encoding: 'utf8' }))
+    const { stdout } = await runColdProcess('production-invoice-correction-cold', [restored.directory, draft.correctionId, JSON.stringify(f.actor)])
+    const cold = JSON.parse(stdout)
     expect(cold.correction).toEqual(correction)
     expect(cold.invoice).toEqual(current)
     expect(restored.directory.startsWith(join(base, 'restore-'))).toBe(true)
