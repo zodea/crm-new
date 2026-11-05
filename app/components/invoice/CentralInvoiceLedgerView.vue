@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import type { CentralInvoiceRecord } from '~/lib/invoice/central-contract'
 import { computed, ref, shallowRef, watch } from 'vue'
+import TablePager from '~/components/ui/TablePager.vue'
 import { centralInvoiceSourceLabel } from '~/lib/invoice/central-source-label'
+import { clampPage, paginate } from '~/lib/kit/table'
 import { isISODateDTO } from '~/types/read-model'
 import CentralInvoiceLedgerCards from './CentralInvoiceLedgerCards.vue'
 
@@ -16,6 +18,8 @@ const startDateBadInput = shallowRef(false)
 const endDateBadInput = shallowRef(false)
 const checked = ref<string[]>([])
 const view = shallowRef<'table' | 'card'>('table')
+const page = shallowRef(1)
+const pageSize = shallowRef(20)
 const dateError = computed(() => {
   if (startDateBadInput.value || endDateBadInput.value || (startDate.value && !isISODateDTO(startDate.value)) || (endDate.value && !isISODateDTO(endDate.value)))
     return '请输入有效的开票日期。'
@@ -44,6 +48,14 @@ const visible = computed(() => {
     const projectName = props.projects.find(project => project.id === record.projectId)?.label ?? ''
     return !needle || [record.fields.invoiceNumber, record.fields.buyer, record.fields.seller, record.fields.remark, projectName].some(value => value.toLocaleLowerCase().includes(needle))
   })
+})
+const currentPage = computed(() => clampPage(page.value, visible.value.length, pageSize.value))
+const pageRows = computed(() => paginate(visible.value, currentPage.value, pageSize.value))
+watch([search, owner, startDate, endDate, startDateBadInput, endDateBadInput, pageSize], () => {
+  page.value = 1
+})
+watch(() => visible.value.length, (length) => {
+  page.value = clampPage(page.value, length, pageSize.value)
 })
 function updateDate(event: Event, boundary: 'start' | 'end') {
   const input = event.target as HTMLInputElement
@@ -159,7 +171,7 @@ function exportVisible() {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="record in visible" :key="record.id" class="border-t border-line">
+          <tr v-for="record in pageRows" :key="record.id" class="border-t border-line">
             <td class="p-2">
               <input v-model="checked" type="checkbox" :value="record.id" :aria-label="`选择发票 ${record.fields.invoiceNumber || record.id}`" :disabled="busy">
             </td>
@@ -202,10 +214,14 @@ function exportVisible() {
       </p>
     </div>
     <div v-else class="min-h-0 min-w-0 flex-1 overflow-auto rounded border border-line bg-panel">
-      <CentralInvoiceLedgerCards :records="visible" :checked="checked" :busy="busy" :project-label="projectLabel" @selection="updateSelection" @open="emit('open', $event)" @discard="emit('discard', $event)" />
+      <CentralInvoiceLedgerCards :records="pageRows" :checked="checked" :busy="busy" :project-label="projectLabel" @selection="updateSelection" @open="emit('open', $event)" @discard="emit('discard', $event)" />
       <p v-if="!dateError && !visible.length" class="p-4 text-sm text-ink-soft">
         当前筛选下没有发票。
       </p>
     </div>
+    <p class="text-sm text-ink-soft">
+      本页 {{ pageRows.length }} 条 · 筛选后 {{ visible.length }} 条 · 已读取归档 {{ archived.length }} 条
+    </p>
+    <TablePager aria-label="列表分页" :total="visible.length" :page="currentPage" :page-size="pageSize" :page-size-options="[10, 20, 50]" @update:page="page = $event" @update:page-size="pageSize = $event" />
   </section>
 </template>
