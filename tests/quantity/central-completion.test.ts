@@ -3,6 +3,7 @@ import type { QuantityCommand } from '~/lib/quantity/central-contract'
 import { afterEach, beforeEach, expect, it } from 'vitest'
 import { createDbCoordinator } from '~/lib/db/coordinator'
 import { decodeQuantityCommand } from '~/lib/quantity/central-command-decoder'
+import { QuantityRepositoryProblem } from '~/lib/quantity/central-contract'
 import { createQuantityService } from '~/lib/quantity/central-service'
 import { decodeQuantityBatchPlan, decodeQuantityCompletion, decodeQuantityWorkspace } from '~/lib/quantity/central-workspace-decoder'
 import { createMigratedMemoryDb } from '../helpers/memory-db'
@@ -11,6 +12,28 @@ let memory: TestDb
 const context = { workspaceId: 'workspace', actorId: 'actor', capabilities: ['project:list:read', 'quantity:read', 'quantity:write', 'crew:list:read', 'worker:list:read'] }
 const query = { projectId: 'project', origin: 'real' as const, includeDemo: false }
 const photo = { fileName: '验收.png', mimeType: 'image/png', fileSize: 3, contentBase64: 'AQID' }
+
+function expectInvalidResponse(action: () => unknown) {
+  let failure: unknown
+  try {
+    action()
+  }
+  catch (cause) {
+    failure = cause
+  }
+  expect(failure).toBeInstanceOf(QuantityRepositoryProblem)
+  expect(failure).toMatchObject({
+    name: 'QuantityRepositoryProblem',
+    message: '工程量服务响应格式或身份无效，请重新读取',
+    problem: {
+      code: 'internal-error',
+      message: '工程量服务响应格式或身份无效，请重新读取',
+      retryable: false,
+      fieldErrors: {},
+      traceId: null,
+    },
+  })
+}
 
 beforeEach(async () => {
   memory = await createMigratedMemoryDb()
@@ -65,10 +88,10 @@ it('两阶段独立完成，月度只计指定阶段，未知现场量保留，�
   const saved = await save(await completion('second', 'completed'))
   const workspace = await service.workspace(query, context)
   expect(decodeQuantityWorkspace(workspace, query)).toEqual(workspace)
-  expect(() => decodeQuantityWorkspace({ ...workspace, data: { ...workspace.data, snapshot: { ...workspace.data.snapshot, units: [] } } }, query)).toThrow()
+  expectInvalidResponse(() => decodeQuantityWorkspace({ ...workspace, data: { ...workspace.data, snapshot: { ...workspace.data.snapshot, units: [] } } }, query))
   const detail = await service.completion({ ...query, unitId: 'unit' }, context)
   expect(decodeQuantityCompletion(detail, { ...query, unitId: 'unit' })).toEqual(detail)
-  expect(() => decodeQuantityCompletion(detail, { ...query, unitId: 'other-unit' })).toThrow()
+  expectInvalidResponse(() => decodeQuantityCompletion(detail, { ...query, unitId: 'other-unit' }))
   expect(workspace.data.stageProgress.map(row => row.completedUnits)).toEqual([1, 1])
   expect(workspace.data.monthly).toMatchObject([{ stageId: 'second', contractQty: { value: 0 }, fieldQty: { value: null } }])
   expect(workspace.data.records).toHaveLength(2)
@@ -97,7 +120,7 @@ it('批量按适用阶段逐项降级草稿，不能绕过缺照片或混入其�
   const { service, save } = await setup()
   const plan = await service.batchPlan({ ...query, trade: '油漆工', unitIds: ['unit'] }, context)
   expect(decodeQuantityBatchPlan(plan, { ...query, trade: '油漆工', unitIds: ['unit'] })).toEqual(plan)
-  expect(() => decodeQuantityBatchPlan(plan, { ...query, trade: '油漆工', unitIds: ['other-unit'] })).toThrow()
+  expectInvalidResponse(() => decodeQuantityBatchPlan(plan, { ...query, trade: '油漆工', unitIds: ['other-unit'] }))
   expect(plan.data.items).toHaveLength(2)
   const items = plan.data.items.map(({ unitId, stageId, expectedCompletionId, expectedCompletionFingerprint, expectedAssignmentId }) => ({ unitId, stageId, expectedCompletionId, expectedCompletionFingerprint, expectedAssignmentId }))
   const result = await save({ kind: 'save-completion-batch', draft: { projectId: query.projectId, trade: '油漆工', completedAt: '2026-09-11', note: '', items } })
