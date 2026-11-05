@@ -8,6 +8,11 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
+| [tests/invoice/correction-contract.test.ts](../../../tests/invoice/correction-contract.test.ts) | 单元／服务／状态 | 更正差异、未知和真实零 |
+| [tests/invoice/correction-http.test.ts](../../../tests/invoice/correction-http.test.ts) | 单元／服务／状态 | 更正读取与回执身份、权限、版本 |
+| [tests/invoice/correction-session.test.ts](../../../tests/invoice/correction-session.test.ts) | 单元／服务／状态 | 更正未知结果及回读失败保留原编号 |
+| [tests/production/invoice-migration-catalog-client.test.ts](../../../tests/production/invoice-migration-catalog-client.test.ts) | 单元／客户端 | 目录来源、版本及身份权限 |
+| [tests/production/invoice-migration-catalog-integration.test.ts](../../../tests/production/invoice-migration-catalog-integration.test.ts) | 隔离 SQLite／服务 | 真实项目目录与客户端核验 |
 | [tests/production/invoice-access.test.ts](../../../tests/production/invoice-access.test.ts) | 路由边界 | 正式发票与更正 API 方法及范围 |
 | [tests/production/invoice-owner.test.ts](../../../tests/production/invoice-owner.test.ts) | 隔离 SQLite／服务 | 发票原件、核对、归档、回执及冷读取 |
 | [tests/production/invoice-contracts.test.ts](../../../tests/production/invoice-contracts.test.ts) | 隔离 SQLite／服务 | 其他支出合同来源核验 |
@@ -50,6 +55,10 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
+| [tests/components/CentralInvoiceCorrectionAuthority.test.ts](../../../tests/components/CentralInvoiceCorrectionAuthority.test.ts) | 组件（jsdom） | 撤权隐藏原票与同身份草稿恢复 |
+| [tests/components/CentralInvoiceCorrectionRoute.test.ts](../../../tests/components/CentralInvoiceCorrectionRoute.test.ts) | 组件（jsdom） | 同路由切票的未保存输入保护 |
+| [tests/components/CentralInvoiceCorrectionScreen.test.ts](../../../tests/components/CentralInvoiceCorrectionScreen.test.ts) | 组件（jsdom） | 更正草稿、提交、打印阻断及原编号 |
+| [tests/components/CentralInvoiceFieldsForm.test.ts](../../../tests/components/CentralInvoiceFieldsForm.test.ts) | 组件（jsdom） | 票面零与未知、版本冲突及识别草稿 |
 | [tests/components/FactorSolverState.test.ts](../../../tests/components/FactorSolverState.test.ts) | 组件（jsdom） | 因子工具保存配置兼容 |
 | [tests/components/FactorTaxCalculator.test.ts](../../../tests/components/FactorTaxCalculator.test.ts) | 组件（jsdom） | 共用金额税额栏 |
 | [tests/components/InvoiceEditPage.test.ts](../../../tests/components/InvoiceEditPage.test.ts) | 组件（jsdom） | 编辑页重新识别草稿：只填表单不写库、保存二次确认（取消不写库）、字段角标与读屏原值、放弃恢复、离开保护、失败保留输入；原图比对框、“原图未定位”、聚焦/悬停强调与旋转换算；平时显示原件，无原文件时说明“原件不在本次会话中”且不显示示意图；首次识别聚焦字段临时框出、失焦撤框 |
@@ -58,10 +67,19 @@
 | [tests/components/InvoicePrintLayout.test.ts](../../../tests/components/InvoicePrintLayout.test.ts) | 组件（jsdom） | 打印面板：无原件的 Excel 发票不可勾选、列出未打印清单，打印只提交有原件的票 |
 | [tests/components/InvoiceExportPreview.test.ts](../../../tests/components/InvoiceExportPreview.test.ts) | 组件（jsdom） | 发票导出预览样式草稿 |
 
+## 真实浏览器（Vitest／Chromium）
+
+| 文件 | 运行层／用途 | 场景或关联说明（定位用） |
+| --- | --- | --- |
+| [tests/browser/CentralInvoiceCorrection.test.ts](../../../tests/browser/CentralInvoiceCorrection.test.ts) | 真实组件／模拟来源 | 更正票面与归属的多视口操作 |
+| [tests/browser/CentralInvoiceCorrectionAuthority.test.ts](../../../tests/browser/CentralInvoiceCorrectionAuthority.test.ts) | 真实组件／模拟来源 | 失权隐藏与同身份草稿恢复 |
+| [tests/browser/CentralInvoiceCorrectionNavigation.test.ts](../../../tests/browser/CentralInvoiceCorrectionNavigation.test.ts) | 真实组件／模拟来源 | 键盘切票和离开保护 |
+
 ## Playwright E2E
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
+| [e2e/production-invoice-correction.spec.ts](../../../e2e/production-invoice-correction.spec.ts) | 隔离服务／合成数据 | 更正草稿、断线原编号恢复与打印阻断 |
 | [e2e/factor-solver.spec.ts](../../../e2e/factor-solver.spec.ts) | Playwright E2E | 精确因子组合工作台 |
 | [e2e/invoice-export-borders.spec.ts](../../../e2e/invoice-export-borders.spec.ts) | Playwright E2E | Issue #437 发票 Excel 分组边框 |
 | [e2e/invoice-ledger-print-mode.spec.ts](../../../e2e/invoice-ledger-print-mode.spec.ts) | Playwright E2E | 发票台账打印入口：Excel 行可在台账勾选合计但不进入打印，进入双栏选择、打印确认并返回台账 |
