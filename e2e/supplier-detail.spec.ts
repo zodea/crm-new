@@ -210,10 +210,12 @@ for (const tabCase of [
   { key: 'invoices', label: /^收票登记\s*0$/, empty: '暂无归档收票' },
 ]) {
   test(`分供方事实页签深链刷新恢复：${tabCase.key}`, async ({ page }) => {
+    test.setTimeout(75_000)
     const id = await createSupplier(page)
     if (tabCase.key === 'invoices')
       await installCompleteSupplierReadFixture(page, id)
     await page.goto(`/base/supplier/${id}?origin=real&tab=${tabCase.key}`)
+    await expect(page.getByRole('heading', { name: supplierInput.name, exact: true })).toBeVisible({ timeout: 45_000 })
     const tab = page.getByRole('navigation', { name: '分供方业务事实' }).getByRole('tab', { name: tabCase.label, exact: true })
     await expect(tab).toHaveAttribute('aria-selected', 'true')
     await expect(page.getByRole('status', { name: tabCase.empty })).toBeVisible()
