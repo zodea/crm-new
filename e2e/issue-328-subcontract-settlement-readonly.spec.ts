@@ -140,25 +140,61 @@ test.describe('AX02 分包结算中央只读链', () => {
       attachments: {},
     } })
     expect(response.ok(), await response.text()).toBe(true)
-    const { id } = await response.json()
+    const { id, version } = await response.json()
+    expect(version).toBe('1')
+    async function expectDraftSource(name: string, expectedVersion: string) {
+      const read = await page.request.get(`/api/read/owner-documents/sub_settlement/${id}`, { params: { origin: 'real', includeDemo: false } })
+      expect(read.ok(), await read.text()).toBe(true)
+      const detail = await read.json()
+      expect(detail.document).toMatchObject({
+        id,
+        kind: 'sub_settlement',
+        name,
+        version: expectedVersion,
+        status: 'draft',
+        source: { type: 'expenditure_settlement', id, locked: false },
+        amounts: { kind: 'sub_settlement', total: '0.00', contractAmount: null, cumulativeSettled: null, priorSettled: null },
+        project: { state: 'missing', entity: 'project', id: null, reason: 'not-recorded' },
+        supplier: { state: 'missing', entity: 'supplier', id: null, reason: 'not-recorded' },
+        contract: { state: 'missing', entity: 'contract', id: null, reason: 'not-recorded' },
+      })
+      expect(detail.contractNavigation).toEqual({ kind: 'unavailable', reason: 'missing-id' })
+    }
+    async function expectMissingContract() {
+      const row = page.getByTestId('subcontract-settlement-detail').locator('.detail-row').filter({ has: page.getByText('分包合同', { exact: true }) })
+      await expect(row).toHaveCount(1)
+      await expect(row.locator('[data-target-state="missing"]')).toBeVisible()
+      await expect(row.getByRole('link')).toHaveCount(0)
+    }
+    await expectDraftSource('待核对分包结算', '1')
     await page.goto(`/subcontract/settlement/${id}?origin=real`)
     await expect(page.getByRole('group', { name: '含税结算额' })).toContainText('¥0.00')
-    await expect(page.getByRole('link', { name: '分包合同不可用' })).toHaveCount(0)
+    await expectMissingContract()
     await page.getByRole('button', { name: '编辑结算' }).click()
     await expect(page).toHaveURL(new RegExp(`/subcontract/settlement/form/${id}`))
+    await expect(page.getByTestId('owner-document-totalAmount')).toHaveValue('0')
     await page.getByTestId('owner-document-name').fill('已补充名称的结算草稿')
     const saved = page.waitForResponse(response => response.url().endsWith('/api/commands/owner-documents') && response.request().method() === 'POST')
     await page.getByRole('group', { name: '表单操作' }).getByRole('button', { name: '保存草稿', exact: true }).click()
-    expect((await saved).ok()).toBe(true)
+    const savedResponse = await saved
+    expect(savedResponse.ok(), await savedResponse.text()).toBe(true)
+    expect(await savedResponse.json()).toMatchObject({ id, version: '2' })
+    await expectDraftSource('已补充名称的结算草稿', '2')
     await expect(page.getByRole('group', { name: '表单操作' }).getByRole('button', { name: '保存并确认' })).toBeEnabled()
     await page.reload()
     await expect(page.getByRole('heading', { name: '已补充名称的结算草稿' })).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByRole('group', { name: '含税结算额' })).toContainText('¥0.00')
+    await expectMissingContract()
+    await expectDraftSource('已补充名称的结算草稿', '2')
     await page.getByTestId('subcontract-settlement-edit').click()
     await expect(page.getByTestId('owner-document-name')).toHaveValue('已补充名称的结算草稿')
+    await expect(page.getByTestId('owner-document-totalAmount')).toHaveValue('0')
     await page.getByRole('button', { name: '返回来源', exact: true }).click()
     await expect(page.getByRole('heading', { name: '已补充名称的结算草稿' })).toBeVisible({ timeout: 20_000 })
     await page.reload()
     await expect(page.getByRole('heading', { name: '已补充名称的结算草稿' })).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByRole('group', { name: '含税结算额' })).toContainText('¥0.00')
+    await expectMissingContract()
   })
 
   test('列表与详情在各宽度无页面级横滚，局部滚动与键盘焦点', async ({ page }) => {
