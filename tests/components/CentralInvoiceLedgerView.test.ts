@@ -55,6 +55,65 @@ it('公司开销独立显示和筛选，不伪装成缺失项目', async () => {
   expect(screen.queryByRole('button', { name: 'project-invoice' })).toBeNull()
 })
 
+it('按开票日期包含边界筛选，与归属、搜索和导出组合，保留跨筛选勾选', async () => {
+  const dated = (id: string, date: string, projectId = 'project-one') => {
+    const record = invoice(id, 100, projectId)
+    return { ...record, fields: { ...record.fields, invoiceDate: date } }
+  }
+  const records = [dated('before', '2025-12-31'), dated('start', '2026-01-01'), dated('end', '2026-01-31'), dated('after', '2026-02-01'), dated('unknown', ''), dated('other-project', '2026-01-15', 'project-two')]
+  const view = render(CentralInvoiceLedgerView, { props: { records, projects: [{ id: 'project-one', label: '项目一' }, { id: 'project-two', label: '项目二' }] } })
+  expect(screen.getByRole('button', { name: 'unknown' })).toBeTruthy()
+  await fireEvent.click(screen.getByLabelText('选择发票 before'))
+  await fireEvent.update(screen.getByLabelText('开票开始日期'), '2026-01-01')
+  expect(screen.queryByRole('button', { name: 'before' })).toBeNull()
+  expect(screen.queryByRole('button', { name: 'unknown' })).toBeNull()
+  expect(screen.getByRole('button', { name: 'start' })).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'after' })).toBeTruthy()
+  await fireEvent.update(screen.getByLabelText('开票结束日期'), '2026-01-31')
+  expect(screen.getByRole('button', { name: 'end' })).toBeTruthy()
+  expect(screen.queryByRole('button', { name: 'after' })).toBeNull()
+  await fireEvent.update(screen.getByLabelText('归属'), 'project-one')
+  expect(screen.queryByRole('button', { name: 'other-project' })).toBeNull()
+  await fireEvent.update(screen.getByLabelText('搜索发票'), 'end')
+  expect(screen.queryByRole('button', { name: 'start' })).toBeNull()
+  await fireEvent.click(screen.getByRole('button', { name: '导出 Excel' }))
+  expect(view.emitted('export')?.[0]?.[0]).toEqual([records[2]])
+  expect(screen.getByText('已选 1 张 · 合计 100.00')).toBeTruthy()
+  await fireEvent.click(screen.getByRole('button', { name: '打印所选' }))
+  expect(view.emitted('preparePrint')?.[0]?.[0]).toEqual([records[0]])
+  await fireEvent.update(screen.getByLabelText('搜索发票'), '')
+  await fireEvent.update(screen.getByLabelText('开票开始日期'), '')
+  expect(screen.getByRole('button', { name: 'before' })).toBeTruthy()
+  expect(screen.queryByRole('button', { name: 'after' })).toBeNull()
+  expect(screen.queryByRole('button', { name: 'unknown' })).toBeNull()
+  await fireEvent.update(screen.getByLabelText('开票结束日期'), '')
+  expect(screen.getByRole('button', { name: 'unknown' })).toBeTruthy()
+  expect((screen.getByLabelText('选择发票 before') as HTMLInputElement).checked).toBe(true)
+})
+
+it('日期范围倒置或日期非法时提示并阻止导出，修正后恢复', async () => {
+  const view = render(CentralInvoiceLedgerView, { props: { records: [invoice('one', 100, 'project-one')], projects: [{ id: 'project-one', label: '项目一' }] } })
+  const start = screen.getByLabelText('开票开始日期') as HTMLInputElement
+  const end = screen.getByLabelText('开票结束日期') as HTMLInputElement
+  const exportButton = screen.getByRole('button', { name: '导出 Excel' }) as HTMLButtonElement
+  await fireEvent.update(start, '2026-02-01')
+  await fireEvent.update(end, '2026-01-01')
+  expect(screen.getByRole('alert').textContent).toContain('开始日期不能晚于结束日期')
+  expect(start.getAttribute('aria-invalid')).toBe('true')
+  expect(exportButton.disabled).toBe(true)
+  await fireEvent.click(exportButton)
+  expect(view.emitted('export')).toBeUndefined()
+  await fireEvent.update(start, '2026-01-01')
+  expect(screen.queryByRole('alert')).toBeNull()
+  expect(exportButton.disabled).toBe(false)
+  await fireEvent.update(start, '0001-01-01')
+  expect(screen.getByRole('alert').textContent).toContain('请输入有效的开票日期')
+  expect(exportButton.disabled).toBe(true)
+  await fireEvent.update(start, '')
+  expect(screen.queryByRole('alert')).toBeNull()
+  expect(exportButton.disabled).toBe(false)
+})
+
 it('按来源证据显示新票与旧票来源，旧票缺少证据时不推断', () => {
   const legacy = { originalState: 'recorded' as const, ambiguousZeroFields: [], ambiguousItemNumbers: false }
   const records: CentralInvoiceRecord[] = [

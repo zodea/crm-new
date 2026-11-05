@@ -1,17 +1,31 @@
 <script setup lang="ts">
 import type { CentralInvoiceRecord } from '~/lib/invoice/central-contract'
-import { computed, ref, watch } from 'vue'
+import { computed, ref, shallowRef, watch } from 'vue'
 import { centralInvoiceSourceLabel } from '~/lib/invoice/central-source-label'
+import { isISODateDTO } from '~/types/read-model'
 
 interface ReferenceOption { id: string, label: string }
 const props = defineProps<{ records: readonly CentralInvoiceRecord[], projects: readonly ReferenceOption[], busy?: boolean }>()
 const emit = defineEmits<{ open: [id: string], discard: [id: string], preparePrint: [records: CentralInvoiceRecord[]], export: [records: CentralInvoiceRecord[]] }>()
 const search = ref('')
 const owner = ref('all')
+const startDate = shallowRef('')
+const endDate = shallowRef('')
+const startDateBadInput = shallowRef(false)
+const endDateBadInput = shallowRef(false)
 const checked = ref<string[]>([])
+const dateError = computed(() => {
+  if (startDateBadInput.value || endDateBadInput.value || (startDate.value && !isISODateDTO(startDate.value)) || (endDate.value && !isISODateDTO(endDate.value)))
+    return '请输入有效的开票日期。'
+  if (startDate.value && endDate.value && startDate.value > endDate.value)
+    return '开始日期不能晚于结束日期。'
+  return ''
+})
 const archived = computed(() => props.records.filter(record => record.accountStatus === 'archived' && record.deletedAt === null))
 const options = computed(() => props.projects.map(project => ({ ...project, count: archived.value.filter(record => record.projectId === project.id).length })))
 const visible = computed(() => {
+  if (dateError.value)
+    return []
   const needle = search.value.trim().toLocaleLowerCase()
   return archived.value.filter((record) => {
     if (owner.value === 'personal' && record.ownerKind !== 'personal')
@@ -20,10 +34,22 @@ const visible = computed(() => {
       return false
     if (owner.value !== 'all' && owner.value !== 'personal' && owner.value !== '__company__' && record.projectId !== owner.value)
       return false
+    if (startDate.value || endDate.value) {
+      const date = record.fields.invoiceDate
+      if (!isISODateDTO(date) || (startDate.value && date < startDate.value) || (endDate.value && date > endDate.value))
+        return false
+    }
     const projectName = props.projects.find(project => project.id === record.projectId)?.label ?? ''
     return !needle || [record.fields.invoiceNumber, record.fields.buyer, record.fields.seller, record.fields.remark, projectName].some(value => value.toLocaleLowerCase().includes(needle))
   })
 })
+function updateDate(event: Event, boundary: 'start' | 'end') {
+  const input = event.target as HTMLInputElement
+  const value = boundary === 'start' ? startDate : endDate
+  const badInput = boundary === 'start' ? startDateBadInput : endDateBadInput
+  value.value = input.value
+  badInput.value = input.validity.badInput
+}
 const selected = computed(() => archived.value.filter(record => checked.value.includes(record.id)))
 const total = computed(() => {
   let cents = 0
@@ -54,6 +80,10 @@ function print() {
   if (selected.value.length && !invalidPrint.value.length)
     emit('preparePrint', selected.value)
 }
+function exportVisible() {
+  if (!props.busy && !dateError.value && visible.value.length)
+    emit('export', visible.value)
+}
 </script>
 
 <template>
@@ -62,7 +92,7 @@ function print() {
       <h1 class="text-lg font-700">
         发票台账
       </h1>
-      <button type="button" :disabled="busy || !visible.length" class="rounded border border-line px-3 py-1 text-sm" @click="emit('export', visible)">
+      <button type="button" :disabled="busy || !visible.length" class="rounded border border-line px-3 py-1 text-sm" @click="exportVisible">
         导出 Excel
       </button>
       <button type="button" :disabled="busy || !selected.length || !!invalidPrint.length" class="rounded border border-line px-3 py-1 text-sm" @click="print">
@@ -77,7 +107,15 @@ function print() {
         <option value="__company__">公司开销</option>
         <option v-for="project in options" :key="project.id" :value="project.id">{{ project.label }}（{{ project.count }}） · {{ project.id }}</option>
       </select></label>
+      <label class="flex flex-col gap-1 text-sm">开票开始日期<input :value="startDate" type="date" :aria-invalid="!!dateError" :aria-describedby="dateError ? 'invoice-date-error' : 'invoice-date-hint'" class="rounded border border-line bg-surface px-2 py-1" @input="updateDate($event, 'start')" @change="updateDate($event, 'start')"></label>
+      <label class="flex flex-col gap-1 text-sm">开票结束日期<input :value="endDate" type="date" :aria-invalid="!!dateError" :aria-describedby="dateError ? 'invoice-date-error' : 'invoice-date-hint'" class="rounded border border-line bg-surface px-2 py-1" @input="updateDate($event, 'end')" @change="updateDate($event, 'end')"></label>
     </div>
+    <p v-if="dateError" id="invoice-date-error" role="alert" class="text-sm text-danger">
+      {{ dateError }}
+    </p>
+    <p v-else id="invoice-date-hint" class="text-sm text-ink-soft">
+      设置日期范围时，日期未填写的发票不计入筛选结果。
+    </p>
     <p v-if="selected.length" role="status" class="text-sm text-ink-soft">
       已选 {{ selected.length }} 张 · {{ total === null ? '合计未统计（金额缺失或超出范围）' : `合计 ${total.toFixed(2)}` }}
     </p>
@@ -148,7 +186,7 @@ function print() {
           </tr>
         </tbody>
       </table>
-      <p v-if="!visible.length" class="p-4 text-sm text-ink-soft">
+      <p v-if="!dateError && !visible.length" class="p-4 text-sm text-ink-soft">
         当前筛选下没有发票。
       </p>
     </div>

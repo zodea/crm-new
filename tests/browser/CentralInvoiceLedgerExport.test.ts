@@ -58,6 +58,21 @@ it('导出弹层在各视口可键盘操作，保存样式可重新读取，并�
   const verifyProjects = async () => [{ id: 'project-browser', label: '合成项目', sourceVersion: projectVersion }]
   const props = { workspace: workspace as never, projects: [{ id: 'project-browser', label: '合成项目', sourceVersion: 'projects:1' }], verifyProjects }
   const first = await render(CentralInvoiceLedgerScreen, { props, global: { plugins: [createPinia()], components } })
+  const owner = page.getByLabelText('归属')
+  const start = page.getByLabelText('开票开始日期')
+  const end = page.getByLabelText('开票结束日期')
+  ;(owner.element() as HTMLElement).focus()
+  await userEvent.tab()
+  await expect.element(start).toHaveFocus()
+  await start.fill('2026-02-01')
+  await end.fill('2026-01-01')
+  await expect.element(page.getByRole('alert')).toHaveTextContent('开始日期不能晚于结束日期')
+  await expect.element(page.getByRole('button', { name: '导出 Excel' })).toBeDisabled()
+  await start.fill('2026-01-01')
+  await expect.element(page.getByRole('button', { name: 'B-001' })).toBeVisible()
+  const ledgerTable = page.getByLabelText('发票台账').element().querySelector('table')!
+  expect(getComputedStyle(ledgerTable.parentElement!).overflowX).toBe('auto')
+  expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(window.innerWidth)
   const open = page.getByRole('button', { name: '导出 Excel' })
   ;(open.element() as HTMLElement).focus()
   await expect.element(open).toHaveFocus()
