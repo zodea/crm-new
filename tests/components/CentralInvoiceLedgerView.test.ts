@@ -30,7 +30,7 @@ function invoice(id: string, totalAmount: number | null, projectId: string): Cen
   }
 }
 
-it('台账保留缺失金额并以稳定项目 ID 筛选，缺失金额不能进入打印队列', async () => {
+it('台账保留缺失金额并以稳定项目 ID 筛选，混选可进入打印核对', async () => {
   const records = [invoice('invoice-one', 100, 'project-one'), invoice('invoice-two', null, 'project-two')]
   const view = render(CentralInvoiceLedgerView, { props: { records, projects: [{ id: 'project-one', label: '同名项目' }, { id: 'project-two', label: '同名项目' }] } })
   expect(screen.getByText('未填写')).toBeTruthy()
@@ -40,7 +40,9 @@ it('台账保留缺失金额并以稳定项目 ID 筛选，缺失金额不能进
   expect(view.emitted('preparePrint')?.[0]?.[0]).toMatchObject([{ id: 'invoice-one', version: '1' }])
   await fireEvent.click(screen.getByLabelText('选择发票 invoice-two'))
   expect(screen.getByText('已选 2 张 · 合计未统计（金额缺失或超出范围）')).toBeTruthy()
-  expect((screen.getByRole('button', { name: '打印所选' }) as HTMLButtonElement).disabled).toBe(true)
+  expect((screen.getByRole('button', { name: '打印所选' }) as HTMLButtonElement).disabled).toBe(false)
+  await fireEvent.click(screen.getByRole('button', { name: '打印所选' }))
+  expect(view.emitted('preparePrint')?.[1]?.[0]).toMatchObject([{ id: 'invoice-one' }, { id: 'invoice-two', fields: { totalAmount: null } }])
   await fireEvent.update(screen.getByLabelText('归属'), 'project-two')
   expect(screen.queryByRole('button', { name: 'invoice-one' })).toBeNull()
   expect(screen.getByRole('button', { name: 'invoice-two' })).toBeTruthy()

@@ -63,7 +63,6 @@ const total = computed(() => {
   }
   return cents / 100
 })
-const invalidPrint = computed(() => selected.value.filter(record => record.sourceKind !== 'scan' || !record.original || record.ocrStatus !== 'done' || record.reviewStatus !== 'reviewed' || record.duplicateStatus !== 'normal' || record.fields.totalAmount === null || record.fields.totalAmount <= 0))
 watch(archived, (rows) => {
   checked.value = checked.value.filter(id => rows.some(record => record.id === id))
 })
@@ -77,7 +76,7 @@ function projectLabel(record: CentralInvoiceRecord) {
   return props.projects.find(project => project.id === record.projectId)?.label ?? '项目来源不可用'
 }
 function print() {
-  if (selected.value.length && !invalidPrint.value.length)
+  if (!props.busy && selected.value.length)
     emit('preparePrint', selected.value)
 }
 function exportVisible() {
@@ -95,7 +94,7 @@ function exportVisible() {
       <button type="button" :disabled="busy || !visible.length" class="rounded border border-line px-3 py-1 text-sm" @click="exportVisible">
         导出 Excel
       </button>
-      <button type="button" :disabled="busy || !selected.length || !!invalidPrint.length" class="rounded border border-line px-3 py-1 text-sm" @click="print">
+      <button type="button" :disabled="busy || !selected.length" class="rounded border border-line px-3 py-1 text-sm" @click="print">
         打印所选
       </button>
     </div>
@@ -118,9 +117,6 @@ function exportVisible() {
     </p>
     <p v-if="selected.length" role="status" class="text-sm text-ink-soft">
       已选 {{ selected.length }} 张 · {{ total === null ? '合计未统计（金额缺失或超出范围）' : `合计 ${total.toFixed(2)}` }}
-    </p>
-    <p v-if="invalidPrint.length" class="text-sm text-warn-ink">
-      所选中 {{ invalidPrint.length }} 张尚不满足打印条件，请先核对或取消选择。
     </p>
     <div class="min-h-0 flex-1 overflow-auto rounded border border-line bg-panel">
       <table class="w-full min-w-180 text-left text-sm">

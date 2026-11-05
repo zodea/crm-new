@@ -3,10 +3,11 @@ import type { CentralInvoicePrintCommand, CentralInvoiceRecord } from '~/lib/inv
 import type { createCentralInvoiceWorkspace } from '~/lib/invoice/central-workspace'
 import type { InvoiceLedgerExportRow, InvoiceXlsxStyleConfig } from '~/lib/invoice/excel'
 import type { InvoicePrintRequest, InvoicePrintViewModel } from '~/lib/invoice/print-layout'
-import { computed, nextTick, onMounted, shallowRef, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, shallowRef, useTemplateRef, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import { useKitUI } from '~/composables/useKitUI'
 import { useTabCloseGuard } from '~/composables/useTabCloseGuard'
+import { centralInvoicePrintReason } from '~/lib/invoice/central-print'
 import { centralInvoiceSourceLabel } from '~/lib/invoice/central-source-label'
 import { createInvoiceLedgerXlsxFromRows, INVOICE_XLSX_MIME, invoiceLedgerTotal } from '~/lib/invoice/excel'
 import { toLocalDateInputValue } from '~/lib/util/local-date'
@@ -24,9 +25,21 @@ const error = shallowRef('')
 const printMode = shallowRef(false)
 const printSelectedId = shallowRef<string | null>(null)
 const printSource = shallowRef<CentralInvoiceRecord[]>([])
+const originalFailures = shallowRef<Record<string, string>>({})
 const pendingPrint = shallowRef<InvoicePrintRequest | null>(null)
 const printTargets = shallowRef<CentralInvoicePrintCommand['targets']>([])
+let active = true
+onBeforeUnmount(() => {
+  active = false
+  clearConfirmationFocus()
+})
 const recoveryPending = shallowRef(false)
+const recoveryReadError = shallowRef(false)
+const printAuthorized = shallowRef(false)
+const errorRef = useTemplateRef<HTMLElement>('errorRef')
+const rootRef = useTemplateRef<HTMLElement>('rootRef')
+let authorityGeneration = 0
+let focusMedia: MediaQueryList | null = null
 const exportOpen = shallowRef(false)
 const exportSaving = shallowRef(false)
 const exportError = shallowRef('')
@@ -36,6 +49,38 @@ const exportProjects = shallowRef<Array<{ id: string, label: string, sourceVersi
 const exportName = shallowRef('')
 const exportTotal = computed(() => invoiceLedgerTotal(exportRows.value))
 const cachedRecords = shallowRef<CentralInvoiceRecord[]>([])
+function invalidatePresentation() {
+  authorityGeneration++
+  clearConfirmationFocus()
+  cachedRecords.value = []
+  printSource.value = []
+  printSelectedId.value = null
+  originalFailures.value = {}
+  pendingPrint.value = null
+  printTargets.value = []
+  printAuthorized.value = false
+  printMode.value = false
+  exportOpen.value = false
+  exportRows.value = []
+  exportVersions.value = []
+  exportProjects.value = []
+  recoveryPending.value = false
+  recoveryReadError.value = false
+  error.value = '发票来源或权限已变化，请重新读取。'
+  const generation = authorityGeneration
+  void nextTick(() => {
+    if (active && generation === authorityGeneration)
+      errorRef.value?.focus()
+  })
+}
+watch(() => props.workspace, (next, previous) => {
+  if (next !== previous)
+    invalidatePresentation()
+}, { flush: 'sync' })
+watch(() => props.workspace.readState.value, (state) => {
+  if (state === 'unavailable')
+    invalidatePresentation()
+}, { flush: 'sync' })
 const records = computed<CentralInvoiceRecord[]>(() => props.workspace.records.value.map(record => ({
   ...record,
   fields: { ...record.fields },
@@ -50,7 +95,11 @@ watch([records, () => props.workspace.readState.value], ([next, state]) => {
     cachedRecords.value = next
 }, { immediate: true })
 const displayedRecords = computed(() => props.workspace.readState.value === 'ready' ? records.value : cachedRecords.value)
-const printModels = computed<InvoicePrintViewModel[]>(() => printSource.value.map(record => ({
+const printSkipped = computed(() => printSource.value.flatMap((record) => {
+  const reason = centralInvoicePrintReason(record) ?? originalFailures.value[record.id]
+  return reason ? [{ record, reason }] : []
+}))
+const printModels = computed<InvoicePrintViewModel[]>(() => printSource.value.filter(record => !centralInvoicePrintReason(record) && !originalFailures.value[record.id]).map(record => ({
   id: record.id,
   fileName: record.original?.fileName ?? '',
   invoiceNumber: record.fields.invoiceNumber,
@@ -73,12 +122,53 @@ function sourceUnavailable() {
   return props.workspace.readState.value === 'unavailable'
 }
 function refreshPending() {
+  if (props.workspace.readState.value !== 'ready')
+    return false
   try {
+    const wasUnreadable = recoveryReadError.value
     recoveryPending.value = !!props.workspace.pendingPrint()
+    recoveryReadError.value = false
+    if (wasUnreadable && error.value === '打印记录存储暂不可核验，请重试核对。')
+      error.value = ''
   }
-  catch (cause) { error.value = message(cause) }
+  catch {
+    recoveryPending.value = true
+    recoveryReadError.value = true
+    error.value = '打印记录存储暂不可核验，请重试核对。'
+  }
+  return !recoveryPending.value
+}
+function clearConfirmationFocus() {
+  focusMedia?.removeEventListener('change', onPrintMediaChange)
+  focusMedia = null
+}
+function onPrintMediaChange() {
+  if (!focusMedia || focusMedia.matches)
+    return
+  const generation = authorityGeneration
+  clearConfirmationFocus()
+  void nextTick(() => {
+    if (generation === authorityGeneration)
+      focusPrintConfirmation()
+  })
+}
+function focusPrintConfirmation() {
+  clearConfirmationFocus()
+  if (!active || busy.value || !pendingPrint.value || !printMode.value || props.workspace.readState.value !== 'ready')
+    return
+  const media = typeof window.matchMedia === 'function' ? window.matchMedia('print') : null
+  if (media?.matches) {
+    focusMedia = media
+    media.addEventListener('change', onPrintMediaChange)
+    if (!media.matches)
+      onPrintMediaChange()
+    return
+  }
+  rootRef.value?.querySelector<HTMLButtonElement>('button[aria-label="已打印"]')?.focus()
 }
 async function mayLeave() {
+  if (printMode.value && busy.value)
+    return false
   if (!pendingPrint.value)
     return true
   return confirm({ variant: 'simple', title: '离开打印排版', message: '本次打印尚未确认记录。确定离开吗？', confirmLabel: '离开' })
@@ -90,13 +180,24 @@ async function run(operation: () => Promise<void>) {
     return
   busy.value = true
   error.value = ''
+  const generation = authorityGeneration
   try {
     await operation()
   }
-  catch (cause) { error.value = message(cause) }
+  catch (cause) {
+    if (generation === authorityGeneration)
+      error.value = message(cause)
+  }
   finally {
     busy.value = false
-    refreshPending()
+    if (generation === authorityGeneration) {
+      refreshPending()
+      await nextTick()
+      if (error.value)
+        errorRef.value?.focus()
+      else if (pendingPrint.value && printMode.value && props.workspace.readState.value === 'ready')
+        focusPrintConfirmation()
+    }
   }
 }
 async function load() {
@@ -107,10 +208,11 @@ onMounted(async () => {
   refreshPending()
 })
 function preparePrint(selected: CentralInvoiceRecord[]) {
-  if (busy.value || recoveryPending.value || !selected.length || selected.some(record => record.fields.totalAmount === null))
+  if (busy.value || recoveryPending.value || exportOpen.value || !selected.length || props.workspace.readState.value !== 'ready')
     return
   printSource.value = selected.map(record => ({ ...record, fields: { ...record.fields }, items: record.items.map(item => ({ ...item })) }))
-  printSelectedId.value = selected[0]!.id
+  originalFailures.value = {}
+  printSelectedId.value = selected.find(record => !centralInvoicePrintReason(record))?.id ?? null
   pendingPrint.value = null
   printTargets.value = []
   printMode.value = true
@@ -174,39 +276,102 @@ async function confirmExport(style: InvoiceXlsxStyleConfig) {
   finally { exportSaving.value = false }
 }
 async function print(payload: InvoicePrintRequest) {
-  if (busy.value || pendingPrint.value || recoveryPending.value)
+  if (busy.value || pendingPrint.value || recoveryPending.value || !printMode.value || props.workspace.readState.value !== 'ready')
     return
-  let targets: CentralInvoicePrintCommand['targets']
-  try {
-    targets = payload.ids.map((id) => {
+  if (!refreshPending())
+    return
+  const sourceWorkspace = props.workspace
+  const generation = authorityGeneration
+  const currentSession = () => active && printMode.value && generation === authorityGeneration && props.workspace === sourceWorkspace
+  await run(async () => {
+    if (!payload.ids.length || new Set(payload.ids).size !== payload.ids.length)
+      throw new Error('打印票据身份无效，请重新选择。')
+    await sourceWorkspace.load()
+    if (!currentSession())
+      return
+    if (props.workspace.readState.value !== 'ready')
+      throw new Error('发票来源尚不可用，请重新读取。')
+    const validatedTargets = (): CentralInvoicePrintCommand['targets'] => payload.ids.map((id) => {
       const source = printSource.value.find(record => record.id === id)
+      const current = records.value.find(record => record.id === id)
       const rotation = payload.rotations[id]
-      if (!source || rotation === undefined)
-        throw new Error('打印票据身份或角度已变化。')
+      if (!source || !current || current.version !== source.version || centralInvoicePrintReason(source) || centralInvoicePrintReason(current) || originalFailures.value[id] || rotation === undefined)
+        throw new Error('打印票据已变化或不再满足打印条件，请返回台账重新选择。')
       return { invoiceId: id, baseVersion: source.version, rotation }
     })
-  }
-  catch (cause) {
-    error.value = message(cause)
-    return
-  }
-  pendingPrint.value = payload
-  printTargets.value = targets
+    validatedTargets()
+    for (const id of payload.ids) {
+      const record = records.value.find(item => item.id === id)!
+      try {
+        await sourceWorkspace.verifiedOriginal(record, true)
+      }
+      catch {
+        if (!currentSession())
+          return
+        originalFailures.value = { ...originalFailures.value, [id]: '原件读取或核验未完成，请确认访问权限后重试' }
+        throw new Error(`发票 ${record.fields.invoiceNumber || record.id} 的原件读取或核验失败，不能打印。`)
+      }
+      if (!currentSession())
+        return
+    }
+    await sourceWorkspace.load()
+    if (!currentSession())
+      return
+    if (props.workspace.readState.value !== 'ready')
+      throw new Error('发票来源尚不可用，请重新读取。')
+    const targets = validatedTargets()
+    if (!refreshPending())
+      return
+    printAuthorized.value = true
+    await nextTick()
+    if (!currentSession() || props.workspace.readState.value !== 'ready') {
+      printAuthorized.value = false
+      return
+    }
+    let completed = false
+    const afterPrint = () => {
+      completed = true
+    }
+    window.addEventListener('afterprint', afterPrint, { once: true })
+    try {
+      window.print()
+    }
+    catch {
+      error.value = '系统打印窗口打开失败，请重试。'
+      return
+    }
+    finally {
+      printAuthorized.value = false
+      window.removeEventListener('afterprint', afterPrint)
+    }
+    if (!currentSession() || props.workspace.readState.value !== 'ready')
+      return
+    if (!completed)
+      throw new Error('无法确认系统打印窗口是否结束，纸张可能已经输出，请先人工核对后再操作。')
+    pendingPrint.value = payload
+    printTargets.value = targets
+  })
+}
+function retryOriginal(id: string) {
+  const next = { ...originalFailures.value }
+  delete next[id]
+  originalFailures.value = next
+  error.value = ''
+}
+async function cancelPrint() {
+  clearConfirmationFocus()
+  pendingPrint.value = null
+  printTargets.value = []
   await nextTick()
-  try {
-    window.print()
-  }
-  catch {
-    pendingPrint.value = null
-    printTargets.value = []
-    error.value = '系统打印窗口打开失败，请重试。'
-  }
+  const buttons = rootRef.value?.querySelectorAll<HTMLButtonElement>('button') ?? []
+  Array.from(buttons).find(button => button.textContent?.trim() === '打印选中')?.focus()
 }
 async function confirmPrinted() {
-  if (!pendingPrint.value || !printTargets.value.length || recoveryPending.value)
+  if (!pendingPrint.value || !printTargets.value.length || recoveryPending.value || props.workspace.readState.value !== 'ready')
     return
   await run(async () => {
     await props.workspace.recordPrinted(printTargets.value)
+    clearConfirmationFocus()
     pendingPrint.value = null
     printTargets.value = []
   })
@@ -223,6 +388,7 @@ async function recoverPrint() {
 async function leavePrint() {
   if (!await mayLeave())
     return
+  clearConfirmationFocus()
   pendingPrint.value = null
   printTargets.value = []
   printMode.value = false
@@ -241,24 +407,51 @@ async function discard(id: string) {
 </script>
 
 <template>
-  <div class="flex h-full min-h-0 flex-col">
-    <div v-if="workspace.readState.value !== 'ready'" role="status" class="flex flex-wrap items-center gap-2 p-3">
+  <div ref="rootRef" class="flex h-full min-h-0 flex-col">
+    <div v-if="workspace.readState.value !== 'ready'" role="status" class="flex flex-wrap items-center gap-2 p-3 print:hidden">
       <span>{{ workspace.loading.value ? '正在读取发票台账…' : '发票来源尚不可用。' }}</span>
       <button type="button" :disabled="busy" class="rounded border border-line px-3 py-1" @click="load">
         重新读取
       </button>
     </div>
-    <div v-if="recoveryPending" role="status" class="flex flex-wrap items-center gap-2 p-3">
-      <span>上次打印记录尚未核对，不能重复提交。</span>
-      <button type="button" :disabled="busy" class="rounded border border-line px-3 py-1" @click="recoverPrint">
-        核对打印记录
+    <div v-if="recoveryPending" role="status" class="flex flex-wrap items-center gap-2 p-3 print:hidden">
+      <span>{{ recoveryReadError ? '打印记录存储暂不可核验，不能开始打印。' : '上次打印记录尚未核对，不能重复提交。' }}</span>
+      <button type="button" :disabled="busy" class="rounded border border-line px-3 py-1" @click="recoveryReadError ? refreshPending() : recoverPrint()">
+        {{ recoveryReadError ? '重新核验打印记录' : '核对打印记录' }}
       </button>
     </div>
-    <p v-if="error" role="alert" class="p-3 text-sm text-danger">
+    <p v-if="error" ref="errorRef" role="alert" tabindex="-1" class="p-3 text-sm text-danger print:hidden">
       {{ error }}
     </p>
-    <CentralInvoiceLedgerView v-show="workspace.readState.value === 'ready' && !printMode" class="min-h-0 flex-1" :records="displayedRecords" :projects="projects" :busy="busy || recoveryPending" @open="emit('open', $event)" @discard="discard" @prepare-print="preparePrint" @export="prepareExport" />
-    <InvoicePrintLayout v-if="printMode && workspace.readState.value === 'ready'" v-model:selected-id="printSelectedId" :invoices="printModels" :print-confirmation="pendingPrint" full-page @print="print" @confirm-print="confirmPrinted" @cancel-print="pendingPrint = null; printTargets = []" @back="leavePrint" />
+    <p v-if="printMode && busy && workspace.readState.value === 'ready'" role="status" class="p-3 text-sm text-ink-soft print:hidden">
+      正在处理打印，请稍候。
+    </p>
+    <CentralInvoiceLedgerView v-show="workspace.readState.value === 'ready' && !printMode" class="min-h-0 flex-1 print:hidden" :records="displayedRecords" :projects="projects" :busy="busy || recoveryPending" @open="emit('open', $event)" @discard="discard" @prepare-print="preparePrint" @export="prepareExport" />
+    <div v-if="printMode" v-show="workspace.readState.value === 'ready'" :class="{ 'central-print-unverified': !printAuthorized }" :inert="busy" :aria-busy="busy" class="min-h-0 flex-1 overflow-auto print:overflow-visible">
+      <section v-if="printSkipped.length" aria-label="不能打印的发票" class="mb-3 rounded border border-warn/35 bg-warn-soft p-3 text-sm text-warn-ink print:hidden">
+        <p role="status">
+          {{ `${printSkipped.length} 张发票不会打印；确认后只登记实际打印的发票。` }}
+        </p>
+        <ul class="mt-2 max-h-40 overflow-auto">
+          <li v-for="item in printSkipped" :key="item.record.id" class="flex items-start gap-2 py-1">
+            <input type="checkbox" disabled :aria-label="`勾选发票 ${item.record.fields.invoiceNumber || item.record.id}`">
+            <span>{{ item.record.fields.invoiceNumber || item.record.id }}：{{ item.reason }}<template v-if="item.record.fields.totalAmount === null">（金额未填写）</template></span>
+            <button v-if="originalFailures[item.record.id]" type="button" class="text-brand underline" @click="retryOriginal(item.record.id)">
+              {{ '重新核验' }}
+            </button>
+          </li>
+        </ul>
+      </section>
+      <InvoicePrintLayout v-model:selected-id="printSelectedId" :invoices="printModels" :print-confirmation="pendingPrint" full-page @print="print" @confirm-print="confirmPrinted" @cancel-print="cancelPrint" @back="leavePrint" />
+    </div>
     <InvoiceExportPreview v-if="exportOpen" v-model:open="exportOpen" :rows="exportRows" :total-amount="exportTotal" :file-name="exportName" :saving="exportSaving" :error="exportError" @confirm="confirmExport" />
   </div>
 </template>
+
+<style scoped>
+@media print {
+  .central-print-unverified :deep(.invoice-print-output) {
+    display: none !important;
+  }
+}
+</style>

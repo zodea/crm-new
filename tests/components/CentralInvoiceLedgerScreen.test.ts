@@ -52,7 +52,9 @@ it('导出当前筛选且保留未知与零，版本变化时阻止导出', asyn
     template: '<div><p>{{ error }}</p><span>{{ totalAmount === null ? "合计未统计" : totalAmount }}</span><button @click="$emit(\'confirm\', {})">确认测试导出</button></div>',
   })
   render(CentralInvoiceLedgerScreen, { props: { workspace: workspace as never, projects: [] }, global: { stubs: { InvoiceExportPreview: preview } } })
-  await fireEvent.click(await screen.findByRole('button', { name: '导出 Excel' }))
+  const exportButton = await screen.findByRole('button', { name: '导出 Excel' })
+  await waitFor(() => expect((exportButton as HTMLButtonElement).disabled).toBe(false))
+  await fireEvent.click(exportButton)
   expect(screen.getByText('合计未统计')).toBeTruthy()
   await fireEvent.click(screen.getByRole('button', { name: '确认测试导出' }))
   await waitFor(() => expect(mocks.exportFile).toHaveBeenCalledOnce())
@@ -114,7 +116,9 @@ it('导出台账来源与页面一致，旧票缺少来源证据时不猜测', a
   const workspace = { records, loading: shallowRef(false), readState: shallowRef('ready'), pendingPrint: () => null, load: vi.fn(async () => {}) }
   const preview = defineComponent({ emits: ['confirm'], template: '<button @click="$emit(\'confirm\', {})">确认测试导出</button>' })
   render(CentralInvoiceLedgerScreen, { props: { workspace: workspace as never, projects: [] }, global: { stubs: { InvoiceExportPreview: preview } } })
-  await fireEvent.click(await screen.findByRole('button', { name: '导出 Excel' }))
+  const exportButton = await screen.findByRole('button', { name: '导出 Excel' })
+  await waitFor(() => expect((exportButton as HTMLButtonElement).disabled).toBe(false))
+  await fireEvent.click(exportButton)
   await fireEvent.click(screen.getByRole('button', { name: '确认测试导出' }))
   await waitFor(() => expect(mocks.exportFile).toHaveBeenCalledOnce())
   const saved = mocks.exportFile.mock.calls[0]![0] as { data: ArrayBuffer }
@@ -154,7 +158,9 @@ it('项目目录版本变化时不导出旧项目名称', async () => {
   const verifyProjects = vi.fn().mockResolvedValueOnce([{ id: 'project-one', label: '旧项目名', sourceVersion: 'projects:2' }]).mockResolvedValueOnce([{ id: 'project-one', label: '旧项目名', sourceVersion: 'projects:1' }])
   const preview = defineComponent({ props: ['error'], emits: ['confirm'], template: '<div><p>{{ error }}</p><button @click="$emit(\'confirm\', {})">确认测试导出</button></div>' })
   render(CentralInvoiceLedgerScreen, { props: { workspace: workspace as never, projects: [{ id: 'project-one', label: '旧项目名', sourceVersion: 'projects:1' }], verifyProjects }, global: { stubs: { InvoiceExportPreview: preview } } })
-  await fireEvent.click(await screen.findByRole('button', { name: '导出 Excel' }))
+  const exportButton = await screen.findByRole('button', { name: '导出 Excel' })
+  await waitFor(() => expect((exportButton as HTMLButtonElement).disabled).toBe(false))
+  await fireEvent.click(exportButton)
   await fireEvent.click(screen.getByRole('button', { name: '确认测试导出' }))
   await screen.findByText('项目目录已变化，请关闭预览并重新读取。')
   expect(mocks.exportFile).not.toHaveBeenCalled()
@@ -172,7 +178,9 @@ it('仅在用户确认已打印后提交原批次，结果未知时核对原任�
   for (const [name, value] of Object.entries({ computed, shallowRef, useTemplateRef, watch }))
     vi.stubGlobal(name, value)
   vi.stubGlobal('useEventListener', vi.fn())
-  const printed = vi.spyOn(window, 'print').mockImplementation(() => {})
+  const printed = vi.spyOn(window, 'print').mockImplementation(() => {
+    window.dispatchEvent(new Event('afterprint'))
+  })
   const record: CentralInvoiceRecord = {
     id: 'invoice-one',
     version: '3',
@@ -206,12 +214,13 @@ it('仅在用户确认已打印后提交原批次，结果未知时核对原任�
     pending = false
     return { outcome: 'applied' as const }
   })
-  const workspace = { records: shallowRef([record]), loading: shallowRef(false), readState: shallowRef('ready'), load: vi.fn(async () => {}), pendingPrint: () => pending, recordPrinted, recoverPrint }
+  const workspace = { records: shallowRef([record]), loading: shallowRef(false), readState: shallowRef('ready'), load: vi.fn(async () => {}), pendingPrint: () => pending, verifiedOriginal: vi.fn(async () => new Blob()), recordPrinted, recoverPrint }
   render(CentralInvoiceLedgerScreen, { props: { workspace: workspace as never, projects: [] } })
   await fireEvent.click(await screen.findByLabelText('选择发票 00123'))
   await fireEvent.click(screen.getByRole('button', { name: '打印所选' }))
   await fireEvent.click(screen.getByRole('button', { name: /打印选中/ }))
-  expect(printed).toHaveBeenCalledOnce()
+  await waitFor(() => expect(printed).toHaveBeenCalledOnce())
+  expect(workspace.verifiedOriginal).toHaveBeenCalledWith(expect.objectContaining({ id: 'invoice-one', version: '3' }), true)
   expect(recordPrinted).not.toHaveBeenCalled()
   await fireEvent.click(screen.getByRole('button', { name: '已打印' }))
   await waitFor(() => expect(recordPrinted).toHaveBeenCalledWith([{ invoiceId: 'invoice-one', baseVersion: '3', rotation: 0 }]))
