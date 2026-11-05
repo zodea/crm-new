@@ -99,6 +99,11 @@ export function useImportRunner(
       const row = pendingRows[done.value]!
       try {
         const reason = validator ? await validator(row, done.value) : null
+        // 校验等待期间页面可能已关闭，该行尚未进入写入。
+        if (cancelled) {
+          phase.value = 'idle'
+          return { status: 'cancelled' }
+        }
         if (reason) {
           rejected.value = [
             ...rejected.value,
@@ -122,6 +127,11 @@ export function useImportRunner(
       done.value += 1
     }
 
+    // 最后一行可能在途时被取消；保留其完成计数和业务拒绝信息。
+    if (cancelled) {
+      phase.value = 'idle'
+      return { status: 'cancelled' }
+    }
     phase.value = 'completed'
     return rejected.value.length
       ? { status: 'completed', rejected: rejected.value }

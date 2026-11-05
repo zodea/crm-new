@@ -43,6 +43,10 @@ const sheet = shallowRef<RawImportSheet | null>(null)
 const mapping = shallowRef<Readonly<Record<string, ImportColumnMatch>>>({})
 const excludedRows = shallowRef<ReadonlySet<number>>(new Set())
 const runner = useImportRunner()
+let instanceGeneration = 0
+function instanceIsCurrent(generation: number) {
+  return generation === instanceGeneration
+}
 const { done, error, phase, total } = runner
 const { exportFile } = useKitUI()
 const rowNumbers = new WeakMap<Record<string, unknown>, number>()
@@ -169,6 +173,7 @@ function confirmSuggestion(fieldKey: string) {
 }
 
 async function goPreview() {
+  const generation = instanceGeneration
   if (missingRequired.value.length)
     return
   if (entityKey === 'supplier') {
@@ -181,6 +186,8 @@ async function goPreview() {
     supplierChoices.value = {}
     try {
       const recovered = await useSupplierCommandStore().recoverPendingImports()
+      if (!instanceIsCurrent(generation))
+        return
       if (recovered.applied || recovered.notApplied)
         supplierRecoveryNotice.value = `已核对上次导入：${recovered.applied} 行已保存，${recovered.notApplied} 行未保存。请重新核对本次预览后选择。`
       const valid = keptEntries.value.flatMap(({ index, row }) => {
@@ -191,8 +198,14 @@ async function goPreview() {
       })
       const repository = useNuxtApp().$repositories.supplierCommands
       const before = await repository.context()
+      if (!instanceIsCurrent(generation))
+        return
       const batch = await repository.previewImport(valid.map(item => item.draft))
+      if (!instanceIsCurrent(generation))
+        return
       const after = await repository.context()
+      if (!instanceIsCurrent(generation))
+        return
       const expected = [...before.capabilities].sort().join('\0')
       if (batch.workspaceId !== before.workspaceId || batch.actorId !== before.actorId || after.workspaceId !== before.workspaceId || after.actorId !== before.actorId
         || [...batch.capabilities].sort().join('\0') !== expected || [...after.capabilities].sort().join('\0') !== expected
@@ -204,10 +217,15 @@ async function goPreview() {
       supplierPrepared.value = new Map(valid.map((item, index) => [item.index, { draft: item.draft, preview: batch.previews[index]! }]))
     }
     catch (cause) {
+      if (!instanceIsCurrent(generation))
+        return
       supplierPreviewError.value = cause instanceof Error ? cause.message : '无法读取已有分供方，请重试'
       return
     }
-    finally { supplierPreviewBusy.value = false }
+    finally {
+      if (instanceIsCurrent(generation))
+        supplierPreviewBusy.value = false
+    }
   }
   if (entityKey === 'crew') {
     const selectedSheet = sheet.value
@@ -219,6 +237,8 @@ async function goPreview() {
     crewChoices.value = {}
     try {
       const recovered = await useCrewExcelImportStore().recoverPending()
+      if (!instanceIsCurrent(generation))
+        return
       if (recovered.applied || recovered.notApplied)
         crewRecoveryNotice.value = `已核对上次导入：${recovered.applied} 行已保存，${recovered.notApplied} 行未保存。请重新核对本次预览后选择。`
       const valid = keptEntries.value.flatMap(({ index, row }) => {
@@ -229,8 +249,14 @@ async function goPreview() {
       })
       const repository = useNuxtApp().$repositories.crewWorkerCommands
       const before = await repository.context()
+      if (!instanceIsCurrent(generation))
+        return
       const batch = await repository.previewCrewExcel(valid.map(item => item.draft))
+      if (!instanceIsCurrent(generation))
+        return
       const after = await repository.context()
+      if (!instanceIsCurrent(generation))
+        return
       const expected = [...before.capabilities].sort().join('\0')
       if (batch.workspaceId !== before.workspaceId || batch.actorId !== before.actorId || after.workspaceId !== before.workspaceId || after.actorId !== before.actorId
         || [...batch.capabilities].sort().join('\0') !== expected || [...after.capabilities].sort().join('\0') !== expected
@@ -242,10 +268,15 @@ async function goPreview() {
       crewPrepared.value = new Map(valid.map((item, index) => [item.index, { draft: item.draft, preview: batch.previews[index]! }]))
     }
     catch (cause) {
+      if (!instanceIsCurrent(generation))
+        return
       crewPreviewError.value = cause instanceof Error ? cause.message : '无法读取已有班组，请重试'
       return
     }
-    finally { crewPreviewBusy.value = false }
+    finally {
+      if (instanceIsCurrent(generation))
+        crewPreviewBusy.value = false
+    }
   }
   if (entityKey === 'worker') {
     const selectedSheet = sheet.value
@@ -258,6 +289,8 @@ async function goPreview() {
     workerRelations.value = {}
     try {
       const recovered = await useWorkerExcelImportStore().recoverPending()
+      if (!instanceIsCurrent(generation))
+        return
       if (recovered.applied || recovered.notApplied)
         workerRecoveryNotice.value = `已核对上次导入：${recovered.applied} 行已保存，${recovered.notApplied} 行未保存。请重新核对本次预览后选择。`
       const valid = keptEntries.value.flatMap(({ index, row }) => {
@@ -268,8 +301,14 @@ async function goPreview() {
       })
       const repository = useNuxtApp().$repositories.crewWorkerCommands
       const before = await repository.context()
+      if (!instanceIsCurrent(generation))
+        return
       const batch = await repository.previewWorkerExcel(valid.map(item => item.draft))
+      if (!instanceIsCurrent(generation))
+        return
       const after = await repository.context()
+      if (!instanceIsCurrent(generation))
+        return
       const expected = [...before.capabilities].sort().join('\0')
       if (batch.workspaceId !== before.workspaceId || batch.actorId !== before.actorId || after.workspaceId !== before.workspaceId || after.actorId !== before.actorId
         || [...batch.capabilities].sort().join('\0') !== expected || [...after.capabilities].sort().join('\0') !== expected
@@ -281,10 +320,15 @@ async function goPreview() {
       workerPrepared.value = new Map(valid.map((item, index) => [item.index, { draft: item.draft, preview: batch.previews[index]! }]))
     }
     catch (cause) {
+      if (!instanceIsCurrent(generation))
+        return
       workerPreviewError.value = cause instanceof Error ? cause.message : '无法读取工人或关联资料，请重试'
       return
     }
-    finally { workerPreviewBusy.value = false }
+    finally {
+      if (instanceIsCurrent(generation))
+        workerPreviewBusy.value = false
+    }
   }
   currentStep.value = 'preview-import'
 }
@@ -329,7 +373,9 @@ async function closeImportTab() {
     await router.replace(tabsStore.activeFullPath)
 }
 
-async function settle(result: ImportRunResult) {
+async function settle(result: ImportRunResult, generation: number) {
+  if (!instanceIsCurrent(generation))
+    return
   if (result.status === 'completed') {
     if (result.rejected?.length) {
       toast.warning(`已处理 ${done.value} 行，${result.rejected.length} 行被拒绝：${entity!.label}`)
@@ -341,6 +387,7 @@ async function settle(result: ImportRunResult) {
 }
 
 async function startImport() {
+  const generation = instanceGeneration
   if (!entity || phase.value === 'running' || crewStarting.value || !importableEntries.value.length || (entityKey === 'supplier' && supplierNeedsReview.value) || (entityKey === 'crew' && crewNeedsReview.value) || (entityKey === 'worker' && workerNeedsReview.value))
     return
   if (entityKey === 'supplier') {
@@ -348,10 +395,16 @@ async function startImport() {
       const source = sheet.value
       if (!source?.sourceHash)
         throw new Error('导入文件来源不完整，请重新选择文件')
-      for (const entry of importableEntries.value)
-        setSupplierImportSource(entry.row, await supplierImportSourceKey(source.sourceHash, source.name, sourceRowNumber(entry.index)))
+      for (const entry of importableEntries.value) {
+        const key = await supplierImportSourceKey(source.sourceHash, source.name, sourceRowNumber(entry.index))
+        if (!instanceIsCurrent(generation))
+          return
+        setSupplierImportSource(entry.row, key)
+      }
     }
     catch (cause) {
+      if (!instanceIsCurrent(generation))
+        return
       toast.error(cause instanceof Error ? cause.message : '无法核对导入来源')
       return
     }
@@ -372,12 +425,17 @@ async function startImport() {
         const choice = crewChoices.value[entry.index]
         const candidate = choice?.startsWith('replace:') ? prepared.preview.candidates.find(value => value.id === choice.slice(8)) : undefined
         const decision = candidate ? { kind: 'replace' as const, fingerprint: prepared.preview.fingerprint, id: candidate.id, version: candidate.version } : { kind: 'create' as const, fingerprint: prepared.preview.fingerprint }
-        bindCrewExcelRow(entry.row, decision, await crewExcelSourceKey(source.sourceHash, source.name, sourceRowNumber(entry.index)))
+        const key = await crewExcelSourceKey(source.sourceHash, source.name, sourceRowNumber(entry.index))
+        if (!instanceIsCurrent(generation))
+          return
+        bindCrewExcelRow(entry.row, decision, key)
       }
       if (sheet.value !== source || mapping.value !== capturedMapping || excludedRows.value !== capturedExclusions || crewChoices.value !== capturedChoices)
         throw new Error('文件、映射或确认选择已变化，请重新预览')
     }
     catch (cause) {
+      if (!instanceIsCurrent(generation))
+        return
       crewStarting.value = false
       toast.error(cause instanceof Error ? cause.message : '无法核对导入来源')
       return
@@ -403,12 +461,17 @@ async function startImport() {
         const crew = prepared.preview.crews.find(value => value.id === relations?.crew)
         const project = prepared.preview.projects.find(value => value.id === relations?.project)
         const decision = { ...(target ? { kind: 'replace' as const, id: target.id, version: target.version } : { kind: 'create' as const }), fingerprint: prepared.preview.fingerprint, ...(crew ? { crew: { id: crew.id, version: crew.version } } : {}), ...(project ? { project: { id: project.id, version: project.version } } : {}) }
-        bindWorkerExcelRow(entry.row, decision, await workerExcelSourceKey(source.sourceHash, source.name, sourceRowNumber(entry.index)))
+        const key = await workerExcelSourceKey(source.sourceHash, source.name, sourceRowNumber(entry.index))
+        if (!instanceIsCurrent(generation))
+          return
+        bindWorkerExcelRow(entry.row, decision, key)
       }
       if (sheet.value !== source || mapping.value !== capturedMapping || excludedRows.value !== capturedExclusions || workerChoices.value !== capturedChoices || workerRelations.value !== capturedRelations)
         throw new Error('文件、映射或确认选择已变化，请重新预览')
     }
     catch (cause) {
+      if (!instanceIsCurrent(generation))
+        return
       crewStarting.value = false
       toast.error(cause instanceof Error ? cause.message : '无法核对导入来源')
       return
@@ -432,46 +495,67 @@ async function startImport() {
       importableEntries.value.map(entry => entry.row),
       entity.importRow,
       entity.validateRow,
-    ))
+    ), generation)
   }
-  finally { crewStarting.value = false }
+  finally {
+    if (instanceIsCurrent(generation))
+      crewStarting.value = false
+  }
 }
 
 async function recoverSupplierImport() {
+  const generation = instanceGeneration
   try {
     const result = await useSupplierCommandStore().recoverPendingImports()
+    if (!instanceIsCurrent(generation))
+      return
     runner.reset()
     supplierRecoveryNotice.value = `已核对上次导入：${result.applied} 行已保存，${result.notApplied} 行未保存。请重新核对本次预览后选择。`
     currentStep.value = 'mapping'
   }
   catch (cause) {
+    if (!instanceIsCurrent(generation))
+      return
     toast.error(cause instanceof Error ? cause.message : '暂时无法核对原导入，请保留当前页面')
   }
 }
 
 async function recoverCrewImport() {
+  const generation = instanceGeneration
   try {
     const result = await useCrewExcelImportStore().recoverPending()
+    if (!instanceIsCurrent(generation))
+      return
     runner.reset()
     crewRecoveryNotice.value = `已核对上次导入：${result.applied} 行已保存，${result.notApplied} 行未保存。请重新核对本次预览后选择。`
     currentStep.value = 'mapping'
   }
-  catch (cause) { toast.error(cause instanceof Error ? cause.message : '暂时无法核对原导入，请保留当前页面') }
+  catch (cause) {
+    if (instanceIsCurrent(generation))
+      toast.error(cause instanceof Error ? cause.message : '暂时无法核对原导入，请保留当前页面')
+  }
 }
 async function recoverWorkerImport() {
+  const generation = instanceGeneration
   try {
     const result = await useWorkerExcelImportStore().recoverPending()
+    if (!instanceIsCurrent(generation))
+      return
     runner.reset()
     workerRecoveryNotice.value = `已核对上次导入：${result.applied} 行已保存，${result.notApplied} 行未保存。请重新核对本次预览后选择。`
     currentStep.value = 'mapping'
   }
-  catch (cause) { toast.error(cause instanceof Error ? cause.message : '暂时无法核对原导入，请保留当前页面') }
+  catch (cause) {
+    if (instanceIsCurrent(generation))
+      toast.error(cause instanceof Error ? cause.message : '暂时无法核对原导入，请保留当前页面')
+  }
 }
 
 async function retryImport() {
+  const generation = instanceGeneration
   if (phase.value === 'running')
     return
-  await settle(await runner.retry())
+  await settle(await runner.retry(), generation)
 }
 
 function rejectionRowNumber(rejection: ImportRowRejection): number {
@@ -491,6 +575,7 @@ function csvCell(value: unknown): string {
 }
 
 async function downloadRejections() {
+  const generation = instanceGeneration
   if (!runner.rejected.value.length)
     return
   const originalKeys = [...new Set(runner.rejected.value.flatMap(rejection => Object.keys(rejection.row)))]
@@ -520,6 +605,8 @@ async function downloadRejections() {
     })
   }
   catch (cause) {
+    if (!instanceIsCurrent(generation))
+      return
     toast.error(cause instanceof Error ? `拒绝清单下载失败：${cause.message}` : '拒绝清单下载失败')
   }
 }
@@ -527,6 +614,7 @@ async function downloadRejections() {
 // 页签被 X 关闭/卸载时停止后台入库：当前行完成后不再推进，
 // 避免卸载后静默失败或对已关页签弹结果。
 onUnmounted(() => {
+  instanceGeneration++
   runner.cancel()
 })
 </script>
