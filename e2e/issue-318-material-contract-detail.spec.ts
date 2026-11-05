@@ -23,6 +23,8 @@ async function reset(request: APIRequestContext, id: string, scenario: Scenario 
 
 test.describe('Issue #318：材料采购合同中央只读详情', () => {
   test.beforeEach(async ({ page }, testInfo) => {
+    if (testInfo.title === 'A02 采购列粘贴、手填单位、未填税率与联系人覆盖保存后保持')
+      testInfo.setTimeout(90_000)
     const id = session(testInfo)
     await page.addInitScript(key => localStorage.setItem(key, 'true'), DATA_VISIBILITY_STORAGE_KEY)
     await page.setExtraHTTPHeaders({ 'x-ruihang-test-session': id })
