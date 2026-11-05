@@ -3,6 +3,7 @@ import { mkdir, mkdtemp } from 'node:fs/promises'
 import { afterAll, expect, it } from 'vitest'
 import { createProductionCustomerService } from '../../server/utils/production-customer-service'
 import { createProductionProjectService } from '../../server/utils/production-project-service'
+import { createProductionStorage } from '../../server/utils/production-storage'
 import { createSeededProductionStorage } from '../helpers/production-storage-seed'
 import { cleanupTestTempRoot, testTempRoot } from '../helpers/test-temp-root'
 
@@ -20,6 +21,82 @@ async function fixture() {
   const command: ProjectCommandRequestDTO = { workspaceId: actor.workspaceId, actorId: actor.actorId, requiredCapability: 'project:write', commandId: 'project-create', baseVersion: null, action: 'save', draft: { name: '磁盘项目', code: '旧001', manager: '项目经理', customerId: customer.id, area: 0, contractAmount: 100.12, plannedEnd: '2026-12-31' }, attachments: { add: [{ fileName: '原说明.txt', fileSize: 3, mimeType: 'text/plain', contentBase64: 'YWJj' }] } }
   return { storage, options, actor, session, customer, command, service: createProductionProjectService(storage) }
 }
+
+it('正式项目合同金额的真实零和未知值各自持久化，冷开及权限变化不混淆', async () => {
+  const f = await fixture()
+  const reopened = createProductionStorage(f.options)
+  try {
+    const zero = await f.service.execute({
+      ...f.command,
+      commandId: 'project-zero-contract-amount',
+      draft: { ...f.command.draft, name: '合成零额项目', code: 'ZERO', contractAmount: 0 },
+      attachments: {},
+    }, f.session)
+    const unknown = await f.service.execute({
+      ...f.command,
+      commandId: 'project-unknown-contract-amount',
+      draft: { ...f.command.draft, name: '合成未知金额项目', code: 'UNKNOWN', contractAmount: null },
+      attachments: {},
+    }, f.session)
+    expect(zero.id).not.toBe(unknown.id)
+
+    async function assertAmounts(service: ReturnType<typeof createProductionProjectService>) {
+      const page = await service.list({}, f.session)
+      expect(page.pagination.total).toBe(2)
+      expect(page.items.find(item => item.project.id === zero.id)).toMatchObject({
+        dataOrigin: 'real',
+        project: { id: zero.id, label: '合成零额项目' },
+        contractAmount: '0.00',
+      })
+      expect(page.items.find(item => item.project.id === unknown.id)).toMatchObject({
+        dataOrigin: 'real',
+        project: { id: unknown.id, label: '合成未知金额项目' },
+        contractAmount: null,
+      })
+      expect(await service.form(zero.id, f.session)).toMatchObject({ version: '1', draft: { id: zero.id, contractAmount: 0 } })
+      expect(await service.form(unknown.id, f.session)).toMatchObject({ version: '1', draft: { id: unknown.id, contractAmount: null } })
+    }
+
+    await assertAmounts(f.service)
+    await f.storage.close()
+    const service = createProductionProjectService(reopened)
+    await assertAmounts(service)
+
+    const projectOnly = () => ({ ...f.actor, capabilities: ['project:list:read'] })
+    const restricted = await service.list({}, projectOnly)
+    expect(restricted.pagination.total).toBe(2)
+    expect(restricted.items.find(item => item.project.id === zero.id)).toMatchObject({
+      contractAmount: '0.00',
+      customer: { state: 'forbidden', id: null, label: null, reason: 'permission-denied' },
+    })
+    expect(restricted.items.find(item => item.project.id === unknown.id)).toMatchObject({
+      contractAmount: null,
+      customer: { state: 'forbidden', id: null, label: null, reason: 'permission-denied' },
+    })
+    expect(JSON.stringify(restricted.items)).not.toContain(f.customer.id)
+    expect(JSON.stringify(restricted.items)).not.toContain('正式客户')
+    const noProjects = () => ({ ...f.actor, capabilities: [] })
+    await expect(service.list({}, noProjects)).rejects.toMatchObject({ problem: { code: 'forbidden' } })
+
+    await service.executeLifecycle({
+      id: zero.id,
+      workspaceId: f.actor.workspaceId,
+      actorId: f.actor.actorId,
+      requiredCapability: 'project:write',
+      commandId: 'delete-zero-contract-project',
+      baseVersion: zero.version,
+      action: 'delete',
+    }, f.session)
+    const remaining = await service.list({}, f.session)
+    expect(remaining.pagination.total).toBe(1)
+    expect(remaining.items[0]).toMatchObject({ project: { id: unknown.id }, contractAmount: null })
+    expect(await service.form(unknown.id, f.session)).toMatchObject({ version: '1', draft: { id: unknown.id, contractAmount: null } })
+  }
+  finally {
+    await f.storage.close()
+    await reopened.close()
+  }
+})
 
 it('项目与原件同库冷回读，客户改名沿原 ID、未知指标不归零、删除恢复保留原件', async () => {
   const f = await fixture()
