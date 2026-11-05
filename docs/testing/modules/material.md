@@ -19,6 +19,7 @@
 | [tests/db/f4-material-migrations.test.ts](../../../tests/db/f4-material-migrations.test.ts) | 单元／服务／状态 | v23 F4 物资表单与库存事实迁移 |
 | [tests/material/forms.test.ts](../../../tests/material/forms.test.ts) | 单元／服务／状态 | f4 物资事实、派生库存与甲供材总控 |
 | [tests/material/price-analysis.test.ts](../../../tests/material/price-analysis.test.ts) | 单元／服务／状态 | 材料单价分析 |
+| [tests/material/delivery-price-service.test.ts](../../../tests/material/delivery-price-service.test.ts) | 合成内存服务与价格投影 | 送货缺原件或价格、补件、修订、删除与恢复对趋势及来源原价的影响；核对历史原件，不覆盖 HTTP、生产持久化或冷重启 |
 
 ## 组件（jsdom）
 
