@@ -177,20 +177,22 @@ function addItem() {
       <summary class="cursor-pointer font-600">
         货物明细（{{ items.length }}）
       </summary>
-      <div v-for="(item, index) in items" :key="index" class="mt-3 border border-line rounded p-3">
-        <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <label v-for="[key, label] in [['name', '名称'], ['spec', '规格'], ['unit', '单位'], ['taxRate', '税率']] as const" :key="key" class="flex flex-col gap-1 text-sm">
-            <span>第 {{ index + 1 }} 行{{ label }}</span>
-            <input v-model="item[key]" :disabled="busy" :readonly="readOnly" class="min-w-0 border border-line rounded bg-surface px-2 py-1" @input="markChanged">
-          </label>
-          <label v-for="[key, label] in itemNumberFields" :key="key" class="flex flex-col gap-1 text-sm">
-            <span>第 {{ index + 1 }} 行{{ label }}</span>
-            <input v-model="item[key]" type="text" inputmode="decimal" :disabled="busy" :readonly="readOnly" placeholder="未填写" class="min-w-0 border border-line rounded bg-surface px-2 py-1" @input="markChanged">
-          </label>
+      <div v-if="items.length" role="region" aria-label="货物明细列表" tabindex="0" class="max-h-64 overflow-y-auto overscroll-contain">
+        <div v-for="(item, index) in items" :key="index" class="mt-3 border border-line rounded p-3">
+          <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <label v-for="[key, label] in [['name', '名称'], ['spec', '规格'], ['unit', '单位'], ['taxRate', '税率']] as const" :key="key" class="flex flex-col gap-1 text-sm">
+              <span>第 {{ index + 1 }} 行{{ label }}</span>
+              <input v-model="item[key]" :disabled="busy" :readonly="readOnly" class="min-w-0 border border-line rounded bg-surface px-2 py-1" @input="markChanged">
+            </label>
+            <label v-for="[key, label] in itemNumberFields" :key="key" class="flex flex-col gap-1 text-sm">
+              <span>第 {{ index + 1 }} 行{{ label }}</span>
+              <input v-model="item[key]" type="text" inputmode="decimal" :disabled="busy" :readonly="readOnly" placeholder="未填写" class="min-w-0 border border-line rounded bg-surface px-2 py-1" @input="markChanged">
+            </label>
+          </div>
+          <button type="button" :disabled="busy || readOnly" class="mt-2 text-danger" @click="items.splice(index, 1); markChanged()">
+            删除第 {{ index + 1 }} 行
+          </button>
         </div>
-        <button type="button" :disabled="busy || readOnly" class="mt-2 text-danger" @click="items.splice(index, 1); markChanged()">
-          删除第 {{ index + 1 }} 行
-        </button>
       </div>
       <button type="button" :disabled="busy || readOnly" class="mt-3 text-brand" @click="addItem">
         添加明细
