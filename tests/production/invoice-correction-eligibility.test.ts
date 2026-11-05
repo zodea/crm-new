@@ -1,8 +1,9 @@
 import { Buffer } from 'node:buffer'
 import { createHash, randomUUID } from 'node:crypto'
-import { mkdir, mkdtemp } from 'node:fs/promises'
+import { constants } from 'node:fs'
+import { copyFile, mkdir, mkdtemp, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { afterAll, expect, it } from 'vitest'
+import { afterAll, beforeAll, expect, it } from 'vitest'
 import { INVOICE_READ_CAPABILITY, INVOICE_WRITE_CAPABILITY } from '../../app/lib/invoice/central-contract'
 import { createProductionAuxiliaryContractService } from '../../server/utils/production-auxiliary-contract-service'
 import { createLocalBackup, restoreBackupIsolated } from '../../server/utils/production-backup-package'
@@ -18,6 +19,7 @@ import { createProductionStorage } from '../../server/utils/production-storage'
 import { createProductionSupplierService } from '../../server/utils/production-supplier-service'
 import { runColdProcess } from '../helpers/cold-process'
 import { createMigratedMemoryDb } from '../helpers/memory-db'
+import { verifyProductionSeed } from '../helpers/production-storage-seed'
 import { createSubcontractFixture } from '../helpers/production-subcontract-fixture'
 import { cleanupTestTempRoot, testTempRoot } from '../helpers/test-temp-root'
 
@@ -36,7 +38,7 @@ function pdf() {
   return Buffer.from(text)
 }
 
-async function fixture() {
+async function buildFixture() {
   const f = await createSubcontractFixture()
   f.setActor({ ...f.session(), capabilities: [...f.session().capabilities, INVOICE_READ_CAPABILITY, INVOICE_WRITE_CAPABILITY, 'finance-payment-application:read', 'finance-payment-application:write', 'finance-payment-record:read', 'auxiliary-contract:read', 'auxiliary-contract:write'] })
   const supplierDraft = JSON.parse((await f.storage.select<{ draft_json: string }>('SELECT draft_json FROM suppliers WHERE id=?', [f.supplier.id]))[0]!.draft_json)
@@ -51,6 +53,51 @@ async function fixture() {
   const reviewed = await service.execute({ ...common, action: 'review', commandId: 'correction-review', invoiceId: uploaded.invoiceId, baseVersion: recognized.version, manualCompletion: false }, f.session)
   const archived = await service.execute({ ...common, action: 'archive', commandId: 'correction-archive', invoiceId: uploaded.invoiceId, baseVersion: reviewed.version, ownerKind: 'project', projectId: f.project.id, supplierId: supplier.id, taxNumbersConfirmed: true, taxVerification: { buyerId: f.signatory.id, buyerVersion: f.signatory.version, supplierVersion: supplier.version } }, f.session)
   return { ...f, service, actor, common, archived, supplier }
+}
+
+async function makeBaseline() {
+  const f = await buildFixture()
+  let path: string
+  try {
+    const root = testTempRoot('invoice-correction-baseline')
+    await mkdir(root, { recursive: true })
+    const directory = await mkdtemp(join(root, 'baseline-'))
+    path = join(directory, 'ruihang.sqlite')
+    await f.storage.backupTo(path)
+  }
+  finally { await f.storage.close() }
+  verifyProductionSeed(path, f.options)
+  const digest = createHash('sha256').update(await readFile(path)).digest('hex')
+  return { path, digest, options: f.options, actor: f.actor, common: f.common, archived: f.archived, supplier: f.supplier, project: f.project, signatory: f.signatory, main: f.main }
+}
+
+let baseline: Awaited<ReturnType<typeof makeBaseline>>
+beforeAll(async () => {
+  baseline = await makeBaseline()
+})
+
+async function fixture() {
+  const root = testTempRoot('invoice-correction-clones')
+  await mkdir(root, { recursive: true })
+  const directory = await mkdtemp(join(root, 'clone-'))
+  const path = join(directory, 'ruihang.sqlite')
+  await copyFile(baseline.path, path, constants.COPYFILE_EXCL)
+  if (createHash('sha256').update(await readFile(path)).digest('hex') !== baseline.digest)
+    throw new Error('发票更正测试快照复制后摘要不一致')
+  const options = { ...baseline.options, directory }
+  verifyProductionSeed(path, options)
+  const storage = createProductionStorage(options)
+  try {
+    await storage.status()
+    const actor = structuredClone(baseline.actor)
+    const session = () => structuredClone(actor)
+    const service = createProductionInvoiceService(storage)
+    return { ...structuredClone({ actor, common: baseline.common, archived: baseline.archived, supplier: baseline.supplier, project: baseline.project, signatory: baseline.signatory, main: baseline.main }), options, storage, session, service }
+  }
+  catch (cause) {
+    await storage.close()
+    throw cause
+  }
 }
 
 it('归档基准、权限和已打印历史均在真实日志与同事务来源下核对', async () => {
