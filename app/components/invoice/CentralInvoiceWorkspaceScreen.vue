@@ -25,6 +25,7 @@ const recognizing = shallowRef(false)
 const recognizingId = shallowRef<string | null>(null)
 const dirty = shallowRef(false)
 const error = shallowRef('')
+const originalError = shallowRef('')
 const pending = shallowRef<{ targetId: string | null, action: string, scopeId?: string } | null>(null)
 const pendingUnavailable = shallowRef(false)
 const batchResults = shallowRef<Array<{ name: string, status: string }> | null>(null)
@@ -190,28 +191,31 @@ async function choose(id: string) {
 }
 async function loadOriginal() {
   const current = selected.value
+  const workspace = props.workspace
   const generation = ++originalGeneration
   originalFile.value = null
-  if (!current?.original) {
+  originalError.value = ''
+  if (!active || workspace.readState.value !== 'ready' || !current?.original) {
     originalLoading.value = false
     return
   }
   originalLoading.value = true
   try {
-    const blob = await props.workspace.verifiedOriginal(current)
-    if (generation === originalGeneration)
+    const blob = await workspace.verifiedOriginal(current)
+    if (active && workspace === props.workspace && workspace.readState.value === 'ready' && generation === originalGeneration)
       originalFile.value = new File([blob], current.original.fileName, { type: current.original.mimeType })
   }
   catch (cause) {
-    if (generation === originalGeneration && !error.value)
-      error.value = message(cause)
+    if (active && workspace === props.workspace && workspace.readState.value === 'ready' && generation === originalGeneration)
+      originalError.value = message(cause)
   }
   finally {
-    if (generation === originalGeneration)
+    if (active && workspace === props.workspace && workspace.readState.value === 'ready' && generation === originalGeneration)
       originalLoading.value = false
   }
 }
-watch(() => [selected.value?.id, selected.value?.version, selected.value?.original?.id, selected.value?.original?.sha256, props.workspace.readState.value], () => {
+watch([() => props.workspace, () => selected.value?.id, () => selected.value?.version, () => selected.value?.original?.id, () => selected.value?.original?.sha256, () => selected.value?.original?.fileSize, () => selected.value?.original?.fileName, () => selected.value?.original?.mimeType, () => props.workspace.readState.value], () => {
+  originalError.value = ''
   if (props.workspace.readState.value === 'ready') {
     void loadOriginal()
   }
@@ -220,7 +224,7 @@ watch(() => [selected.value?.id, selected.value?.version, selected.value?.origin
     originalFile.value = null
     originalLoading.value = false
   }
-})
+}, { flush: 'sync' })
 async function run(operation: () => Promise<void>) {
   if (busy.value)
     return
@@ -255,7 +259,11 @@ async function load() {
   })
 }
 onMounted(async () => {
+  const beforeLoad = originalGeneration
   await load()
+  // 已经有 ready 数据且加载没有触发状态变化时，监听器没有机会启动首次读取。
+  if (active && beforeLoad === originalGeneration && props.workspace.readState.value === 'ready')
+    void loadOriginal()
   refreshPending()
 })
 async function upload(files: File[], projectId: string | null) {
@@ -569,7 +577,7 @@ async function recover() {
         </li>
       </ul>
     </section>
-    <CentralInvoiceWorkspaceView v-show="workspace.readState.value === 'ready'" ref="workspaceView" class="min-h-0 flex-1" :records="displayedRecords" :selected-id="selectedId" :original-file="originalFile" :original-loading="originalLoading" :recognizing-id="recognizingId" :busy="busy || uploadPreflight || !!pending || pendingUnavailable" :selection-unavailable="!!missingRecord" :source-available="workspace.readState.value === 'ready'" :cloud-available="!!cloudAvailable" :projects="projects" :suppliers="suppliers" :signatories="signatories" :contracts="contracts" :draft-record="draftRecord" :recognition-baseline="draft?.before" :region-candidate="regionCandidate" :restored-snapshot="restoredSnapshot" :error="error" @select="choose" @upload="upload" @manual="navigateTo('/finance/invoice/manual-new')" @attach="attach" @save="save" @review="review" @archive="archive" @discard="discard" @link-contract="linkContract" @confirm-legacy="confirmLegacy" @recognize="recognize" @retry-original="loadOriginal" @dirty="dirty = $event" @save-recognition="draftRecord && saveRecognition(draftRecord.fields, draftRecord.items)" @discard-recognition="discardRecognition" />
+    <CentralInvoiceWorkspaceView v-show="workspace.readState.value === 'ready'" ref="workspaceView" class="min-h-0 flex-1" :records="displayedRecords" :selected-id="selectedId" :original-file="originalFile" :original-loading="originalLoading" :recognizing-id="recognizingId" :busy="busy || uploadPreflight || !!pending || pendingUnavailable" :selection-unavailable="!!missingRecord" :source-available="workspace.readState.value === 'ready'" :cloud-available="!!cloudAvailable" :projects="projects" :suppliers="suppliers" :signatories="signatories" :contracts="contracts" :draft-record="draftRecord" :recognition-baseline="draft?.before" :region-candidate="regionCandidate" :restored-snapshot="restoredSnapshot" :error="error || originalError" @select="choose" @upload="upload" @manual="navigateTo('/finance/invoice/manual-new')" @attach="attach" @save="save" @review="review" @archive="archive" @discard="discard" @link-contract="linkContract" @confirm-legacy="confirmLegacy" @recognize="recognize" @retry-original="loadOriginal" @dirty="dirty = $event" @save-recognition="draftRecord && saveRecognition(draftRecord.fields, draftRecord.items)" @discard-recognition="discardRecognition" />
     <p v-if="workspace.readState.value !== 'ready' && error" role="alert" class="p-3 text-sm text-danger">
       {{ error }}
     </p>
