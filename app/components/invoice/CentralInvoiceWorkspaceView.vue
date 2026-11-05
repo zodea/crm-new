@@ -8,6 +8,7 @@ import { useInvoiceRegionTarget } from '~/composables/useInvoiceRegionTarget'
 import { INVOICE_RECOGNITION_FIELDS, invoiceRecognitionChanges, invoiceRecognitionMarks } from '~/lib/invoice/recognition-changes'
 import { invoiceRegionFocus, invoiceRegionHighlights } from '~/lib/invoice/recognition-regions'
 import AdaptiveWorkbench from '../shared/AdaptiveWorkbench.vue'
+import CentralInvoiceDuplicateNotice from './CentralInvoiceDuplicateNotice.vue'
 import CentralInvoiceFieldsForm from './CentralInvoiceFieldsForm.vue'
 import CentralInvoiceQueue from './CentralInvoiceQueue.vue'
 import InvoiceRegionViewer from './InvoiceRegionViewer.vue'
@@ -32,6 +33,7 @@ const props = defineProps<{
   restoredSnapshot?: CentralInvoiceFormSnapshot | null
   regionCandidate?: LocalInvoiceCandidate | null
   selectionUnavailable?: boolean
+  sourceAvailable?: boolean
   error?: string
 }>()
 const emit = defineEmits<{
@@ -246,6 +248,7 @@ function setDirty(value: boolean) {
       </template>
       <template #review>
         <div class="flex min-h-0 min-w-0 flex-col gap-3 overflow-auto">
+          <CentralInvoiceDuplicateNotice v-if="selected && sourceAvailable && !selectionUnavailable" :record="selected" :records="records" :dirty="formDirty || !!draftRecord" :busy="busy" @select="emit('select', $event)" />
           <p v-if="selected?.legacy" role="status" class="rounded border border-line bg-panel p-3 text-sm">
             旧资料：{{ legacyOriginalLabels[selected.legacy.originalState] }}。<span v-if="selected.legacy.ambiguousZeroFields.length || selected.legacy.ambiguousItemNumbers">旧金额或明细中的零可能表示未知，请结合原件核对。</span>
           </p>

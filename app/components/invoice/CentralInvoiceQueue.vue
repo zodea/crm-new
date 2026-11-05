@@ -68,6 +68,7 @@ function chooseFiles(event: Event) {
           <button type="button" :disabled="busy" class="w-full px-3 py-3 text-left" :class="record.id === selectedId ? 'bg-surface-sink' : ''" :aria-pressed="record.id === selectedId" @click="emit('select', record.id)">
             <span class="block break-all text-sm font-600">{{ record.fields.invoiceNumber || record.original?.fileName || '未填写票号' }}</span>
             <span aria-live="polite" class="mt-1 block text-xs" :class="record.id !== recognizingId && record.ocrStatus === 'failed' ? 'text-warn-ink' : 'text-ink-soft'">{{ record.id === recognizingId ? '正在识别或核对结果' : recognitionLabels[record.ocrStatus] }}</span>
+            <span v-if="record.duplicateStatus === 'duplicate'" class="mt-1 block text-xs text-warn-ink">曾标记为重复，请核对</span>
             <span class="mt-1 block text-xs text-ink-soft">{{ record.reviewStatus === 'reviewed' ? '已核对' : '待核对' }} · {{ record.accountStatus === 'archived' ? '已归档' : '未归档' }}</span>
             <span class="mt-1 block text-xs text-ink-soft">{{ record.printCount > 0 ? `已登记打印 ${record.printCount} 次` : '未登记打印' }}</span>
             <span class="mt-1 block text-xs text-ink-soft">{{ record.fields.totalAmount === null ? '价税合计未填写' : `价税合计 ${record.fields.totalAmount}` }}</span>
