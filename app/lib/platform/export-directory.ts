@@ -4,6 +4,7 @@ import { appendCollisionSuffix } from '~/lib/kit/export'
 interface BrowserWritableFile {
   write: (data: Uint8Array) => Promise<void>
   close: () => Promise<void>
+  abort?: () => Promise<void>
 }
 
 interface BrowserFileHandle {
@@ -107,10 +108,24 @@ async function pickBrowserDirectory(
           if (await browserFileExists(targetDirectory, candidate))
             continue
 
-          const file = await targetDirectory.getFileHandle(candidate, { create: true })
-          const writable = await file.createWritable()
-          await writable.write(data)
-          await writable.close()
+          let writable: BrowserWritableFile | undefined
+          try {
+            const file = await targetDirectory.getFileHandle(candidate, { create: true })
+            writable = await file.createWritable()
+            await writable.write(data)
+            await writable.close()
+          }
+          catch (cause) {
+            try {
+              await writable?.abort?.()
+            }
+            catch {
+              // 不依赖终止成功，也不按名称删除可能已被其他操作修改的文件。
+            }
+            const path = [...segments.slice(0, -1), candidate].join('/')
+            const detail = cause instanceof Error && cause.message ? `${cause.message}。` : ''
+            throw new Error(`${detail}目标目录中的“${path}”可能留下空文件或未完成文件，请先核对后重试。`, { cause })
+          }
           return
         }
       },
