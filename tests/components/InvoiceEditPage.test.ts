@@ -184,12 +184,18 @@ describe('发票编辑页重新识别（草稿）', () => {
     beforeEach(() => {
       Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:audit'), revokeObjectURL: vi.fn() })
     })
+    async function decodeImage(view: ReturnType<typeof render>) {
+      const image = view.getByRole('img', { name: 'audit.png' })
+      Object.defineProperties(image, { naturalWidth: { value: 1000 }, naturalHeight: { value: 700 } })
+      await fireEvent.load(image)
+    }
 
     it('原文件在会话中时左栏改为原图：变动字段框出并带字段名，定位不到的说明“原图未定位”，读屏同步说明', async () => {
       const { view, recognize } = mountEditPage({ invoiceNumber: 'NEW', totalAmount: 226, taxAmount: 26, fieldRegions: regions }, 'done', file)
       // 草稿前：原件平时预览，没有任何框
       expect(view.getByTestId('invoice-region-viewer')).toBeTruthy()
       expect(view.queryAllByTestId('invoice-region-box')).toHaveLength(0)
+      await decodeImage(view)
       await recognize(true)
       const boxes = view.getAllByTestId('invoice-region-box')
       expect(boxes.map(box => box.textContent?.trim())).toEqual(['单据编号', '价税合计'])
@@ -209,6 +215,7 @@ describe('发票编辑页重新识别（草稿）', () => {
 
     it('聚焦字段强调对应框并保持，悬停变动条目临时覆盖；旋转后框随之换算', async () => {
       const { view, recognize } = mountEditPage({ invoiceNumber: 'NEW', totalAmount: 226, fieldRegions: regions }, 'done', file)
+      await decodeImage(view)
       await recognize(true)
       const active = () => view.getAllByTestId('invoice-region-box').filter(box => box.dataset.active === 'true').map(box => box.dataset.fields)
       expect(active()).toEqual([])
@@ -242,6 +249,7 @@ describe('发票编辑页重新识别（草稿）', () => {
       expect(view.getByRole('img', { name: 'audit.png' })).toBeTruthy()
       expect(view.queryByTestId('invoice-original-missing')).toBeNull()
       expect(view.queryByTestId('invoice-region-legend')).toBeNull()
+      await decodeImage(view)
       await recognize(true)
       expect(view.getAllByTestId('invoice-region-box')).toHaveLength(1)
       // 放弃草稿：原件仍在，比对框撤下
@@ -253,6 +261,7 @@ describe('发票编辑页重新识别（草稿）', () => {
     it('首次识别后聚焦字段临时框出所在块，失焦撤回；定位不到的字段读屏与原图说明“原图未定位”', async () => {
       const { view, recognize } = mountEditPage({ invoiceNumber: 'NEW', totalAmount: 226, fieldRegions: regions }, 'failed', file)
       expect(view.queryByTestId('invoice-region-legend')).toBeNull()
+      await decodeImage(view)
       await recognize(true)
       expect(view.queryAllByTestId('invoice-region-box')).toHaveLength(0)
       expect(view.getByTestId('invoice-region-legend').textContent).toContain('聚焦或悬停字段输入框')
@@ -283,6 +292,7 @@ describe('发票编辑页重新识别（草稿）', () => {
 
     it('重新识别草稿期间回到比对：变动框常驻，失焦不撤框', async () => {
       const { view, recognize } = mountEditPage({ invoiceNumber: 'NEW', fieldRegions: regions }, 'done', file, regions)
+      await decodeImage(view)
       await fireEvent.focus(view.getByLabelText('价税合计'))
       expect(view.getAllByTestId('invoice-region-box').map(box => box.dataset.fields)).toEqual(['totalAmount'])
       await recognize(true)

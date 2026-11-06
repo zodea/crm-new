@@ -111,6 +111,7 @@
 | [tests/components/InvoiceReviewForm.test.ts](../../../tests/components/InvoiceReviewForm.test.ts) | 组件（jsdom） | 识别校对表单草稿模式：修改只交父级不写库，变动字段角标与读屏原值；聚焦/悬停变动字段通知原图强调，读屏说明原图是否框出；首次识别点字段定位聚焦即定位、失焦撤回，未定位字段读屏说明 |
 | [tests/components/InvoiceRegionViewer.test.ts](../../../tests/components/InvoiceRegionViewer.test.ts) | 组件（jsdom） | 发票原图预览器：普通预览缩放与左右旋转、PDF 超页数上限如实提示、渲染/解码失败可解释并重试、点字段定位与比对两种区域模式 |
 | [tests/components/InvoiceRegionViewerDecodeFailure.test.ts](../../../tests/components/InvoiceRegionViewerDecodeFailure.test.ts) | 组件（jsdom） | 合成 PDF 页图解码失败、重试、定位撤销和旧结果迟到 |
+| [tests/components/InvoiceImageDecodeReadiness.test.ts](../../../tests/components/InvoiceImageDecodeReadiness.test.ts) | 组件（jsdom） | 旧工作台图片解码前不定位、零尺寸、解码失败重试及旧文件事件迟到；中央空几何帧仍拒绝定位 |
 | [tests/components/InvoicePrintLayout.test.ts](../../../tests/components/InvoicePrintLayout.test.ts) | 组件（jsdom） | 打印面板：无原件的 Excel 发票不可勾选、列出未打印清单，打印只提交有原件的票 |
 | [tests/components/InvoiceExportPreview.test.ts](../../../tests/components/InvoiceExportPreview.test.ts) | 组件（jsdom） | 发票导出预览样式草稿 |
 
@@ -128,6 +129,7 @@
 | [tests/browser/CentralInvoiceObservedAuthority.test.ts](../../../tests/browser/CentralInvoiceObservedAuthority.test.ts) | 浏览器组件／合成传输 | 两视口旧 403 后隐藏票面、保留输入及键盘重读，并回归原编号恢复；不访问真实服务 |
 | [tests/browser/CentralInvoiceLoadInterleaving.test.ts](../../../tests/browser/CentralInvoiceLoadInterleaving.test.ts) | 真实组件／合成传输 | 两视口旧读取成功或网络失败迟到不覆盖新数据或提示，键盘焦点；外部并发使用合成来源 |
 | [tests/browser/CentralInvoiceRegions.test.ts](../../../tests/browser/CentralInvoiceRegions.test.ts) | 真实组件／模拟来源 | 原件定位与撤权 |
+| [tests/browser/InvoiceImageDecodeReadiness.test.ts](../../../tests/browser/InvoiceImageDecodeReadiness.test.ts) | 真实浏览器／合成图片 | 五视口真实图片解码后的定位、旋转及损坏恢复；不读取真实发票 |
 | [tests/browser/InvoicePdfPageDecodeFailure.test.ts](../../../tests/browser/InvoicePdfPageDecodeFailure.test.ts) | 真实浏览器／合成页图 | 五视口 PDF 页图解码失败、键盘重试和焦点返回 |
 | [tests/browser/pdf-preview-real-browser.test.ts](../../../tests/browser/pdf-preview-real-browser.test.ts) | 真实浏览器／合成 PDF | 真实 pdf.js 和 canvas 渲染单页旋转 PDF、图像解码与调用者释放 URL |
 | [tests/browser/CentralInvoiceRerecognition.test.ts](../../../tests/browser/CentralInvoiceRerecognition.test.ts) | 真实组件／模拟来源 | 重识别草稿与交互 |

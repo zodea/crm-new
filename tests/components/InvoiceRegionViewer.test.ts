@@ -98,6 +98,9 @@ describe('发票原图预览器（工作台与编辑页平时预览、比对与�
     expect(view.getByTestId('invoice-region-legend').textContent).not.toContain('原图未定位')
 
     await view.rerender({ file: image, mode: 'focus', groups: [group], unlocated, activeKey: 'invoiceNumber' })
+    const img = view.getByRole('img', { name: '原件.png' })
+    Object.defineProperties(img, { naturalWidth: { value: 1000 }, naturalHeight: { value: 500 } })
+    await fireEvent.load(img)
     const boxes = view.getAllByTestId('invoice-region-box')
     expect(boxes.map(box => box.dataset.active)).toEqual(['true'])
     expect(boxes[0]!.textContent).toContain('单据编号')
@@ -108,11 +111,14 @@ describe('发票原图预览器（工作台与编辑页平时预览、比对与�
     expect(view.getByTestId('invoice-region-legend').textContent).toContain('供应商：原图未定位')
   })
 
-  it('比对模式保持 #507 现状：标题“原图比对”，常驻框与“已框出 / 原图未定位”图例', () => {
+  it('比对模式保持 #507 现状：标题“原图比对”，常驻框与“已框出 / 原图未定位”图例', async () => {
     const group = { id: 'g', pageIndex: 0, box: { x: 0.5, y: 0.1, width: 0.4, height: 0.1 }, keys: ['invoiceNumber'], labels: ['单据编号'] }
     const view = render(InvoiceRegionViewer, { props: { file: image, mode: 'compare', groups: [group], unlocated: [{ key: 'seller', label: '供应商' }], activeKey: null } })
     expect(view.getByRole('region', { name: '发票原图识别变动比对' })).toBeTruthy()
     expect(view.getByText('原图比对')).toBeTruthy()
+    const img = view.getByRole('img', { name: '原件.png' })
+    Object.defineProperties(img, { naturalWidth: { value: 1000 }, naturalHeight: { value: 500 } })
+    await fireEvent.load(img)
     expect(view.getAllByTestId('invoice-region-box').map(box => box.dataset.active)).toEqual(['false'])
     expect(view.getByTestId('invoice-region-legend').textContent).toContain('已框出：单据编号')
     expect(view.getByTestId('invoice-region-legend').textContent).toContain('原图未定位：供应商')

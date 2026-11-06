@@ -133,15 +133,13 @@ function onImageError(page: { url: string, file: File, reload: number }) {
     imageFailed.value = true
 }
 
-/** 未取到原始尺寸前按 A4 竖版比例占位，框仍按百分比定位。 */
+/** 未取到原始尺寸前按 A4 竖版比例占位，不显示定位框。 */
 const A4 = { width: 1, height: Math.SQRT2 }
 function frameMatches(pageIndex: number, size: { width: number, height: number }, natural: boolean) {
-  if (isPdf.value && !natural)
+  if (!natural)
     return false
   if (!props.frames)
     return true
-  if (!natural)
-    return false
   const matches = props.frames.filter(frame => frame.pageIndex === pageIndex)
   if (matches.length !== 1)
     return false
