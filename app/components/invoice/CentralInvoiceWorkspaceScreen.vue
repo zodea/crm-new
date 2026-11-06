@@ -533,13 +533,28 @@ async function confirmLegacy() {
 }
 async function discard() {
   const current = selected.value
-  if (!current || dirty.value || draft.value || !await confirm({ variant: 'simple', title: '废弃发票', message: `确定废弃 ${current.fields.invoiceNumber || current.id} 吗？`, confirmLabel: '废弃' }))
+  if (!current || dirty.value || draft.value)
     return
+  const sourceWorkspace = props.workspace
+  const sourceGeneration = uploadAuthorityGeneration
+  const selectedGeneration = recognitionGeneration
+  const sourceIsCurrent = () => active && props.workspace === sourceWorkspace && sourceGeneration === uploadAuthorityGeneration
+    && selectedGeneration === recognitionGeneration && sourceWorkspace.readState.value === 'ready'
+    && selected.value?.id === current.id && selected.value.version === current.version && !dirty.value && !draft.value
+  if (!await confirm({ variant: 'simple', title: '废弃发票', message: `确定废弃 ${current.fields.invoiceNumber || current.id} 吗？`, confirmLabel: '废弃' }))
+    return
+  if (!sourceIsCurrent()) {
+    if (active)
+      error.value = '发票或权限已变化，废弃操作未提交。'
+    return
+  }
   await run(async () => {
-    const removed = await props.workspace.discard(current)
+    const removed = await sourceWorkspace.discard(current, sourceIsCurrent)
+    if (!active || props.workspace !== sourceWorkspace || sourceGeneration !== uploadAuthorityGeneration || selectedId.value !== current.id)
+      return
     selectedId.value = null
     undoToast('发票已废弃', async () => {
-      await props.workspace.restore(removed)
+      await sourceWorkspace.restore(removed)
     })
   })
 }

@@ -101,7 +101,7 @@ export function createCentralInvoiceSession(options: {
           throw new Error('发票提交身份或目标已变化，请保留输入。')
         }
         if (beforeSubmit && !beforeSubmit())
-          throw new Error('发票或权限已变化，识别结果未提交。')
+          throw new Error(command.action === 'recognize' ? '发票或权限已变化，识别结果未提交。' : '发票或权限已变化，操作未提交。')
         const descriptor = { ...scope, commandId: command.commandId, action: command.action }
         recovery.remember(key, descriptor)
         const result = await options.repository.execute(command)

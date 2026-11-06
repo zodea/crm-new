@@ -271,8 +271,8 @@ export function createCentralInvoiceWorkspace(options: {
         throw new Error('请选择与项目归属一致的合同。')
       return execute({ ...envelope(), action: 'archive', invoiceId: invoice.id, baseVersion: invoice.version, ownerKind, projectId, supplierId, taxNumbersConfirmed: true, taxVerification, ...(contract ? { contract } : {}) })
     },
-    async discard(invoice: CentralInvoiceRecord) {
-      return execute({ ...envelope(), action: 'discard', invoiceId: invoice.id, baseVersion: invoice.version })
+    async discard(invoice: CentralInvoiceRecord, beforeSubmit?: () => boolean) {
+      return execute({ ...envelope(), action: 'discard', invoiceId: invoice.id, baseVersion: invoice.version }, beforeSubmit)
     },
     async restore(invoice: CentralInvoiceRecord) {
       return execute({ ...envelope(), action: 'restore', invoiceId: invoice.id, baseVersion: invoice.version })
