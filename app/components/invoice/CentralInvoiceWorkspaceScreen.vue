@@ -158,7 +158,9 @@ function clearBatch() {
     })
   }
 }
-watch([() => props.workspace, () => props.workspace.readState.value], () => {
+watch([() => props.workspace, () => props.workspace.readState.value], ([workspace, state], [previousWorkspace]) => {
+  if (workspace !== previousWorkspace || state === 'unavailable' || state === 'unread')
+    workspaceView.value?.clearQueueSearch?.()
   uploadAuthorityGeneration++
   recognitionProgressGeneration++
   recognizingId.value = null

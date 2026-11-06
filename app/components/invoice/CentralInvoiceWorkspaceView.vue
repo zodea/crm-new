@@ -78,7 +78,7 @@ function forwardUpload(files: File[], projectId: string | null) {
   dropError.value = ''
   emit('upload', files, projectId)
 }
-defineExpose({ captureForm: () => fieldsForm.value?.capture() ?? null })
+defineExpose({ captureForm: () => fieldsForm.value?.capture() ?? null, clearQueueSearch: () => queue.value?.clearSearch() })
 const activePane = shallowRef<'queue' | 'source' | 'review'>('queue')
 const sourceFromReview = shallowRef(false)
 watch(activePane, (pane, previous) => {
