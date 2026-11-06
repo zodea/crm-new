@@ -101,6 +101,7 @@ function fixture(kind: 'ordinary' | 'print', outcome: 'applied' | 'not-applied')
     fetcher,
     revokeRead: () => { capabilities = ['finance-invoice:write'] },
     revokeWrite: () => { capabilities = ['finance-invoice:read'] },
+    addCapability: () => { capabilities = [...granted, 'project:list:read'] },
     switchActor: () => { actorId = 'other-actor' },
     restore: () => {
       capabilities = [...granted]
@@ -171,5 +172,19 @@ describe('普通和打印原编号：读取权限迟到失效', () => {
     const resolutions = f.fetcher.mock.calls.filter(([url]) => url === resolveUrl)
     expect(resolutions).toHaveLength(2)
     expect(resolutions.every(([, options]) => JSON.stringify(options?.body) === JSON.stringify({ commandId: 'synthetic-command' }))).toBe(true)
+  })
+
+  it.each(['ordinary', 'print'] as const)('%s 未应用核对期间能力集合改变时保留原号', async (kind) => {
+    const f = fixture(kind, 'not-applied')
+    await expect(f.submit()).rejects.toThrow('合成请求结果未知')
+    const pending = f.session.recover()
+    await f.entered.promise
+    f.addCapability()
+    f.gate.resolve()
+    await expect(pending).rejects.toThrow('发票读取来源或权限已变化')
+    expect(f.session.pending()?.commandId).toBe('synthetic-command')
+    f.restore()
+    expect(await f.session.recover()).toEqual({ outcome: 'not-applied' })
+    expect(f.session.pending()).toBeNull()
   })
 })

@@ -73,7 +73,7 @@ function fixture(workspaceId: string) {
     await afterApply()
     return receipt
   })
-  const get = vi.fn(async () => ({ record: structuredClone(current), sourceVersion: 'read-synthetic-2', meta: { sources: [{ key: 'invoices', sourceVersion: 'invoices:2' }] } }))
+  const get = vi.fn(async () => ({ record: structuredClone(current), sourceVersion: 'read-synthetic-2', capabilities: ['finance-invoice:read', 'finance-invoice:write'], meta: { sources: [{ key: 'invoices', sourceVersion: 'invoices:2' }] } }))
   const resolve = vi.fn(async (commandId: string) => {
     if (!receipt || receipt.commandId !== commandId)
       throw new Error('合成原编号不存在')
@@ -81,7 +81,7 @@ function fixture(workspaceId: string) {
   })
   const list = vi.fn(async () => {
     const revision = current.version === '2' ? '2' : '1'
-    return { items: [structuredClone(current)], pagination: { total: 1 }, sourceVersion: `read-synthetic-${revision}`, meta: { sources: [{ key: 'invoices', sourceVersion: `invoices:${revision}` }] } }
+    return { items: [structuredClone(current)], pagination: { total: 1 }, sourceVersion: `read-synthetic-${revision}`, capabilities: ['finance-invoice:read', 'finance-invoice:write'], meta: { sources: [{ key: 'invoices', sourceVersion: `invoices:${revision}` }] } }
   })
   const workspace = createCentralInvoiceWorkspace({
     identity,
@@ -215,7 +215,7 @@ it('授权等待期间重读且原编号存储不可读时保留存储缺口提�
   await a.workspace.load()
   await waitFor(() => expect((screen.getByRole('button', { name: '保存修改' }) as HTMLButtonElement).disabled).toBe(false))
 })
-it('已发送后同源重读，现有来源校验保守失效且原编号完成核对', async () => {
+it('已发送后同源重读，完整等版本详情一致时保留已读版本并完成原编号核对', async () => {
   const a = fixture('synthetic-a')
   await a.workspace.load()
   await open(a)
@@ -229,12 +229,23 @@ it('已发送后同源重读，现有来源校验保守失效且原编号完成�
   await entered.promise
   expect(a.workspace.pending(a.current().id)?.commandId).toBe('synthetic-command-synthetic-a')
   await a.workspace.load()
+  const reread = JSON.parse(JSON.stringify(a.workspace.records.value[0])) as CentralInvoiceRecord
+  expect(reread.version).toBe('2')
+  expect(reread).toEqual(a.current())
+  expect(a.workspace.sourceVersion.value).toBe('read-synthetic-2')
   expect(await screen.findByRole('button', { name: '核对上次提交' })).toBeTruthy()
   release.resolve()
   await waitFor(() => expect(a.workspace.pending(a.current().id)).toBeNull())
   await waitFor(() => expect(screen.queryByRole('button', { name: '核对上次提交' })).toBeNull())
-  expect(a.workspace.readState.value).toBe('unavailable')
-  expect(a.workspace.records.value).toEqual([])
+  expect(a.get).toHaveBeenCalledOnce()
+  const detail = await a.get.mock.results[0]!.value
+  expect(detail.record).toEqual(reread)
+  expect(detail.sourceVersion).toBe('read-synthetic-2')
+  expect(detail.meta.sources[0]?.sourceVersion).toBe('invoices:2')
+  expect(detail.capabilities).toEqual(['finance-invoice:read', 'finance-invoice:write'])
+  expect(a.workspace.readState.value).toBe('ready')
+  expect(a.workspace.records.value).toEqual([reread])
+  expect(a.workspace.sourceVersion.value).toBe('read-synthetic-2')
   expect(a.execute).toHaveBeenCalledOnce()
 })
 for (const outcome of ['成功', '失败'] as const) {

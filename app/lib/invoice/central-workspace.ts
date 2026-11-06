@@ -1,17 +1,33 @@
 import type { RecoveryStorage } from '../forms/command-recovery'
 import type { CentralInvoiceCommand, CentralInvoiceFields, CentralInvoiceItem, CentralInvoicePrintCommand, CentralInvoiceRecord, InvoiceContractReference, InvoiceTaxVerificationSelection } from './central-contract'
-import type { createCentralInvoiceHttp } from './central-http'
+import type { createCentralInvoiceHttp, InvoiceDetailRead } from './central-http'
 import type { LocalInvoiceCandidate } from './recognize'
 import { readonly, shallowRef } from 'vue'
 import { problemFromHttpFailure } from '../read-model/problem'
 import { INVOICE_READ_CAPABILITY, INVOICE_WRITE_CAPABILITY } from './central-contract'
 import { invoiceCandidateForCommand } from './central-recognition'
-import { createCentralInvoicePrintSession, createCentralInvoiceSession, pendingCentralInvoiceCommands } from './central-session'
+import { CentralInvoiceReadInconsistentError, createCentralInvoicePrintSession, createCentralInvoiceSession, pendingCentralInvoiceCommands, sameInvoiceCapabilities } from './central-session'
 import { prepareInvoiceOriginal } from './central-upload'
 
 type Client = ReturnType<typeof createCentralInvoiceHttp>
 interface Context { workspaceId: string, actorId: string, capabilities: readonly string[] }
 type Identity = Pick<Context, 'workspaceId' | 'actorId'>
+
+function sameValue(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right))
+    return true
+  if (Array.isArray(left) || Array.isArray(right)) {
+    return Array.isArray(left) && Array.isArray(right) && left.length === right.length
+      && Array.from({ length: left.length }, (_, index) => index).every(index => Object.hasOwn(left, index)
+        && Object.hasOwn(right, index) && sameValue(left[index], right[index]))
+  }
+  if (left === null || right === null || typeof left !== 'object' || typeof right !== 'object')
+    return false
+  const leftKeys = Object.keys(left).sort()
+  const rightKeys = Object.keys(right).sort()
+  return leftKeys.length === rightKeys.length && leftKeys.every((key, index) => key === rightKeys[index]
+    && sameValue((left as Record<string, unknown>)[key], (right as Record<string, unknown>)[key]))
+}
 
 export class CentralInvoiceLoadSupersededError extends Error {
   constructor() {
@@ -36,12 +52,14 @@ export function createCentralInvoiceWorkspace(options: {
   const readState = shallowRef<'unread' | 'loading' | 'ready' | 'unavailable'>('unread')
   const sourceVersion = shallowRef<string | null>(null)
   let sourceRevision: number | null = null
+  let sourceCapabilities: string[] | null = null
   let generation = 0
   const makeId = options.commandId ?? (() => crypto.randomUUID())
   function invalidate() {
     records.value = []
     sourceVersion.value = null
     sourceRevision = null
+    sourceCapabilities = null
     readState.value = 'unavailable'
   }
   function invalidateAuthority() {
@@ -59,10 +77,12 @@ export function createCentralInvoiceWorkspace(options: {
       throw cause
     }
     if (actor.workspaceId !== identity.workspaceId || actor.actorId !== identity.actorId
+      || !sameInvoiceCapabilities(actor.capabilities, actor.capabilities)
       || !actor.capabilities.includes(INVOICE_READ_CAPABILITY) || (write && !actor.capabilities.includes(INVOICE_WRITE_CAPABILITY))) {
       invalidateAuthority()
       throw new Error('发票工作区身份或权限已变化，请重新登录后核对原提交。')
     }
+    return [...actor.capabilities]
   }
   async function sessionContext() {
     try {
@@ -75,8 +95,8 @@ export function createCentralInvoiceWorkspace(options: {
       throw cause
     }
   }
-  const session = (targetId: string | null) => createCentralInvoiceSession({ identity, targetId, repository: options.client, context: sessionContext, storage: options.storage })
-  const printSession = () => createCentralInvoicePrintSession({ identity, repository: options.client, context: sessionContext, storage: options.storage })
+  const session = (targetId: string | null) => createCentralInvoiceSession({ identity, targetId, repository: options.client, context: sessionContext, storage: options.storage, beforeClear: validateReadBatchBeforeClear })
+  const printSession = () => createCentralInvoicePrintSession({ identity, repository: options.client, context: sessionContext, storage: options.storage, beforeClear: validateReadBatchBeforeClear })
   function updateRecord(record: CentralInvoiceRecord) {
     const index = records.value.findIndex(item => item.id === record.id)
     if (record.deletedAt !== null) {
@@ -93,12 +113,36 @@ export function createCentralInvoiceWorkspace(options: {
       return await operation()
     }
     catch (cause) {
-      if (['forbidden', 'unauthenticated'].includes(problemFromHttpFailure(cause)?.code ?? ''))
+      if (cause instanceof CentralInvoiceReadInconsistentError || ['forbidden', 'unauthenticated'].includes(problemFromHttpFailure(cause)?.code ?? ''))
         invalidateAuthority()
       throw cause
     }
   }
-  function applyReadBatch(reads: Array<{ record: CentralInvoiceRecord, meta: { sources: Array<{ key: string, sourceVersion: string | null }> }, sourceVersion: string }>) {
+  function matchesListedRecord(record: CentralInvoiceRecord, listedRecords: ReadonlyMap<string, CentralInvoiceRecord>) {
+    const listed = listedRecords.get(record.id)
+    return record.deletedAt === null ? !!listed && sameValue(listed, record) : !listed
+  }
+  function validateReadBatchBeforeClear(reads: readonly InvoiceDetailRead[]) {
+    // 列表不可读或仍在读取时没有可比较的完整快照，不能把它当作空集合。
+    if (loading.value || readState.value !== 'ready')
+      return
+    if (!reads.length || sourceRevision === null || sourceVersion.value === null || !sourceCapabilities
+      || reads.some(read => !sameInvoiceCapabilities(sourceCapabilities!, read.capabilities))) {
+      throw new CentralInvoiceReadInconsistentError()
+    }
+    const revisions = reads.map((read) => {
+      const version = read.meta.sources[0]?.sourceVersion ?? ''
+      return /^invoices:\d+$/.test(version) ? Number(version.slice('invoices:'.length)) : Number.NaN
+    })
+    if (revisions.some(revision => !Number.isSafeInteger(revision) || revision < sourceRevision!))
+      throw new CentralInvoiceReadInconsistentError()
+    if (revisions.every(revision => revision === sourceRevision)) {
+      const listedRecords = new Map(records.value.map(record => [record.id, record]))
+      if (reads.some(read => read.sourceVersion !== sourceVersion.value || !matchesListedRecord(read.record, listedRecords)))
+        throw new CentralInvoiceReadInconsistentError()
+    }
+  }
+  function applyReadBatch(reads: InvoiceDetailRead[]) {
     if (loading.value) {
       generation++
       loading.value = false
@@ -107,9 +151,22 @@ export function createCentralInvoiceWorkspace(options: {
     }
     if (readState.value !== 'ready')
       return
+    if (!sourceCapabilities || reads.some(read => !sameInvoiceCapabilities(sourceCapabilities!, read.capabilities))) {
+      invalidateAuthority()
+      return
+    }
     const versions = reads.map(read => read.meta.sources.find(source => source.key === 'invoices')?.sourceVersion ?? '')
     const parsed = versions.map(value => /^invoices:\d+$/.test(value) ? Number(value.slice('invoices:'.length)) : Number.NaN)
+    const listedRecords = new Map(records.value.map(record => [record.id, record]))
+    if (reads.length && sourceRevision !== null && sourceVersion.value !== null
+      && parsed.every(value => Number.isSafeInteger(value) && value === sourceRevision)
+      && reads.every(read => read.sourceVersion === sourceVersion.value)
+      && new Set(reads.map(read => read.record.id)).size === reads.length
+      && reads.every(read => matchesListedRecord(read.record, listedRecords))) {
+      return
+    }
     if (!reads.length || sourceRevision === null || parsed.some(value => !Number.isSafeInteger(value) || value !== sourceRevision! + 1)
+      || new Set(reads.map(read => read.record.id)).size !== reads.length
       || reads.some(read => read.sourceVersion !== reads[0]!.sourceVersion)) {
       invalidate()
       return
@@ -125,7 +182,7 @@ export function createCentralInvoiceWorkspace(options: {
     let checkingAuthority = false
     try {
       checkingAuthority = true
-      await authorize()
+      const initialCapabilities = await authorize()
       checkingAuthority = false
       if (generation !== current)
         throw new CentralInvoiceLoadSupersededError()
@@ -135,6 +192,8 @@ export function createCentralInvoiceWorkspace(options: {
       let expectedRevision: number | null = null
       for (let page = 1; ; page++) {
         const response = await options.client.list({ page, pageSize: 100 })
+        if (!sameInvoiceCapabilities(initialCapabilities, response.capabilities))
+          throw new CentralInvoiceReadInconsistentError()
         if ((expectedVersion !== null && response.sourceVersion !== expectedVersion) || (expectedTotal !== null && response.pagination.total !== expectedTotal))
           throw new Error('发票列表读取期间发生变化，请重新读取。')
         expectedVersion = response.sourceVersion
@@ -148,8 +207,10 @@ export function createCentralInvoiceWorkspace(options: {
           break
       }
       checkingAuthority = true
-      await authorize()
+      const finalCapabilities = await authorize()
       checkingAuthority = false
+      if (!sameInvoiceCapabilities(initialCapabilities, finalCapabilities))
+        throw new CentralInvoiceReadInconsistentError()
       if (generation !== current)
         throw new CentralInvoiceLoadSupersededError()
       if (new Set(next.map(record => record.id)).size !== next.length)
@@ -157,10 +218,11 @@ export function createCentralInvoiceWorkspace(options: {
       records.value = next
       sourceVersion.value = expectedVersion
       sourceRevision = expectedRevision
+      sourceCapabilities = initialCapabilities
       readState.value = 'ready'
     }
     catch (cause) {
-      if (!checkingAuthority && ['forbidden', 'unauthenticated'].includes(problemFromHttpFailure(cause)?.code ?? '')) {
+      if (cause instanceof CentralInvoiceReadInconsistentError || (!checkingAuthority && ['forbidden', 'unauthenticated'].includes(problemFromHttpFailure(cause)?.code ?? ''))) {
         invalidateAuthority()
       }
       else if (generation === current) {

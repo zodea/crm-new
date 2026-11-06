@@ -72,7 +72,7 @@ function fixture(workspaceId: string, invoice = record, additional: CentralInvoi
   const candidate = { source: 'cloud' as const, fields: { ...record.fields, buyer: '云识别购方', items: [], projectHint: '', balanced: false }, textPages: ['synthetic'], unrecognizedPageIndexes: [], requiresReview: true as const }
   const cloud = vi.fn(async (_file: File) => candidate)
   const client = {
-    list: vi.fn(async () => ({ items: structuredClone([invoice, ...additional]), pagination: { total: 1 + additional.length }, sourceVersion: 'invoices:1', meta: { sources: [{ key: 'invoices', sourceVersion: 'invoices:1' }] } })),
+    list: vi.fn(async () => ({ items: structuredClone([invoice, ...additional]), pagination: { total: 1 + additional.length }, sourceVersion: 'invoices:1', capabilities: [...capabilities], meta: { sources: [{ key: 'invoices', sourceVersion: 'invoices:1' }] } })),
     original: vi.fn(async () => new Blob([bytes], { type: 'image/png' })),
     execute: vi.fn(),
   }

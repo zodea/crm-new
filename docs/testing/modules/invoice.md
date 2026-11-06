@@ -12,8 +12,10 @@
 | [tests/invoice/central-pending-discovery.test.ts](../../../tests/invoice/central-pending-discovery.test.ts) | 单元／状态 | 原编号发现与身份隔离 |
 | [tests/invoice/central-http-revision-safety.test.ts](../../../tests/invoice/central-http-revision-safety.test.ts) | 单元／合成传输 | 来源修订安全整数、列表／详情／预检及普通和打印原编号恢复；不访问真实服务 |
 | [tests/invoice/central-workspace-read-interleaving.test.ts](../../../tests/invoice/central-workspace-read-interleaving.test.ts) | 单元／合成传输 | 已开始提交或打印与旧列表交错、恢复和后继读取代次保护；不访问真实服务 |
+| [tests/invoice/central-workspace-read-consistency.test.ts](../../../tests/invoice/central-workspace-read-consistency.test.ts) | 单元／合成传输 | 分页能力与来源、同版本完整回读、打印整批及原编号；不复算不透明范围指纹 |
+| [tests/invoice/central-workspace-real-scope.test.ts](../../../tests/invoice/central-workspace-real-scope.test.ts) | 隔离内存 SQLite／真实服务 | 101 张合成票经真实服务和 HTTP 适配器分页，核对真实分页范围与来源；不连接真实服务或磁盘库 |
 | [tests/invoice/central-workspace-observed-authority.test.ts](../../../tests/invoice/central-workspace-observed-authority.test.ts) | 单元／合成传输 | 已观察会话核验失败及旧 401/403 的遮蔽、重验代次与原编号保护；不访问真实服务 |
-| [tests/invoice/central-session-read-authority.test.ts](../../../tests/invoice/central-session-read-authority.test.ts) | 单元／合成传输 | 普通及打印会话失读权时保留原编号，并在权限恢复后核对原号；不访问真实服务 |
+| [tests/invoice/central-session-read-authority.test.ts](../../../tests/invoice/central-session-read-authority.test.ts) | 单元／合成传输 | 普通及打印会话失读权或能力集合变化时保留原编号，并在权限恢复后核对原号；不访问真实服务 |
 | [tests/invoice/central-recognition.test.ts](../../../tests/invoice/central-recognition.test.ts) | 单元／状态 | 识别区域不进入写命令 |
 | [tests/invoice/central-workspace-recognition.test.ts](../../../tests/invoice/central-workspace-recognition.test.ts) | 单元／状态 | 识别后的身份权限核对 |
 | [tests/stores/invoice-manual-startup.test.ts](../../../tests/stores/invoice-manual-startup.test.ts) | 单元／状态 | 手工原编号刷新与身份隔离 |

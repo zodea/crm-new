@@ -73,7 +73,7 @@ function fixture(workspaceId: string, recognized = false) {
     await afterApply()
     return receipt
   })
-  const get = vi.fn(async () => ({ record: structuredClone(current), sourceVersion: 'read-synthetic-2', meta: { sources: [{ key: 'invoices', sourceVersion: 'invoices:2' }] } }))
+  const get = vi.fn(async () => ({ record: structuredClone(current), sourceVersion: 'read-synthetic-2', capabilities: [...capabilities], meta: { sources: [{ key: 'invoices', sourceVersion: 'invoices:2' }] } }))
   const resolve = vi.fn(async (commandId: string) => {
     if (!receipt || receipt.commandId !== commandId)
       throw new Error('合成原编号不存在')
@@ -81,7 +81,7 @@ function fixture(workspaceId: string, recognized = false) {
   })
   const list = vi.fn(async () => {
     const revision = current.version === '2' ? '2' : '1'
-    return { items: [structuredClone(current)], pagination: { total: 1 }, sourceVersion: `read-synthetic-${revision}`, meta: { sources: [{ key: 'invoices', sourceVersion: `invoices:${revision}` }] } }
+    return { items: [structuredClone(current)], pagination: { total: 1 }, sourceVersion: `read-synthetic-${revision}`, capabilities: [...capabilities], meta: { sources: [{ key: 'invoices', sourceVersion: `invoices:${revision}` }] } }
   })
   const workspace = createCentralInvoiceWorkspace({
     identity,
