@@ -259,17 +259,17 @@ export function createCentralInvoiceWorkspace(options: {
     async review(invoice: CentralInvoiceRecord, manualCompletion: boolean) {
       return execute({ ...envelope(), action: 'review', invoiceId: invoice.id, baseVersion: invoice.version, manualCompletion })
     },
-    async archive(invoice: CentralInvoiceRecord, ownerKind: 'project' | 'personal' | 'company', projectId: string | null, supplierId: string, taxNumbersConfirmed: boolean, taxVerification: InvoiceTaxVerificationSelection, contract?: InvoiceContractReference | null) {
+    async archive(invoice: CentralInvoiceRecord, ownerKind: 'project' | 'personal' | 'company', projectId: string | null, supplierId: string, taxNumbersConfirmed: boolean, taxVerification: InvoiceTaxVerificationSelection, contract?: InvoiceContractReference | null, beforeSubmit?: () => boolean) {
       if (!taxNumbersConfirmed)
         throw new Error('请先核对购销双方税号。')
       if (ownerKind === 'company') {
         if (projectId !== null || !contract || contract.domain !== 'company')
           throw new Error('公司开销归档须选择真实公司支出合同。')
-        return execute({ ...envelope(), action: 'archive', invoiceId: invoice.id, baseVersion: invoice.version, ownerKind, projectId: null, supplierId, taxNumbersConfirmed: true, taxVerification, contract: { ...contract, domain: 'company' } })
+        return execute({ ...envelope(), action: 'archive', invoiceId: invoice.id, baseVersion: invoice.version, ownerKind, projectId: null, supplierId, taxNumbersConfirmed: true, taxVerification, contract: { ...contract, domain: 'company' } }, beforeSubmit)
       }
       if (contract && (ownerKind !== 'project' || contract.domain === 'company'))
         throw new Error('请选择与项目归属一致的合同。')
-      return execute({ ...envelope(), action: 'archive', invoiceId: invoice.id, baseVersion: invoice.version, ownerKind, projectId, supplierId, taxNumbersConfirmed: true, taxVerification, ...(contract ? { contract } : {}) })
+      return execute({ ...envelope(), action: 'archive', invoiceId: invoice.id, baseVersion: invoice.version, ownerKind, projectId, supplierId, taxNumbersConfirmed: true, taxVerification, ...(contract ? { contract } : {}) }, beforeSubmit)
     },
     async discard(invoice: CentralInvoiceRecord, beforeSubmit?: () => boolean) {
       return execute({ ...envelope(), action: 'discard', invoiceId: invoice.id, baseVersion: invoice.version }, beforeSubmit)

@@ -504,10 +504,25 @@ async function archive(attribution: { ownerKind: 'project' | 'personal' | 'compa
   const current = selected.value
   if (!current || dirty.value || draft.value)
     return
+  const sourceWorkspace = props.workspace
+  const sourceGeneration = uploadAuthorityGeneration
+  const selectedGeneration = recognitionGeneration
+  const sourceIsCurrent = () => active && props.workspace === sourceWorkspace && sourceGeneration === uploadAuthorityGeneration
+    && selectedGeneration === recognitionGeneration && sourceWorkspace.readState.value === 'ready'
+    && selected.value?.id === current.id && selected.value.version === current.version && !dirty.value && !draft.value
+    && props.signatories.some(item => item.id === attribution.taxVerification.buyerId && item.version === attribution.taxVerification.buyerVersion)
+    && props.suppliers.some(item => item.id === attribution.supplierId && item.version === attribution.taxVerification.supplierVersion)
+    && (attribution.ownerKind !== 'project' || props.projects.some(item => item.id === attribution.projectId))
+    && (!attribution.contract || (props.contracts ?? []).some(item => item.domain === attribution.contract!.domain && item.id === attribution.contract!.id && item.version === attribution.contract!.version))
   if (!await confirm({ variant: 'simple', title: '确认核对购销双方税号', message: `请对照发票原件和真实主体资料核对税号。\n购买方：${current.fields.buyerTaxNo}\n销售方：${current.fields.sellerTaxNo}\n确认两项均已核对后归档。`, confirmLabel: '已核对并归档' }))
     return
+  if (!sourceIsCurrent()) {
+    if (active)
+      error.value = '发票或归档来源已变化，归档操作未提交。'
+    return
+  }
   await run(async () => {
-    await props.workspace.archive(current, attribution.ownerKind, attribution.projectId, attribution.supplierId, true, attribution.taxVerification, attribution.contract)
+    await sourceWorkspace.archive(current, attribution.ownerKind, attribution.projectId, attribution.supplierId, true, attribution.taxVerification, attribution.contract, sourceIsCurrent)
   })
 }
 async function linkContract(contract: InvoiceContractReference | null) {
