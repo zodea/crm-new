@@ -124,6 +124,7 @@ function evidence(value: unknown, identity: Identity): value is ReadEvidence & R
   return meta.workspaceId === identity.workspaceId && meta.actorId === identity.actorId && meta.authorizedScope.coverage === 'complete'
     && meta.capabilities.includes(INVOICE_READ_CAPABILITY) && meta.sources.length === 1 && meta.sources[0]?.key === 'invoices'
     && meta.sources[0].state === 'readable' && /^invoices:\d+$/.test(meta.sources[0].sourceVersion ?? '') && typeof value.sourceVersion === 'string'
+    && Number.isSafeInteger(Number(meta.sources[0].sourceVersion!.slice('invoices:'.length)))
 }
 
 /** 已保存与已回读分开；调用方须保留 commandId 直至原提交和同一身份回读均完成。 */

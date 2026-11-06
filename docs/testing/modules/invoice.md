@@ -10,6 +10,7 @@
 | --- | --- | --- |
 | [tests/invoice/central-original-binding.test.ts](../../../tests/invoice/central-original-binding.test.ts) | 单元／状态 | 原件字节与权限核对 |
 | [tests/invoice/central-pending-discovery.test.ts](../../../tests/invoice/central-pending-discovery.test.ts) | 单元／状态 | 原编号发现与身份隔离 |
+| [tests/invoice/central-http-revision-safety.test.ts](../../../tests/invoice/central-http-revision-safety.test.ts) | 单元／合成传输 | 来源修订安全整数、列表／详情／预检及普通和打印原编号恢复；不访问真实服务 |
 | [tests/invoice/central-session-read-authority.test.ts](../../../tests/invoice/central-session-read-authority.test.ts) | 单元／合成传输 | 普通及打印会话失读权时保留原编号，并在权限恢复后核对原号；不访问真实服务 |
 | [tests/invoice/central-recognition.test.ts](../../../tests/invoice/central-recognition.test.ts) | 单元／状态 | 识别区域不进入写命令 |
 | [tests/invoice/central-workspace-recognition.test.ts](../../../tests/invoice/central-workspace-recognition.test.ts) | 单元／状态 | 识别后的身份权限核对 |
