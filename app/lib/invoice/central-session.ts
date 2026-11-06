@@ -2,7 +2,7 @@ import type { RecoveryStorage } from '../forms/command-recovery'
 import type { CentralInvoiceCommand, CentralInvoiceCommandResult, CentralInvoicePrintCommand, CentralInvoicePrintResult } from './central-contract'
 import type { InvoiceDetailRead, InvoicePrintResolution, InvoiceResolution } from './central-http'
 import { commandRecoveryKey, commandVersionAtLeast, createCommandRecoveryStorage } from '../forms/command-recovery'
-import { CentralInvoiceProblem, INVOICE_WRITE_CAPABILITY } from './central-contract'
+import { CentralInvoiceProblem, INVOICE_READ_CAPABILITY, INVOICE_WRITE_CAPABILITY } from './central-contract'
 
 interface Identity { workspaceId: string, actorId: string }
 type Context = Identity & { capabilities: readonly string[] }
@@ -67,8 +67,10 @@ export function createCentralInvoiceSession(options: {
   let busy = false
   async function authorize() {
     const context = await options.context()
-    if (context.workspaceId !== identity.workspaceId || context.actorId !== identity.actorId || !context.capabilities.includes(INVOICE_WRITE_CAPABILITY))
+    if (context.workspaceId !== identity.workspaceId || context.actorId !== identity.actorId
+      || !context.capabilities.includes(INVOICE_READ_CAPABILITY) || !context.capabilities.includes(INVOICE_WRITE_CAPABILITY)) {
       throw new CentralInvoiceProblem('forbidden', '当前身份或权限已变化，请恢复原会话后核对原提交。')
+    }
   }
   async function confirmRead(result: CentralInvoiceCommandResult, commandId: string) {
     if (result.commandId !== commandId || (scope.targetId !== null && result.invoiceId !== scope.targetId))
@@ -146,8 +148,10 @@ export function createCentralInvoicePrintSession(options: {
   let busy = false
   async function authorize() {
     const context = await options.context()
-    if (context.workspaceId !== identity.workspaceId || context.actorId !== identity.actorId || !context.capabilities.includes(INVOICE_WRITE_CAPABILITY))
+    if (context.workspaceId !== identity.workspaceId || context.actorId !== identity.actorId
+      || !context.capabilities.includes(INVOICE_READ_CAPABILITY) || !context.capabilities.includes(INVOICE_WRITE_CAPABILITY)) {
       throw new CentralInvoiceProblem('forbidden', '当前身份或权限已变化，请恢复原会话后核对打印任务。')
+    }
   }
   async function confirmRead(result: CentralInvoicePrintResult, commandId: string) {
     if (result.commandId !== commandId || !result.records.length)

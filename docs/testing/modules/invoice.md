@@ -10,6 +10,7 @@
 | --- | --- | --- |
 | [tests/invoice/central-original-binding.test.ts](../../../tests/invoice/central-original-binding.test.ts) | 单元／状态 | 原件字节与权限核对 |
 | [tests/invoice/central-pending-discovery.test.ts](../../../tests/invoice/central-pending-discovery.test.ts) | 单元／状态 | 原编号发现与身份隔离 |
+| [tests/invoice/central-session-read-authority.test.ts](../../../tests/invoice/central-session-read-authority.test.ts) | 单元／合成传输 | 普通及打印会话失读权时保留原编号，并在权限恢复后核对原号；不访问真实服务 |
 | [tests/invoice/central-recognition.test.ts](../../../tests/invoice/central-recognition.test.ts) | 单元／状态 | 识别区域不进入写命令 |
 | [tests/invoice/central-workspace-recognition.test.ts](../../../tests/invoice/central-workspace-recognition.test.ts) | 单元／状态 | 识别后的身份权限核对 |
 | [tests/stores/invoice-manual-startup.test.ts](../../../tests/stores/invoice-manual-startup.test.ts) | 单元／状态 | 手工原编号刷新与身份隔离 |
@@ -116,6 +117,7 @@
 | [tests/browser/CentralInvoiceLedgerSnapshot.test.ts](../../../tests/browser/CentralInvoiceLedgerSnapshot.test.ts) | 真实组件／模拟来源 | 五视口筛选、键盘、焦点和来源变化；导出文件调用为替身 |
 | [tests/browser/CentralInvoiceManualCompany.test.ts](../../../tests/browser/CentralInvoiceManualCompany.test.ts) | 真实组件／模拟来源 | 手工公司票归档选择 |
 | [tests/browser/CentralInvoicePendingRecovery.test.ts](../../../tests/browser/CentralInvoicePendingRecovery.test.ts) | 真实组件／模拟来源 | 原编号发现与恢复 |
+| [tests/browser/CentralInvoiceSessionReadAuthority.test.ts](../../../tests/browser/CentralInvoiceSessionReadAuthority.test.ts) | 真实组件／合成传输 | 失读权隐藏票面、重新读取与键盘核对原号；会话与服务响应均为合成 |
 | [tests/browser/CentralInvoiceRegions.test.ts](../../../tests/browser/CentralInvoiceRegions.test.ts) | 真实组件／模拟来源 | 原件定位与撤权 |
 | [tests/browser/InvoicePdfPageDecodeFailure.test.ts](../../../tests/browser/InvoicePdfPageDecodeFailure.test.ts) | 真实浏览器／合成页图 | 五视口 PDF 页图解码失败、键盘重试和焦点返回 |
 | [tests/browser/pdf-preview-real-browser.test.ts](../../../tests/browser/pdf-preview-real-browser.test.ts) | 真实浏览器／合成 PDF | 真实 pdf.js 和 canvas 渲染单页旋转 PDF、图像解码与调用者释放 URL |

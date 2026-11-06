@@ -283,7 +283,7 @@ it('首次识别提交权限核对期间来源切换，真实 session 不留编�
   const pending = session.submit(command, () => current)
   await waitFor(() => expect(contextRead).toHaveBeenCalledOnce())
   current = false
-  context.resolve({ workspaceId: 'synthetic-a', actorId: 'actor', capabilities: ['finance-invoice:write'] })
+  context.resolve({ workspaceId: 'synthetic-a', actorId: 'actor', capabilities: ['finance-invoice:read', 'finance-invoice:write'] })
   await expect(pending).rejects.toThrow('识别结果未提交')
   expect(execute).not.toHaveBeenCalled()
   expect(memory.size).toBe(0)
