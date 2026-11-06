@@ -1,17 +1,33 @@
 <script setup lang="ts">
 import type { CentralInvoiceRecord } from '~/lib/invoice/central-contract'
 import { computed, shallowRef } from 'vue'
+import KitMultiSelectFilter from '~/components/ui/KitMultiSelectFilter.vue'
 
 const props = defineProps<{ records: readonly CentralInvoiceRecord[], selectedId: string | null, projects: readonly { id: string, label: string }[], busy?: boolean, recognizingId?: string | null }>()
 const emit = defineEmits<{ select: [id: string], upload: [files: File[], projectId: string | null], manual: [] }>()
 const uploadKind = shallowRef<'project' | 'company'>('project')
 const projectId = shallowRef('')
 const search = shallowRef('')
+const statuses = shallowRef<string[]>([])
+const filterGeneration = shallowRef(0)
+const statusOptions = [
+  { key: 'recognizing', label: '当前会话正在识别或核对' },
+  { key: 'pending', label: '识别尚未完成' },
+  { key: 'failed', label: '识别失败或部分页面未识别' },
+  { key: 'done', label: '识别完成' },
+  { key: 'unreviewed', label: '待核对' },
+]
 const keyword = computed(() => search.value.trim().toLowerCase())
-const matches = computed(() => props.records.filter(record => !keyword.value || [record.fields.invoiceNumber, record.original?.fileName, record.fields.buyer, record.fields.seller]
-  .some(value => value?.toLowerCase().includes(keyword.value))))
+const matches = computed(() => props.records.filter((record) => {
+  const inProgress = record.id === props.recognizingId
+  const statusMatch = !statuses.value.length || statuses.value.some(status => status === 'recognizing'
+    ? inProgress
+    : status === 'unreviewed' ? record.reviewStatus === 'unreviewed' : !inProgress && record.ocrStatus === status)
+  return statusMatch && (!keyword.value || [record.fields.invoiceNumber, record.original?.fileName, record.fields.buyer, record.fields.seller]
+    .some(value => value?.toLowerCase().includes(keyword.value)))
+}))
 const matchedIds = computed(() => new Set(matches.value.map(record => record.id)))
-const selectedOutsideSearch = computed(() => !!keyword.value && props.records.some(record => record.id === props.selectedId) && !matchedIds.value.has(props.selectedId!))
+const selectedOutsideSearch = computed(() => (!!keyword.value || !!statuses.value.length) && props.records.some(record => record.id === props.selectedId) && !matchedIds.value.has(props.selectedId!))
 const visibleRecords = computed(() => selectedOutsideSearch.value ? props.records.filter(record => record.id === props.selectedId || matchedIds.value.has(record.id)) : matches.value)
 const validProject = computed(() => props.projects.some(project => project.id === projectId.value))
 const recognitionLabels: Record<CentralInvoiceRecord['ocrStatus'], string> = {
@@ -31,6 +47,8 @@ function acceptFiles(files: File[] | null): string {
 }
 function clearSearch() {
   search.value = ''
+  statuses.value = []
+  filterGeneration.value++
 }
 defineExpose({ acceptFiles, clearSearch })
 function chooseFiles(event: Event) {
@@ -68,6 +86,7 @@ function chooseFiles(event: Event) {
       <p class="mt-2 text-xs text-ink-soft">
         项目票先选真实项目；公司开销归档须关联已有公司合同。支持 PDF、PNG 和 JPEG，单个文件不超过 10 MiB。
       </p>
+      <KitMultiSelectFilter :key="filterGeneration" v-model="statuses" class="mt-3" label="发票状态" aria-label="筛选发票状态" :options="statusOptions" full-width :min-width="100" />
       <label class="mt-3 flex flex-col gap-1 text-sm">
         搜索发票队列
         <input v-model="search" type="search" class="min-w-0 border border-line rounded bg-surface p-1" placeholder="票号、文件名或购销方">
@@ -77,11 +96,11 @@ function chooseFiles(event: Event) {
       <p v-if="!records.length" class="p-4 text-sm text-ink-faint">
         暂无发票，上传文件后可在此核对。
       </p>
-      <p v-else-if="keyword && !matches.length" role="status" class="p-3 text-sm text-ink-soft">
-        当前已读取的发票中没有匹配结果。
+      <p v-else-if="(keyword || statuses.length) && !matches.length" role="status" class="p-3 text-sm text-ink-soft">
+        {{ statuses.length ? '当前已读取的发票中没有符合筛选条件的结果。' : '当前已读取的发票中没有匹配结果。' }}
       </p>
       <p v-if="selectedOutsideSearch" role="status" class="p-3 text-sm text-ink-soft">
-        当前选中发票不符合搜索条件，仍保留以便继续处理。
+        {{ statuses.length ? '当前选中发票不符合筛选条件，仍保留以便继续处理。' : '当前选中发票不符合搜索条件，仍保留以便继续处理。' }}
       </p>
       <ul v-if="visibleRecords.length" class="m-0 list-none p-0">
         <li v-for="record in visibleRecords" :key="record.id" class="border-b border-line">
