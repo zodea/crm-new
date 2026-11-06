@@ -16,7 +16,7 @@
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
 | [tests/components/HomeDashboardSurface.test.ts](../../../tests/components/HomeDashboardSurface.test.ts) | 组件（jsdom） | homeDashboardSurface |
-| [tests/components/HomeProjectSourceNavigation.test.ts](../../../tests/components/HomeProjectSourceNavigation.test.ts) | 组件（jsdom） | 首页中央项目与施工进度来源导航 |
+| [tests/components/HomeProjectSourceNavigation.test.ts](../../../tests/components/HomeProjectSourceNavigation.test.ts) | 组件（jsdom） | 首页中央项目与施工进度来源导航；中央排程失权与恢复使用真实仓库、合成接口响应及甘特展示替身 |
 
 ## Playwright E2E
 
