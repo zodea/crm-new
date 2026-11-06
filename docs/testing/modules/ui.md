@@ -42,6 +42,11 @@
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/detail-1440-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/detail-1440-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/detail-390-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/detail-390-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/detail-768-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/detail-768-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
+| [e2e/runtime-visual-matrix.spec.ts-snapshots/detail-lower-390-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/detail-lower-390-chromium-win32.png) | 视觉基线 | 项目详情滚动后基础信息 |
+| [e2e/runtime-visual-matrix.spec.ts-snapshots/detail-lower-768-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/detail-lower-768-chromium-win32.png) | 视觉基线 | 项目详情滚动后基础信息 |
+| [e2e/runtime-visual-matrix.spec.ts-snapshots/detail-lower-1024-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/detail-lower-1024-chromium-win32.png) | 视觉基线 | 项目详情滚动后基础信息 |
+| [e2e/runtime-visual-matrix.spec.ts-snapshots/detail-lower-1280-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/detail-lower-1280-chromium-win32.png) | 视觉基线 | 项目详情滚动后基础信息 |
+| [e2e/runtime-visual-matrix.spec.ts-snapshots/detail-lower-1440-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/detail-lower-1440-chromium-win32.png) | 视觉基线 | 项目详情滚动后基础信息 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/entity-detail-shell-1024-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/entity-detail-shell-1024-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/entity-detail-shell-1280-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/entity-detail-shell-1280-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
 | [e2e/runtime-visual-matrix.spec.ts-snapshots/entity-detail-shell-1440-chromium-win32.png](../../../e2e/runtime-visual-matrix.spec.ts-snapshots/entity-detail-shell-1440-chromium-win32.png) | 视觉基线 | 通用视觉矩阵截图 |
@@ -137,7 +142,7 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
-| [e2e/runtime-visual-matrix.spec.ts](../../../e2e/runtime-visual-matrix.spec.ts) | Playwright 视觉矩阵 | 14 个运行样态 × 390/768/1024/1280/1440px；普通截图记录中性鼠标与焦点状态，表单保留自身 autofocus、浮层保留真实焦点；独立 Windows/Chromium 演示配置校验 origin/data-profile，矩阵及责任配置经隔离中央会话的正式命令回执准备；两组表单名称的键盘主操作、矩阵局部滚动及弹层 Esc 返回焦点分别参数化 |
+| [e2e/runtime-visual-matrix.spec.ts](../../../e2e/runtime-visual-matrix.spec.ts) | Playwright 视觉矩阵 | 14 个运行样态 × 390/768/1024/1280/1440px；项目详情额外检查滚动后的基础信息；普通截图记录中性鼠标与焦点状态，表单保留自身 autofocus、浮层保留真实焦点；独立 Windows/Chromium 演示配置校验 origin/data-profile，矩阵及责任配置经隔离中央会话的正式命令回执准备；两组表单名称的键盘主操作、矩阵局部滚动及弹层 Esc 返回焦点分别参数化 |
 
 ## Playwright E2E
 

@@ -22,6 +22,8 @@
 
 `pnpm test` 不包含浏览器组件、E2E 或视觉矩阵。浏览器组件、工资测试类型、循环依赖与依赖重复检查目前也未接入推送钩子和 CI，涉及这些文件时须单独选择对应本地入口。钩子实际执行范围见 [Git 工作流](../agents/git-workflow.md)，远端套件见 [CI 使用规则](../agents/ci-usage.md)。
 
+视觉矩阵只在测试页面加载 [Noto Sans SC 测试字体](../../tests/fixtures/visual-font/NotoSansSC-variable.ttf)，不修改产品字体。该文件来自 [Google Fonts 官方仓库](https://github.com/google/fonts/tree/main/ofl/notosanssc)，上游版本 2.004（`notofonts/noto-cjk` 提交 `523d033d6cb47f4a80c58a35753646f5c3608a78`），Google Fonts 文件的 Git blob 为 `fb0637bafbcd804fe32152370a1225990745b4bc`，SHA-256 为 `a3041811a78c361b1de50f953c805e0244951c21c5bd412f7232ef0d899af0da`；许可见同目录 [OFL.txt](../../tests/fixtures/visual-font/OFL.txt)。测试显式确认常用字重加载成功，加载失败时不得以系统字体替代生成基线。基线调整须逐项复核差异，保留布局、焦点和交互断言。
+
 ### Vitest 本地缓存
 
 `pnpm test`、`test:unit`、`test:components` 在已忽略的 `.tmp/` 下保留两类缓存，跨次运行复用：

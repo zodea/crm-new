@@ -10,6 +10,7 @@
 | --- | --- | --- |
 | [e2e/helpers/responsive.ts](../../../e2e/helpers/responsive.ts) | 辅助／夹具 | 供测试导入的夹具／辅助代码；按所属业务就近查阅 |
 | [e2e/helpers/visual-environment.ts](../../../e2e/helpers/visual-environment.ts) | 辅助／夹具 | 供测试导入的夹具／辅助代码；按所属业务就近查阅 |
+| [tests/fixtures/visual-font/NotoSansSC-variable.ttf](../../../tests/fixtures/visual-font/NotoSansSC-variable.ttf) | 视觉测试字体 | 固定字体版本及许可见[测试入口](../README.md) |
 | [tests/browser/setup.ts](../../../tests/browser/setup.ts) | 测试环境初始化 | 真实浏览器组件测试初始化 |
 | [tests/components/setup.ts](../../../tests/components/setup.ts) | 测试环境初始化 | jsdom 测试清理与浏览器 API 替身 |
 | [tests/global-setup.ts](../../../tests/global-setup.ts) | 测试环境初始化 | unit 全局准备：冷进程入口预打包、迁移后内存库快照；共享旧缓存不自动删除 |
