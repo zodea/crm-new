@@ -83,10 +83,10 @@ export function createInvoiceMigrationSession(options: { identity: Pick<Context,
       return unavailable()
     return commands.sort((left, right) => left.commandId.localeCompare(right.commandId))
   }
-  async function state() {
+  async function state(expectedCapabilities?: string) {
     const caps = await authorize()
     const value = await options.fetcher('/api/read/invoices/migration-state')
-    if (await authorize() !== caps)
+    if (await authorize() !== caps || (expectedCapabilities !== undefined && caps !== expectedCapabilities))
       throw new CentralInvoiceProblem('forbidden', '读取旧发票批次期间权限已变化。')
     if (!object(value) || value.dataOrigin !== 'real' || !hasConsistentReadMeta(value, 'invoice-read-v1', 'real') || !object(value.meta)
       || value.meta.workspaceId !== identity.workspaceId || value.meta.actorId !== identity.actorId || !object(value.meta.authorizedScope) || value.meta.authorizedScope.coverage !== 'complete'
@@ -108,8 +108,8 @@ export function createInvoiceMigrationSession(options: { identity: Pick<Context,
       return unavailable()
     return batches
   }
-  async function readback(saved: InvoiceMigrationReceipt, action: 'publish' | 'retire') {
-    const batches = await state()
+  async function readback(saved: InvoiceMigrationReceipt, action: 'publish' | 'retire', expectedCapabilities?: string) {
+    const batches = await state(expectedCapabilities)
     const actual = batches.find(batch => batch.batchId === saved.batchId)
     if (!actual || actual.sourceSha256 !== saved.sourceSha256 || JSON.stringify(actual.invoiceIds) !== JSON.stringify(saved.invoiceIds)
       || (action === 'retire' && actual.retiredAt !== saved.createdAt)) {
@@ -125,9 +125,11 @@ export function createInvoiceMigrationSession(options: { identity: Pick<Context,
     }
     finally { active = false }
   }
-  async function submit(action: 'publish' | 'retire', targetId: string | null, data: Record<string, unknown>, expectedSourceSha256?: string) {
+  async function submit(action: 'publish' | 'retire', targetId: string | null, data: Record<string, unknown>, expectedSourceSha256?: string, beforeSubmit?: () => boolean) {
     return guard(async () => {
       const caps = await authorize()
+      if (beforeSubmit && !beforeSubmit())
+        throw new CentralInvoiceProblem('unavailable', '页面或迁入来源已变化，本次操作未发送。')
       const commandId = options.commandId?.() ?? crypto.randomUUID()
       const descriptor = { ...identity, commandId, family: 'invoice-legacy', targetId, action, ...(action === 'publish' ? { sourceSha256: expectedSourceSha256 } : {}) }
       recovery.remember(key(targetId), descriptor)
@@ -137,7 +139,9 @@ export function createInvoiceMigrationSession(options: { identity: Pick<Context,
         return unavailable()
       if (await authorize() !== caps)
         throw new CentralInvoiceProblem('forbidden', '旧发票迁入后身份或权限已变化，请核对原提交。')
-      await readback(saved, action)
+      await readback(saved, action, caps)
+      if (beforeSubmit && !beforeSubmit())
+        return unavailable()
       recovery.clear(key(targetId), commandId)
       return saved
     })
@@ -147,8 +151,8 @@ export function createInvoiceMigrationSession(options: { identity: Pick<Context,
     pendingAll,
     identityVerified: () => identityVerified,
     pending: (targetId: string | null) => recovery.read(key(targetId)),
-    publish: (source: { sha256: string, payloadBase64: string }, mappings: InvoiceMigrationMappings) => submit('publish', null, { source, mappings }, source.sha256),
-    retire: (batchId: string) => submit('retire', batchId, { batchId }),
+    publish: (source: { sha256: string, payloadBase64: string }, mappings: InvoiceMigrationMappings, beforeSubmit?: () => boolean) => submit('publish', null, { source, mappings }, source.sha256, beforeSubmit),
+    retire: (batchId: string, beforeSubmit?: () => boolean) => submit('retire', batchId, { batchId }, undefined, beforeSubmit),
     recover: (targetId: string | null) => guard(async () => {
       const caps = await authorize()
       const pending = recovery.read(key(targetId))

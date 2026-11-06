@@ -32,7 +32,7 @@ it('必须预检完整关联与历史付款后才允许确认迁入，并在提�
   await waitFor(() => expect(publish).toHaveBeenCalledOnce())
   expect(check).toHaveBeenCalledTimes(3)
   expect(catalogClient.load).toHaveBeenCalledWith(['projects'])
-  expect(publish).toHaveBeenCalledWith(expect.objectContaining({ sha256: 'a'.repeat(64) }), { projects: [{ legacyId: 'project-old', targetId: 'project-new', version: '1', sourceVersion: 'projects:1' }], suppliers: [], contracts: [] })
+  expect(publish).toHaveBeenCalledWith(expect.objectContaining({ sha256: 'a'.repeat(64) }), { projects: [{ legacyId: 'project-old', targetId: 'project-new', version: '1', sourceVersion: 'projects:1' }], suppliers: [], contracts: [] }, expect.any(Function))
 })
 
 it('有未核对原提交时阻止新迁入并提供原编号恢复', async () => {

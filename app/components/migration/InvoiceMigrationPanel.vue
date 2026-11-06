@@ -22,6 +22,7 @@ const busy = shallowRef(false)
 const error = shallowRef('')
 const result = shallowRef('')
 let generation = 0
+let mappingGeneration = 0
 let active = true
 function invalidate(message: string) {
   generation++
@@ -88,6 +89,7 @@ const mappings = computed<InvoiceMigrationMappings>(() => {
 const mappedCount = computed(() => mappings.value.projects.length + mappings.value.suppliers.length + mappings.value.contracts.length + (preview.value?.references.filter(row => row.table === 'company_expense_contracts' && catalog.value?.contracts.some(item => item.domain === 'company' && `${item.domain}:${item.id}` === choices.value[`company_expense_contracts:${row.legacyId}`])).length ?? 0) + (mappings.value.companyInvoices?.length ?? 0))
 const requiredCount = computed(() => (preview.value?.references.length ?? 0) + (preview.value?.invoices.filter(invoice => invoice.companyContractId).length ?? 0))
 watch(mappings, () => {
+  mappingGeneration++
   checked.value = null
 }, { flush: 'sync' })
 const canCheck = computed(() => ready.value && !!source.value && !!preview.value && !!catalog.value && mappedCount.value === requiredCount.value && !pending.value.length && !busy.value)
@@ -258,12 +260,21 @@ async function publish(epoch: number) {
   if (!source.value || !preview.value || !checked.value || pending.value.length)
     return
   await check(epoch)
-  if (!checked.value || checked.value.invoiceCount === 0 || checked.value.missingAllocationIds.length)
+  if (!source.value || !checked.value || checked.value.invoiceCount === 0 || checked.value.missingAllocationIds.length)
     return
+  const session = props.session
+  const selectedSource = source.value
+  const selectedMappings = mappings.value
+  const selectedCheck = checked.value
+  const selectedMappingGeneration = mappingGeneration
+  const beforeSubmit = () => active && epoch === generation && props.session === session && ready.value && !pending.value.length
+    && source.value === selectedSource && checked.value === selectedCheck && mappingGeneration === selectedMappingGeneration
   if (!await confirm({ variant: 'simple', title: '确认迁入旧发票', message: `将迁入 ${checked.value.invoiceCount} 条旧发票。请确认已核对关联、缺件及历史付款，并保留完整原库。`, confirmLabel: '确认迁入' }))
     return
   assertCurrent(epoch)
-  const saved = await props.session.publish(source.value, mappings.value)
+  if (!beforeSubmit())
+    throw new Error('页面或迁入来源已变化，本次操作未发送。')
+  const saved = await session.publish(selectedSource, selectedMappings, beforeSubmit)
   assertCurrent(epoch)
   result.value = `已核对迁入批次 ${saved.batchId}，共 ${saved.invoiceIds.length} 条发票。`
   source.value = null
@@ -276,10 +287,18 @@ async function recover(targetId: string | null, epoch: number) {
   result.value = resolution.outcome === 'applied' ? `原提交已核对，批次 ${resolution.result.batchId}。` : '已核对原提交未生效，可以重新预检。'
 }
 async function retire(batchId: string, epoch: number) {
+  const session = props.session
+  const selectedBatch = batches.value.find(batch => batch.batchId === batchId && !batch.retiredAt)
+  if (!selectedBatch)
+    return
+  const beforeSubmit = () => active && epoch === generation && props.session === session && ready.value && !pending.value.length
+    && batches.value.some(batch => batch === selectedBatch && !batch.retiredAt)
   if (!await confirm({ variant: 'simple', title: '确认撤回迁入批次', message: '仅在该批次没有后续修改或关联时才能整批撤回；历史证据仍保留。', confirmLabel: '确认撤回' }))
     return
   assertCurrent(epoch)
-  const saved = await props.session.retire(batchId)
+  if (!beforeSubmit())
+    throw new Error('页面或迁入批次已变化，本次操作未发送。')
+  const saved = await session.retire(batchId, beforeSubmit)
   assertCurrent(epoch)
   result.value = `已核对撤回批次 ${saved.batchId}。`
 }
