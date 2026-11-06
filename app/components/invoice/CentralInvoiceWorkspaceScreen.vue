@@ -43,6 +43,7 @@ let recognitionGeneration = 0
 let regionGeneration = 0
 let uploadAuthorityGeneration = 0
 let recognitionProgressGeneration = 0
+let formGeneration = 0
 let active = true
 onBeforeUnmount(() => {
   active = false
@@ -179,10 +180,26 @@ async function mayLeave() {
 }
 useTabCloseGuard(mayLeave)
 onBeforeRouteLeave(mayLeave)
+function leaveContextIsCurrent() {
+  const workspace = props.workspace
+  const authority = uploadAuthorityGeneration
+  const selection = recognitionGeneration
+  const form = formGeneration
+  const invoiceId = selectedId.value
+  const currentDraft = draft.value
+  return () => active && props.workspace === workspace && workspace.readState.value === 'ready'
+    && uploadAuthorityGeneration === authority && recognitionGeneration === selection && formGeneration === form
+    && selectedId.value === invoiceId && draft.value === currentDraft
+}
+function setDirty(value: boolean) {
+  formGeneration++
+  dirty.value = value
+}
 async function choose(id: string) {
   if (id === selectedId.value)
     return
-  if (!await mayLeave())
+  const isCurrent = leaveContextIsCurrent()
+  if (!await mayLeave() || !isCurrent())
     return
   dirty.value = false
   draft.value = null
@@ -509,7 +526,8 @@ async function saveRecognition(fields: CentralInvoiceFields, items: CentralInvoi
 }
 async function discardRecognition() {
   const current = draft.value
-  if (!current || !await mayLeave())
+  const isCurrent = leaveContextIsCurrent()
+  if (!current || !await mayLeave() || !isCurrent())
     return
   restoredSnapshot.value = current.before
   draft.value = null
@@ -671,7 +689,7 @@ async function recover() {
         </li>
       </ul>
     </section>
-    <CentralInvoiceWorkspaceView v-show="workspace.readState.value === 'ready'" ref="workspaceView" class="min-h-0 flex-1" :records="displayedRecords" :selected-id="selectedId" :original-file="originalFile" :original-loading="originalLoading" :recognizing-id="recognizingId" :busy="busy || uploadPreflight || !!pending || pendingUnavailable" :selection-unavailable="!!missingRecord" :source-available="workspace.readState.value === 'ready'" :cloud-available="!!cloudAvailable" :projects="projects" :suppliers="suppliers" :signatories="signatories" :contracts="contracts" :draft-record="draftRecord" :recognition-baseline="draft?.before" :region-candidate="regionCandidate" :restored-snapshot="restoredSnapshot" :error="error || originalError" @select="choose" @upload="upload" @manual="navigateTo('/finance/invoice/manual-new')" @attach="attach" @save="save" @review="review" @archive="archive" @discard="discard" @link-contract="linkContract" @confirm-legacy="confirmLegacy" @recognize="recognize" @retry-original="loadOriginal" @dirty="dirty = $event" @save-recognition="draftRecord && saveRecognition(draftRecord.fields, draftRecord.items)" @discard-recognition="discardRecognition" />
+    <CentralInvoiceWorkspaceView v-show="workspace.readState.value === 'ready'" ref="workspaceView" class="min-h-0 flex-1" :records="displayedRecords" :selected-id="selectedId" :original-file="originalFile" :original-loading="originalLoading" :recognizing-id="recognizingId" :busy="busy || uploadPreflight || !!pending || pendingUnavailable" :selection-unavailable="!!missingRecord" :source-available="workspace.readState.value === 'ready'" :cloud-available="!!cloudAvailable" :projects="projects" :suppliers="suppliers" :signatories="signatories" :contracts="contracts" :draft-record="draftRecord" :recognition-baseline="draft?.before" :region-candidate="regionCandidate" :restored-snapshot="restoredSnapshot" :error="error || originalError" @select="choose" @upload="upload" @manual="navigateTo('/finance/invoice/manual-new')" @attach="attach" @save="save" @review="review" @archive="archive" @discard="discard" @link-contract="linkContract" @confirm-legacy="confirmLegacy" @recognize="recognize" @retry-original="loadOriginal" @dirty="setDirty" @save-recognition="draftRecord && saveRecognition(draftRecord.fields, draftRecord.items)" @discard-recognition="discardRecognition" />
     <p v-if="workspace.readState.value !== 'ready' && error" role="alert" class="p-3 text-sm text-danger">
       {{ error }}
     </p>

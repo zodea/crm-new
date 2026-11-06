@@ -28,7 +28,7 @@ function deferred<T>() {
   return { promise, resolve }
 }
 const bytes = Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aP1sAAAAASUVORK5CYII='), char => char.charCodeAt(0))
-async function fixture(workspaceId: string, invoiceNumber: string) {
+async function fixture(workspaceId: string, invoiceNumber: string, additional: CentralInvoiceRecord[] = []) {
   const sha = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), byte => byte.toString(16).padStart(2, '0')).join('')
   let current: CentralInvoiceRecord = {
     id: 'same-invoice',
@@ -73,7 +73,7 @@ async function fixture(workspaceId: string, invoiceNumber: string) {
   const workspace = createCentralInvoiceWorkspace({
     identity: { workspaceId, actorId: 'synthetic-actor' },
     context: async () => ({ workspaceId, actorId: 'synthetic-actor', capabilities: ['finance-invoice:read', 'finance-invoice:write'] }),
-    client: { list: async () => ({ items: [structuredClone(current)], pagination: { total: 1 }, sourceVersion: 'invoices:1', meta: { sources: [{ key: 'invoices', sourceVersion: 'invoices:1' }] } }), execute, get, original: async () => new Blob([bytes], { type: 'image/png' }) } as never,
+    client: { list: async () => ({ items: structuredClone([current, ...additional]), pagination: { total: 1 + additional.length }, sourceVersion: 'invoices:1', meta: { sources: [{ key: 'invoices', sourceVersion: 'invoices:1' }] } }), execute, get, original: async () => new Blob([bytes], { type: 'image/png' }) } as never,
     recognizeLocal: vi.fn(async () => candidate) as never,
     storage: () => storage,
     commandId: () => `synthetic-command-${workspaceId}`,
@@ -101,6 +101,70 @@ async function saveDraft() {
   await userEvent.keyboard('{Enter}')
   return button
 }
+it('键盘取消、来源重读后的迟到确认和正常放弃草稿', async ({ task }) => {
+  const width = /^chromium-(390|768|1024|1280|1440)$/.exec(task.file.projectName ?? '')
+  expect(window.innerWidth).toBe(Number(width?.[1]))
+  const a = await fixture('synthetic-a', 'SYN-A')
+  await render(CentralInvoiceWorkspaceScreen, { props: { workspace: a.workspace, projects: [], suppliers: [], signatories: [], initialSelectedId: 'same-invoice' }, global: { stubs: { NuxtLink: true, InvoiceRegionViewer: true } } })
+  await createDraft()
+  const discard = page.getByRole('button', { name: '放弃识别草稿' })
+  confirm.mockResolvedValueOnce(false)
+  discard.element().focus()
+  await expect.element(discard).toHaveFocus()
+  await userEvent.keyboard('{Enter}')
+  await expect.element(page.getByText(/重新识别结果为未保存草稿/)).toBeVisible()
+  const pending = deferred<boolean>()
+  confirm.mockReturnValueOnce(pending.promise)
+  discard.element().focus()
+  await userEvent.keyboard('{Enter}')
+  await expect.poll(() => confirm.mock.calls.length).toBe(2)
+  await a.workspace.load()
+  pending.resolve(true)
+  await pending.promise
+  await new Promise<void>(resolve => setTimeout(resolve, 0))
+  await expect.element(page.getByText(/重新识别结果为未保存草稿/)).toBeVisible()
+  expect(a.execute).not.toHaveBeenCalled()
+  confirm.mockResolvedValueOnce(true)
+  discard.element().focus()
+  await userEvent.keyboard('{Enter}')
+  await expect.element(page.getByText(/重新识别结果为未保存草稿/)).not.toBeInTheDocument()
+  await expect.element(page.getByLabelText('购买方', { exact: true })).toHaveValue('购方-synthetic-a')
+  expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(document.documentElement.clientWidth + 1)
+})
+it('键盘确认切票前来源重读不清草稿，重新确认后正常切票', async ({ task }) => {
+  const width = /^chromium-(390|768|1024|1280|1440)$/.exec(task.file.projectName ?? '')
+  expect(window.innerWidth).toBe(Number(width?.[1]))
+  const second = { ...(await fixture('other', 'SYN-B')).current(), id: 'second-invoice' }
+  const a = await fixture('synthetic-a', 'SYN-A', [second])
+  await render(CentralInvoiceWorkspaceScreen, { props: { workspace: a.workspace, projects: [], suppliers: [], signatories: [], initialSelectedId: 'same-invoice' }, global: { stubs: { NuxtLink: true, InvoiceRegionViewer: true } } })
+  await createDraft()
+  if (window.innerWidth < 960)
+    await page.getByRole('tab', { name: '队列' }).click()
+  const next = page.getByRole('button', { name: /SYN-B/ })
+  const pending = deferred<boolean>()
+  confirm.mockReturnValueOnce(pending.promise)
+  next.element().focus()
+  await expect.element(next).toHaveFocus()
+  await userEvent.keyboard('{Enter}')
+  await expect.poll(() => confirm.mock.calls.length).toBe(1)
+  await a.workspace.load()
+  pending.resolve(true)
+  await pending.promise
+  await new Promise<void>(resolve => setTimeout(resolve, 0))
+  if (window.innerWidth < 960)
+    await page.getByRole('tab', { name: '校对' }).click()
+  await expect.element(page.getByText(/重新识别结果为未保存草稿/)).toBeVisible()
+  if (window.innerWidth < 960)
+    await page.getByRole('tab', { name: '队列' }).click()
+  confirm.mockResolvedValueOnce(true)
+  next.element().focus()
+  await userEvent.keyboard('{Enter}')
+  if (window.innerWidth < 960)
+    await page.getByRole('tab', { name: '校对' }).click()
+  await expect.element(page.getByLabelText('购买方', { exact: true })).toHaveValue('购方-other')
+  expect(a.execute).not.toHaveBeenCalled()
+  expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(document.documentElement.clientWidth + 1)
+})
 it('草稿生成后切换来源再保存，不向任何来源提交', async ({ task }) => {
   const width = /^chromium-(390|768|1024|1280|1440)$/.exec(task.file.projectName ?? '')
   expect(window.innerWidth).toBe(Number(width?.[1]))
