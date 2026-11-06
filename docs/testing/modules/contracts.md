@@ -80,6 +80,8 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
+| [tests/components/OtherSettlementFrozenHistory.test.ts](../../../tests/components/OtherSettlementFrozenHistory.test.ts) | 组件（jsdom）／合成数据 | 冻结版本原费用、审计、零与未知及来源缺失；原件组件为替身，不验证正文读写 |
+| [tests/browser/OtherSettlementFrozenHistory.test.ts](../../../tests/browser/OtherSettlementFrozenHistory.test.ts) | 浏览器组件／合成数据 | 五视口键盘切换、缺失提示及不溢出；原件组件为替身，不验证真实服务或正文读写 |
 | [e2e/issue-331-other-settlement.spec.ts](../../../e2e/issue-331-other-settlement.spec.ts) | Playwright E2E | AX05 其他支出结算中央往返 |
 | [tests/other-settlement/central.test.ts](../../../tests/other-settlement/central.test.ts) | 单元／服务／状态 | aX05 其他支出结算中央命令 |
 | [tests/other-settlement/http.test.ts](../../../tests/other-settlement/http.test.ts) | 单元／服务／状态 | aX05 HTTP Repository 边界 |
