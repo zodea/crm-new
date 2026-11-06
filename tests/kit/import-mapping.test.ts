@@ -38,11 +38,23 @@ describe('导入映射：智能预匹配', () => {
     })
   })
 
-  it('同一源列只被认领一次，精确匹配优先于建议匹配', () => {
-    // 「联系人电话」对 contact 是包含（建议），对 phone 不精确；
-    // 「联系电话」对 phone 精确——精确先认领后，建议匹配不得复用同列。
+  it('联系电话精确匹配电话字段，不误映射联系人字段', () => {
     expect(autoMatchColumns(['联系电话'], template)).toEqual({
       phone: { column: '联系电话', confidence: 'confirmed' },
+    })
+  })
+
+  it('先出现的建议字段与后出现的精确字段竞争同一列时精确匹配优先', () => {
+    const competing: ImportTemplateField[] = [
+      { key: 'contact', label: '联系人' },
+      { key: 'phone', label: '联系电话', aliases: ['联系人电话'] },
+    ]
+
+    expect(autoMatchColumns(['联系人电话'], competing.slice(0, 1))).toEqual({
+      contact: { column: '联系人电话', confidence: 'suggested' },
+    })
+    expect(autoMatchColumns(['联系人电话'], competing)).toEqual({
+      phone: { column: '联系人电话', confidence: 'confirmed' },
     })
   })
 
@@ -124,6 +136,17 @@ describe('导入映射：按映射构建入库行', () => {
     }
 
     expect(buildImportRows(mapping, [{ 分供方名称: '华东建材' }])).toEqual([{}])
+  })
+
+  it('人工确认同一源列映射给多个字段时仍按两个字段投影', () => {
+    const mapping = {
+      contact: { column: '联系人电话', confidence: 'confirmed' as const },
+      phone: { column: '联系人电话', confidence: 'confirmed' as const },
+    }
+
+    expect(buildImportRows(mapping, [{ 联系人电话: '合成内容' }])).toEqual([
+      { contact: '合成内容', phone: '合成内容' },
+    ])
   })
 })
 

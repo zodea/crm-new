@@ -15,7 +15,7 @@
 | [tests/kit/export.test.ts](../../../tests/kit/export.test.ts) | 单元／服务／状态 | 导出路径分流：chooseExportPath |
 | [tests/kit/import-entities.test.ts](../../../tests/kit/import-entities.test.ts) | 单元／服务／状态 | 导入实体注册表 |
 | [tests/kit/import-mapping-tab.test.ts](../../../tests/kit/import-mapping-tab.test.ts) | 单元／服务／状态 | 导入登记按需加载、调用时目标冻结；页签上限、未知实体及导航失败回滚 |
-| [tests/kit/import-mapping.test.ts](../../../tests/kit/import-mapping.test.ts) | 单元／服务／状态 | 导入映射：智能预匹配 |
+| [tests/kit/import-mapping.test.ts](../../../tests/kit/import-mapping.test.ts) | 单元／服务／状态 | 导入映射：精确与建议争用同列时的预匹配，以及人工重复映射的行投影 |
 | [tests/kit/import-runner.test.ts](../../../tests/kit/import-runner.test.ts) | 单元／服务／状态 | 导入执行器 |
 | [tests/kit/import-source.test.ts](../../../tests/kit/import-source.test.ts) | 单元／服务／状态 | 导入源解析：原始表头 + 行 |
 | [tests/stores/export-workflows.test.ts](../../../tests/stores/export-workflows.test.ts) | 单元／服务／状态 | 配置导出工作流上下文 |
