@@ -17,7 +17,7 @@
 | [tests/stores/tab-session.test.ts](../../../tests/stores/tab-session.test.ts) | 单元／服务／状态 | 浏览器页签按需验证；迁入页仅凭同身份原命令编号恢复，不缓存正文，不借其他 actor、来源或命令族授予恢复资格 |
 | [tests/stores/tabs.test.ts](../../../tests/stores/tabs.test.ts) | 单元／服务／状态 | 页签缓存失效 |
 | [tests/tabs/navigation-intent.test.ts](../../../tests/tabs/navigation-intent.test.ts) | 单元／服务／状态 | 普通业务导航与旧页签恢复意图 |
-| [tests/tabs/page-cache.test.ts](../../../tests/tabs/page-cache.test.ts) | 单元／服务／状态 | 页签页面缓存身份 |
+| [tests/tabs/page-cache.test.ts](../../../tests/tabs/page-cache.test.ts) | 单元／服务／状态 | 页签 wrapper 注册表的关闭与保留身份；不替代真实 KeepAlive 或浏览器验收 |
 | [tests/tabs/restore-deadline.test.ts](../../../tests/tabs/restore-deadline.test.ts) | 单元／服务／状态 | 恢复等待边界 |
 | [tests/tabs/restore-session.test.ts](../../../tests/tabs/restore-session.test.ts) | 单元／服务／状态 | 页签恢复按需校验与安全回退 |
 | [tests/tabs/restore-target.test.ts](../../../tests/tabs/restore-target.test.ts) | 单元／服务／状态 | 页签恢复目标、身份与来源白名单；仅工资恢复加载其读取模块，加载期间取消不读取事实 |

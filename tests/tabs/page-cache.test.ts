@@ -35,6 +35,20 @@ describe('页签页面缓存身份', () => {
     expect(getTabPageWrapper(base, '/base/supplier/1')).not.toBe(before)
   })
 
+  it('只关闭一个页签时保留其他页签的 wrapper 身份', () => {
+    const base = defineComponent({ name: 'TwoSupplierDetails' })
+    const closed = getTabPageWrapper(base, '/base/supplier/closed')
+    const retained = getTabPageWrapper(base, '/base/supplier/retained')
+
+    pruneTabPageWrappers(['/base/supplier/retained'])
+
+    const reopened = getTabPageWrapper(base, '/base/supplier/closed')
+    expect(reopened).not.toBe(closed)
+    expect(getTabPageWrapper(base, '/base/supplier/retained')).toBe(retained)
+    expect(unwrapTabPageComponent(reopened)).toBe(base)
+    expect(unwrapTabPageComponent(retained)).toBe(base)
+  })
+
   it('插件注册时立即包装已完成的首次路由', () => {
     const base = defineComponent({ name: 'InitialPage' })
     const record = { components: { default: base } }
