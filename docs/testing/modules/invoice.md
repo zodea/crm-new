@@ -76,6 +76,7 @@
 | [tests/components/CentralInvoiceQueue.test.ts](../../../tests/components/CentralInvoiceQueue.test.ts) | 组件（jsdom） | 队列金额与上传 |
 | [tests/components/CentralInvoiceQueueSearch.test.ts](../../../tests/components/CentralInvoiceQueueSearch.test.ts) | 组件（jsdom） | 队列已保存字段搜索、选中与草稿保留、来源变化清词 |
 | [tests/components/CentralInvoiceRerecognition.test.ts](../../../tests/components/CentralInvoiceRerecognition.test.ts) | 组件（jsdom） | 未保存输入和重识别 |
+| [tests/components/CentralInvoiceRerecognitionConsentRace.test.ts](../../../tests/components/CentralInvoiceRerecognitionConsentRace.test.ts) | 组件（jsdom） | 重识别草稿的来源绑定、提交守卫、迟到回包和原编号恢复；合成原件与写入 sink |
 | [tests/components/CentralInvoiceCloudConsentRace.test.ts](../../../tests/components/CentralInvoiceCloudConsentRace.test.ts) | 组件（jsdom） | 云识别确认与来源变化；合成原件和云 sink，不连接真实云服务 |
 | [tests/components/CentralInvoiceDiscardConsentRace.test.ts](../../../tests/components/CentralInvoiceDiscardConsentRace.test.ts) | 组件（jsdom） | 废弃确认、授权期间生命周期和来源变化；真实 workspace/session 配合合成写入 sink |
 | [tests/components/CentralInvoiceArchiveConsentRace.test.ts](../../../tests/components/CentralInvoiceArchiveConsentRace.test.ts) | 组件（jsdom） | 归档确认、授权等待和来源变化；真实 workspace/session 配合合成写入 sink |
@@ -111,6 +112,7 @@
 | [tests/browser/CentralInvoicePendingRecovery.test.ts](../../../tests/browser/CentralInvoicePendingRecovery.test.ts) | 真实组件／模拟来源 | 原编号发现与恢复 |
 | [tests/browser/CentralInvoiceRegions.test.ts](../../../tests/browser/CentralInvoiceRegions.test.ts) | 真实组件／模拟来源 | 原件定位与撤权 |
 | [tests/browser/CentralInvoiceRerecognition.test.ts](../../../tests/browser/CentralInvoiceRerecognition.test.ts) | 真实组件／模拟来源 | 重识别草稿与交互 |
+| [tests/browser/CentralInvoiceRerecognitionConsentRace.test.ts](../../../tests/browser/CentralInvoiceRerecognitionConsentRace.test.ts) | 真实组件／模拟来源 | 五视口键盘、焦点与重识别提交来源守卫；受控确认和合成原件、写入 sink |
 | [tests/browser/CentralInvoiceCloudConsentRace.test.ts](../../../tests/browser/CentralInvoiceCloudConsentRace.test.ts) | 真实组件／模拟来源 | 五视口键盘、焦点与云识别来源切换；受控确认替身、合成原件及云 sink，不连接真实云 |
 | [tests/browser/CentralInvoiceDiscardConsentRace.test.ts](../../../tests/browser/CentralInvoiceDiscardConsentRace.test.ts) | 真实组件／模拟来源 | 五视口键盘、焦点与确认期间卸载；受控确认替身和合成写入 sink |
 | [tests/browser/CentralInvoiceArchiveConsentRace.test.ts](../../../tests/browser/CentralInvoiceArchiveConsentRace.test.ts) | 真实组件／模拟来源 | 五视口键盘、焦点与归档确认时来源切换；受控确认替身和合成写入 sink |

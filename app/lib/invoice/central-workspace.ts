@@ -240,10 +240,10 @@ export function createCentralInvoiceWorkspace(options: {
     },
     recognizeWithCandidate,
     prepareRerecognition: recognizeFile,
-    async saveRerecognition(invoice: CentralInvoiceRecord, candidate: LocalInvoiceCandidate, currentFields: CentralInvoiceFields, currentItems: CentralInvoiceItem[], confirmed: boolean) {
+    async saveRerecognition(invoice: CentralInvoiceRecord, candidate: LocalInvoiceCandidate, currentFields: CentralInvoiceFields, currentItems: CentralInvoiceItem[], confirmed: boolean, beforeSubmit?: () => boolean) {
       if (!confirmed)
         throw new Error('请先确认重新识别后的字段变化。')
-      return execute({ ...envelope(), action: 'rerecognize', invoiceId: invoice.id, baseVersion: invoice.version, ...invoiceCandidateForCommand(candidate), currentFields, currentItems, confirmed: true })
+      return execute({ ...envelope(), action: 'rerecognize', invoiceId: invoice.id, baseVersion: invoice.version, ...invoiceCandidateForCommand(candidate), currentFields, currentItems, confirmed: true }, beforeSubmit)
     },
     async edit(invoice: CentralInvoiceRecord, fields: CentralInvoiceFields, items: CentralInvoiceItem[]) {
       return execute({ ...envelope(), action: 'edit', invoiceId: invoice.id, baseVersion: invoice.version, fields, items })

@@ -29,7 +29,7 @@ const originalError = shallowRef('')
 const pending = shallowRef<{ targetId: string | null, action: string, scopeId?: string } | null>(null)
 const pendingUnavailable = shallowRef(false)
 const batchResults = shallowRef<Array<{ name: string, status: string }> | null>(null)
-const draft = shallowRef<{ invoice: CentralInvoiceRecord, candidate: LocalInvoiceCandidate, before: CentralInvoiceFormSnapshot } | null>(null)
+const draft = shallowRef<{ workspace: Workspace, invoice: CentralInvoiceRecord, candidate: LocalInvoiceCandidate, before: CentralInvoiceFormSnapshot } | null>(null)
 const recognizedRegions = shallowRef<{ invoice: CentralInvoiceRecord, candidate: LocalInvoiceCandidate } | null>(null)
 const restoredSnapshot = shallowRef<CentralInvoiceFormSnapshot | null>(null)
 const workspaceView = useTemplateRef<InstanceType<typeof CentralInvoiceWorkspaceView>>('workspaceView')
@@ -447,7 +447,7 @@ async function recognize(source: 'local' | 'cloud') {
       if (candidate.unrecognizedPageIndexes.length || !(parsed.invoiceNumber.trim() || parsed.buyer.trim() || parsed.seller.trim() || parsed.totalAmount !== null || parsed.items.length))
         throw new Error('重新识别未完成，原有字段和原件保持不变。')
       restoredSnapshot.value = null
-      draft.value = { invoice: current, candidate, before: before! }
+      draft.value = { workspace: sourceWorkspace, invoice: current, candidate, before: before! }
     })
   }
   finally { recognizing.value = false }
@@ -475,20 +475,37 @@ async function saveRecognition(fields: CentralInvoiceFields, items: CentralInvoi
   const current = draft.value
   if (!current)
     return
+  if (current.workspace !== props.workspace) {
+    error.value = '发票来源已变化，识别草稿未提交。'
+    return
+  }
+  const sourceWorkspace = current.workspace
+  const sourceGeneration = uploadAuthorityGeneration
+  const selectedGeneration = recognitionGeneration
+  const sourceIsCurrent = () => active && props.workspace === sourceWorkspace && sourceGeneration === uploadAuthorityGeneration
+    && selectedGeneration === recognitionGeneration && sourceWorkspace.readState.value === 'ready'
+    && draft.value === current && selected.value?.id === current.invoice.id && selected.value.version === current.invoice.version
+    && sameOriginal(current.invoice, selected.value)
   if (!await confirm({ variant: 'simple', title: '确认保存重新识别', message: recognitionChangeMessage(current.before, fields, items), confirmLabel: '确认保存' }))
     return
-  if (draft.value !== current || selected.value?.id !== current.invoice.id || selected.value.version !== current.invoice.version || props.workspace.readState.value !== 'ready') {
-    error.value = '发票或权限已变化，识别草稿仍保留，请先核对最新版本。'
+  if (!sourceIsCurrent()) {
+    if (active && props.workspace === sourceWorkspace && sourceGeneration === uploadAuthorityGeneration)
+      error.value = '发票或权限已变化，识别草稿仍保留，请先核对最新版本。'
     return
   }
   const regionEpoch = regionGeneration
   await run(async () => {
-    const saved = await props.workspace.saveRerecognition(current.invoice, current.candidate, fields, items, true)
+    const saved = await sourceWorkspace.saveRerecognition(current.invoice, current.candidate, fields, items, true, sourceIsCurrent)
+    if (!active || props.workspace !== sourceWorkspace || sourceGeneration !== uploadAuthorityGeneration || selectedId.value !== current.invoice.id
+      || draft.value?.invoice !== current.invoice || draft.value?.before !== current.before) {
+      return
+    }
     rememberRegions(current.invoice, saved, current.candidate, regionEpoch)
     draft.value = null
     restoredSnapshot.value = null
     dirty.value = false
-  })
+  }, () => active && props.workspace === sourceWorkspace && sourceGeneration === uploadAuthorityGeneration
+    && selectedId.value === current.invoice.id && draft.value?.before === current.before)
 }
 async function discardRecognition() {
   const current = draft.value
