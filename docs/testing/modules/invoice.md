@@ -68,6 +68,7 @@
 | [tests/components/CentralInvoiceEntry.test.ts](../../../tests/components/CentralInvoiceEntry.test.ts) | 组件（jsdom） | 中央目录缺口和权限 |
 | [tests/components/InvoiceExportTableAmounts.test.ts](../../../tests/components/InvoiceExportTableAmounts.test.ts) | 组件（jsdom） | 旧及中央台账共用预览区分未知与真实零 |
 | [tests/components/CentralInvoiceLedgerScreen.test.ts](../../../tests/components/CentralInvoiceLedgerScreen.test.ts) | 组件（jsdom） | 台账导出及来源版本 |
+| [tests/components/CentralInvoiceLedgerSnapshot.test.ts](../../../tests/components/CentralInvoiceLedgerSnapshot.test.ts) | 组件（jsdom）／合成来源 | 跨页导出来源变化、新匹配、目录核验竞态、权限失效与零和未知 |
 | [tests/components/CentralInvoiceLedgerView.test.ts](../../../tests/components/CentralInvoiceLedgerView.test.ts) | 组件（jsdom） | 台账来源与筛选 |
 | [tests/components/CentralInvoiceManualCreate.test.ts](../../../tests/components/CentralInvoiceManualCreate.test.ts) | 组件（jsdom） | 手工草稿、输入保护与原编号 |
 | [tests/components/CentralInvoiceManualEntry.test.ts](../../../tests/components/CentralInvoiceManualEntry.test.ts) | 组件（jsdom） | 失权隐藏及身份隔离 |
@@ -100,6 +101,7 @@
 | [tests/browser/CentralInvoiceArchive.test.ts](../../../tests/browser/CentralInvoiceArchive.test.ts) | 真实组件／模拟来源 | 归档来源及主要视口 |
 | [tests/browser/CentralInvoiceDragUpload.test.ts](../../../tests/browser/CentralInvoiceDragUpload.test.ts) | 真实组件／模拟来源 | 五视口拖放、归属失效与键盘上传入口 |
 | [tests/browser/CentralInvoiceLedgerExport.test.ts](../../../tests/browser/CentralInvoiceLedgerExport.test.ts) | 真实组件／模拟来源 | 台账导出与主要视口 |
+| [tests/browser/CentralInvoiceLedgerSnapshot.test.ts](../../../tests/browser/CentralInvoiceLedgerSnapshot.test.ts) | 真实组件／模拟来源 | 五视口筛选、键盘、焦点和来源变化；导出文件调用为替身 |
 | [tests/browser/CentralInvoiceManualCompany.test.ts](../../../tests/browser/CentralInvoiceManualCompany.test.ts) | 真实组件／模拟来源 | 手工公司票归档选择 |
 | [tests/browser/CentralInvoicePendingRecovery.test.ts](../../../tests/browser/CentralInvoicePendingRecovery.test.ts) | 真实组件／模拟来源 | 原编号发现与恢复 |
 | [tests/browser/CentralInvoiceRegions.test.ts](../../../tests/browser/CentralInvoiceRegions.test.ts) | 真实组件／模拟来源 | 原件定位与撤权 |

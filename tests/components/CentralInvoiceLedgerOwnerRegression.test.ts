@@ -62,7 +62,7 @@ function invoice(ownerKind: 'personal' | 'project' | null): CentralInvoiceRecord
   }
 }
 function workspace(record: CentralInvoiceRecord) {
-  return { records: shallowRef([record]), loading: shallowRef(false), readState: shallowRef<'ready' | 'unavailable'>('ready'), pendingPrint: () => null, load: vi.fn(async () => {}) }
+  return { records: shallowRef([record]), loading: shallowRef(false), readState: shallowRef<'ready' | 'unavailable'>('ready'), sourceVersion: shallowRef('read-1'), pendingPrint: () => null, load: vi.fn(async () => {}) }
 }
 async function openPreview() {
   const button = await screen.findByRole('button', { name: '导出 Excel' })

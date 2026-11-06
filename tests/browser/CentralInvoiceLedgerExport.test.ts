@@ -53,7 +53,7 @@ it('导出弹层在各视口可键盘操作，保存样式可重新读取，并�
     updatedAt: '2026-01-01T00:00:00.000Z',
     deletedAt: null,
   }
-  const workspace = { records: shallowRef([record]), loading: shallowRef(false), readState: shallowRef('ready'), pendingPrint: () => null, load: vi.fn(async () => {}) }
+  const workspace = { records: shallowRef([record]), loading: shallowRef(false), readState: shallowRef('ready'), sourceVersion: shallowRef('read-1'), pendingPrint: () => null, load: vi.fn(async () => {}) }
   let projectVersion = 'projects:2'
   const verifyProjects = async () => [{ id: 'project-browser', label: '合成项目', sourceVersion: projectVersion }]
   const props = { workspace: workspace as never, projects: [{ id: 'project-browser', label: '合成项目', sourceVersion: 'projects:1' }], verifyProjects }

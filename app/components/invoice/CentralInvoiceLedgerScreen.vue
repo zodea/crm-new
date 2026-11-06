@@ -30,6 +30,7 @@ const exportSaving = shallowRef(false)
 const exportError = shallowRef('')
 const exportRows = shallowRef<InvoiceLedgerExportRow[]>([])
 const exportVersions = shallowRef<Array<{ id: string, version: string }>>([])
+const exportSourceVersion = shallowRef<string | null>(null)
 const exportProjects = shallowRef<Array<{ id: string, label: string, sourceVersion: string }> | null>([])
 const exportName = shallowRef('')
 const readableProjects = computed(() => props.projectsReadable ? props.projects : [])
@@ -86,6 +87,7 @@ function expireExport(reason: string) {
   exportOpen.value = false
   exportRows.value = []
   exportVersions.value = []
+  exportSourceVersion.value = null
   exportProjects.value = []
   error.value = reason
   const generation = authorityGeneration
@@ -94,6 +96,10 @@ function expireExport(reason: string) {
       errorRef.value?.focus()
   })
 }
+watch(() => props.workspace.sourceVersion?.value, (version) => {
+  if (exportOpen.value && version !== exportSourceVersion.value)
+    expireExport('发票来源已变化，请重新读取并打开预览。')
+}, { flush: 'sync' })
 watch([() => props.projectsReadable, () => props.projects], ([readable, projects]) => {
   const snapshot = exportProjects.value
   if (!exportOpen.value || !snapshot?.length)
@@ -108,6 +114,7 @@ function invalidatePresentation() {
   exportOpen.value = false
   exportRows.value = []
   exportVersions.value = []
+  exportSourceVersion.value = null
   exportProjects.value = []
   error.value = '发票来源或权限已变化，请重新读取。'
   const generation = authorityGeneration
@@ -172,6 +179,12 @@ onMounted(async () => {
 function prepareExport(rows: CentralInvoiceRecord[]) {
   if (busy.value || !rows.length || props.workspace.readState.value !== 'ready')
     return
+  const sourceVersion = props.workspace.sourceVersion?.value
+  if (!sourceVersion) {
+    expireExport('发票来源版本无法核验，请重新读取。')
+    return
+  }
+  exportSourceVersion.value = sourceVersion
   exportRows.value = rows.map(record => ({
     invoiceDate: record.fields.invoiceDate,
     invoiceNumber: record.fields.invoiceNumber,
@@ -200,10 +213,19 @@ async function confirmExport(style: InvoiceXlsxStyleConfig) {
   const rows = exportRows.value
   const versions = exportVersions.value
   const projects = exportProjects.value
+  const sourceVersion = exportSourceVersion.value
   const verifyProjects = props.verifyProjects
-  const currentSession = () => active && exportOpen.value && generation === authorityGeneration && props.workspace === sourceWorkspace
-    && sourceWorkspace.readState.value === 'ready' && exportRows.value === rows && exportVersions.value === versions
-    && exportProjects.value === projects && rows.length > 0 && versions.length === rows.length
+  const currentSession = () => {
+    if (!active || !exportOpen.value || generation !== authorityGeneration || props.workspace !== sourceWorkspace
+      || exportRows.value !== rows || exportVersions.value !== versions || exportProjects.value !== projects) {
+      return false
+    }
+    if (!sourceVersion || sourceWorkspace.sourceVersion?.value !== sourceVersion || sourceWorkspace.readState.value !== 'ready') {
+      expireExport('发票来源已变化，请重新读取并打开预览。')
+      return false
+    }
+    return rows.length > 0 && versions.length === rows.length
+  }
   exportSaving.value = true
   exportError.value = ''
   let projectReadFailed = false

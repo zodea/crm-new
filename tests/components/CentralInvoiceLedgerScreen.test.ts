@@ -42,7 +42,7 @@ it('导出当前筛选且保留未知与零，版本变化时阻止导出', asyn
   }
   const records = shallowRef([base, { ...base, id: 'invoice-two', fields: { ...base.fields, invoiceNumber: '002', totalAmount: 0 } }])
   let changed = false
-  const workspace = { records, loading: shallowRef(false), readState: shallowRef('ready'), pendingPrint: () => null, load: vi.fn(async () => {
+  const workspace = { records, loading: shallowRef(false), readState: shallowRef('ready'), sourceVersion: shallowRef('read-1'), pendingPrint: () => null, load: vi.fn(async () => {
     if (changed)
       records.value = records.value.map(record => ({ ...record, version: '2' }))
   }) }
@@ -119,7 +119,7 @@ it('导出台账来源与页面一致，旧票缺少来源证据时不猜测', a
     updatedAt: '2026-01-01T00:00:00.000Z',
     deletedAt: null,
   })))
-  const workspace = { records, loading: shallowRef(false), readState: shallowRef('ready'), pendingPrint: () => null, load: vi.fn(async () => {}) }
+  const workspace = { records, loading: shallowRef(false), readState: shallowRef('ready'), sourceVersion: shallowRef('read-1'), pendingPrint: () => null, load: vi.fn(async () => {}) }
   const preview = defineComponent({ emits: ['confirm'], template: '<button @click="$emit(\'confirm\', {})">确认测试导出</button>' })
   render(CentralInvoiceLedgerScreen, { props: { workspace: workspace as never, projects: [] }, global: { stubs: { InvoiceExportPreview: preview } } })
   const exportButton = await screen.findByRole('button', { name: '导出 Excel' })
@@ -160,7 +160,7 @@ it('项目目录版本变化时不导出旧项目名称', async () => {
     updatedAt: '',
     deletedAt: null,
   } as CentralInvoiceRecord
-  const workspace = { records: shallowRef([record]), loading: shallowRef(false), readState: shallowRef('ready'), pendingPrint: () => null, load: vi.fn(async () => {}) }
+  const workspace = { records: shallowRef([record]), loading: shallowRef(false), readState: shallowRef('ready'), sourceVersion: shallowRef('read-1'), pendingPrint: () => null, load: vi.fn(async () => {}) }
   const verifyProjects = vi.fn().mockResolvedValueOnce([{ id: 'project-one', label: '旧项目名', sourceVersion: 'projects:2' }]).mockResolvedValueOnce([{ id: 'project-one', label: '旧项目名', sourceVersion: 'projects:1' }])
   const preview = defineComponent({ props: ['error'], emits: ['confirm'], template: '<div><p>{{ error }}</p><button @click="$emit(\'confirm\', {})">确认测试导出</button></div>' })
   render(CentralInvoiceLedgerScreen, { props: { workspace: workspace as never, projects: [{ id: 'project-one', label: '旧项目名', sourceVersion: 'projects:1' }], verifyProjects }, global: { stubs: { InvoiceExportPreview: preview } } })
@@ -222,7 +222,7 @@ it('仅在用户确认已打印后提交原批次，结果未知时核对原任�
     pending = false
     return { outcome: 'applied' as const }
   })
-  const workspace = { records: shallowRef([record]), loading: shallowRef(false), readState: shallowRef('ready'), load: vi.fn(async () => {}), pendingPrint: () => pending, verifiedOriginal: vi.fn(async () => new Blob()), recordPrinted, recoverPrint }
+  const workspace = { records: shallowRef([record]), loading: shallowRef(false), readState: shallowRef('ready'), sourceVersion: shallowRef('read-1'), load: vi.fn(async () => {}), pendingPrint: () => pending, verifiedOriginal: vi.fn(async () => new Blob()), recordPrinted, recoverPrint }
   render(CentralInvoiceLedgerScreen, { props: { workspace: workspace as never, projects: [] } })
   await fireEvent.click(await screen.findByLabelText('选择发票 00123'))
   await fireEvent.click(screen.getByRole('button', { name: '打印所选' }))
