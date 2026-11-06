@@ -24,6 +24,7 @@ const jobId = String(route.params.jobId)
 const tabFullPath = route.fullPath
 const workflow = shallowRef(workflowsStore.get(jobId))
 const source = computed(() => workflow.value?.source ?? EMPTY_SOURCE)
+let instanceActive = true
 
 // 表单只呈现两级目录/两段命名；调用方传入更多时进入页签即截断，保证预览与写盘一致
 // （resolveTwoLevelFolderPath 对 >2 级抛错，不截断会让预览计算属性直接崩渲染）。
@@ -60,6 +61,8 @@ async function closeWorkflowTab() {
 }
 
 async function settle(result: ConfiguredExportRunResult) {
+  if (!instanceActive)
+    return
   if (result.status === 'exported') {
     toast.success(`已导出到 ${result.displayPath} 文件夹`)
     await closeWorkflowTab()
@@ -83,6 +86,7 @@ function backToConfig() {
 }
 
 onUnmounted(() => {
+  instanceActive = false
   workflowsStore.remove(jobId)
 })
 </script>
