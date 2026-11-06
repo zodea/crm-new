@@ -227,10 +227,13 @@ export function createCentralInvoiceWorkspace(options: {
     async manual(fields: CentralInvoiceFields, items: CentralInvoiceItem[]) {
       return execute({ ...envelope(), action: 'manual', baseVersion: null, fields, items })
     },
-    async attachOriginal(invoice: CentralInvoiceRecord, file: File, confirmed: boolean) {
+    async attachOriginal(invoice: CentralInvoiceRecord, file: File, confirmed: boolean, beforeSubmit?: () => boolean) {
       if (!confirmed)
         throw new Error('请先确认原件属于这张发票。')
-      return execute({ ...envelope(), action: 'attach-original', invoiceId: invoice.id, baseVersion: invoice.version, original: await prepareInvoiceOriginal(file), confirmed: true })
+      const original = await prepareInvoiceOriginal(file)
+      if (beforeSubmit && !beforeSubmit())
+        throw new Error('发票或来源已变化，原件关联未提交。')
+      return execute({ ...envelope(), action: 'attach-original', invoiceId: invoice.id, baseVersion: invoice.version, original, confirmed: true }, beforeSubmit)
     },
     async recognize(invoice: CentralInvoiceRecord, source: 'local' | 'cloud' = 'local', confirmedCloud = false) {
       return (await recognizeWithCandidate(invoice, source, confirmedCloud)).record

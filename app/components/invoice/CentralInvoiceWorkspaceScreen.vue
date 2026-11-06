@@ -225,7 +225,7 @@ watch([() => props.workspace, () => selected.value?.id, () => selected.value?.ve
     originalLoading.value = false
   }
 }, { flush: 'sync' })
-async function run(operation: () => Promise<void>) {
+async function run(operation: () => Promise<void>, isRelevant: () => boolean = () => true) {
   if (busy.value)
     return
   busy.value = true
@@ -233,10 +233,14 @@ async function run(operation: () => Promise<void>) {
   try {
     await operation()
   }
-  catch (cause) { error.value = message(cause) }
+  catch (cause) {
+    if (isRelevant())
+      error.value = message(cause)
+  }
   finally {
     busy.value = false
-    refreshPending()
+    if (isRelevant())
+      refreshPending()
   }
 }
 async function load() {
@@ -369,11 +373,25 @@ async function upload(files: File[], projectId: string | null) {
 }
 async function attach(file: File) {
   const current = selected.value
-  if (!current || !await confirm({ variant: 'simple', title: '确认关联原件', message: `请确认所选文件属于发票 ${current.fields.invoiceNumber || current.id}。`, confirmLabel: '确认关联' }))
+  if (!current || current.original || props.workspace.readState.value !== 'ready')
     return
+  const sourceWorkspace = props.workspace
+  const sourceGeneration = uploadAuthorityGeneration
+  const selectedGeneration = recognitionGeneration
+  const sourceIsCurrent = () => active && props.workspace === sourceWorkspace && sourceGeneration === uploadAuthorityGeneration
+    && selectedGeneration === recognitionGeneration && sourceWorkspace.readState.value === 'ready'
+    && selected.value?.id === current.id && selected.value.version === current.version && !selected.value.original
+  if (!await confirm({ variant: 'simple', title: '确认关联原件', message: `请确认所选文件属于发票 ${current.fields.invoiceNumber || current.id}。`, confirmLabel: '确认关联' }))
+    return
+  if (!sourceIsCurrent()) {
+    if (active)
+      error.value = '发票或来源已变化，原件关联未提交。'
+    return
+  }
   await run(async () => {
-    await props.workspace.attachOriginal(current, file, true)
-  })
+    await sourceWorkspace.attachOriginal(current, file, true, sourceIsCurrent)
+  }, () => active && props.workspace === sourceWorkspace && sourceGeneration === uploadAuthorityGeneration
+    && selectedGeneration === recognitionGeneration && selectedId.value === current.id)
 }
 async function recognize(source: 'local' | 'cloud') {
   const current = selected.value
