@@ -79,6 +79,7 @@
 | [tests/components/CentralInvoiceDiscardConsentRace.test.ts](../../../tests/components/CentralInvoiceDiscardConsentRace.test.ts) | 组件（jsdom） | 废弃确认、授权期间生命周期和来源变化；真实 workspace/session 配合合成写入 sink |
 | [tests/components/CentralInvoiceArchiveConsentRace.test.ts](../../../tests/components/CentralInvoiceArchiveConsentRace.test.ts) | 组件（jsdom） | 归档确认、授权等待和来源变化；真实 workspace/session 配合合成写入 sink |
 | [tests/components/CentralInvoiceAttachConsentRace.test.ts](../../../tests/components/CentralInvoiceAttachConsentRace.test.ts) | 组件（jsdom） | 关联原件确认、读取、授权和迟到回包；真实 workspace/session 配合合成写入 sink 与原编号恢复 |
+| [tests/components/CentralInvoiceLegacyConsentRace.test.ts](../../../tests/components/CentralInvoiceLegacyConsentRace.test.ts) | 组件（jsdom） | 旧票核对确认、授权和迟到回包；真实 workspace/session 配合合成写入 sink 与原编号恢复 |
 | [tests/components/CentralInvoiceWorkspaceScreen.test.ts](../../../tests/components/CentralInvoiceWorkspaceScreen.test.ts) | 组件（jsdom） | 工作台与原编号恢复 |
 | [tests/components/CentralInvoiceWorkspaceView.test.ts](../../../tests/components/CentralInvoiceWorkspaceView.test.ts) | 组件（jsdom） | 归档归属与来源版本 |
 | [tests/components/CentralInvoiceDragUpload.test.ts](../../../tests/components/CentralInvoiceDragUpload.test.ts) | 组件（jsdom） | 上传确认期间目录、权限和原编号变化阻断 |
@@ -113,6 +114,7 @@
 | [tests/browser/CentralInvoiceDiscardConsentRace.test.ts](../../../tests/browser/CentralInvoiceDiscardConsentRace.test.ts) | 真实组件／模拟来源 | 五视口键盘、焦点与确认期间卸载；受控确认替身和合成写入 sink |
 | [tests/browser/CentralInvoiceArchiveConsentRace.test.ts](../../../tests/browser/CentralInvoiceArchiveConsentRace.test.ts) | 真实组件／模拟来源 | 五视口键盘、焦点与归档确认时来源切换；受控确认替身和合成写入 sink |
 | [tests/browser/CentralInvoiceAttachConsentRace.test.ts](../../../tests/browser/CentralInvoiceAttachConsentRace.test.ts) | 真实组件／模拟来源 | 五视口键盘、焦点与原件确认期间切换来源或卸载；受控确认、合成文件与写入 sink |
+| [tests/browser/CentralInvoiceLegacyConsentRace.test.ts](../../../tests/browser/CentralInvoiceLegacyConsentRace.test.ts) | 真实组件／模拟来源 | 五视口键盘、焦点与旧票核对确认期间切换来源或卸载；受控确认和合成写入 sink |
 | [tests/browser/CentralInvoiceCorrection.test.ts](../../../tests/browser/CentralInvoiceCorrection.test.ts) | 真实组件／模拟来源 | 更正票面与归属的多视口操作 |
 | [tests/browser/CentralInvoiceCorrectionAuthority.test.ts](../../../tests/browser/CentralInvoiceCorrectionAuthority.test.ts) | 真实组件／模拟来源 | 失权隐藏与同身份草稿恢复 |
 | [tests/browser/CentralInvoiceCorrectionNavigation.test.ts](../../../tests/browser/CentralInvoiceCorrectionNavigation.test.ts) | 真实组件／模拟来源 | 键盘切票和离开保护 |

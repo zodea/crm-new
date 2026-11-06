@@ -558,11 +558,23 @@ async function confirmLegacy() {
   const current = selected.value
   if (!current || dirty.value || draft.value || missingRecord.value)
     return
+  const sourceWorkspace = props.workspace
+  const sourceGeneration = uploadAuthorityGeneration
+  const selectedGeneration = recognitionGeneration
+  const sourceIsCurrent = () => active && props.workspace === sourceWorkspace && sourceGeneration === uploadAuthorityGeneration
+    && selectedGeneration === recognitionGeneration && sourceWorkspace.readState.value === 'ready'
+    && selected.value?.id === current.id && selected.value.version === current.version && !dirty.value && !draft.value && !missingRecord.value
   if (!await confirm({ variant: 'simple', title: '核对旧发票', message: '请确认已核对票号、日期、销售方、金额和归属。确认后可用于新增付款，历史付款依据保持不变。', confirmLabel: '确认已核对' }))
     return
+  if (!sourceIsCurrent()) {
+    if (active)
+      error.value = '发票或来源已变化，旧发票核对未提交。'
+    return
+  }
   await run(async () => {
-    await props.workspace.confirmLegacy(current, true)
-  })
+    await sourceWorkspace.confirmLegacy(current, true, sourceIsCurrent)
+  }, () => active && props.workspace === sourceWorkspace && sourceGeneration === uploadAuthorityGeneration
+    && selectedGeneration === recognitionGeneration && selectedId.value === current.id)
 }
 async function discard() {
   const current = selected.value

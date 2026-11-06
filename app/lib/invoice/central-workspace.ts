@@ -254,10 +254,10 @@ export function createCentralInvoiceWorkspace(options: {
     async linkContract(_invoice: CentralInvoiceRecord, _contract: InvoiceContractReference | null, _confirmed: boolean) {
       throw new Error('已归档发票的合同变更须使用独立更正单；该流程尚未开放。')
     },
-    async confirmLegacy(invoice: CentralInvoiceRecord, confirmed: boolean) {
+    async confirmLegacy(invoice: CentralInvoiceRecord, confirmed: boolean, beforeSubmit?: () => boolean) {
       if (!confirmed)
         throw new Error('请先明确确认旧发票已核对。')
-      return execute({ ...envelope(), action: 'confirm-legacy', invoiceId: invoice.id, baseVersion: invoice.version, confirmed: true })
+      return execute({ ...envelope(), action: 'confirm-legacy', invoiceId: invoice.id, baseVersion: invoice.version, confirmed: true }, beforeSubmit)
     },
     async review(invoice: CentralInvoiceRecord, manualCompletion: boolean) {
       return execute({ ...envelope(), action: 'review', invoiceId: invoice.id, baseVersion: invoice.version, manualCompletion })
