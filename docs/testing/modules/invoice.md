@@ -100,6 +100,7 @@
 | [tests/components/InvoiceEditPage.test.ts](../../../tests/components/InvoiceEditPage.test.ts) | 组件（jsdom） | 编辑页重新识别草稿：只填表单不写库、保存二次确认（取消不写库）、字段角标与读屏原值、放弃恢复、离开保护、失败保留输入；原图比对框、“原图未定位”、聚焦/悬停强调与旋转换算；平时显示原件，无原文件时说明“原件不在本次会话中”且不显示示意图；首次识别聚焦字段临时框出、失焦撤框 |
 | [tests/components/InvoiceReviewForm.test.ts](../../../tests/components/InvoiceReviewForm.test.ts) | 组件（jsdom） | 识别校对表单草稿模式：修改只交父级不写库，变动字段角标与读屏原值；聚焦/悬停变动字段通知原图强调，读屏说明原图是否框出；首次识别点字段定位聚焦即定位、失焦撤回，未定位字段读屏说明 |
 | [tests/components/InvoiceRegionViewer.test.ts](../../../tests/components/InvoiceRegionViewer.test.ts) | 组件（jsdom） | 发票原图预览器：普通预览缩放与左右旋转、PDF 超页数上限如实提示、渲染/解码失败可解释并重试、点字段定位与比对两种区域模式 |
+| [tests/components/InvoiceRegionViewerDecodeFailure.test.ts](../../../tests/components/InvoiceRegionViewerDecodeFailure.test.ts) | 组件（jsdom） | 合成 PDF 页图解码失败、重试、定位撤销和旧结果迟到 |
 | [tests/components/InvoicePrintLayout.test.ts](../../../tests/components/InvoicePrintLayout.test.ts) | 组件（jsdom） | 打印面板：无原件的 Excel 发票不可勾选、列出未打印清单，打印只提交有原件的票 |
 | [tests/components/InvoiceExportPreview.test.ts](../../../tests/components/InvoiceExportPreview.test.ts) | 组件（jsdom） | 发票导出预览样式草稿 |
 
@@ -114,6 +115,7 @@
 | [tests/browser/CentralInvoiceManualCompany.test.ts](../../../tests/browser/CentralInvoiceManualCompany.test.ts) | 真实组件／模拟来源 | 手工公司票归档选择 |
 | [tests/browser/CentralInvoicePendingRecovery.test.ts](../../../tests/browser/CentralInvoicePendingRecovery.test.ts) | 真实组件／模拟来源 | 原编号发现与恢复 |
 | [tests/browser/CentralInvoiceRegions.test.ts](../../../tests/browser/CentralInvoiceRegions.test.ts) | 真实组件／模拟来源 | 原件定位与撤权 |
+| [tests/browser/InvoicePdfPageDecodeFailure.test.ts](../../../tests/browser/InvoicePdfPageDecodeFailure.test.ts) | 真实浏览器／合成页图 | 五视口 PDF 页图解码失败、键盘重试和焦点返回 |
 | [tests/browser/CentralInvoiceRerecognition.test.ts](../../../tests/browser/CentralInvoiceRerecognition.test.ts) | 真实组件／模拟来源 | 重识别草稿与交互 |
 | [tests/browser/CentralInvoiceRerecognitionConsentRace.test.ts](../../../tests/browser/CentralInvoiceRerecognitionConsentRace.test.ts) | 真实组件／模拟来源 | 五视口键盘、焦点与重识别提交来源守卫；切票和放弃草稿的确认迟到、取消及正常操作；受控确认替身和合成原件、写入 sink |
 | [tests/browser/CentralInvoiceLeaveRealConfirm.test.ts](../../../tests/browser/CentralInvoiceLeaveRealConfirm.test.ts) | 真实组件／模拟来源 | 五视口真实确认宿主的 Escape、焦点、来源重读后迟到确认和单宿主抢占；第二次确认由测试直接触发，识别及数据来源为合成替身 |

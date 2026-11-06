@@ -31,15 +31,20 @@ const isPdf = computed(() => props.file.type === 'application/pdf' || /\.pdf$/i.
 const imageUrl = useObjectUrl(computed(() => isPdf.value ? undefined : props.file))
 const imageSize = shallowRef<{ width: number, height: number } | null>(null)
 const imageFailed = shallowRef(false)
+const pdfSizeMismatch = shallowRef(false)
 const pdfPages = shallowRef<PdfPreviewPage[]>([])
+const loadedPdfPages = shallowRef<ReadonlySet<number>>(new Set())
 const pdfTotalPages = shallowRef(0)
 const pdfState = shallowRef<'idle' | 'loading' | 'failed'>('idle')
 /** 重试计数：PDF 重新渲染、图片重新挂载 */
 const reloadToken = shallowRef(0)
+const scroller = useTemplateRef<HTMLElement>('scroller')
+const retryButton = useTemplateRef<HTMLButtonElement>('retryButton')
 
 function revokePdfPages() {
   pdfPages.value.forEach(page => URL.revokeObjectURL(page.url))
   pdfPages.value = []
+  loadedPdfPages.value = new Set()
   pdfTotalPages.value = 0
 }
 
@@ -47,7 +52,7 @@ watch(() => props.file, () => {
   rotation.value = 0
 })
 
-watch([() => props.file, reloadToken], async ([file], _, onCleanup) => {
+watch([() => props.file, reloadToken], async ([file, reload], _, onCleanup) => {
   let cancelled = false
   onCleanup(() => {
     cancelled = true
@@ -55,12 +60,14 @@ watch([() => props.file, reloadToken], async ([file], _, onCleanup) => {
   revokePdfPages()
   imageSize.value = null
   imageFailed.value = false
+  pdfSizeMismatch.value = false
   if (!isPdf.value)
     return
   pdfState.value = 'loading'
   try {
     const result = await renderPdfPreviewPages(file)
-    if (cancelled) {
+    await nextTick()
+    if (cancelled || file !== props.file || reload !== reloadToken.value) {
       result.pages.forEach(page => URL.revokeObjectURL(page.url))
       return
     }
@@ -69,7 +76,8 @@ watch([() => props.file, reloadToken], async ([file], _, onCleanup) => {
     pdfState.value = result.pages.length ? 'idle' : 'failed'
   }
   catch {
-    if (!cancelled)
+    await nextTick()
+    if (!cancelled && file === props.file && reload === reloadToken.value)
       pdfState.value = 'failed'
   }
 }, { immediate: true })
@@ -78,24 +86,58 @@ onScopeDispose(revokePdfPages)
 const failure = computed(() => {
   if (isPdf.value && pdfState.value === 'failed')
     return 'PDF 无法在此渲染（文件可能已损坏、加密或不是有效的 PDF）'
+  if (isPdf.value && pdfSizeMismatch.value)
+    return 'PDF 页图尺寸与渲染结果不一致，无法定位'
+  if (isPdf.value && imageFailed.value)
+    return 'PDF 页图无法显示，请重新加载原图'
   if (!isPdf.value && imageFailed.value)
     return '图片无法显示（文件可能已损坏或不是浏览器可解码的图片格式）'
   return null
 })
 
 function reload() {
+  if (typeof document !== 'undefined' && document.activeElement === retryButton.value)
+    scroller.value?.focus({ preventScroll: true })
   reloadToken.value++
 }
 
-function onImageLoad(event: Event) {
+function isCurrentPage(page: { url: string, file: File, reload: number }) {
+  if (page.file !== props.file || page.reload !== reloadToken.value)
+    return false
+  return isPdf.value ? pdfPages.value.some(item => item.url === page.url) : page.url === imageUrl.value
+}
+
+function onImageLoad(page: { pageIndex: number, url: string, file: File, reload: number, size: { width: number, height: number } }, event: Event) {
+  if (!isCurrentPage(page))
+    return
   const image = event.target as HTMLImageElement
+  if (isPdf.value) {
+    if (!image.naturalWidth || !image.naturalHeight) {
+      imageFailed.value = true
+      return
+    }
+    if (image.naturalWidth !== page.size.width || image.naturalHeight !== page.size.height) {
+      pdfSizeMismatch.value = true
+      return
+    }
+    if (!loadedPdfPages.value.has(page.pageIndex))
+      loadedPdfPages.value = new Set([...loadedPdfPages.value, page.pageIndex])
+    return
+  }
   if (image.naturalWidth && image.naturalHeight)
     imageSize.value = { width: image.naturalWidth, height: image.naturalHeight }
+}
+
+function onImageError(page: { url: string, file: File, reload: number }) {
+  if (isCurrentPage(page))
+    imageFailed.value = true
 }
 
 /** 未取到原始尺寸前按 A4 竖版比例占位，框仍按百分比定位。 */
 const A4 = { width: 1, height: Math.SQRT2 }
 function frameMatches(pageIndex: number, size: { width: number, height: number }, natural: boolean) {
+  if (isPdf.value && !natural)
+    return false
   if (!props.frames)
     return true
   if (!natural)
@@ -117,10 +159,12 @@ const pages = computed(() => {
   if (failure.value)
     return []
   const list = isPdf.value
-    ? pdfPages.value.map(page => ({ pageIndex: page.pageIndex, url: page.url, size: { width: page.width, height: page.height }, natural: true }))
+    ? pdfPages.value.map(page => ({ pageIndex: page.pageIndex, url: page.url, size: { width: page.width, height: page.height }, natural: loadedPdfPages.value.has(page.pageIndex) }))
     : imageUrl.value ? [{ pageIndex: 0, url: imageUrl.value, size: imageSize.value ?? A4, natural: !!imageSize.value }] : []
   return list.map(page => ({
     ...page,
+    file: props.file,
+    reload: reloadToken.value,
     verified: frameMatches(page.pageIndex, page.size, page.natural),
     frame: rotatedFrame(page.size, rotation.value),
     groups: props.groups
@@ -140,7 +184,7 @@ const hiddenPages = computed(() => isPdf.value && pdfPages.value.length && pdfTo
 
 /** 框所在页超出已渲染页数（PDF 只渲染前若干页）时归入未定位，不悬空。 */
 const renderedPageIndexes = computed(() => new Set(pages.value.filter(page => page.verified).map(page => page.pageIndex)))
-watch(renderedPageIndexes, value => emit('verifiedPages', [...value]), { immediate: true })
+watch(renderedPageIndexes, value => emit('verifiedPages', [...value]), { immediate: true, flush: 'post' })
 const offPageLabels = computed(() => props.groups
   .filter(group => pageCount.value > 0 && !renderedPageIndexes.value.has(group.pageIndex))
   .flatMap(group => group.labels))
@@ -176,7 +220,6 @@ function rotate(delta: 90 | -90) {
   rotation.value = ((rotation.value + delta + 360) % 360) as PreviewRotation
 }
 
-const scroller = useTemplateRef<HTMLElement>('scroller')
 const { width: scrollerWidth } = useElementSize(scroller)
 const reducedMotion = usePreferredReducedMotion()
 
@@ -281,7 +324,7 @@ watch(scrollerWidth, (width, previous) => {
       <div v-else-if="failure" class="flex flex-col items-center gap-2 py-10 text-center text-12px text-warn-ink" role="alert">
         <span class="i-lucide-file-warning text-18px" aria-hidden="true" />
         <p>{{ failure }}，原文件未改动{{ mode ? '；原图未定位' : '' }}</p>
-        <button type="button" class="btn-secondary" @click="reload">
+        <button ref="retryButton" type="button" class="btn-secondary" @click="reload">
           <span class="i-lucide-refresh-cw mr-1 text-12px" aria-hidden="true" />重新加载原图
         </button>
       </div>
@@ -300,8 +343,8 @@ watch(scrollerWidth, (width, previous) => {
             class="absolute left-1/2 top-1/2 max-w-none select-none"
             :style="{ width: `${page.frame.imageWidth}%`, height: `${page.frame.imageHeight}%`, transform: `translate(-50%, -50%) rotate(${rotation}deg)` }"
             draggable="false"
-            @load="onImageLoad"
-            @error="imageFailed = true"
+            @load="onImageLoad(page, $event)"
+            @error="onImageError(page)"
           >
           <span v-if="pageCount > 1" class="absolute right-1 top-1 rounded-[var(--radius-sm)] bg-ink px-1 text-10px text-white" aria-hidden="true">
             {{ page.pageIndex + 1 }} / {{ pageCount }}
