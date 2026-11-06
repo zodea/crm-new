@@ -2,7 +2,7 @@
 import type { createInvoiceMigrationSession, InvoiceMigrationMappings } from '~/lib/invoice/central-migration'
 import type { createInvoiceMigrationCatalogClient, InvoiceCatalogKey, InvoiceMigrationCatalog } from '~/lib/invoice/central-migration-catalog'
 import type { createInvoiceMigrationPreview, InvoiceMappingPreview, InvoiceSourcePreview } from '~/lib/invoice/central-migration-preview'
-import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { useKitUI } from '~/composables/useKitUI'
 import { bindReadAuthority } from '~/lib/read-model/authority'
 import { problemFromHttpFailure } from '~/lib/read-model/problem'
@@ -43,7 +43,7 @@ onBeforeUnmount(() => {
   active = false
   generation++
 })
-watch(() => [props.session, props.previewClient, props.catalogClient, props.loadBuyers], () => invalidate('来源或可用目录已变化，请重新读取并核对。'))
+watch(() => [props.session, props.previewClient, props.catalogClient, props.loadBuyers], () => invalidate('来源或可用目录已变化，请重新读取并核对。'), { flush: 'sync' })
 function assertCurrent(epoch: number) {
   if (!active || epoch !== generation)
     throw new Error('访问状态已变化，原提交编号仍保留。')
@@ -123,6 +123,7 @@ async function load(epoch: number) {
     invalidateForAuthority(cause, epoch)
     throw cause
   }
+  await nextTick()
   assertCurrent(epoch)
   if (typeof props.session.pendingAll !== 'function') {
     const targets = [null, ...next.map(batch => batch.batchId)]
@@ -148,6 +149,7 @@ async function run(work: (epoch: number) => Promise<void>) {
       error.value = message(cause)
   }
   finally {
+    await nextTick()
     if (active && epoch === generation) {
       try {
         await load(epoch)
@@ -171,6 +173,12 @@ async function choose(event: Event) {
   if (!file || pending.value.length)
     return
   await run(async (epoch) => {
+    const origin = { session: props.session, previewClient: props.previewClient, catalogClient: props.catalogClient, loadBuyers: props.loadBuyers }
+    function assertFileCurrent() {
+      assertCurrent(epoch)
+      if (props.session !== origin.session || props.previewClient !== origin.previewClient || props.catalogClient !== origin.catalogClient || props.loadBuyers !== origin.loadBuyers)
+        throw new Error('来源或可用目录已变化，请重新读取并核对。')
+    }
     source.value = null
     preview.value = null
     checked.value = null
@@ -178,19 +186,26 @@ async function choose(event: Event) {
     result.value = ''
     choices.value = {}
     const bytes = new Uint8Array(await file.arrayBuffer())
+    await nextTick()
+    assertFileCurrent()
     const { inspectNativeMigrationSnapshot } = await import('~/lib/db/native-snapshot')
+    await nextTick()
+    assertFileCurrent()
     const inspected = await inspectNativeMigrationSnapshot(bytes)
-    assertCurrent(epoch)
+    await nextTick()
+    assertFileCurrent()
     const payloadBase64 = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader()
       reader.onerror = () => reject(new Error('无法读取所选快照。'))
       reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '')
       reader.readAsDataURL(file)
     })
-    assertCurrent(epoch)
+    await nextTick()
+    assertFileCurrent()
     const selected = { sha256: inspected.sha256, payloadBase64 }
     const sourcePreview = await props.previewClient.source(selected)
-    assertCurrent(epoch)
+    await nextTick()
+    assertFileCurrent()
     if (sourcePreview.schemaVersion !== inspected.schemaVersion)
       throw new Error('来源版本与预检不一致。')
     source.value = selected
@@ -217,12 +232,15 @@ async function loadCatalog(epoch: number) {
   if (preview.value.invoices.some(invoice => invoice.companyContractId) && !needed.includes('suppliers'))
     needed.push('suppliers')
   const value = await props.catalogClient.load(needed)
+  await nextTick()
   assertCurrent(epoch)
   if (preview.value.invoices.some(invoice => invoice.companyContractId)) {
     if (!props.loadBuyers)
       throw new Error('我方主体目录尚不可用，不能核对公司票。')
-    buyers.value = await props.loadBuyers()
+    const nextBuyers = await props.loadBuyers()
+    await nextTick()
     assertCurrent(epoch)
+    buyers.value = nextBuyers
   }
   catalog.value = value
 }

@@ -91,6 +91,8 @@
 | [tests/components/CentralInvoiceCorrectionScreen.test.ts](../../../tests/components/CentralInvoiceCorrectionScreen.test.ts) | 组件（jsdom） | 更正草稿、提交、打印阻断及原编号 |
 | [tests/components/CentralInvoiceFieldsForm.test.ts](../../../tests/components/CentralInvoiceFieldsForm.test.ts) | 组件（jsdom） | 票面零与未知、版本冲突及识别草稿 |
 | [tests/components/InvoiceMigrationPanel.test.ts](../../../tests/components/InvoiceMigrationPanel.test.ts) | 组件（jsdom） | 旧票映射、公司主体及预检缺口 |
+| [tests/components/InvoiceMigrationFileLifetime.test.ts](../../../tests/components/InvoiceMigrationFileLifetime.test.ts) | 组件／合成来源 | 快照读取、解析及预检迟到时的已观察失效与来源切换保护 |
+| [tests/components/InvoiceMigrationModuleLifetime.test.ts](../../../tests/components/InvoiceMigrationModuleLifetime.test.ts) | 组件／合成来源 | 快照解析模块加载期间来源失效不启动旧校验 |
 | [tests/components/InvoiceMigrationPendingReadFailure.test.ts](../../../tests/components/InvoiceMigrationPendingReadFailure.test.ts) | 组件及隔离服务 | 发布或恢复后批次读取失败，重进后保留并核对原编号 |
 | [tests/components/InvoiceMigrationRecoveryFlow.test.ts](../../../tests/components/InvoiceMigrationRecoveryFlow.test.ts) | 组件（jsdom） | 迁入断线后原编号核对 |
 | [tests/components/FactorSolverState.test.ts](../../../tests/components/FactorSolverState.test.ts) | 组件（jsdom） | 因子工具保存配置兼容 |
@@ -126,6 +128,7 @@
 | [tests/browser/CentralInvoiceCorrectionNavigation.test.ts](../../../tests/browser/CentralInvoiceCorrectionNavigation.test.ts) | 真实组件／模拟来源 | 键盘切票和离开保护 |
 | [tests/browser/InvoiceMigrationPendingReadFailure.test.ts](../../../tests/browser/InvoiceMigrationPendingReadFailure.test.ts) | 真实组件／模拟来源 | 读取失败时原编号提示、撤权和多视口 |
 | [tests/browser/InvoiceMigrationPanel.test.ts](../../../tests/browser/InvoiceMigrationPanel.test.ts) | 真实组件／模拟来源 | 迁入映射和原编号多视口操作 |
+| [tests/browser/InvoiceMigrationFileLifetime.test.ts](../../../tests/browser/InvoiceMigrationFileLifetime.test.ts) | 浏览器组件／合成来源 | 快照选择、失效停止后续校验、键盘及两视口 |
 
 ## Playwright E2E
 
