@@ -1,6 +1,7 @@
-import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
+import { Buffer } from 'node:buffer'
+import { mkdir, mkdtemp, readdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   buildReport,
   classifyDocument,
@@ -81,24 +82,49 @@ describe('ocr 本地样本验收清单', () => {
     const deliveryDirectory = join(root, '送货单')
     await mkdir(invoiceDirectory)
     await mkdir(deliveryDirectory)
-    await writeFile(join(invoiceDirectory, 'invoice.pdf'), '%PDF-1.4\n')
-    await writeFile(join(deliveryDirectory, 'delivery.jpg'), 'synthetic-image-fixture')
-
-    const report = await buildReport({
-      root,
-      mode: 'representative',
-      perGroup: 1,
+    const invoicePath = join(invoiceDirectory, 'invoice.pdf')
+    const deliveryPath = join(deliveryDirectory, 'delivery.jpg')
+    const invoiceBytes = Buffer.from('%PDF-1.4\nOCR_INPUT_PRIVATE_INVOICE_7a81\n')
+    const deliveryBytes = Buffer.from('SYNTHETIC_IMG_PRIVATE_DELIVERY_b412')
+    await writeFile(invoicePath, invoiceBytes)
+    await writeFile(deliveryPath, deliveryBytes)
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
+      throw new Error('合成清单不应访问网络')
     })
 
-    expect(report.safety).toEqual({
-      callsOcrApi: false,
-      includesRawOcr: false,
-      includesFileContent: false,
-      productDataMutation: false,
-    })
-    expect(report.totals.supportedFiles).toBe(2)
-    expect(report.totals.selectedFiles).toBe(2)
-    expect(report.samples.every(sample => sample.comparison.status === 'pending')).toBe(true)
-    expect(JSON.stringify(report)).not.toContain('accessToken')
+    try {
+      const report = await buildReport({
+        root,
+        mode: 'representative',
+        perGroup: 1,
+      })
+
+      expect(report.safety).toEqual({
+        callsOcrApi: false,
+        includesRawOcr: false,
+        includesFileContent: false,
+        productDataMutation: false,
+      })
+      expect(report.totals.supportedFiles).toBe(2)
+      expect(report.totals.selectedFiles).toBe(2)
+      expect(report.samples).toEqual(expect.arrayContaining([
+        expect.objectContaining({ relativePath: '发票/invoice.pdf', documentType: 'invoice', format: 'pdf', sizeBytes: 40 }),
+        expect.objectContaining({ relativePath: '送货单/delivery.jpg', documentType: 'delivery', format: 'image', sizeBytes: 35 }),
+      ]))
+      expect(report.samples.every(sample => sample.comparison.status === 'pending')).toBe(true)
+      const serialized = JSON.stringify(report)
+      expect(serialized).not.toContain('accessToken')
+      expect(serialized).not.toContain('OCR_INPUT_PRIVATE_INVOICE_7a81')
+      expect(serialized).not.toContain('SYNTHETIC_IMG_PRIVATE_DELIVERY_b412')
+      expect(fetchSpy).not.toHaveBeenCalled()
+      expect(await readFile(invoicePath)).toEqual(invoiceBytes)
+      expect(await readFile(deliveryPath)).toEqual(deliveryBytes)
+      expect((await readdir(root)).sort()).toEqual(['发票', '送货单'].sort())
+      expect(await readdir(invoiceDirectory)).toEqual(['invoice.pdf'])
+      expect(await readdir(deliveryDirectory)).toEqual(['delivery.jpg'])
+    }
+    finally {
+      fetchSpy.mockRestore()
+    }
   })
 })

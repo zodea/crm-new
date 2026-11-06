@@ -13,7 +13,7 @@
 | [tests/ocr/paddleocr-poll-deadline.test.ts](../../../tests/ocr/paddleocr-poll-deadline.test.ts) | 单元／服务／状态 | 轮询总时限与单次请求时限的先后及迟到完成状态，全部使用合成响应 |
 | [tests/ocr/preferences.test.ts](../../../tests/ocr/preferences.test.ts) | 单元／服务／状态 | ocr 本机偏好 |
 | [tests/ocr/runtime-options.test.ts](../../../tests/ocr/runtime-options.test.ts) | 单元／服务／状态 | ocr 运行参数契约 |
-| [tests/ocr/sample-acceptance.test.ts](../../../tests/ocr/sample-acceptance.test.ts) | 单元／服务／状态 | OCR 本地样本验收清单；项目内独立合成样本 |
+| [tests/ocr/sample-acceptance.test.ts](../../../tests/ocr/sample-acceptance.test.ts) | 单元／服务／状态 | 独立合成样本元数据与正文哨兵不泄露、输入不变、未调用全局 fetch；报告仍包含来源路径与文件名 |
 | [tests/ocr/sample-runner.test.ts](../../../tests/ocr/sample-runner.test.ts) | 单元／服务／状态 | OCR 样本运行摘要与重试；项目内独立合成输入及输出 |
 | [tests/ocr/settings.test.ts](../../../tests/ocr/settings.test.ts) | 单元／服务／状态 | ocr 设置运行状态 |
 | [tests/recognize/engine.test.ts](../../../tests/recognize/engine.test.ts) | 单元／服务／状态 | recognizeDocument |
