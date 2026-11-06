@@ -245,8 +245,8 @@ export function createCentralInvoiceWorkspace(options: {
         throw new Error('请先确认重新识别后的字段变化。')
       return execute({ ...envelope(), action: 'rerecognize', invoiceId: invoice.id, baseVersion: invoice.version, ...invoiceCandidateForCommand(candidate), currentFields, currentItems, confirmed: true }, beforeSubmit)
     },
-    async edit(invoice: CentralInvoiceRecord, fields: CentralInvoiceFields, items: CentralInvoiceItem[]) {
-      return execute({ ...envelope(), action: 'edit', invoiceId: invoice.id, baseVersion: invoice.version, fields, items })
+    async edit(invoice: CentralInvoiceRecord, fields: CentralInvoiceFields, items: CentralInvoiceItem[], beforeSubmit?: () => boolean) {
+      return execute({ ...envelope(), action: 'edit', invoiceId: invoice.id, baseVersion: invoice.version, fields, items }, beforeSubmit)
     },
     async editArchived(_invoice: CentralInvoiceRecord, _fields: CentralInvoiceFields, _items: CentralInvoiceItem[], _confirmed: boolean) {
       throw new Error('已归档发票须使用独立更正单；该流程尚未开放。')

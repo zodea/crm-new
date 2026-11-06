@@ -544,11 +544,33 @@ async function save(payload: { invoiceId: string, baseVersion: string, fields: C
   if (current.accountStatus === 'archived' && !await confirm({ variant: 'simple', title: '确认更正已归档发票', message: changeMessage(current, payload.fields, payload.items), confirmLabel: '确认更正' }))
     return
   restoredSnapshot.value = null
-  await run(async () => {
-    if (current.accountStatus === 'archived')
+  if (current.accountStatus === 'archived') {
+    await run(async () => {
       await props.workspace.editArchived(current, payload.fields, payload.items, true)
-    else await props.workspace.edit(current, payload.fields, payload.items)
-  })
+    })
+    return
+  }
+  const sourceWorkspace = props.workspace
+  const sourceGeneration = uploadAuthorityGeneration
+  const selectedGeneration = recognitionGeneration
+  const currentFormGeneration = formGeneration
+  const sourceIsCurrent = () => active && props.workspace === sourceWorkspace && sourceGeneration === uploadAuthorityGeneration
+    && selectedGeneration === recognitionGeneration && currentFormGeneration === formGeneration && sourceWorkspace.readState.value === 'ready'
+    && selected.value?.id === current.id && selected.value.version === current.version && !draft.value && !missingRecord.value
+  const resultIsRelevant = () => active && props.workspace === sourceWorkspace && sourceGeneration === uploadAuthorityGeneration && selectedId.value === current.id
+  let blockedBeforeSubmit = false
+  await run(async () => {
+    await sourceWorkspace.edit(current, payload.fields, payload.items, () => {
+      const allowed = sourceIsCurrent()
+      blockedBeforeSubmit = !allowed
+      return allowed
+    })
+  }, resultIsRelevant)
+  if (active && !resultIsRelevant()) {
+    refreshPending()
+    if (blockedBeforeSubmit && !pendingUnavailable.value && props.workspace === sourceWorkspace && sourceWorkspace.readState.value === 'ready' && selectedId.value === current.id)
+      error.value = '发票或来源已变化，保存未提交；请核对后重试。'
+  }
 }
 async function review(manualCompletion: boolean) {
   const current = selected.value
