@@ -1,6 +1,7 @@
 import { Buffer } from 'node:buffer'
 import { copyFile, lstat, mkdir, mkdtemp } from 'node:fs/promises'
 import { join, toNamespacedPath } from 'node:path'
+import process from 'node:process'
 import { DatabaseSync } from 'node:sqlite'
 import { afterAll, expect, it } from 'vitest'
 import { backupDigest, backupFileDigest, inspectProductionBackup } from '../../server/utils/production-backup-manifest'
@@ -79,7 +80,7 @@ async function longPathBackup() {
   const expected = await inspectProductionBackup(shortPath)
   let longDirectory = directory
   while (join(longDirectory, '完整数据库.sqlite').length <= 280)
-    longDirectory = join(longDirectory, '中文独立备份及原件历史核验')
+    longDirectory = join(longDirectory, process.platform === 'win32' ? '中文独立备份及原件历史核验' : '中文-backup-history-verification')
   await mkdir(longDirectory, { recursive: true })
   const path = join(longDirectory, '完整数据库.sqlite')
   await copyFile(shortPath, path)

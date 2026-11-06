@@ -2,6 +2,7 @@ import { Buffer } from 'node:buffer'
 import { randomUUID } from 'node:crypto'
 import { lstat, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import process from 'node:process'
 import { afterAll, expect, it } from 'vitest'
 import { backupFileDigest, inspectProductionBackup } from '../../server/utils/production-backup-manifest'
 import { copyBackupPackage, createLocalBackup, readBackupPackage, restoreBackupIsolated } from '../../server/utils/production-backup-package'
@@ -50,7 +51,7 @@ async function longPathRoot() {
 async function longDirectory(root: string, name: string) {
   let path = join(root, name)
   while (join(path, 'ruihang.sqlite').length <= 280)
-    path = join(path, '中文完整备份与冷恢复原件审计')
+    path = join(path, process.platform === 'win32' ? '中文完整备份与冷恢复原件审计' : '中文-backup-recovery-audit')
   await mkdir(path, { recursive: true })
   expect(join(path, 'ruihang.sqlite').length).toBeGreaterThan(260)
   return path

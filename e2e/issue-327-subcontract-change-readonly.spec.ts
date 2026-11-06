@@ -1,5 +1,6 @@
 import type { APIRequestContext, Page, TestInfo } from '@playwright/test'
 import { Buffer } from 'node:buffer'
+import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import { installContractEngineeringFixture, selectContractEngineeringFixture } from './helpers/contract-engineering-fixture'
 import { createVerifiedSignatory, selectVerifiedSignatory } from './helpers/contract-signatory'
@@ -9,7 +10,7 @@ type Scenario = 'ready' | 'empty' | 'forbidden' | 'unavailable'
 type Domain = 'owner-documents' | 'subcontract-contracts' | 'projects'
 
 function session(testInfo: TestInfo) {
-  return Buffer.from(testInfo.testId, 'utf8').toString('base64url')
+  return Buffer.from(`${testInfo.testId}-${testInfo.retry}`, 'utf8').toString('base64url')
 }
 
 async function reset(request: APIRequestContext, id: string, domain: Domain, scenario: Scenario = 'ready') {
@@ -26,7 +27,7 @@ async function chooseLookup(page: Page, label: string, option: string) {
 }
 
 async function createSubcontract(page: Page, name: string): Promise<string> {
-  const ownName = '此流程已核实我方签约主体'
+  const ownName = `此流程已核实我方签约主体-${randomUUID()}`
   const ownId = await createVerifiedSignatory(page, ownName)
   await installContractEngineeringFixture(page, 'subcontract', '中央正式施工项目')
   await page.goto('/contract/subcontract/form')
@@ -116,7 +117,7 @@ test.describe('Issue #327：分包变洽签专属只读链', () => {
     await reset(page.context().request, id, 'owner-documents')
   })
 
-  test('中央命令保存后从全局、项目和分包合同进入同一专属详情并精确返回', async ({ page }, testInfo) => {
+  test('中央命令保存后从全局列表进入专属详情并精确返回', async ({ page }, testInfo) => {
     const contractName = 'E2E 中央劳务分包合同'
     const contractId = await createSubcontract(page, contractName)
     const changeId = await createChange(page, contractName, 'submit')
@@ -176,6 +177,14 @@ test.describe('Issue #327：分包变洽签专属只读链', () => {
     await expect.poll(() => globalWorkspace.evaluate(element => element.scrollTop)).toBe(globalScrollTop)
     await mainLink.evaluate(element => (element as HTMLElement).click())
     await expect(page.getByTestId('subcontract-change-detail')).toBeVisible({ timeout: 20_000 })
+  })
+
+  test('中央分包变洽签详情与分供方、合同来源往返', async ({ page }) => {
+    const contractName = 'E2E 中央劳务分包合同'
+    const contractId = await createSubcontract(page, contractName)
+    const changeId = await createChange(page, contractName, 'submit')
+    await page.goto(`/subcontract/change/${changeId}?origin=real`)
+    await expect(page.getByTestId('subcontract-change-detail')).toBeVisible({ timeout: 20_000 })
     await page.reload()
     await expect(page.getByRole('heading', { name: 'E2E 分包范围调整' })).toBeVisible()
     await page.getByRole('link', { name: '中央正式劳务分供方' }).click()
@@ -196,6 +205,12 @@ test.describe('Issue #327：分包变洽签专属只读链', () => {
     await expect(page.getByRole('link', { name: 'E2E 分包范围调整' })).toBeFocused()
     await page.getByRole('link', { name: '返回来源详情' }).click()
     await expect(page).toHaveURL(new RegExp(`/subcontract/change/${changeId}\\?origin=real`))
+  })
+
+  test('从分供方进入中央分包变洽签并精确返回', async ({ page }) => {
+    const contractName = 'E2E 中央劳务分包合同'
+    await createSubcontract(page, contractName)
+    await createChange(page, contractName, 'submit')
 
     await page.goto('/base/supplier/supplier-real-327?origin=real')
     await expect(page.getByRole('heading', { name: '中央正式劳务分供方' })).toBeVisible({ timeout: 20_000 })
@@ -214,6 +229,12 @@ test.describe('Issue #327：分包变洽签专属只读链', () => {
     await expect(page).toHaveURL(/\/base\/supplier\/supplier-real-327\?origin=real&subChangeJourney=origin_[^#]+#supplier-subcontract-change-link/)
     await expect(page.getByRole('link', { name: '查看分包变洽签' })).toBeFocused()
     await expect.poll(() => workspace.evaluate(element => element.scrollTop)).toBe(supplierScrollTop)
+  })
+
+  test('从项目进入中央分包变洽签并精确返回', async ({ page }) => {
+    const contractName = 'E2E 中央劳务分包合同'
+    await createSubcontract(page, contractName)
+    await createChange(page, contractName, 'submit')
 
     await page.goto(`/project/project-real-320?origin=real`)
     const projectCard = page.getByRole('link', { name: /分包变洽签/ })

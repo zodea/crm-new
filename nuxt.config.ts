@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
 import process from 'node:process'
 import { isolatedFreshBuildPaths } from './scripts/e2e-isolation'
@@ -28,7 +29,7 @@ export default defineNuxtConfig({
     ],
     // sql.js 按运行时路径加载 WASM；显式携带现有依赖，构建后无需手工补文件。
     // xlsx 整包内联：外置时 Windows 开发态会把 dist/cpexcel.js 写成裸盘符路径，ESM 加载失败。
-    externals: { traceInclude: ['sql.js/dist/sql-wasm.wasm'], inline: [/[\\/]xlsx[\\/]/] },
+    externals: { traceInclude: [createRequire(resolve('package.json')).resolve('sql.js/dist/sql-wasm.wasm')], inline: [/[\\/]xlsx[\\/]/] },
   },
 
   runtimeConfig: {
