@@ -47,6 +47,7 @@
 | [tests/invoice/excel.test.ts](../../../tests/invoice/excel.test.ts) | 单元／服务／状态 | 发票台账 Excel 导出 |
 | [tests/invoice/ledger-nodes.test.ts](../../../tests/invoice/ledger-nodes.test.ts) | 单元／服务／状态 | 台账树键与 query 预筛（specs §07：预筛不进页签身份） |
 | [tests/invoice/print-layout.test.ts](../../../tests/invoice/print-layout.test.ts) | 单元／服务／状态 | 发票打印排版与打印资格：无原件、识别、确认、重复、金额逐项拒绝原因 |
+| [tests/invoice/pdf-preview-ownership.test.ts](../../../tests/invoice/pdf-preview-ownership.test.ts) | 单元／合成替身 | PDF 页图所有权与异常回收，销毁失败由 pdf.js、canvas 和 URL 替身注入 |
 | [tests/invoice/recognition-changes.test.ts](../../../tests/invoice/recognition-changes.test.ts) | 单元／服务／状态 | 重新识别前后的字段差异：人工值被覆盖、清空、补出均列出，长票号按文本比较；草稿字段标记与保存确认正文 |
 | [tests/invoice/recognition-regions.test.ts](../../../tests/invoice/recognition-regions.test.ts) | 单元／服务／状态 | 识别字段 → OCR 版面块区域：归一化、金额数字边界、标签消歧、不造框条件、180° 翻转与多页；旋转/缩放坐标换算；变动字段按块合并与“原图未定位”清单；首次识别点字段定位只框当前字段 |
 | [tests/recognize/local-document.test.ts](../../../tests/recognize/local-document.test.ts) | 单元／服务／状态 | 本机 OCR 合成结果的文本与真实多边形：源帧核验、越界/歧义拒绝、混合 PDF 页码与缺口 |
@@ -116,6 +117,7 @@
 | [tests/browser/CentralInvoicePendingRecovery.test.ts](../../../tests/browser/CentralInvoicePendingRecovery.test.ts) | 真实组件／模拟来源 | 原编号发现与恢复 |
 | [tests/browser/CentralInvoiceRegions.test.ts](../../../tests/browser/CentralInvoiceRegions.test.ts) | 真实组件／模拟来源 | 原件定位与撤权 |
 | [tests/browser/InvoicePdfPageDecodeFailure.test.ts](../../../tests/browser/InvoicePdfPageDecodeFailure.test.ts) | 真实浏览器／合成页图 | 五视口 PDF 页图解码失败、键盘重试和焦点返回 |
+| [tests/browser/pdf-preview-real-browser.test.ts](../../../tests/browser/pdf-preview-real-browser.test.ts) | 真实浏览器／合成 PDF | 真实 pdf.js 和 canvas 渲染单页旋转 PDF、图像解码与调用者释放 URL |
 | [tests/browser/CentralInvoiceRerecognition.test.ts](../../../tests/browser/CentralInvoiceRerecognition.test.ts) | 真实组件／模拟来源 | 重识别草稿与交互 |
 | [tests/browser/CentralInvoiceRerecognitionConsentRace.test.ts](../../../tests/browser/CentralInvoiceRerecognitionConsentRace.test.ts) | 真实组件／模拟来源 | 五视口键盘、焦点与重识别提交来源守卫；切票和放弃草稿的确认迟到、取消及正常操作；受控确认替身和合成原件、写入 sink |
 | [tests/browser/CentralInvoiceLeaveRealConfirm.test.ts](../../../tests/browser/CentralInvoiceLeaveRealConfirm.test.ts) | 真实组件／模拟来源 | 五视口真实确认宿主的 Escape、焦点、来源重读后迟到确认和单宿主抢占；第二次确认由测试直接触发，识别及数据来源为合成替身 |

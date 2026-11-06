@@ -23,6 +23,8 @@ export async function renderPdfPreviewPages(file: File): Promise<PdfPreviewResul
   await import('pdfjs-dist/legacy/build/pdf.worker.mjs')
   const loadingTask = pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) })
   const pages: PdfPreviewPage[] = []
+  let result: PdfPreviewResult | null = null
+  let renderFailure: { error: unknown } | null = null
   try {
     const pdf = await loadingTask.promise
     for (let pageNumber = 1; pageNumber <= Math.min(pdf.numPages, MAX_PREVIEW_PAGES); pageNumber++) {
@@ -43,13 +45,25 @@ export async function renderPdfPreviewPages(file: File): Promise<PdfPreviewResul
     }
     const totalPages = pdf.numPages
     await pdf.cleanup()
-    return { pages, totalPages }
+    result = { pages, totalPages }
   }
   catch (error) {
+    renderFailure = { error }
     pages.forEach(page => URL.revokeObjectURL(page.url))
-    throw error
   }
-  finally {
+  let destroyFailure: { error: unknown } | null = null
+  try {
     await loadingTask.destroy()
   }
+  catch (error) {
+    destroyFailure = { error }
+  }
+  if (renderFailure || destroyFailure) {
+    if (!renderFailure)
+      pages.forEach(page => URL.revokeObjectURL(page.url))
+    if (renderFailure && destroyFailure)
+      throw new AggregateError([renderFailure.error, destroyFailure.error], 'PDF 渲染与资源清理均失败。')
+    throw (renderFailure ?? destroyFailure)!.error
+  }
+  return result!
 }
