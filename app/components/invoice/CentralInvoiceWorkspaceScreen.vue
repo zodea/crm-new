@@ -8,6 +8,7 @@ import { onBeforeRouteLeave } from 'vue-router'
 import { useKitUI } from '~/composables/useKitUI'
 import { useTabCloseGuard } from '~/composables/useTabCloseGuard'
 import { invoiceCandidateForCommand } from '~/lib/invoice/central-recognition'
+import { CentralInvoiceLoadSupersededError } from '~/lib/invoice/central-workspace'
 import CentralInvoiceWorkspaceView from './CentralInvoiceWorkspaceView.vue'
 
 type Workspace = ReturnType<typeof createCentralInvoiceWorkspace>
@@ -265,7 +266,14 @@ async function run(operation: () => Promise<void>, isRelevant: () => boolean = (
 async function load() {
   await run(async () => {
     const before = selected.value
-    await props.workspace.load()
+    try {
+      await props.workspace.load()
+    }
+    catch (cause) {
+      if (cause instanceof CentralInvoiceLoadSupersededError)
+        return
+      throw cause
+    }
     if (selectedId.value && !records.value.some(record => record.id === selectedId.value)) {
       if ((dirty.value || draft.value) && before) {
         missingRecord.value = before

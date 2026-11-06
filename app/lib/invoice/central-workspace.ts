@@ -13,6 +13,13 @@ type Client = ReturnType<typeof createCentralInvoiceHttp>
 interface Context { workspaceId: string, actorId: string, capabilities: readonly string[] }
 type Identity = Pick<Context, 'workspaceId' | 'actorId'>
 
+export class CentralInvoiceLoadSupersededError extends Error {
+  constructor() {
+    super('发票读取目标已变化。')
+    this.name = 'CentralInvoiceLoadSupersededError'
+  }
+}
+
 /** 工作台与台账共用同一中央事实；页面草稿及文件对象由调用方持有。 */
 export function createCentralInvoiceWorkspace(options: {
   identity: Identity
@@ -76,6 +83,12 @@ export function createCentralInvoiceWorkspace(options: {
     }
   }
   function applyReadBatch(reads: Array<{ record: CentralInvoiceRecord, meta: { sources: Array<{ key: string, sourceVersion: string | null }> }, sourceVersion: string }>) {
+    if (loading.value) {
+      generation++
+      loading.value = false
+      invalidate()
+      return
+    }
     if (readState.value !== 'ready')
       return
     const versions = reads.map(read => read.meta.sources.find(source => source.key === 'invoices')?.sourceVersion ?? '')
@@ -93,8 +106,11 @@ export function createCentralInvoiceWorkspace(options: {
     const current = ++generation
     loading.value = true
     readState.value = 'loading'
+    let checkingAuthority = false
     try {
+      checkingAuthority = true
       await authorize()
+      checkingAuthority = false
       const next: CentralInvoiceRecord[] = []
       let expectedVersion: string | null = null
       let expectedTotal: number | null = null
@@ -113,9 +129,11 @@ export function createCentralInvoiceWorkspace(options: {
         if (next.length >= response.pagination.total)
           break
       }
+      checkingAuthority = true
       await authorize()
+      checkingAuthority = false
       if (generation !== current)
-        throw new Error('发票读取目标已变化。')
+        throw new CentralInvoiceLoadSupersededError()
       if (new Set(next.map(record => record.id)).size !== next.length)
         throw new Error('发票列表身份重复，请重新读取。')
       records.value = next
@@ -126,6 +144,10 @@ export function createCentralInvoiceWorkspace(options: {
     catch (cause) {
       if (generation === current) {
         invalidate()
+      }
+      else if (!checkingAuthority && !['forbidden', 'unauthenticated'].includes(problemFromHttpFailure(cause)?.code ?? '')
+        && !(cause instanceof CentralInvoiceLoadSupersededError)) {
+        throw new CentralInvoiceLoadSupersededError()
       }
       throw cause
     }
