@@ -74,6 +74,7 @@
 | [tests/components/CentralInvoicePendingRecovery.test.ts](../../../tests/components/CentralInvoicePendingRecovery.test.ts) | 组件（jsdom） | 待核对提交与更正分流 |
 | [tests/components/CentralInvoiceQueue.test.ts](../../../tests/components/CentralInvoiceQueue.test.ts) | 组件（jsdom） | 队列金额与上传 |
 | [tests/components/CentralInvoiceRerecognition.test.ts](../../../tests/components/CentralInvoiceRerecognition.test.ts) | 组件（jsdom） | 未保存输入和重识别 |
+| [tests/components/CentralInvoiceCloudConsentRace.test.ts](../../../tests/components/CentralInvoiceCloudConsentRace.test.ts) | 组件（jsdom） | 云识别确认与来源变化；合成原件和云 sink，不连接真实云服务 |
 | [tests/components/CentralInvoiceWorkspaceScreen.test.ts](../../../tests/components/CentralInvoiceWorkspaceScreen.test.ts) | 组件（jsdom） | 工作台与原编号恢复 |
 | [tests/components/CentralInvoiceWorkspaceView.test.ts](../../../tests/components/CentralInvoiceWorkspaceView.test.ts) | 组件（jsdom） | 归档归属与来源版本 |
 | [tests/components/CentralInvoiceDragUpload.test.ts](../../../tests/components/CentralInvoiceDragUpload.test.ts) | 组件（jsdom） | 上传确认期间目录、权限和原编号变化阻断 |
@@ -103,6 +104,7 @@
 | [tests/browser/CentralInvoicePendingRecovery.test.ts](../../../tests/browser/CentralInvoicePendingRecovery.test.ts) | 真实组件／模拟来源 | 原编号发现与恢复 |
 | [tests/browser/CentralInvoiceRegions.test.ts](../../../tests/browser/CentralInvoiceRegions.test.ts) | 真实组件／模拟来源 | 原件定位与撤权 |
 | [tests/browser/CentralInvoiceRerecognition.test.ts](../../../tests/browser/CentralInvoiceRerecognition.test.ts) | 真实组件／模拟来源 | 重识别草稿与交互 |
+| [tests/browser/CentralInvoiceCloudConsentRace.test.ts](../../../tests/browser/CentralInvoiceCloudConsentRace.test.ts) | 真实组件／模拟来源 | 五视口键盘、焦点与云识别来源切换；受控确认替身、合成原件及云 sink，不连接真实云 |
 | [tests/browser/CentralInvoiceCorrection.test.ts](../../../tests/browser/CentralInvoiceCorrection.test.ts) | 真实组件／模拟来源 | 更正票面与归属的多视口操作 |
 | [tests/browser/CentralInvoiceCorrectionAuthority.test.ts](../../../tests/browser/CentralInvoiceCorrectionAuthority.test.ts) | 真实组件／模拟来源 | 失权隐藏与同身份草稿恢复 |
 | [tests/browser/CentralInvoiceCorrectionNavigation.test.ts](../../../tests/browser/CentralInvoiceCorrectionNavigation.test.ts) | 真实组件／模拟来源 | 键盘切票和离开保护 |

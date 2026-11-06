@@ -379,6 +379,12 @@ async function recognize(source: 'local' | 'cloud') {
   const current = selected.value
   if (!current || draft.value || (dirty.value && current.ocrStatus !== 'done'))
     return
+  const sourceWorkspace = props.workspace
+  const sourceGeneration = uploadAuthorityGeneration
+  const selectedGeneration = recognitionGeneration
+  const cloudSourceIsCurrent = () => active && props.workspace === sourceWorkspace && sourceGeneration === uploadAuthorityGeneration
+    && selectedGeneration === recognitionGeneration && sourceWorkspace.readState.value === 'ready'
+    && selected.value?.id === current.id && selected.value.version === current.version && sameOriginal(current, selected.value)
   if (source === 'cloud' && !props.cloudAvailable) {
     error.value = '云识别尚未启用，请使用本机识别。'
     return
@@ -386,6 +392,11 @@ async function recognize(source: 'local' | 'cloud') {
   const consent = source === 'cloud' && await confirm({ variant: 'simple', title: '确认使用云识别', message: '所选发票原件将发送至已配置的云识别服务。', confirmLabel: '确认发送' })
   if (source === 'cloud' && !consent)
     return
+  if (source === 'cloud' && !cloudSourceIsCurrent()) {
+    if (active)
+      error.value = '发票或权限已变化，未保存输入仍保留。'
+    return
+  }
   if (selected.value?.id !== current.id || selected.value.version !== current.version || props.workspace.readState.value !== 'ready') {
     error.value = '发票或权限已变化，未保存输入仍保留。'
     return
@@ -401,11 +412,15 @@ async function recognize(source: 'local' | 'cloud') {
     await run(async () => {
       if (current.ocrStatus !== 'done') {
         const regionEpoch = regionGeneration
-        const result = await withRecognitionProgress(current.id, () => props.workspace.recognizeWithCandidate(current, source, consent))
+        const result = await withRecognitionProgress(current.id, () => source === 'cloud'
+          ? sourceWorkspace.recognizeWithCandidate(current, source, consent, cloudSourceIsCurrent)
+          : sourceWorkspace.recognizeWithCandidate(current, source, consent))
         rememberRegions(current, result.record, result.candidate, regionEpoch)
         return
       }
-      const candidate = await withRecognitionProgress(current.id, () => props.workspace.prepareRerecognition(current, source, consent))
+      const candidate = await withRecognitionProgress(current.id, () => source === 'cloud'
+        ? sourceWorkspace.prepareRerecognition(current, source, consent, cloudSourceIsCurrent)
+        : sourceWorkspace.prepareRerecognition(current, source, consent))
       if (!active || generation !== recognitionGeneration || props.workspace.readState.value !== 'ready')
         throw new Error('发票或权限已变化，未保存输入仍保留。')
       const parsed = candidate.fields

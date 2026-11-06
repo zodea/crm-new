@@ -134,11 +134,11 @@ export function createCentralInvoiceWorkspace(options: {
         loading.value = false
     }
   }
-  async function execute(command: CentralInvoiceCommand) {
+  async function execute(command: CentralInvoiceCommand, beforeSubmit?: () => boolean) {
     await authorize(true)
     const target = 'invoiceId' in command ? command.invoiceId : null
     return guarded(async () => {
-      const saved = await session(target).submit(command)
+      const saved = await session(target).submit(command, beforeSubmit)
       applyReadBatch([saved.read])
       return saved.read.record
     })
@@ -162,7 +162,7 @@ export function createCentralInvoiceWorkspace(options: {
       throw new Error('发票原件已变化，请重新读取后再操作。')
     return blob
   }
-  async function recognizeFile(invoice: CentralInvoiceRecord, source: 'local' | 'cloud', confirmedCloud = false) {
+  async function recognizeFile(invoice: CentralInvoiceRecord, source: 'local' | 'cloud', confirmedCloud = false, cloudSourceIsCurrent?: () => boolean) {
     const blob = await verifiedOriginal(invoice, true)
     if (!invoice.original)
       throw new Error('该发票没有已保存原件，请先关联原件。')
@@ -171,19 +171,23 @@ export function createCentralInvoiceWorkspace(options: {
     if (source === 'cloud') {
       if (!confirmedCloud || !options.recognizeCloud)
         throw new Error('云识别尚未启用，或尚未明确确认发送所选文件。')
+      if (cloudSourceIsCurrent && !cloudSourceIsCurrent())
+        throw new Error('发票或权限已变化，未发送云识别。')
       candidate = await options.recognizeCloud(file)
     }
     else {
       candidate = await options.recognizeLocal(file)
     }
     await authorize(true)
+    if (source === 'cloud' && cloudSourceIsCurrent && !cloudSourceIsCurrent())
+      throw new Error('发票或权限已变化，识别结果未保存。')
     if (candidate.source !== source || candidate.requiresReview !== true)
       throw new Error('识别来源或人工核对标记不一致，请重新识别。')
     return candidate
   }
-  async function recognizeWithCandidate(invoice: CentralInvoiceRecord, source: 'local' | 'cloud' = 'local', confirmedCloud = false) {
-    const candidate = await recognizeFile(invoice, source, confirmedCloud)
-    const record = await execute({ ...envelope(), action: 'recognize', invoiceId: invoice.id, baseVersion: invoice.version, ...invoiceCandidateForCommand(candidate) })
+  async function recognizeWithCandidate(invoice: CentralInvoiceRecord, source: 'local' | 'cloud' = 'local', confirmedCloud = false, cloudSourceIsCurrent?: () => boolean) {
+    const candidate = await recognizeFile(invoice, source, confirmedCloud, cloudSourceIsCurrent)
+    const record = await execute({ ...envelope(), action: 'recognize', invoiceId: invoice.id, baseVersion: invoice.version, ...invoiceCandidateForCommand(candidate) }, source === 'cloud' ? cloudSourceIsCurrent : undefined)
     return { record, candidate }
   }
   return {
