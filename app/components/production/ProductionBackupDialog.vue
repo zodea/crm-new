@@ -36,6 +36,9 @@ const open = defineModel<boolean>('open', { required: true })
           <p class="text-ink-muted">
             计划每 {{ status?.intervalHours ?? 12 }} 小时备份；电脑唤醒或服务重启后会补跑。正式写入仍需上线验收。
           </p>
+          <p class="text-ink-muted">
+            自动清理已暂停。请维护人定期检查备份位置的可用空间，及时处理容量问题。此前清理中断的副本可能不完整，请维护人核验；历史提示不能证明副本完整。
+          </p>
           <p v-if="status && !status.configured" class="text-danger">
             请维护人配置主备份、离线副本与隔离恢复位置，再执行验证。
           </p>

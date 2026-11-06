@@ -12,6 +12,7 @@ import { createFixtureCacheDirectory, createFixtureSourceHashReader, findFixture
  */
 export const COLD_ENTRIES = [
   'production-auxiliary-cold',
+  'production-backup-paused-cold',
   'production-boq-cold',
   'production-construction-cold',
   'production-construction-scope-cold',

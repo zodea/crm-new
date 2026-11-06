@@ -28,8 +28,9 @@
 | [tests/production/backup-manifest.test.ts](../../../tests/production/backup-manifest.test.ts) | 单元／服务／状态 | 一致副本清单及超过 260 字符中文普通路径的只读核验；原件、两版审计、回执和摘要保全，缺正文、字节坏损或未知表拒绝 |
 | [tests/production/backup-package.test.ts](../../../tests/production/backup-package.test.ts) | 单元／服务／状态 | 中文深目录新库与冷打开、长目标一致备份、离线复制及隔离恢复；原件和同键回执保真、不重复写，已有目标与健康副本不被覆盖 |
 | [tests/production/backup-policy.test.ts](../../../tests/production/backup-policy.test.ts) | 单元／服务／状态 | 备份保护与调度使用实际数据时点 |
-| [tests/production/backup-retention.test.ts](../../../tests/production/backup-retention.test.ts) | 单元／服务／状态 | 一次旅程检查已清理包确实不存在，并逐一保留最后成功、基线和混入未知文件的包 |
+| [tests/production/backup-retention.test.ts](../../../tests/production/backup-retention.test.ts) | 单元／服务／状态 | 未接入生产自动流程的底层旧保留算法：到期包和受保护包区分 |
 | [tests/production/backup-service.test.ts](../../../tests/production/backup-service.test.ts) | 单元／服务／状态 | 计划补跑、原键回执、介质失败保上份、离线时点和隔离恢复证明持久一致 |
+| [tests/production/backup-cleanup-paused.test.ts](../../../tests/production/backup-cleanup-paused.test.ts) | 合成目录／真实服务与独立进程 | 自动清理暂停、各副本与原键保全；隔离恢复的合成客户和原件独立进程回读 |
 | [tests/production/backup-ui-state.test.ts](../../../tests/production/backup-ui-state.test.ts) | 单元／服务／状态 | 备份失响应后刷新重建界面仍使用原编号，成功回读后才清除；不完整成功回执的明确拒绝 |
 | [tests/production/material-contract-storage.test.ts](../../../tests/production/material-contract-storage.test.ts) | 单元／服务／状态 | 材采日常 SQL 事务、原件与回执冷读、完整混合图备份及封存；损坏图停止恢复，未接管正式初次写入保持门禁 |
 | [tests/production/storage-backup.test.ts](../../../tests/production/storage-backup.test.ts) | 单元／服务／状态 | 一致备份保留已提交事实并拒绝覆盖已有目标，原库和副本能独立读取 |
@@ -51,6 +52,12 @@
 | --- | --- | --- |
 | [tests/components/production-access-gate.test.ts](../../../tests/components/production-access-gate.test.ts) | 组件（jsdom） | 已认证后的连接失败遮挡但不卸载输入，明确过期才卸载业务页 |
 
+## 浏览器组件
+
+| 文件 | 运行层／用途 | 场景或关联说明（定位用） |
+| --- | --- | --- |
+| [tests/browser/ProductionBackupPause.test.ts](../../../tests/browser/ProductionBackupPause.test.ts) | 浏览器组件 | 暂停自动清理与空间提示、键盘焦点及五视口布局 |
+
 ## Playwright E2E
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
@@ -63,4 +70,5 @@
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
 | [e2e/helpers/browser-production-snapshot.ts](../../../e2e/helpers/browser-production-snapshot.ts) | 辅助／夹具 | 供测试导入的夹具／辅助代码；按所属业务就近查阅 |
+| [tests/helpers/production-backup-paused-cold.ts](../../../tests/helpers/production-backup-paused-cold.ts) | 辅助／独立进程 | 合成备份原键回读与副本摘要核对 |
 | [tests/helpers/production-target-cost-cold.ts](../../../tests/helpers/production-target-cost-cold.ts) | 辅助／夹具 | 预算版本、原基线与原件独立进程读取入口 |

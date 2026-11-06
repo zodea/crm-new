@@ -7,7 +7,6 @@ import { randomUUID } from 'node:crypto'
 import { backupDigest, backupInvalid } from './production-backup-manifest'
 import { backupInventoryDigest, copyBackupPackage, createLocalBackup, readBackupPackage, restoreBackupIsolated } from './production-backup-package'
 import { backupProtection, backupShouldRun } from './production-backup-policy'
-import { pruneProductionBackups } from './production-backup-retention'
 import { productionStorageManifest } from './production-storage-schema'
 
 type Session = () => BusinessSession
@@ -144,24 +143,7 @@ export function createProductionBackupService(storage: ProductionStorage, config
         }
         authorize(session)
       })
-      if (command.action !== 'verify-restore') {
-        // A cleanup failure does not erase a successful verified backup or its receipt.
-        try {
-          const runs = await storage.select<RunRow>('SELECT * FROM production_backup_runs WHERE action=? AND state=\'succeeded\' ORDER BY rowid DESC', [command.action])
-          const baseline = (await storage.select<{ package_id: string }>('SELECT package_id FROM production_backup_baseline WHERE singleton=1'))[0]
-          const protectedIds = new Set([packageId, ...(baseline ? [baseline.package_id] : [])])
-          const candidates = runs.map(row => ({ id: row.package_id!, capturedAt: row.captured_at! }))
-          const roots = command.action === 'backup' ? [config.primaryDirectory, config.stagingDirectory] : [config.offlineDirectory]
-          for (const root of roots) {
-            const result = await pruneProductionBackups(root, candidates, protectedIds, config)
-            if (result.skipped.length)
-              throw new Error('retention skipped unverified package')
-          }
-        }
-        catch {
-          await storage.execute('UPDATE production_backup_runs SET error_message=COALESCE(error_message||\'；\',\'\')||? WHERE id=?', ['备份已完成；部分旧副本未通过清理核对，已保留，请维护人检查。', command.commandId])
-        }
-      }
+      // 自动到期清理已暂停；成功回执不触发备份副本删除。
     }
     catch (cause) {
       // Paths and raw filesystem errors may contain private machine details. Keep the public diagnostic bounded.
