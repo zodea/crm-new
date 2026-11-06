@@ -281,8 +281,8 @@ export function createCentralInvoiceWorkspace(options: {
         throw new Error('请先明确确认旧发票已核对。')
       return execute({ ...envelope(), action: 'confirm-legacy', invoiceId: invoice.id, baseVersion: invoice.version, confirmed: true }, beforeSubmit)
     },
-    async review(invoice: CentralInvoiceRecord, manualCompletion: boolean) {
-      return execute({ ...envelope(), action: 'review', invoiceId: invoice.id, baseVersion: invoice.version, manualCompletion })
+    async review(invoice: CentralInvoiceRecord, manualCompletion: boolean, beforeSubmit?: () => boolean) {
+      return execute({ ...envelope(), action: 'review', invoiceId: invoice.id, baseVersion: invoice.version, manualCompletion }, beforeSubmit)
     },
     async archive(invoice: CentralInvoiceRecord, ownerKind: 'project' | 'personal' | 'company', projectId: string | null, supplierId: string, taxNumbersConfirmed: boolean, taxVerification: InvoiceTaxVerificationSelection, contract?: InvoiceContractReference | null, beforeSubmit?: () => boolean) {
       if (!taxNumbersConfirmed)

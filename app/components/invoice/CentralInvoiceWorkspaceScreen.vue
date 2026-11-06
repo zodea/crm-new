@@ -582,8 +582,29 @@ async function save(payload: { invoiceId: string, baseVersion: string, fields: C
 }
 async function review(manualCompletion: boolean) {
   const current = selected.value
-  if (current && !dirty.value && !draft.value)
-    await run(async () => { await props.workspace.review(current, manualCompletion) })
+  if (!current || dirty.value || draft.value || missingRecord.value)
+    return
+  const sourceWorkspace = props.workspace
+  const sourceGeneration = uploadAuthorityGeneration
+  const selectedGeneration = recognitionGeneration
+  const currentFormGeneration = formGeneration
+  const sourceIsCurrent = () => active && props.workspace === sourceWorkspace && sourceGeneration === uploadAuthorityGeneration
+    && selectedGeneration === recognitionGeneration && currentFormGeneration === formGeneration && sourceWorkspace.readState.value === 'ready'
+    && selected.value?.id === current.id && selected.value.version === current.version && !dirty.value && !draft.value && !missingRecord.value
+  const resultIsRelevant = () => active && props.workspace === sourceWorkspace && sourceGeneration === uploadAuthorityGeneration && selectedId.value === current.id
+  let blockedBeforeSubmit = false
+  await run(async () => {
+    await sourceWorkspace.review(current, manualCompletion, () => {
+      const allowed = sourceIsCurrent()
+      blockedBeforeSubmit = !allowed
+      return allowed
+    })
+  }, resultIsRelevant)
+  if (active && !resultIsRelevant()) {
+    refreshPending()
+    if (blockedBeforeSubmit && !pendingUnavailable.value && props.workspace === sourceWorkspace && sourceWorkspace.readState.value === 'ready' && selectedId.value === current.id)
+      error.value = '发票或来源已变化，核对未提交；请核对后重试。'
+  }
 }
 async function archive(attribution: { ownerKind: 'project' | 'personal' | 'company', projectId: string | null, supplierId: string, taxVerification: InvoiceTaxVerificationSelection, contract?: InvoiceContractReference | null }) {
   const current = selected.value
