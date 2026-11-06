@@ -16,7 +16,7 @@
 | [tests/production/payroll-storage.test.ts](../../../tests/production/payroll-storage.test.ts) | 真实磁盘与独立进程 | C1/C2 冻结与零成员、P4/P7、正式编号、固定名册及完整目录、原键与回执故障回滚；C1 班组资格变化后陈旧来源拒绝核对，重读保留草稿并明确阻断原因 |
 | [tests/production/payroll-history-adoption.test.ts](../../../tests/production/payroll-history-adoption.test.ts) | 真实完整 SQLite 与同库引用 | A/P5/P6 原冻结、管理簿与更正补退、同源工程量引用和原目录保全 |
 | [tests/production/storage-schema.test.ts](../../../tests/production/storage-schema.test.ts) | 单元／服务／状态 | 真实盘历史与付款核验保护被删除、替换或改变条件时冷启动和备份拒绝，不重建保护冒充完整 |
-| [tests/production/migration-references.test.ts](../../../tests/production/migration-references.test.ts) | 单元／服务／状态 | 实际主档引用ID和独立版本、权限、冷打开及损坏拒绝 |
+| [tests/production/migration-references.test.ts](../../../tests/production/migration-references.test.ts) | 单元／服务／状态 | 实际主档引用ID和独立版本、权限、冷打开及损坏拒绝；同名合成项目按稳定身份读取、改名与同进程重开后不串接 |
 | [tests/production/backup-quotation.test.ts](../../../tests/production/backup-quotation.test.ts) | 单元／服务／状态 | 报价实际参与者、原价与未知税点、原件字节、冷回执；结构完整性及损坏历史拒绝 |
 | [tests/production/finance-storage.test.ts](../../../tests/production/finance-storage.test.ts) | 单元／服务／状态 | F3 单库事务、原费用不重复计成本、实付确认与撤回、原件与冷启动原键，工作台实付权限／来源版本及失权迟到响应；付款采用发票期间撤权回滚 |
 | [tests/production/finance-verification.test.ts](../../../tests/production/finance-verification.test.ts) | 实际 SQLite 及正式参与者 | 旧 v12/v13 备份、v30 升级历史冻结及原件冷恢复；损坏依据拒绝、未知原键与可靠后读、撤权和版本冲突 |

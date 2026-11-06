@@ -44,3 +44,43 @@ it('迁入关联使用实际同库主档ID与独立记录版本，权限/来源�
   }
   finally { await storage.close() }
 })
+
+it('同名正式项目按各自稳定身份与版本读取，改名后重开仍不串接', async () => {
+  const root = testTempRoot('same-name-project-references')
+  await mkdir(root, { recursive: true })
+  const directory = await mkdtemp(join(root, 'synthetic-'))
+  const identity = { workspaceId: 'same-name-workspace', actorId: 'same-name-owner' }
+  const storage = await createSeededProductionStorage({ directory, workspaceId: identity.workspaceId, ownerId: identity.actorId, purpose: 'verification' })
+  const actor = { ...identity, capabilities: ['project:list:read', 'project:write', 'customer:list:read', 'customer:write'] }
+  const session = () => actor
+  try {
+    const customer = await createProductionCustomerService(storage).execute({ ...identity, requiredCapability: 'customer:write', commandId: 'same-name-customer', baseVersion: null, action: 'save', draft: { name: '合成客户', contact: '合成联系人' }, attachments: {} }, session)
+    const project = createProductionProjectService(storage)
+    const common = { ...identity, requiredCapability: 'project:write', baseVersion: null, action: 'save', attachments: {} }
+    const draft = { name: 'SAME-PROJECT', customerId: customer.id, manager: '合成项目经理' }
+    const firstCommand = { ...common, commandId: 'same-name-first', draft: { ...draft, code: 'SYN-A' } }
+    const first = await project.execute(firstCommand, session)
+    const second = await project.execute({ ...common, commandId: 'same-name-second', draft: { ...draft, code: 'SYN-B' } }, session)
+    expect(first.id).not.toBe(second.id)
+    expect([first.id, second.id]).not.toContain(draft.name)
+    expect(await project.execute(firstCommand, session)).toEqual(first)
+    await storage.withTransaction(async (tx) => {
+      const sameName = (await listMigrationReferences(tx, actor, 'projects')).filter(row => row.label === draft.name)
+      expect(sameName).toHaveLength(2)
+      expect(sameName.map(row => row.serverId).sort()).toEqual([first.id, second.id].sort())
+      expect(await readMigrationReference(tx, actor, 'projects', first.id)).toEqual({ entityType: 'projects', serverId: first.id, label: draft.name, version: first.version, sourceVersion: 'projects:2' })
+      expect(await readMigrationReference(tx, actor, 'projects', second.id)).toEqual({ entityType: 'projects', serverId: second.id, label: draft.name, version: second.version, sourceVersion: 'projects:2' })
+      expect(await readMigrationReference(tx, actor, 'projects', draft.name)).toBeNull()
+    })
+    const renamed = await project.execute({ ...common, id: first.id, commandId: 'same-name-rename', baseVersion: first.version, draft: { ...draft, name: 'SAME-PROJECT-RENAMED', code: 'SYN-A' } }, session)
+    expect(renamed.id).toBe(first.id)
+    expect(renamed.version).not.toBe(first.version)
+    await storage.close()
+    await storage.withTransaction(async (tx) => {
+      expect(await readMigrationReference(tx, actor, 'projects', first.id)).toEqual({ entityType: 'projects', serverId: first.id, label: 'SAME-PROJECT-RENAMED', version: renamed.version, sourceVersion: 'projects:3' })
+      expect(await readMigrationReference(tx, actor, 'projects', second.id)).toEqual({ entityType: 'projects', serverId: second.id, label: draft.name, version: second.version, sourceVersion: 'projects:3' })
+      expect(await readMigrationReference(tx, actor, 'projects', draft.name)).toBeNull()
+    })
+  }
+  finally { await storage.close() }
+})
