@@ -16,7 +16,7 @@
 | [tests/production/finance-invoice-adoption.test.ts](../../../tests/production/finance-invoice-adoption.test.ts) | 隔离 SQLite／真实来源 | 发票采用版本冻结与合同变更后的历史 |
 | [tests/production/finance-invoice-source-version.test.ts](../../../tests/production/finance-invoice-source-version.test.ts) | 隔离 SQLite／服务 | 发票参与者版本与付款来源核验 |
 | [tests/production/finance-migration-application-actions.test.ts](../../../tests/production/finance-migration-application-actions.test.ts) | 合成旧库／隔离服务 | 旧申请编辑、重复删除与迁入事实保全 |
-| [tests/production/payment-contract-domains.test.ts](../../../tests/production/payment-contract-domains.test.ts) | 隔离 SQLite／真实来源 | 分包、其他支出和公司合同的票款链 |
+| [tests/production/payment-contract-domains.test.ts](../../../tests/production/payment-contract-domains.test.ts) | 隔离 SQLite／真实来源 | 分包、其他支出和公司合同的票款链；无迁入缺件时财务原件例外集合必须为空 |
 | [tests/production/payment-invoice-confirmation.test.ts](../../../tests/production/payment-invoice-confirmation.test.ts) | 隔离 SQLite／真实来源 | 付款确认的发票核对、冻结及原编号 |
 | [tests/production/payment-invoice-evidence.test.ts](../../../tests/production/payment-invoice-evidence.test.ts) | 单元／服务 | 合同、权限、来源及发票归属拒绝 |
 | [tests/production/payment-settlement-evidence.test.ts](../../../tests/production/payment-settlement-evidence.test.ts) | 隔离 SQLite／真实来源 | 结算合同、来源版本与付款冻结 |

@@ -60,7 +60,11 @@ it('分包、其他支出和公司合同通过真实来源候选、指定发票�
     expect(wrong.map(result => result.status === 'fulfilled' ? 'fulfilled' : result.reason.problem?.code)).toEqual(['validation-failed', 'validation-failed'])
     const companyCandidates = await finance.lookup('payment_application', { kind: 'invoices', keyword: '', projectId: null, supplierId: supplier.id }, f.session)
     expect(companyCandidates.items.map(row => row.id)).toEqual([companyInvoice])
-    await expect(validateFinanceJournal(f.storage, f.session())).resolves.toBeDefined()
+    // 本用例没有迁入历史缺件，当前付款附件也不存在正文缺失；不得凭空放宽任何原件校验。
+    expect(await f.storage.select('SELECT command_id FROM finance_imports')).toEqual([])
+    expect(await f.storage.select(`SELECT f.id FROM file_refs f LEFT JOIN file_payloads p ON p.file_ref_id=f.id
+      WHERE f.owner_type IN ('payment_application','payment_record') AND p.file_ref_id IS NULL`)).toEqual([])
+    expect(await validateFinanceJournal(f.storage, f.session())).toEqual({ metadataOnlyFileIds: new Set() })
   }
   finally { await f.storage.close() }
 })
