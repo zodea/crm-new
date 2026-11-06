@@ -12,6 +12,7 @@
 | [tests/invoice/central-pending-discovery.test.ts](../../../tests/invoice/central-pending-discovery.test.ts) | 单元／状态 | 原编号发现与身份隔离 |
 | [tests/invoice/central-http-revision-safety.test.ts](../../../tests/invoice/central-http-revision-safety.test.ts) | 单元／合成传输 | 来源修订安全整数、列表／详情／预检及普通和打印原编号恢复；不访问真实服务 |
 | [tests/invoice/central-workspace-read-interleaving.test.ts](../../../tests/invoice/central-workspace-read-interleaving.test.ts) | 单元／合成传输 | 已开始提交或打印与旧列表交错、恢复和后继读取代次保护；不访问真实服务 |
+| [tests/invoice/central-workspace-observed-authority.test.ts](../../../tests/invoice/central-workspace-observed-authority.test.ts) | 单元／合成传输 | 已观察会话核验失败及旧 401/403 的遮蔽、重验代次与原编号保护；不访问真实服务 |
 | [tests/invoice/central-session-read-authority.test.ts](../../../tests/invoice/central-session-read-authority.test.ts) | 单元／合成传输 | 普通及打印会话失读权时保留原编号，并在权限恢复后核对原号；不访问真实服务 |
 | [tests/invoice/central-recognition.test.ts](../../../tests/invoice/central-recognition.test.ts) | 单元／状态 | 识别区域不进入写命令 |
 | [tests/invoice/central-workspace-recognition.test.ts](../../../tests/invoice/central-workspace-recognition.test.ts) | 单元／状态 | 识别后的身份权限核对 |
@@ -72,7 +73,7 @@
 | [tests/components/CentralInvoiceEntry.test.ts](../../../tests/components/CentralInvoiceEntry.test.ts) | 组件（jsdom） | 中央目录缺口和权限 |
 | [tests/components/InvoiceExportTableAmounts.test.ts](../../../tests/components/InvoiceExportTableAmounts.test.ts) | 组件（jsdom） | 旧及中央台账共用预览区分未知与真实零 |
 | [tests/components/CentralInvoiceLedgerScreen.test.ts](../../../tests/components/CentralInvoiceLedgerScreen.test.ts) | 组件（jsdom） | 台账导出及来源版本 |
-| [tests/components/CentralInvoiceLoadInterleaving.test.ts](../../../tests/components/CentralInvoiceLoadInterleaving.test.ts) | 组件（jsdom）／合成传输 | 工作台与台账旧载入成功或网络失败、新读取及权限/网络错误提示 |
+| [tests/components/CentralInvoiceLoadInterleaving.test.ts](../../../tests/components/CentralInvoiceLoadInterleaving.test.ts) | 组件（jsdom）／合成传输 | 工作台与台账旧载入成功或网络失败、新读取；旧权限拒绝时遮蔽、提示及重验 |
 | [tests/components/CentralInvoiceLedgerSnapshot.test.ts](../../../tests/components/CentralInvoiceLedgerSnapshot.test.ts) | 组件（jsdom）／合成来源 | 跨页导出来源变化、新匹配、目录核验竞态、权限失效与零和未知 |
 | [tests/components/CentralInvoiceLedgerView.test.ts](../../../tests/components/CentralInvoiceLedgerView.test.ts) | 组件（jsdom） | 台账来源与筛选 |
 | [tests/components/CentralInvoiceManualCreate.test.ts](../../../tests/components/CentralInvoiceManualCreate.test.ts) | 组件（jsdom） | 手工草稿、输入保护与原编号 |
@@ -122,6 +123,7 @@
 | [tests/browser/CentralInvoiceManualCompany.test.ts](../../../tests/browser/CentralInvoiceManualCompany.test.ts) | 真实组件／模拟来源 | 手工公司票归档选择 |
 | [tests/browser/CentralInvoicePendingRecovery.test.ts](../../../tests/browser/CentralInvoicePendingRecovery.test.ts) | 真实组件／模拟来源 | 原编号发现与恢复 |
 | [tests/browser/CentralInvoiceSessionReadAuthority.test.ts](../../../tests/browser/CentralInvoiceSessionReadAuthority.test.ts) | 真实组件／合成传输 | 失读权隐藏票面、重新读取与键盘核对原号；会话与服务响应均为合成 |
+| [tests/browser/CentralInvoiceObservedAuthority.test.ts](../../../tests/browser/CentralInvoiceObservedAuthority.test.ts) | 浏览器组件／合成传输 | 两视口旧 403 后隐藏票面、保留输入及键盘重读，并回归原编号恢复；不访问真实服务 |
 | [tests/browser/CentralInvoiceLoadInterleaving.test.ts](../../../tests/browser/CentralInvoiceLoadInterleaving.test.ts) | 真实组件／合成传输 | 两视口旧读取成功或网络失败迟到不覆盖新数据或提示，键盘焦点；外部并发使用合成来源 |
 | [tests/browser/CentralInvoiceRegions.test.ts](../../../tests/browser/CentralInvoiceRegions.test.ts) | 真实组件／模拟来源 | 原件定位与撤权 |
 | [tests/browser/InvoicePdfPageDecodeFailure.test.ts](../../../tests/browser/InvoicePdfPageDecodeFailure.test.ts) | 真实浏览器／合成页图 | 五视口 PDF 页图解码失败、键盘重试和焦点返回 |

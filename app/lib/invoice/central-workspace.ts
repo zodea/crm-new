@@ -44,23 +44,39 @@ export function createCentralInvoiceWorkspace(options: {
     sourceRevision = null
     readState.value = 'unavailable'
   }
+  function invalidateAuthority() {
+    generation++
+    loading.value = false
+    invalidate()
+  }
   async function authorize(write = false) {
     let actor: Context
     try {
       actor = await options.context()
     }
     catch (cause) {
-      invalidate()
+      invalidateAuthority()
       throw cause
     }
     if (actor.workspaceId !== identity.workspaceId || actor.actorId !== identity.actorId
       || !actor.capabilities.includes(INVOICE_READ_CAPABILITY) || (write && !actor.capabilities.includes(INVOICE_WRITE_CAPABILITY))) {
-      invalidate()
+      invalidateAuthority()
       throw new Error('发票工作区身份或权限已变化，请重新登录后核对原提交。')
     }
   }
-  const session = (targetId: string | null) => createCentralInvoiceSession({ identity, targetId, repository: options.client, context: options.context, storage: options.storage })
-  const printSession = () => createCentralInvoicePrintSession({ identity, repository: options.client, context: options.context, storage: options.storage })
+  async function sessionContext() {
+    try {
+      return await options.context()
+    }
+    catch (cause) {
+      // 401/403 由调用会话的 guarded 处理；其他会话读取错误也不能继续展示旧票面。
+      if (!['forbidden', 'unauthenticated'].includes(problemFromHttpFailure(cause)?.code ?? ''))
+        invalidateAuthority()
+      throw cause
+    }
+  }
+  const session = (targetId: string | null) => createCentralInvoiceSession({ identity, targetId, repository: options.client, context: sessionContext, storage: options.storage })
+  const printSession = () => createCentralInvoicePrintSession({ identity, repository: options.client, context: sessionContext, storage: options.storage })
   function updateRecord(record: CentralInvoiceRecord) {
     const index = records.value.findIndex(item => item.id === record.id)
     if (record.deletedAt !== null) {
@@ -78,7 +94,7 @@ export function createCentralInvoiceWorkspace(options: {
     }
     catch (cause) {
       if (['forbidden', 'unauthenticated'].includes(problemFromHttpFailure(cause)?.code ?? ''))
-        invalidate()
+        invalidateAuthority()
       throw cause
     }
   }
@@ -111,6 +127,8 @@ export function createCentralInvoiceWorkspace(options: {
       checkingAuthority = true
       await authorize()
       checkingAuthority = false
+      if (generation !== current)
+        throw new CentralInvoiceLoadSupersededError()
       const next: CentralInvoiceRecord[] = []
       let expectedVersion: string | null = null
       let expectedTotal: number | null = null
@@ -142,7 +160,10 @@ export function createCentralInvoiceWorkspace(options: {
       readState.value = 'ready'
     }
     catch (cause) {
-      if (generation === current) {
+      if (!checkingAuthority && ['forbidden', 'unauthenticated'].includes(problemFromHttpFailure(cause)?.code ?? '')) {
+        invalidateAuthority()
+      }
+      else if (generation === current) {
         invalidate()
       }
       else if (!checkingAuthority && !['forbidden', 'unauthenticated'].includes(problemFromHttpFailure(cause)?.code ?? '')
@@ -222,15 +243,13 @@ export function createCentralInvoiceWorkspace(options: {
     pendingAll: () => pendingCentralInvoiceCommands(identity, options.storage),
     pendingPrint: () => printSession().pending(),
     async recover(targetId: string | null) {
-      return guarded(async () => {
-        const result = await session(targetId).recover()
-        if (result?.outcome === 'applied') {
-          applyReadBatch([result.read])
-          if (readState.value !== 'ready')
-            await load()
-        }
-        return result
-      })
+      const result = await guarded(() => session(targetId).recover())
+      if (result?.outcome === 'applied') {
+        applyReadBatch([result.read])
+        if (readState.value !== 'ready')
+          await load()
+      }
+      return result
     },
     async recoverPrint() {
       return guarded(async () => {

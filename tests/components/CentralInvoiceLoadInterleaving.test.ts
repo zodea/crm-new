@@ -1,5 +1,5 @@
 import type { CentralInvoiceRecord } from '~/lib/invoice/central-contract'
-import { render, screen } from '@testing-library/vue'
+import { fireEvent, render, screen, waitFor } from '@testing-library/vue'
 import { flushPromises } from '@vue/test-utils'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { computed, shallowRef, useTemplateRef, watch } from 'vue'
@@ -47,7 +47,9 @@ it.each([
   { mode: 'ledger', oldResult: 'network' },
   { mode: 'workspace', oldResult: 'forbidden' },
   { mode: 'workspace', oldResult: 'unauthenticated' },
-] as const)('$mode 后继读取完成后，旧读取 $oldResult 不污染当前页面', async ({ mode, oldResult }) => {
+  { mode: 'ledger', oldResult: 'forbidden' },
+  { mode: 'ledger', oldResult: 'unauthenticated' },
+] as const)('$mode 后继读取完成后，按旧读取 $oldResult 处理当前页面', async ({ mode, oldResult }) => {
   let current = invoice()
   let revision = 1
   let holdOld = false
@@ -114,14 +116,25 @@ it.each([
   await listReturned.promise
   await flushPromises()
   expect(workspace.loading.value).toBe(false)
-  expect(workspace.readState.value).toBe('ready')
-  expect(workspace.records.value[0]?.version).toBe('2')
   expect(screen.queryByText('发票读取目标已变化。')).toBeNull()
   expect(screen.queryByText('合成旧网络读取失败')).toBeNull()
-  if (oldResult === 'forbidden')
-    expect(screen.queryByText('合成旧权限读取失败')).not.toBeNull()
-  if (oldResult === 'unauthenticated')
-    expect(screen.queryByText('合成旧登录已失效')).not.toBeNull()
+  if (oldResult === 'forbidden' || oldResult === 'unauthenticated') {
+    expect(workspace.readState.value).toBe('unavailable')
+    expect(workspace.records.value).toEqual([])
+    expect(workspace.sourceVersion.value).toBeNull()
+    expect(screen.getByText(/发票来源尚不可用/)).toBeTruthy()
+    const message = mode === 'ledger'
+      ? '发票来源或权限已变化，请重新读取。'
+      : oldResult === 'forbidden' ? '合成旧权限读取失败' : '合成旧登录已失效'
+    expect(screen.getByRole('alert').textContent).toContain(message)
+    await fireEvent.click(screen.getByRole('button', { name: '重新读取' }))
+    await waitFor(() => expect(workspace.readState.value).toBe('ready'))
+    expect(workspace.records.value[0]?.version).toBe('2')
+  }
+  else {
+    expect(workspace.readState.value).toBe('ready')
+    expect(workspace.records.value[0]?.version).toBe('2')
+  }
   expect(fetcher.mock.calls.filter(([url]) => url === '/api/commands/invoices')).toHaveLength(1)
   view.unmount()
 })
