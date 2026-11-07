@@ -39,8 +39,12 @@ test('真实冻结楼层范围在预览、XLSX及分页打印一致，不补断�
   const command = (read: PayrollACommandRead, action: PayrollAAction) => ({ commandId: randomUUID(), workspaceId: read.context.workspaceId, actorId: read.context.actorId, origin: 'real' as const, requiredCapability: 'payroll:write' as const, sourceVersion: read.context.sourceVersion, projectId, statementId: 'statementId' in read ? read.statementId : null, draftKey: 'draftKey' in read ? read.draftKey : null, configScope: 'scope' in read ? read.scope : null, action })
   const config = await repository.aConfig(query, { projectId, leaderWorkerId, crewId: null, month: query.month })
   await repository.execute(command(config, { kind: 'save-a-prices', prices: [{ priceId: null, itemId: config.priceOptions[0]!.itemId, unit: '㎡', mode: 'baseline', workerId: null, effectiveMonth: query.month, unitPrice: 100, scope: { kind: 'project' } }] }))
-  const draft = { projectId, leaderWorkerId, crewId: null, memberWorkerIds: [leaderWorkerId], book: { bookPurpose: 'ordinary' as const, managementBookId: null }, month: query.month, periodKind: 'monthly' as const, payRatio: 1, note: '只列原责任完成，不能把房间分项认作整层收尾。' }
-  const form = await repository.aForm(query, { statementId: null, draftKey: randomUUID(), draft })
+  const initialDraft = { projectId, leaderWorkerId, crewId: null, memberWorkerIds: [leaderWorkerId], book: { bookPurpose: 'ordinary' as const, managementBookId: null }, month: query.month, periodKind: 'monthly' as const, payRatio: 1, note: '只列原责任完成，不能把房间分项认作整层收尾。' }
+  const draftKey = randomUUID()
+  const preview = await repository.aForm(query, { statementId: null, draftKey, draft: initialDraft })
+  expect(preview.draft.ratioPlan?.itemRatios.length).toBeGreaterThan(0)
+  const draft = { ...initialDraft, ratioPlan: { ...preview.draft.ratioPlan!, itemRatios: preview.draft.ratioPlan!.itemRatios.map(row => ({ ...row, ratio: 1 })) } }
+  const form = await repository.aForm(query, { statementId: null, draftKey, draft })
   const statementId = (await repository.execute(command(form, { kind: 'save-a-draft', draft }))).statementId!
   await repository.execute(command(await repository.aForm(query, { statementId }), { kind: 'check-a' }))
   await repository.execute(command(await repository.aForm(query, { statementId }), { kind: 'release-a', release: { actualAmount: 2800, allocations: [{ workerId: leaderWorkerId, amount: 2800 }] } }))

@@ -104,10 +104,14 @@ jobs:
         run: pnpm generate
 
   e2e:
-    name: e2e
+    name: e2e (${{ matrix.shard }}/4)
     if: ${{ inputs.run_e2e }}
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
 
     steps:
       - name: Checkout
@@ -140,6 +144,7 @@ jobs:
         shell: bash
         env:
           E2E_TARGETS: ${{ inputs.e2e_targets }}
+          E2E_SHARD: ${{ matrix.shard }}
           NODE_OPTIONS: --max-old-space-size=4096
         run: |
           targets=()
@@ -151,7 +156,7 @@ jobs:
           pnpm exec playwright test --list --project=chromium --project=chromium-b "${targets[@]}"
           result=0
           for project in chromium chromium-b; do
-            if ! pnpm exec playwright test --project="$project" --pass-with-no-tests --output="test-results/e2e-$project" "${targets[@]}"; then
+            if ! pnpm exec playwright test --project="$project" --shard="$E2E_SHARD/4" --pass-with-no-tests --output="test-results/e2e-$project" "${targets[@]}"; then
               result=1
             fi
           done
@@ -161,7 +166,7 @@ jobs:
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
-          name: playwright-test-results
+          name: playwright-test-results-${{ matrix.shard }}
           path: test-results/
           if-no-files-found: ignore
           retention-days: 7
