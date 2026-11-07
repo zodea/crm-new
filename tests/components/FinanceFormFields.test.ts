@@ -251,6 +251,20 @@ describe('financeFormFields real-ID and detail-grid flow', () => {
     })
   })
 
+  it.each([
+    { bizType: '公司付款', disabled: false },
+    { bizType: '有合同-材料', disabled: true },
+    { bizType: '无合同-零星采购', disabled: false },
+  ])('$bizType 按合同是否必填决定无合同结算选择', ({ bizType, disabled }) => {
+    const wrapper = mountFields('payment_application', {
+      bizType,
+      supplierId: 'supplier-real-id',
+      contractId: null,
+      settlementAllocations: [{ settlementId: null, allocatedAmount: 10 }],
+    })
+    expect(wrapper.get('[data-placeholder="选择结算单"]').attributes('disabled') !== undefined).toBe(disabled)
+  })
+
   it('clears project and settlement state when switching to company payment', async () => {
     const wrapper = mountFields('payment_application', {
       name: '公司付款',
