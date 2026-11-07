@@ -153,8 +153,10 @@ export function createInvoiceMigrationSession(options: { identity: Pick<Context,
     pending: (targetId: string | null) => recovery.read(key(targetId)),
     publish: (source: { sha256: string, payloadBase64: string }, mappings: InvoiceMigrationMappings, beforeSubmit?: () => boolean) => submit('publish', null, { source, mappings }, source.sha256, beforeSubmit),
     retire: (batchId: string, beforeSubmit?: () => boolean) => submit('retire', batchId, { batchId }, undefined, beforeSubmit),
-    recover: (targetId: string | null) => guard(async () => {
+    recover: (targetId: string | null, isCurrent?: () => boolean) => guard(async () => {
       const caps = await authorize()
+      if (isCurrent && !isCurrent())
+        return unavailable()
       const pending = recovery.read(key(targetId))
       if (!pending || pending.workspaceId !== identity.workspaceId || pending.actorId !== identity.actorId || pending.family !== 'invoice-legacy'
         || pending.targetId !== targetId || !['publish', 'retire'].includes(pending.action) || (pending.action === 'publish') !== (targetId === null)) {
@@ -170,13 +172,17 @@ export function createInvoiceMigrationSession(options: { identity: Pick<Context,
       if (value.outcome === 'not-applied') {
         if (value.commandId !== pending.commandId)
           return unavailable()
+        if (isCurrent && !isCurrent())
+          return unavailable()
         recovery.clear(key(targetId), pending.commandId)
         return { outcome: 'not-applied' as const, commandId: pending.commandId }
       }
       const saved = receipt(value.result, pending.commandId, pending.action as 'publish' | 'retire', targetId)
       if (pending.action === 'publish' && saved.sourceSha256 !== pending.sourceSha256)
         return unavailable()
-      await readback(saved, pending.action as 'publish' | 'retire')
+      await readback(saved, pending.action as 'publish' | 'retire', caps)
+      if (isCurrent && !isCurrent())
+        return unavailable()
       recovery.clear(key(targetId), pending.commandId)
       return { outcome: 'applied' as const, result: saved }
     }),

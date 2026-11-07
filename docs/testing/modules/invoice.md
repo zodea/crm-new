@@ -104,6 +104,7 @@
 | [tests/components/CentralInvoiceFieldsForm.test.ts](../../../tests/components/CentralInvoiceFieldsForm.test.ts) | 组件（jsdom） | 票面零与未知、版本冲突及识别草稿 |
 | [tests/components/InvoiceMigrationPanel.test.ts](../../../tests/components/InvoiceMigrationPanel.test.ts) | 组件（jsdom） | 旧票映射、公司主体及预检缺口 |
 | [tests/components/InvoiceMigrationAuthorityRace.test.ts](../../../tests/components/InvoiceMigrationAuthorityRace.test.ts) | 组件（jsdom） | 迁入及撤回的授权等待、已发送后失权保留原编号与原命令恢复；使用真实迁入 session 和合成预检、授权、存储及服务替身 |
+| [tests/components/InvoiceMigrationRecoverAuthorityRace.test.ts](../../../tests/components/InvoiceMigrationRecoverAuthorityRace.test.ts) | 组件（jsdom） | 原编号核对期间失权、切源与能力变化保号；已应用和未应用使用真实迁入 session 及合成授权、存储和服务替身 |
 | [tests/components/InvoiceMigrationFileLifetime.test.ts](../../../tests/components/InvoiceMigrationFileLifetime.test.ts) | 组件／合成来源 | 快照读取、解析及预检迟到时的已观察失效与来源切换保护 |
 | [tests/components/InvoiceMigrationModuleLifetime.test.ts](../../../tests/components/InvoiceMigrationModuleLifetime.test.ts) | 组件／合成来源 | 快照解析模块加载期间来源失效不启动旧校验 |
 | [tests/components/InvoiceMigrationPendingReadFailure.test.ts](../../../tests/components/InvoiceMigrationPendingReadFailure.test.ts) | 组件及隔离服务 | 发布或恢复后批次读取失败，重进后保留并核对原编号 |
@@ -154,6 +155,7 @@
 | [tests/browser/InvoiceMigrationPendingReadFailure.test.ts](../../../tests/browser/InvoiceMigrationPendingReadFailure.test.ts) | 真实组件／模拟来源 | 读取失败时原编号提示、撤权和多视口 |
 | [tests/browser/InvoiceMigrationPanel.test.ts](../../../tests/browser/InvoiceMigrationPanel.test.ts) | 真实组件／模拟来源 | 迁入映射和原编号多视口操作 |
 | [tests/browser/InvoiceMigrationAuthorityRace.test.ts](../../../tests/browser/InvoiceMigrationAuthorityRace.test.ts) | 真实组件／合成来源 | 五视口键盘确认及授权等待期间失权；确认、文件、授权、存储及命令使用受控合成替身 |
+| [tests/browser/InvoiceMigrationRecoverAuthorityRace.test.ts](../../../tests/browser/InvoiceMigrationRecoverAuthorityRace.test.ts) | 真实组件／合成来源 | 五视口键盘核对期间失权保号及恢复会话重试；授权、存储和服务均为合成替身 |
 | [tests/browser/InvoiceMigrationFileLifetime.test.ts](../../../tests/browser/InvoiceMigrationFileLifetime.test.ts) | 浏览器组件／合成来源 | 快照选择、失效停止后续校验、键盘及两视口 |
 
 ## Playwright E2E

@@ -48,7 +48,7 @@ it('有未核对原提交时阻止新迁入并提供原编号恢复', async () =
   await waitFor(() => expect((screen.getByRole('button', { name: '核对原提交' }) as HTMLButtonElement).disabled).toBe(false))
   await fireEvent.click(screen.getByRole('button', { name: '核对原提交' }))
   await waitFor(() => expect((screen.getByLabelText('选择完整 SQLite 快照') as HTMLInputElement).disabled).toBe(false))
-  expect(recover).toHaveBeenCalledWith(null)
+  expect(recover).toHaveBeenCalledWith(null, expect.any(Function))
 })
 
 it('公司旧票必须逐票手选分供方和我方主体，通过预检后才能发布', async () => {

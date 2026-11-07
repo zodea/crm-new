@@ -282,7 +282,9 @@ async function publish(epoch: number) {
   checked.value = null
 }
 async function recover(targetId: string | null, epoch: number) {
-  const resolution = await props.session.recover(targetId)
+  const session = props.session
+  const isCurrent = () => active && epoch === generation && props.session === session
+  const resolution = await session.recover(targetId, isCurrent)
   assertCurrent(epoch)
   result.value = resolution.outcome === 'applied' ? `原提交已核对，批次 ${resolution.result.batchId}。` : '已核对原提交未生效，可以重新预检。'
 }
