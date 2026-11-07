@@ -372,7 +372,8 @@ test.describe('Issue #318：材料采购合同中央只读详情', () => {
     await page.getByRole('group', { name: '表单操作' }).getByRole('button', { name: '保存', exact: true }).click()
     expect((await saved).ok()).toBe(true)
     await expect(page).toHaveURL(/\/contract\/material\/form\/contract-existing-318/)
-    await expect(page.getByRole('group', { name: '表单操作' }).getByRole('button', { name: '保存', exact: true })).toBeDisabled()
+    // 无未保存改动时禁用保存草稿；普通保存按整页表单规范仍可用。
+    await expect(page.getByRole('group', { name: '表单操作' }).getByRole('button', { name: '保存草稿', exact: true })).toBeDisabled()
     await expect(page.getByLabel('合同名称 *')).toHaveValue('既有中央材料采购合同（留在表单）')
     await page.reload()
     await page.goto('/contract/contract-existing-318?origin=real&contractKind=material')

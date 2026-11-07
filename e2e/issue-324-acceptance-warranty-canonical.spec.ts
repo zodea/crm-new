@@ -31,7 +31,7 @@ test.describe('Issue #324：验收—保修 canonical 双视图', () => {
     await resetOwnerDocuments(page.context().request, id)
   })
 
-  test('项目、施工合同与全局列表均以同一 ID 进入双视图并返回原上下文', async ({ page }) => {
+  test('项目以同一 ID 进入保修视图并返回原上下文', async ({ page }) => {
     await page.goto('/project/project-real-320?origin=real')
     await expect(page.getByRole('heading', { name: '中央正式施工项目' })).toBeVisible({ timeout: 20_000 })
     const projectJourney = page.getByRole('region', { name: '项目商务单据' })
@@ -45,7 +45,9 @@ test.describe('Issue #324：验收—保修 canonical 双视图', () => {
     await page.getByRole('link', { name: '返回来源详情' }).click()
     await expect(page).toHaveURL(/\/project\/project-real-320\?origin=real&ownerJourney=origin_[^#]+#project-owner-document-card-warranty/)
     await expect(projectJourney.getByRole('link', { name: /保修管理/ })).toBeFocused()
+  })
 
+  test('施工合同以同一 ID 进入验收和保修双视图并返回原上下文', async ({ page }) => {
     const browserContractResponse = page.waitForResponse(response => response.url().includes('/api/read/construction-contracts/construction-contract-existing-320'))
     await page.goto('/contract/construction-contract-existing-320?origin=real&contractKind=construction&tab=acceptance')
     const browserContractDetail = await (await browserContractResponse).json() as { sections: { acceptance: { acceptances: unknown[], warranties: unknown[] } } }
@@ -71,7 +73,9 @@ test.describe('Issue #324：验收—保修 canonical 双视图', () => {
     await page.getByRole('link', { name: '返回验收·保修列表' }).click()
     await expect(page).toHaveURL(/\/contract\/construction-contract-existing-320\?.*tab=acceptance/)
     await expect(page.getByRole('link', { name: '中央正式施工项目竣工验收' }).first()).toBeFocused()
+  })
 
+  test('全局列表以同一 ID 进入保修视图并返回原上下文', async ({ page }) => {
     await page.goto('/owner/acceptance?origin=real&variant=warranty')
     await page.getByRole('link', { name: 'YS-2026-324' }).click()
     await expect(page).toHaveURL(/\/owner\/acceptance\/acceptance-real-324\?.*variant=warranty.*returnTo=/)

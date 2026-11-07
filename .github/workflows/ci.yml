@@ -104,13 +104,14 @@ jobs:
         run: pnpm generate
 
   e2e:
-    name: e2e (${{ matrix.shard }}/8)
+    name: e2e (${{ matrix.project }}, ${{ matrix.shard }}/8)
     if: ${{ inputs.run_e2e }}
     runs-on: ubuntu-latest
     timeout-minutes: 35
     strategy:
       fail-fast: false
       matrix:
+        project: [chromium, chromium-b]
         shard: [1, 2, 3, 4, 5, 6, 7, 8]
 
     steps:
@@ -145,6 +146,7 @@ jobs:
         env:
           E2E_TARGETS: ${{ inputs.e2e_targets }}
           E2E_SHARD: ${{ matrix.shard }}
+          E2E_PROJECT: ${{ matrix.project }}
           NODE_OPTIONS: --max-old-space-size=4096
         run: |
           targets=()
@@ -153,20 +155,15 @@ jobs:
           fi
 
           # Reject an empty overall selection before allowing an empty individual group.
-          pnpm exec playwright test --list --project=chromium --project=chromium-b "${targets[@]}"
-          result=0
-          for project in chromium chromium-b; do
-            if ! pnpm exec playwright test --project="$project" --shard="$E2E_SHARD/8" --pass-with-no-tests --reporter=list,github --output="test-results/e2e-$project" "${targets[@]}"; then
-              result=1
-            fi
-          done
-          exit "$result"
+          pnpm exec playwright test --list --reporter=list --project=chromium --project=chromium-b "${targets[@]}"
+          PLAYWRIGHT_JSON_OUTPUT_NAME="test-results/e2e-$E2E_PROJECT-report.json" \
+            pnpm exec playwright test --project="$E2E_PROJECT" --shard="$E2E_SHARD/8" --pass-with-no-tests --reporter=list,github,json --output="test-results/e2e-$E2E_PROJECT" "${targets[@]}"
 
       - name: Upload Playwright diagnostics
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
-          name: playwright-test-results-${{ matrix.shard }}
+          name: playwright-test-results-${{ matrix.project }}-${{ matrix.shard }}
           path: test-results/
           if-no-files-found: ignore
           retention-days: 7

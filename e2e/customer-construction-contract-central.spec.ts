@@ -5,7 +5,8 @@ import { expect, test } from '@playwright/test'
 import { createVerifiedSignatory, selectVerifiedSignatory, verifiedSignatoryAdoption } from './helpers/contract-signatory'
 import { expectNoPageOverflow, expectOverlayAboveShell } from './helpers/responsive'
 
-test.use({ screenshot: 'off', video: 'off', trace: 'off' })
+// 首次失败也保留截图与追踪，便于区分页面行为和浏览器资源问题。
+test.use({ video: 'off' })
 
 const adoptedSignatories = new WeakMap<Page, Awaited<ReturnType<typeof verifiedSignatoryAdoption>>>()
 interface NetworkDiagnosticRequest {
