@@ -211,33 +211,32 @@ test('筛选等待响应时保留现有表格，不闪出整块加载遮罩', as
   expect(requests - beforeClear).toBe(1)
 })
 
-test('四态从筛选列表进入同来源详情，刷新及返回后文字、色调和定位一致', async ({ page }) => {
-  const rows = supplierIdentities.get(page)!
-  await page.route(/\/api\/read\/suppliers\/[^/?]+\?/, async (route) => {
-    const url = new URL(route.request().url())
-    await route.fulfill({ json: buildSupplierDetailRead({
-      suppliers: rows,
-      projects: [],
-      projectSuppliers: [],
-      contracts: [],
-      settlements: [],
-      invoices: [],
-      paymentApplications: [],
-      paymentRecords: [],
-      paymentAllocations: [],
-      query: parseSupplierDetailQuery(url.pathname.split('/').at(-1)!, Object.fromEntries(url.searchParams)),
-      asOf: '2026-09-08T00:00:00.000Z',
-      sourceVersion: 'replica-synthetic',
-      capabilities: ['supplier:list:read', 'supplier:read'],
-    }) })
-  })
-  const states = [
-    { label: '资料缺失', tone: 'warn' },
-    { label: '齐全待核验', tone: 'brand' },
-    { label: '合格', tone: 'ok' },
-    { label: '退回', tone: 'danger' },
-  ]
-  for (const [index, state] of states.entries()) {
+for (const [index, state] of [
+  { label: '资料缺失', tone: 'warn' },
+  { label: '齐全待核验', tone: 'brand' },
+  { label: '合格', tone: 'ok' },
+  { label: '退回', tone: 'danger' },
+].entries()) {
+  test(`${state.label}从筛选列表进入同来源详情，刷新及返回后文字、色调和定位一致`, async ({ page }) => {
+    const rows = supplierIdentities.get(page)!
+    await page.route(/\/api\/read\/suppliers\/[^/?]+\?/, async (route) => {
+      const url = new URL(route.request().url())
+      await route.fulfill({ json: buildSupplierDetailRead({
+        suppliers: rows,
+        projects: [],
+        projectSuppliers: [],
+        contracts: [],
+        settlements: [],
+        invoices: [],
+        paymentApplications: [],
+        paymentRecords: [],
+        paymentAllocations: [],
+        query: parseSupplierDetailQuery(url.pathname.split('/').at(-1)!, Object.fromEntries(url.searchParams)),
+        asOf: '2026-09-08T00:00:00.000Z',
+        sourceVersion: 'replica-synthetic',
+        capabilities: ['supplier:list:read', 'supplier:read'],
+      }) })
+    })
     const { name, id } = rows[index]!
     await page.goto(`/base/supplier?sort=name-asc&search=${encodeURIComponent(name)}`)
     const list = page.locator('.supplier-reference-list')
@@ -256,5 +255,5 @@ test('四态从筛选列表进入同来源详情，刷新及返回后文字、�
     await expect(list.getByRole('searchbox')).toHaveValue(name)
     await expect(list.getByRole('link', { name, exact: true })).toBeFocused()
     await expect(status).toHaveAttribute('data-tone', state.tone)
-  }
-})
+  })
+}

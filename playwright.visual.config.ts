@@ -13,6 +13,8 @@ export default defineConfig({
   testMatch: /(?:runtime-visual-matrix|issue-169-responsibility-dialog)\.spec\.ts/,
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
+  // 视觉用例的真实数据准备不应承担开发服务首次编译的开销。
+  globalSetup: process.env.CI ? './e2e/helpers/warm-dev-server.ts' : undefined,
   retries: process.env.CI ? 1 : 0,
   workers: 1,
   reporter: process.env.CI ? 'github' : 'list',

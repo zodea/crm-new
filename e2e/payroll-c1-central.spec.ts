@@ -159,9 +159,10 @@ test('无工程量项目考勤、个人标准、C1核对实发、原键恢复与
   await dialog.getByRole('button', { name: '确认实际发放', exact: true }).click()
   await expect(dialog.getByRole('button', { name: '核对原提交', exact: true })).toBeVisible()
   await capture(page, 'unknown-original-allocation', '[role="dialog"]')
-  const replay = page.waitForRequest(request => request.url().endsWith('/api/commands/payroll-c1') && request.postDataJSON()?.commandId === original)
+  const replay = page.waitForResponse(response => response.url().endsWith('/api/commands/payroll-c1') && response.request().postDataJSON()?.commandId === original)
   await dialog.getByRole('button', { name: '核对原提交', exact: true }).click()
-  await replay
+  expect((await replay).ok()).toBe(true)
+  // 原命令的响应已到达后再移除拦截，避免请求刚发出时撤销仍在执行的处理器。
   await page.unroute('**/api/commands/payroll-c1')
   await expect(page.getByRole('button', { name: '下载工资与考勤表', exact: true })).toBeVisible()
   await page.addInitScript(() => Object.defineProperty(window, 'showDirectoryPicker', { configurable: true, value: undefined }))
