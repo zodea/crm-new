@@ -9,6 +9,7 @@
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
 | [tests/invoice/central-original-binding.test.ts](../../../tests/invoice/central-original-binding.test.ts) | 单元／状态 | 原件字节与权限核对 |
+| [tests/invoice/central-upload-file-authority-race.test.ts](../../../tests/invoice/central-upload-file-authority-race.test.ts) | 单元／合成传输 | 原件读取和末次授权等待时来源失效、正常上传与原编号；不访问真实服务 |
 | [tests/invoice/central-pending-discovery.test.ts](../../../tests/invoice/central-pending-discovery.test.ts) | 单元／状态 | 原编号发现与身份隔离 |
 | [tests/invoice/central-http-revision-safety.test.ts](../../../tests/invoice/central-http-revision-safety.test.ts) | 单元／合成传输 | 来源修订安全整数、列表／详情／预检及普通和打印原编号恢复；不访问真实服务 |
 | [tests/invoice/central-workspace-read-interleaving.test.ts](../../../tests/invoice/central-workspace-read-interleaving.test.ts) | 单元／合成传输 | 已开始提交或打印与旧列表交错、恢复和后继读取代次保护；不访问真实服务 |
@@ -73,6 +74,7 @@
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
 | [tests/components/CentralInvoiceEntry.test.ts](../../../tests/components/CentralInvoiceEntry.test.ts) | 组件（jsdom） | 中央目录缺口和权限 |
+| [tests/components/CentralInvoiceBatchUpload.test.ts](../../../tests/components/CentralInvoiceBatchUpload.test.ts) | 组件（jsdom）／合成来源 | 批量逐项结果、来源失效时停止及页面提交守卫 |
 | [tests/components/InvoiceExportTableAmounts.test.ts](../../../tests/components/InvoiceExportTableAmounts.test.ts) | 组件（jsdom） | 旧及中央台账共用预览区分未知与真实零 |
 | [tests/components/CentralInvoiceLedgerScreen.test.ts](../../../tests/components/CentralInvoiceLedgerScreen.test.ts) | 组件（jsdom） | 台账导出及来源版本 |
 | [tests/components/CentralInvoiceLoadInterleaving.test.ts](../../../tests/components/CentralInvoiceLoadInterleaving.test.ts) | 组件（jsdom）／合成传输 | 工作台与台账旧载入成功或网络失败、新读取；旧权限拒绝时遮蔽、提示及重验 |
@@ -140,6 +142,7 @@
 | [tests/browser/CentralInvoiceLeaveRealConfirm.test.ts](../../../tests/browser/CentralInvoiceLeaveRealConfirm.test.ts) | 真实组件／模拟来源 | 五视口真实确认宿主的 Escape、焦点、来源重读后迟到确认和单宿主抢占；第二次确认由测试直接触发，识别及数据来源为合成替身 |
 | [tests/browser/CentralInvoiceCloudConsentRace.test.ts](../../../tests/browser/CentralInvoiceCloudConsentRace.test.ts) | 真实组件／模拟来源 | 五视口键盘、焦点与云识别来源切换；受控确认替身、合成原件及云 sink，不连接真实云 |
 | [tests/browser/CentralInvoiceDiscardConsentRace.test.ts](../../../tests/browser/CentralInvoiceDiscardConsentRace.test.ts) | 真实组件／模拟来源 | 五视口键盘、焦点与确认期间卸载；受控确认替身和合成写入 sink |
+| [tests/browser/CentralInvoiceBatchUpload.test.ts](../../../tests/browser/CentralInvoiceBatchUpload.test.ts) | 浏览器组件／合成来源 | 批次键盘焦点与失权清理、真实文件读取迟到后阻断旧上传；不连接真实服务 |
 | [tests/browser/CentralInvoiceArchiveConsentRace.test.ts](../../../tests/browser/CentralInvoiceArchiveConsentRace.test.ts) | 真实组件／模拟来源 | 五视口键盘、焦点与归档确认时来源切换；受控确认替身和合成写入 sink |
 | [tests/browser/CentralInvoiceAttachConsentRace.test.ts](../../../tests/browser/CentralInvoiceAttachConsentRace.test.ts) | 真实组件／模拟来源 | 五视口键盘、焦点与原件确认期间切换来源或卸载；受控确认、合成文件与写入 sink |
 | [tests/browser/CentralInvoiceLegacyConsentRace.test.ts](../../../tests/browser/CentralInvoiceLegacyConsentRace.test.ts) | 真实组件／模拟来源 | 五视口键盘、焦点与旧票核对确认期间切换来源或卸载；受控确认和合成写入 sink |

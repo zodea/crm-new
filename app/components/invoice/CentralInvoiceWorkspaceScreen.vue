@@ -8,7 +8,7 @@ import { onBeforeRouteLeave } from 'vue-router'
 import { useKitUI } from '~/composables/useKitUI'
 import { useTabCloseGuard } from '~/composables/useTabCloseGuard'
 import { invoiceCandidateForCommand } from '~/lib/invoice/central-recognition'
-import { CentralInvoiceLoadSupersededError } from '~/lib/invoice/central-workspace'
+import { CentralInvoiceLoadSupersededError, CentralInvoiceUploadNotSubmittedError } from '~/lib/invoice/central-workspace'
 import CentralInvoiceWorkspaceView from './CentralInvoiceWorkspaceView.vue'
 
 type Workspace = ReturnType<typeof createCentralInvoiceWorkspace>
@@ -348,17 +348,20 @@ async function upload(files: File[], projectId: string | null) {
         if (batchResults.value)
           batchResults.value = batchResults.value.map((item, current) => current === index ? { ...item, status } : item)
       }
+      const uploadIsCurrent = () => active && props.workspace === workspace
+        && authorityGeneration === uploadAuthorityGeneration && workspace.readState.value === 'ready'
+        && (projectId === null || props.projects.some(project => project.id === projectId))
       for (const [index, file] of files.entries()) {
         if (!canContinue() || pending.value)
           break
         setStatus(index, '正在上传')
         let invoice: CentralInvoiceRecord
         try {
-          invoice = await workspace.upload(file, projectId)
+          invoice = await workspace.upload(file, projectId, uploadIsCurrent)
         }
         catch (cause) {
           if (canContinue()) {
-            setStatus(index, '结果未能确认')
+            setStatus(index, cause instanceof CentralInvoiceUploadNotSubmittedError ? '未提交' : '结果未能确认')
             error.value = message(cause)
           }
           break

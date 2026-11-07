@@ -3,12 +3,13 @@ import { flushPromises } from '@vue/test-utils'
 import { expect, it, vi } from 'vitest'
 import { defineComponent, h, nextTick, shallowRef } from 'vue'
 import CentralInvoiceWorkspaceScreen from '~/components/invoice/CentralInvoiceWorkspaceScreen.vue'
+import { CentralInvoiceUploadNotSubmittedError } from '~/lib/invoice/central-workspace'
 
 vi.mock('~/composables/useKitUI', () => ({ useKitUI: () => ({ confirm: async () => true, undoToast: () => {} }) }))
 vi.mock('~/composables/useTabCloseGuard', () => ({ useTabCloseGuard: () => {} }))
 vi.mock('vue-router', () => ({ onBeforeRouteLeave: () => {} }))
 
-function setupBatch(options: { failUpload?: boolean, failRecognition?: boolean, pendingRecognition?: boolean, storageBroken?: boolean, loseSourceAfterUpload?: boolean, waitForUpload?: Promise<void>, waitForRecognition?: Promise<void> } = {}) {
+function setupBatch(options: { failUpload?: boolean, failUploadAfterGate?: boolean, failRecognition?: boolean, pendingRecognition?: boolean, storageBroken?: boolean, loseSourceAfterUpload?: boolean, checkUploadGuard?: boolean, waitForUpload?: Promise<void>, waitForRecognition?: Promise<void> } = {}) {
   const files = ['one.pdf', 'two.pdf', 'three.pdf'].map(name => new File(['%PDF-1.4'], name, { type: 'application/pdf' }))
   let unresolved: { targetId: string | null, action: string, commandId: string } | null = null
   let storageBroken = false
@@ -27,9 +28,15 @@ function setupBatch(options: { failUpload?: boolean, failRecognition?: boolean, 
         throw new Error('浏览器存储不可用')
       return unresolved?.targetId === id ? unresolved : null
     },
-    upload: vi.fn(async (file: File) => {
+    upload: vi.fn(async (file: File, _projectId: string | null, beforeSubmit?: () => boolean) => {
       if (file.name === 'one.pdf' && options.waitForUpload)
         await options.waitForUpload
+      if (options.checkUploadGuard && !beforeSubmit?.())
+        throw new CentralInvoiceUploadNotSubmittedError()
+      if (file.name === 'one.pdf' && options.failUploadAfterGate) {
+        unresolved = { targetId: null, action: 'upload', commandId: 'original-upload' }
+        throw new Error('合成提交响应丢失')
+      }
       if (file.name === 'two.pdf' && options.failUpload) {
         unresolved = { targetId: null, action: 'upload', commandId: 'original-upload' }
         throw new Error('two.pdf 合成响应丢失')
@@ -57,8 +64,8 @@ function setupBatch(options: { failUpload?: boolean, failRecognition?: boolean, 
       return () => h('button', { onClick: () => emit('upload', files, 'project-one') }, '上传合成批次')
     },
   })
-  render(CentralInvoiceWorkspaceScreen, { props: { workspace: workspace as never, projects: [{ id: 'project-one', label: '合成项目' }], suppliers: [], signatories: [] }, global: { stubs: { CentralInvoiceWorkspaceView: content, NuxtLink: true } } })
-  return { workspace, files }
+  const rendered = render(CentralInvoiceWorkspaceScreen, { props: { workspace: workspace as never, projects: [{ id: 'project-one', label: '合成项目' }], suppliers: [], signatories: [] }, global: { stubs: { CentralInvoiceWorkspaceView: content, NuxtLink: true } } })
+  return { workspace, files, rendered }
 }
 
 it('第二张提交结果未知时保留第一张事实，并明确后续未处理且不重复提交', async () => {
@@ -123,6 +130,69 @@ it('失权后恢复时，旧上传迟到不能恢复文件名或继续处理', a
   expect(workspace.recognizeWithCandidate).not.toHaveBeenCalled()
   expect(screen.queryByRole('region', { name: '本次上传结果' })).toBeNull()
   expect(screen.queryByText(/one\.pdf|two\.pdf|three\.pdf/)).toBeNull()
+})
+
+it('失权后重新读取恢复，真实页面传入的原批次守卫仍拒绝迟到上传', async () => {
+  let finishUpload!: () => void
+  const waitForUpload = new Promise<void>((resolve) => {
+    finishUpload = resolve
+  })
+  const { workspace } = setupBatch({ waitForUpload, checkUploadGuard: true })
+  await flushPromises()
+  await fireEvent.click(await screen.findByRole('button', { name: '上传合成批次' }))
+  await flushPromises()
+  const beforeSubmit = workspace.upload.mock.calls[0]?.[2]
+  expect(beforeSubmit).toBeTypeOf('function')
+  expect(beforeSubmit?.()).toBe(true)
+  workspace.readState.value = 'unavailable'
+  await nextTick()
+  workspace.readState.value = 'ready'
+  await nextTick()
+  expect(beforeSubmit?.()).toBe(false)
+  finishUpload()
+  await flushPromises()
+  expect(workspace.upload).toHaveBeenCalledOnce()
+  expect(workspace.recognizeWithCandidate).not.toHaveBeenCalled()
+  expect(screen.queryByRole('region', { name: '本次上传结果' })).toBeNull()
+  expect(screen.queryByText(/one\.pdf|two\.pdf|three\.pdf/)).toBeNull()
+})
+
+it('文件读取期间所选项目从当前目录消失时，页面传入的守卫阻止提交', async () => {
+  let finishUpload!: () => void
+  const waitForUpload = new Promise<void>((resolve) => {
+    finishUpload = resolve
+  })
+  const { workspace, rendered } = setupBatch({ waitForUpload, checkUploadGuard: true })
+  await flushPromises()
+  await fireEvent.click(await screen.findByRole('button', { name: '上传合成批次' }))
+  await flushPromises()
+  const beforeSubmit = workspace.upload.mock.calls[0]?.[2]
+  expect(beforeSubmit?.()).toBe(true)
+  await rendered.rerender({ workspace: workspace as never, projects: [], suppliers: [], signatories: [] })
+  expect(beforeSubmit?.()).toBe(false)
+  finishUpload()
+  await flushPromises()
+  expect(workspace.upload).toHaveBeenCalledOnce()
+  expect(workspace.recognizeWithCandidate).not.toHaveBeenCalled()
+  expect(screen.getByRole('region', { name: '本次上传结果' }).textContent).toContain('one.pdf：未提交')
+})
+
+it('已发送后项目消失且响应丢失，仍保留结果未知与原编号', async () => {
+  let finishUpload!: () => void
+  const waitForUpload = new Promise<void>((resolve) => {
+    finishUpload = resolve
+  })
+  const { workspace, rendered } = setupBatch({ waitForUpload, failUploadAfterGate: true })
+  await flushPromises()
+  await fireEvent.click(await screen.findByRole('button', { name: '上传合成批次' }))
+  await flushPromises()
+  await rendered.rerender({ workspace: workspace as never, projects: [], suppliers: [], signatories: [] })
+  finishUpload()
+  await flushPromises()
+  expect(workspace.upload).toHaveBeenCalledOnce()
+  expect(workspace.pendingAll()).toEqual([{ targetId: null, action: 'upload', commandId: 'original-upload' }])
+  expect(screen.getByRole('region', { name: '本次上传结果' }).textContent).toContain('one.pdf：结果未能确认')
+  expect(screen.getByRole('button', { name: '核对上次提交' })).toBeTruthy()
 })
 
 it('识别期间失权后恢复，迟到的识别结果不会恢复清单或处理后续文件', async () => {

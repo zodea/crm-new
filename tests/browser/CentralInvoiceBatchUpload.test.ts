@@ -3,6 +3,7 @@ import { render } from 'vitest-browser-vue'
 import { page, userEvent } from 'vitest/browser'
 import { defineComponent, h, nextTick, shallowRef } from 'vue'
 import CentralInvoiceWorkspaceScreen from '~/components/invoice/CentralInvoiceWorkspaceScreen.vue'
+import { createCentralInvoiceWorkspace } from '~/lib/invoice/central-workspace'
 
 vi.mock('~/composables/useTabCloseGuard', () => ({ useTabCloseGuard: () => {} }))
 vi.mock('~/composables/useKitUI', () => ({ useKitUI: () => ({ confirm: async () => true, undoToast: () => {} }) }))
@@ -63,4 +64,67 @@ it('各视口中断清单可键盘滚动，失权清除清单并以原编号核�
   await userEvent.keyboard('{Enter}')
   await vi.waitFor(() => expect(recovered).toEqual(['original-upload']))
   expect(workspace.upload).toHaveBeenCalledTimes(2)
+})
+
+it('真实页面选择文件后读取迟到，失权并恢复不能发送旧上传', async () => {
+  const identity = { workspaceId: 'synthetic-workspace', actorId: 'synthetic-actor' }
+  const granted = ['finance-invoice:read', 'finance-invoice:write']
+  let capabilities = [...granted]
+  let finishRead!: () => void
+  let startRead!: () => void
+  const readGate = new Promise<void>((resolve) => {
+    finishRead = resolve
+  })
+  const readStarted = new Promise<void>((resolve) => {
+    startRead = resolve
+  })
+  const originalRead = File.prototype.arrayBuffer
+  const arrayBuffer = vi.spyOn(File.prototype, 'arrayBuffer').mockImplementation(async function (this: File) {
+    if (this.name === 'synthetic-race.pdf') {
+      startRead()
+      await readGate
+    }
+    return originalRead.call(this)
+  })
+  const at = '2026-01-01T00:00:00.000Z'
+  const list = async () => ({ items: [], pagination: { requestedPage: 1, page: 1, pageSize: 100, total: 0 }, sourceVersion: 'synthetic-0', capabilities: [...granted], meta: { sources: [{ key: 'invoices', state: 'readable', sourceVersion: 'invoices:0', asOf: at }] } })
+  const execute = vi.fn(async () => {
+    throw new Error('不应发送合成命令')
+  })
+  const entries = new Map<string, string>()
+  const storage = () => ({
+    get length() { return entries.size },
+    key: (index: number) => [...entries.keys()][index] ?? null,
+    getItem: (key: string) => entries.get(key) ?? null,
+    setItem: (key: string, value: string) => { entries.set(key, value) },
+    removeItem: (key: string) => { entries.delete(key) },
+  })
+  const workspace = createCentralInvoiceWorkspace({ identity, client: { list, execute } as never, context: async () => ({ ...identity, capabilities: [...capabilities] }), storage, commandId: () => 'synthetic-upload', recognizeLocal: async () => {
+    throw new Error('未使用识别')
+  } })
+  const upload = vi.spyOn(workspace, 'upload')
+  try {
+    await workspace.load()
+    await render(defineComponent({ setup: () => () => h(CentralInvoiceWorkspaceScreen, { workspace, projects: [{ id: 'project-one', label: '合成项目' }], suppliers: [], signatories: [] }) }), { global: { stubs: { NuxtLink: true } } })
+    await vi.waitFor(() => expect(workspace.readState.value).toBe('ready'))
+    await page.getByLabelText('上传项目').selectOptions('project-one')
+    await page.getByLabelText('上传发票').upload([new File(['%PDF-1'], 'synthetic-race.pdf', { type: 'application/pdf' })])
+    await readStarted
+    capabilities = []
+    await expect(workspace.load()).rejects.toThrow('身份或权限已变化')
+    await expect.element(page.getByRole('button', { name: '重新读取' })).toBeVisible()
+    capabilities = [...granted]
+    await workspace.load()
+    finishRead()
+    expect(upload).toHaveBeenCalledOnce()
+    await expect(upload.mock.results[0]!.value).rejects.toThrow('未提交')
+    await nextTick()
+    expect(execute).not.toHaveBeenCalled()
+    expect(entries.size).toBe(0)
+    await expect.element(page.getByRole('region', { name: '本次上传结果' })).not.toBeInTheDocument()
+  }
+  finally {
+    finishRead()
+    arrayBuffer.mockRestore()
+  }
 })
