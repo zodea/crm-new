@@ -21,7 +21,7 @@
 | [tests/target-cost/detail.test.ts](../../../tests/target-cost/detail.test.ts) | 单元／服务／状态 | target cost detail read model |
 | [tests/target-cost/files.test.ts](../../../tests/target-cost/files.test.ts) | 单元／服务／状态 | 中央预算原件真实保存读取；缺件明确，跨预算不能读写，失败补传不丢旧元数据和审计 |
 | [tests/target-cost/history-presentation.test.ts](../../../tests/target-cost/history-presentation.test.ts) | 单元／服务／状态 | 预算操作历史展示 |
-| [tests/target-cost/items.test.ts](../../../tests/target-cost/items.test.ts) | 单元／服务／状态 | target cost item persistence |
+| [tests/target-cost/items.test.ts](../../../tests/target-cost/items.test.ts) | 单元／服务／状态 | 明细新增、更新、软删除及审计；后续行错误定位与整批不变；真实零、空数量和单价 |
 | [tests/target-cost/list.test.ts](../../../tests/target-cost/list.test.ts) | 单元／服务／状态 | target cost list read model |
 | [tests/target-cost/navigation.test.ts](../../../tests/target-cost/navigation.test.ts) | 单元／服务／状态 | 目标成本来源与返回上下文 |
 | [tests/target-cost/null-read.test.ts](../../../tests/target-cost/null-read.test.ts) | 单元／服务／状态 | 预算空值与真实零 |
