@@ -3,7 +3,7 @@ import process from 'node:process'
 import { defineConfig, devices } from '@playwright/test'
 
 const externalBaseURL = process.env.PLAYWRIGHT_BASE_URL
-const VISUAL_SPEC = /runtime-visual-matrix\.spec\.ts/
+const VISUAL_SPEC = /(?:runtime-visual-matrix|issue-169-responsibility-dialog)\.spec\.ts/
 const PRODUCTION_SPEC = /[\\/]production-[^\\/]+\.spec\.ts$/
 
 // 中央 spec 按文件名排序后交替分入两组，各连一个独立 dev server（独立进程内存、构建与 Vite 缓存目录）。
@@ -45,7 +45,8 @@ export default defineConfig({
   reporter: process.env.CI ? 'github' : 'list',
   use: {
     screenshot: 'only-on-failure',
-    trace: 'on-first-retry',
+    // 首次失败也保留追踪，重试通过时仍可定位间歇性的导航和加载问题。
+    trace: 'retain-on-failure',
     video: 'retain-on-failure',
   },
   projects: [

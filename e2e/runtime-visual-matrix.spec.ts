@@ -1,6 +1,5 @@
 import type { Locator, Page } from '@playwright/test'
 import { randomUUID } from 'node:crypto'
-import { fileURLToPath } from 'node:url'
 import { expect, test } from '@playwright/test'
 import { installQuantityProductionFixture } from './helpers/quantity-production-fixture'
 import {
@@ -12,6 +11,7 @@ import {
   expectTabSequence,
 } from './helpers/responsive'
 import { VISUAL_BASE_URL, VISUAL_DATA_PROFILE } from './helpers/visual-environment'
+import { installVisualFont, visualFontLoaded } from './helpers/visual-font'
 
 const DATA_VISIBILITY_STORAGE_KEY = 'ruihang:workspace-default:include-demo'
 const RESPONSIVE_WIDTHS = [390, 768, 1024, 1280, 1440] as const
@@ -24,8 +24,6 @@ const VIEWPORT_HEIGHTS: Record<(typeof RESPONSIVE_WIDTHS)[number], number> = {
   1440: 1000,
 }
 const MASK_COLOR = '#e9edf4'
-const VISUAL_FONT_PATH = fileURLToPath(new URL('../tests/fixtures/visual-font/NotoSansSC-variable.ttf', import.meta.url))
-const VISUAL_FONT_URL = '/__visual-fixtures/NotoSansSC-variable.ttf'
 
 interface VisualSample {
   key: string
@@ -375,30 +373,10 @@ const SAMPLES: VisualSample[] = [
 ]
 
 test.beforeEach(async ({ page }) => {
-  await page.route(`${VISUAL_BASE_URL}${VISUAL_FONT_URL}`, route => route.fulfill({
-    path: VISUAL_FONT_PATH,
-    contentType: 'font/ttf',
-  }))
+  await installVisualFont(page)
   await page.context().setExtraHTTPHeaders({ 'x-ruihang-test-session': `visual-${randomUUID()}` })
   await page.clock.install({ time: VISUAL_NOW })
-  await page.addInitScript(({ dataVisibilityStorageKey, fontUrl }) => {
-    const installVisualFont = () => {
-      const style = document.createElement('style')
-      style.textContent = `
-        @font-face {
-          font-family: "Visual Noto Sans SC";
-          src: url("${fontUrl}") format("truetype");
-          font-style: normal;
-          font-weight: 100 900;
-          font-display: block;
-        }
-        :root {
-          --font-sans: "Visual Noto Sans SC", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif !important;
-        }
-      `
-      document.head.appendChild(style)
-    }
-    document.addEventListener('DOMContentLoaded', installVisualFont, { once: true })
+  await page.addInitScript((dataVisibilityStorageKey) => {
     localStorage.removeItem('ruihang-sidebar-pinned')
     localStorage.removeItem('ruihang-sidebar-groups')
     localStorage.removeItem('ruihang-shell-theme')
@@ -417,7 +395,7 @@ test.beforeEach(async ({ page }) => {
       document.addEventListener('DOMContentLoaded', observeNuxtDevtools, { once: true })
     else
       observeNuxtDevtools()
-  }, { dataVisibilityStorageKey: DATA_VISIBILITY_STORAGE_KEY, fontUrl: VISUAL_FONT_URL })
+  }, DATA_VISIBILITY_STORAGE_KEY)
 })
 
 test.describe('#184 / #186 / #187 / #188 / #189 运行态视觉基线', () => {
@@ -434,14 +412,7 @@ test.describe('#184 / #186 / #187 / #188 / #189 运行态视觉基线', () => {
         await sample.prepare(page, width)
         await page.waitForLoadState('networkidle')
         // 字体未加载时不能退回系统字体并生成看似有效的视觉基线。
-        const fontLoaded = await page.evaluate(async () => {
-          const faces = await Promise.all([400, 700].map(weight =>
-            document.fonts.load(`${weight} 14px "Visual Noto Sans SC"`, '测试 Aa'),
-          ))
-          await document.fonts.ready
-          return faces.every(group => group.length > 0 && group.every(face => face.status === 'loaded'))
-        })
-        expect(fontLoaded, '视觉测试必须加载固定的中文测试字体').toBe(true)
+        expect(await visualFontLoaded(page), '视觉测试必须加载固定的中文测试字体').toBe(true)
         // 夹具可能通过正式回执地址重新加载文档，截图脱敏样式须注入最终文档。
         await page.addStyleTag({
           content: `

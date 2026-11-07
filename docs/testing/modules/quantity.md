@@ -64,7 +64,6 @@
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
 | [e2e/issue-169-responsibility-dialog.spec.ts-snapshots/responsibility-dialog-1740x974-chromium-win32.png](../../../e2e/issue-169-responsibility-dialog.spec.ts-snapshots/responsibility-dialog-1740x974-chromium-win32.png) | 视觉基线 | 责任配置弹窗截图 |
-| [e2e/issue-169-responsibility-dialog.spec.ts-snapshots/responsibility-dialog-1740x974-noto-static-chromium-win32.png](../../../e2e/issue-169-responsibility-dialog.spec.ts-snapshots/responsibility-dialog-1740x974-noto-static-chromium-win32.png) | 视觉基线 | Windows 同名 Noto 静态字体渲染的责任配置弹窗截图 |
 
 ## 组件（jsdom）
 
@@ -91,7 +90,7 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
-| [e2e/issue-169-responsibility-dialog.spec.ts](../../../e2e/issue-169-responsibility-dialog.spec.ts) | Playwright E2E | Issue #169：责任配置弹窗视觉与模态边界 |
+| [e2e/issue-169-responsibility-dialog.spec.ts](../../../e2e/issue-169-responsibility-dialog.spec.ts) | Playwright 视觉 | Issue #169：责任配置弹窗视觉与模态边界 |
 | [e2e/quantity-archive-export.spec.ts](../../../e2e/quantity-archive-export.spec.ts) | Playwright E2E | 中央矩阵归档取消、确认及解除回读一致，分类导出保留目录和施工记录原值 |
 | [e2e/quantity-assignment.spec.ts](../../../e2e/quantity-assignment.spec.ts) | Playwright E2E | Issue #103 Slice 4：户×工种责任配置 |
 | [e2e/quantity-central-api.spec.ts](../../../e2e/quantity-central-api.spec.ts) | Playwright E2E | 工程量真实 HTTP 从中央新项目保存区域与模板，重读并拒绝身份、版本和来源错配 |

@@ -120,6 +120,7 @@
 | [e2e/auxiliary-list-refresh.spec.ts](../../../e2e/auxiliary-list-refresh.spec.ts) | Playwright E2E | ${path} 同来源筛选和刷新保留表格，失败可重试，拒绝权限时清空 |
 | [e2e/contract-aux-list.spec.ts](../../../e2e/contract-aux-list.spec.ts) | Playwright E2E | Issue #196：辅助合同与结算列表 |
 | [e2e/issue-330-auxiliary-contracts.spec.ts](../../../e2e/issue-330-auxiliary-contracts.spec.ts) | Playwright E2E | AX04 辅助合同只读与编辑 |
+| [e2e/production-auxiliary-contracts.spec.ts](../../../e2e/production-auxiliary-contracts.spec.ts) | 生产验收 | 辅助合同正式保存、恢复及迁入 |
 | [tests/auxiliary-contract/central.test.ts](../../../tests/auxiliary-contract/central.test.ts) | 单元／服务／状态 | 辅助合同中央事实 |
 | [tests/auxiliary-contract/http.test.ts](../../../tests/auxiliary-contract/http.test.ts) | 单元／服务／状态 | 辅助合同 HTTP Repository |
 | [tests/auxiliary-contract/migration.test.ts](../../../tests/auxiliary-contract/migration.test.ts) | 单元／服务／状态 | aX04 受控迁移 |

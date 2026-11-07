@@ -10,7 +10,7 @@ if (process.env.PLAYWRIGHT_BASE_URL)
 
 export default defineConfig({
   testDir: './e2e',
-  testMatch: /runtime-visual-matrix\.spec\.ts/,
+  testMatch: /(?:runtime-visual-matrix|issue-169-responsibility-dialog)\.spec\.ts/,
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
@@ -21,7 +21,8 @@ export default defineConfig({
     baseURL: VISUAL_BASE_URL,
     locale: 'zh-CN',
     screenshot: 'only-on-failure',
-    trace: 'on-first-retry',
+    // 首次失败时保留导航和网络记录，避免重试通过后丢失间歇故障的现场。
+    trace: 'retain-on-failure',
     video: 'retain-on-failure',
   },
   projects: [

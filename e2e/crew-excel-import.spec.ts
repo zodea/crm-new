@@ -7,7 +7,8 @@ test('班组导入先核对同名资料和文件内重复，替换保留未映�
   const headers = { 'x-ruihang-test-reset': '1', 'x-ruihang-test-session': session }
   const reset = () => page.request.post('/api/testing/crew-workers/reset', { headers, data: { scenario: 'ready' } })
   expect((await reset()).ok()).toBe(true)
-  await page.setExtraHTTPHeaders({ 'x-ruihang-test-session': session })
+  // 浏览器请求与 page.request 共用同一隔离会话，种子和导入预览才能读取同一份数据。
+  await page.context().setExtraHTTPHeaders({ 'x-ruihang-test-session': session })
   try {
     const created = await page.request.post('/api/commands/crews', { data: { workspaceId: 'workspace-default', actorId: 'actor-default', requiredCapability: 'crew:write', commandId: 'crew-excel-seed', baseVersion: null, action: 'save', attachments: {}, draft: { name: '合成已有班组', trade: '泥工', contactName: '合成负责人', contactPhone: '13800000001', defaultPayRatio: 0.8, note: '原备注' } } })
     expect(created.ok()).toBe(true)

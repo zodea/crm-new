@@ -41,8 +41,12 @@ test('真实三张工资从0暂缓到自动分完1000，五档视口及逐单冷
     expect(config.priceOptions).toHaveLength(1)
     await repository.execute(command(config, { kind: 'save-a-prices', prices: [{ priceId: null, itemId: config.priceOptions[0]!.itemId, unit: '㎡', mode: 'baseline', workerId: null, effectiveMonth: query.month, unitPrice: 1000, scope: { kind: 'project' } }] }))
     const book = { bookPurpose: 'ordinary' as const, managementBookId: null }
-    const draft = { ...scope, book, memberWorkerIds: [leaderWorkerId], periodKind: 'monthly' as const, payRatio: 1, note: '自动分余真实验收' }
-    const form = await repository.aForm(query, { statementId: null, draftKey: randomUUID(), draft })
+    const initialDraft = { ...scope, book, memberWorkerIds: [leaderWorkerId], periodKind: 'monthly' as const, payRatio: 1, note: '自动分余真实验收' }
+    const draftKey = randomUUID()
+    const preview = await repository.aForm(query, { statementId: null, draftKey, draft: initialDraft })
+    expect(preview.draft.ratioPlan?.itemRatios.length).toBeGreaterThan(0)
+    const draft = { ...initialDraft, ratioPlan: { ...preview.draft.ratioPlan!, itemRatios: preview.draft.ratioPlan!.itemRatios.map(row => ({ ...row, ratio: 1 })) } }
+    const form = await repository.aForm(query, { statementId: null, draftKey, draft })
     const saved = await repository.execute(command(form, { kind: 'save-a-draft', draft }))
     statementIds.push(saved.statementId!)
     const roundingScope = { projectId, leaderWorkerId, book, month: query.month }
