@@ -77,6 +77,7 @@
 | [tests/components/CentralInvoiceBatchUpload.test.ts](../../../tests/components/CentralInvoiceBatchUpload.test.ts) | 组件（jsdom）／合成来源 | 批量逐项结果、来源失效时停止及页面提交守卫 |
 | [tests/components/InvoiceExportTableAmounts.test.ts](../../../tests/components/InvoiceExportTableAmounts.test.ts) | 组件（jsdom） | 旧及中央台账共用预览区分未知与真实零 |
 | [tests/components/CentralInvoiceLedgerScreen.test.ts](../../../tests/components/CentralInvoiceLedgerScreen.test.ts) | 组件（jsdom） | 台账导出及来源版本 |
+| [tests/components/CentralInvoicePrintAuthorityRace.test.ts](../../../tests/components/CentralInvoicePrintAuthorityRace.test.ts) | 组件（jsdom）／合成来源 | 打印确认授权期间切源、卸载及失效恢复不发送旧登记；已发送后来源变化、原编号与存储缺口 |
 | [tests/components/CentralInvoiceLoadInterleaving.test.ts](../../../tests/components/CentralInvoiceLoadInterleaving.test.ts) | 组件（jsdom）／合成传输 | 工作台与台账旧载入成功或网络失败、新读取；旧权限拒绝时遮蔽、提示及重验 |
 | [tests/components/CentralInvoiceLedgerSnapshot.test.ts](../../../tests/components/CentralInvoiceLedgerSnapshot.test.ts) | 组件（jsdom）／合成来源 | 跨页导出来源变化、新匹配、目录核验竞态、权限失效与零和未知 |
 | [tests/components/CentralInvoiceLedgerView.test.ts](../../../tests/components/CentralInvoiceLedgerView.test.ts) | 组件（jsdom） | 台账来源与筛选 |
@@ -126,6 +127,7 @@
 | [tests/browser/CentralInvoiceArchive.test.ts](../../../tests/browser/CentralInvoiceArchive.test.ts) | 真实组件／模拟来源 | 归档来源及主要视口 |
 | [tests/browser/CentralInvoiceDragUpload.test.ts](../../../tests/browser/CentralInvoiceDragUpload.test.ts) | 真实组件／模拟来源 | 五视口拖放、归属失效与键盘上传入口 |
 | [tests/browser/CentralInvoiceLedgerExport.test.ts](../../../tests/browser/CentralInvoiceLedgerExport.test.ts) | 真实组件／模拟来源 | 台账导出与主要视口 |
+| [tests/browser/CentralInvoicePrintAuthorityRace.test.ts](../../../tests/browser/CentralInvoicePrintAuthorityRace.test.ts) | 真实组件／合成来源 | 两视口键盘打印确认、授权期间及已发送后切源与同源登记；系统打印与原件核验为替身 |
 | [tests/browser/CentralInvoiceLedgerSnapshot.test.ts](../../../tests/browser/CentralInvoiceLedgerSnapshot.test.ts) | 真实组件／模拟来源 | 五视口筛选、键盘、焦点和来源变化；导出文件调用为替身 |
 | [tests/browser/CentralInvoiceManualCompany.test.ts](../../../tests/browser/CentralInvoiceManualCompany.test.ts) | 真实组件／模拟来源 | 手工公司票归档选择 |
 | [tests/browser/CentralInvoicePendingRecovery.test.ts](../../../tests/browser/CentralInvoicePendingRecovery.test.ts) | 真实组件／模拟来源 | 原编号发现与恢复 |

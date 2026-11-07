@@ -396,9 +396,9 @@ export function createCentralInvoiceWorkspace(options: {
     async restore(invoice: CentralInvoiceRecord) {
       return execute({ ...envelope(), action: 'restore', invoiceId: invoice.id, baseVersion: invoice.version })
     },
-    async recordPrinted(targets: CentralInvoicePrintCommand['targets']) {
+    async recordPrinted(targets: CentralInvoicePrintCommand['targets'], beforeSubmit?: () => boolean, beforeClear?: () => boolean) {
       return guarded(async () => {
-        const result = await printSession().submit({ ...envelope(), action: 'record-printed', targets })
+        const result = await printSession().submit({ ...envelope(), action: 'record-printed', targets }, beforeSubmit, beforeClear)
         applyReadBatch(result.reads)
         return result.result
       })

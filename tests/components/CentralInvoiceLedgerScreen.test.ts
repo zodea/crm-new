@@ -231,7 +231,7 @@ it('仅在用户确认已打印后提交原批次，结果未知时核对原任�
   expect(workspace.verifiedOriginal).toHaveBeenCalledWith(expect.objectContaining({ id: 'invoice-one', version: '3' }), true)
   expect(recordPrinted).not.toHaveBeenCalled()
   await fireEvent.click(screen.getByRole('button', { name: '已打印' }))
-  await waitFor(() => expect(recordPrinted).toHaveBeenCalledWith([{ invoiceId: 'invoice-one', baseVersion: '3', rotation: 0 }]))
+  await waitFor(() => expect(recordPrinted).toHaveBeenCalledWith([{ invoiceId: 'invoice-one', baseVersion: '3', rotation: 0 }], expect.any(Function), expect.any(Function)))
   await fireEvent.click(await screen.findByRole('button', { name: '核对打印记录' }))
   await waitFor(() => expect(recoverPrint).toHaveBeenCalledOnce())
   expect(recordPrinted).toHaveBeenCalledOnce()

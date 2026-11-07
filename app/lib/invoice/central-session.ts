@@ -174,7 +174,7 @@ export function createCentralInvoicePrintSession(options: {
     }
     return [...context.capabilities]
   }
-  async function confirmRead(result: CentralInvoicePrintResult, commandId: string, initialCapabilities: readonly string[]) {
+  async function confirmRead(result: CentralInvoicePrintResult, commandId: string, initialCapabilities: readonly string[], beforeClear?: () => boolean) {
     if (result.commandId !== commandId || !result.records.length)
       throw new CentralInvoiceReadInconsistentError('打印回执与原任务不一致，请保留原编号。')
     const reads: InvoiceDetailRead[] = []
@@ -194,6 +194,8 @@ export function createCentralInvoicePrintSession(options: {
       throw new CentralInvoiceReadInconsistentError()
     }
     options.beforeClear?.(reads)
+    if (beforeClear && !beforeClear())
+      throw new CentralInvoiceReadInconsistentError('打印登记已发送，原编号仍保留，请回原来源核对。')
     recovery.clear(key, commandId)
     return reads
   }
@@ -208,14 +210,16 @@ export function createCentralInvoicePrintSession(options: {
   }
   return {
     pending: () => recovery.read(key),
-    submit(command: CentralInvoicePrintCommand) {
+    submit(command: CentralInvoicePrintCommand, beforeSubmit?: () => boolean, beforeClear?: () => boolean) {
       return guard(async () => {
         const initialCapabilities = await authorize()
         if (command.workspaceId !== identity.workspaceId || command.actorId !== identity.actorId)
           throw new Error('打印任务身份已变化，请保留原任务。')
+        if (beforeSubmit && !beforeSubmit())
+          throw new Error('打印记录未提交，纸张可能已输出，请先人工核对。')
         recovery.remember(key, { ...scope, commandId: command.commandId, action: command.action })
         const result = await options.repository.recordPrinted(command)
-        return { result, reads: await confirmRead(result, command.commandId, initialCapabilities) }
+        return { result, reads: await confirmRead(result, command.commandId, initialCapabilities, beforeClear) }
       })
     },
     recover() {

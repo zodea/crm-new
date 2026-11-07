@@ -213,12 +213,23 @@ export function useCentralInvoicePrint(options: {
   async function confirmPrinted() {
     if (!pendingPrint.value || !printTargets.value.length || recoveryPending.value || options.workspace().readState.value !== 'ready')
       return
+    const sourceWorkspace = options.workspace()
+    const generation = options.generation()
+    const submittedPrint = pendingPrint.value
+    const submittedTargets = printTargets.value
+    const currentSession = () => options.active() && options.workspace() === sourceWorkspace && generation === options.generation()
+      && sourceWorkspace.readState.value === 'ready' && printMode.value
+      && pendingPrint.value === submittedPrint && printTargets.value === submittedTargets
     await run(async () => {
-      await options.workspace().recordPrinted(printTargets.value)
+      await sourceWorkspace.recordPrinted(submittedTargets, () => currentSession() && refreshPending(), currentSession)
+      if (!currentSession())
+        return
       clearConfirmationFocus()
       pendingPrint.value = null
       printTargets.value = []
     })
+    if (currentSession() && recoveryReadError.value)
+      error.value = '打印记录存储暂不可核验，请重试核对。'
   }
   async function recoverPrint() {
     await run(async () => {

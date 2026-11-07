@@ -100,7 +100,7 @@ it('混选时逐票说明不可打印原因，核验原件后仅登记合格扫�
   await fireEvent.click(screen.getByRole('button', { name: /打印选中/ }))
   await waitFor(() => expect(printed).toHaveBeenCalledTimes(2))
   await fireEvent.click(screen.getByRole('button', { name: '已打印' }))
-  await waitFor(() => expect(workspace.recordPrinted).toHaveBeenCalledWith([{ invoiceId: '可打印', baseVersion: '3', rotation: 0 }]))
+  await waitFor(() => expect(workspace.recordPrinted).toHaveBeenCalledWith([{ invoiceId: '可打印', baseVersion: '3', rotation: 0 }], expect.any(Function), expect.any(Function)))
 })
 
 it('全部不合格仍可逐票核对原因，但无法打印或登记', async () => {
