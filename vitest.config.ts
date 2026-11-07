@@ -1,3 +1,4 @@
+import { availableParallelism } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import vue from '@vitejs/plugin-vue'
 import { defineConfig } from 'vitest/config'
@@ -51,8 +52,9 @@ export default defineConfig({
           globalSetup: ['./tests/global-setup.ts'],
           include: HEAVY_UNIT_TESTS,
           exclude: NON_UNIT_TESTS,
-          // maxWorkers 与其余项目不同，Vitest 要求独立 groupOrder：先跑 unit/component，再以半数逻辑核并发跑本组。
-          maxWorkers: '50%',
+          // 重型夹具还竞争磁盘；半数逻辑核在高核数机器上仍可能耗尽 I/O，最多并发 3 个。
+          // maxWorkers 与其余项目不同，Vitest 要求独立 groupOrder。
+          maxWorkers: Math.max(1, Math.min(3, Math.floor(availableParallelism() / 2))),
           sequence: { groupOrder: 1 },
         },
       },

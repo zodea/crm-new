@@ -8,7 +8,7 @@
 
 | 用途 | 工具与入口 | 范围 |
 | --- | --- | --- |
-| 单元、服务、状态及静态契约 | Vitest：`pnpm test:unit` | [unit 与 unit-heavy 项目](../../vitest.config.ts)，排除组件与浏览器目录；冷进程、整库迁入与正式库读写等重夹具文件归 unit-heavy，在其余项目之后以半数逻辑核并发运行 |
+| 单元、服务、状态及静态契约 | Vitest：`pnpm test:unit` | [unit 与 unit-heavy 项目](../../vitest.config.ts)，排除组件与浏览器目录；冷进程、整库迁入与正式库读写等重夹具文件归 unit-heavy，在其余项目之后按半数可用逻辑核运行，最多并发 3 个 |
 | jsdom 组件 | Vitest、Vue Test Utils、Testing Library：`pnpm test:components` | [component 项目](../../vitest.config.ts)；部分用例使用 `vitest-axe` 检查无障碍规则 |
 | 单元与 jsdom 组件合并 | `pnpm test` | 仅以上 unit、unit-heavy、component 三个项目 |
 | 真实浏览器组件行为 | Vitest Browser、Playwright provider、`vitest-browser-vue`：`pnpm test:browser` | [独立配置](../../vitest.browser.config.ts)，Chromium 多视口 |
