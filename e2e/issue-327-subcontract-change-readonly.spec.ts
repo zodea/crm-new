@@ -3,7 +3,7 @@ import { Buffer } from 'node:buffer'
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import { installContractEngineeringFixture, selectContractEngineeringFixture } from './helpers/contract-engineering-fixture'
-import { createVerifiedSignatory, selectVerifiedSignatory } from './helpers/contract-signatory'
+import { createVerifiedSignatory, selectVerifiedSignatory, verifiedSignatoryAdoption } from './helpers/contract-signatory'
 import { expectLocalHorizontalScroll, expectNoPageOverflow, RESPONSIVE_WIDTHS } from './helpers/responsive'
 
 type Scenario = 'ready' | 'empty' | 'forbidden' | 'unavailable'
@@ -71,6 +71,41 @@ async function createChange(page: Page, contractName: string, action: 'draft' | 
   const response = await responsePromise
   expect(response.ok(), await response.text()).toBe(true)
   return (await response.json() as { id: string }).id
+}
+
+// 创建界面由同文件的中央命令旅程覆盖；来源往返单独使用真实命令准备数据，避免重复冷启动两个表单。
+async function seedSubmittedChange(page: Page, contractName: string) {
+  const ownId = await createVerifiedSignatory(page, `来源往返已核实主体-${randomUUID()}`)
+  const adoption = await verifiedSignatoryAdoption(page, ownId)
+  const identity = { workspaceId: 'workspace-default', actorId: 'actor-default' }
+  const contract = await page.request.post('/api/commands/subcontract-contracts', { data: {
+    ...identity,
+    requiredCapability: 'subcontract-contract:write',
+    commandId: randomUUID(),
+    baseVersion: null,
+    action: 'save',
+    constructionMain: { id: 'synthetic-ui-construction-main', projectId: 'project-real-320', basis: '0'.repeat(64) },
+    draft: { ...adoption, name: contractName, projectId: 'project-real-320', supplierId: 'supplier-real-327', subKind: '劳务', content: 'E2E 正式劳务分包范围', signDate: '2026-08-25', amount: 0 },
+    attachments: { add: [], removeIds: [], restoreIds: [] },
+  } })
+  expect(contract.ok(), await contract.text()).toBe(true)
+  const contractId = (await contract.json()).id as string
+  expect(contractId).toBeTruthy()
+  const change = await page.request.post('/api/commands/owner-documents', { data: {
+    ...identity,
+    requiredCapability: 'subcontract-document:write',
+    commandId: randomUUID(),
+    kind: 'sub_change',
+    id: null,
+    baseVersion: null,
+    action: 'submit',
+    draft: { no: 'FB-E2E-327', projectId: 'project-real-320', contractId, supplierId: 'supplier-real-327', changeType: '增项', changeDate: '2026-08-27', approvedAmount: 42700, changedArea: 132.7, actualApprovedPrice: 41000, reason: 'E2E 分包范围调整' },
+    attachments: { add: [{ fileName: 'e2e-分包现场指令单.pdf', fileSize: 28, mimeType: 'application/pdf', category: '业务附件' }], removeIds: [], restoreIds: [] },
+  } })
+  expect(change.ok(), await change.text()).toBe(true)
+  const changeId = (await change.json()).id as string
+  expect(changeId).toBeTruthy()
+  return { contractId, changeId }
 }
 
 async function createPaginationDrafts(
@@ -179,10 +214,9 @@ test.describe('Issue #327：分包变洽签专属只读链', () => {
     await expect(page.getByTestId('subcontract-change-detail')).toBeVisible({ timeout: 20_000 })
   })
 
-  test('中央分包变洽签详情与分供方、合同来源往返', async ({ page }) => {
+  test('中央分包变洽签详情与分供方往返', async ({ page }) => {
     const contractName = 'E2E 中央劳务分包合同'
-    const contractId = await createSubcontract(page, contractName)
-    const changeId = await createChange(page, contractName, 'submit')
+    const { changeId } = await seedSubmittedChange(page, contractName)
     await page.goto(`/subcontract/change/${changeId}?origin=real`)
     await expect(page.getByTestId('subcontract-change-detail')).toBeVisible({ timeout: 20_000 })
     await page.reload()
@@ -192,13 +226,21 @@ test.describe('Issue #327：分包变洽签专属只读链', () => {
     await page.getByRole('link', { name: '返回分包变洽签' }).click()
     await expect(page).toHaveURL(new RegExp(`/subcontract/change/${changeId}\\?origin=real`))
     await expect(page.getByRole('heading', { name: 'E2E 分包范围调整' })).toBeVisible()
+  })
 
+  test('中央分包变洽签来源筛选保留有效结果及无匹配空态', async ({ page }) => {
+    const contractName = 'E2E 中央劳务分包合同'
+    await seedSubmittedChange(page, contractName)
     await page.goto('/subcontract/change?supplier=supplier-real-327')
     await expect(page.getByLabel('来源筛选')).toContainText('分供方：中央正式劳务分供方')
     await expect(page.getByRole('link', { name: 'FB-E2E-327', exact: true })).toBeVisible()
     await page.goto('/subcontract/change?supplier=supplier-unknown-327')
     await expect(page.locator('[data-ui="kit-table-empty"]:visible').filter({ hasText: '没有符合条件的分包变洽签' })).toBeVisible()
+  })
 
+  test('中央分包变洽签详情与合同来源往返', async ({ page }) => {
+    const contractName = 'E2E 中央劳务分包合同'
+    const { contractId, changeId } = await seedSubmittedChange(page, contractName)
     await page.goto(`/subcontract/change/${changeId}?origin=real`)
     await page.getByText('来源单据', { exact: true }).locator('..').getByRole('link', { name: contractName }).click()
     await expect(page).toHaveURL(new RegExp(`/contract/${contractId}\\?.*tab=changes.*focus=${changeId}.*returnTo=`))

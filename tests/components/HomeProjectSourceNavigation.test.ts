@@ -63,6 +63,161 @@ async function open(location = '/') {
 }
 
 describe('首页中央项目与施工进度来源导航', () => {
+  it('用户跳转尚在解析时，迟到的首页项目读取不能取消导航', async () => {
+    const { wrapper, router } = await open()
+    let releaseRead!: () => void
+    beforeRead = id => id === 'b'
+      ? new Promise((resolve) => {
+          releaseRead = resolve
+        })
+      : Promise.resolve()
+    await wrapper.get('select').setValue('real:b')
+    await flushPromises()
+
+    let releaseNavigation!: () => void
+    let markNavigationStarted!: () => void
+    const started = new Promise<void>((resolve) => {
+      markNavigationStarted = resolve
+    })
+    router.beforeEach(async (to) => {
+      if (to.path === '/project') {
+        markNavigationStarted()
+        await new Promise<void>((resolve) => {
+          releaseNavigation = resolve
+        })
+      }
+    })
+    const navigation = router.push('/project')
+    await started
+    releaseRead()
+    await flushPromises()
+    releaseNavigation()
+    await navigation
+    await flushPromises()
+    expect(router.currentRoute.value.fullPath).toBe('/project')
+    wrapper.unmount()
+  })
+
+  it('离开被拒绝时，恢复仍有效的首页项目地址', async () => {
+    const { wrapper, router } = await open()
+    let releaseRead!: () => void
+    beforeRead = id => id === 'b'
+      ? new Promise((resolve) => {
+          releaseRead = resolve
+        })
+      : Promise.resolve()
+    await wrapper.get('select').setValue('real:b')
+    await flushPromises()
+
+    let releaseNavigation!: () => void
+    let markNavigationStarted!: () => void
+    const started = new Promise<void>((resolve) => {
+      markNavigationStarted = resolve
+    })
+    router.beforeEach(async (to) => {
+      if (to.path === '/project') {
+        markNavigationStarted()
+        await new Promise<void>((resolve) => {
+          releaseNavigation = resolve
+        })
+        return false
+      }
+    })
+    const navigation = router.push('/project')
+    await started
+    releaseRead()
+    await flushPromises()
+    releaseNavigation()
+    await navigation
+    await flushPromises()
+    expect(router.currentRoute.value.query).toMatchObject({ project: 'b', origin: 'real' })
+    expect(wrapper.text()).toContain('中央项目 b的排程来源尚未接入')
+    wrapper.unmount()
+  })
+
+  it('较早的跳转被后一次跳转取代时，不恢复过期的首页地址', async () => {
+    const { wrapper, router } = await open()
+    let releaseRead!: () => void
+    beforeRead = id => id === 'b'
+      ? new Promise((resolve) => {
+          releaseRead = resolve
+        })
+      : Promise.resolve()
+    await wrapper.get('select').setValue('real:b')
+    await flushPromises()
+
+    const releases = new Map<string, () => void>()
+    let markFirstStarted!: () => void
+    let markSecondStarted!: () => void
+    const firstStarted = new Promise<void>((resolve) => {
+      markFirstStarted = resolve
+    })
+    const secondStarted = new Promise<void>((resolve) => {
+      markSecondStarted = resolve
+    })
+    router.beforeEach(async (to) => {
+      if (to.path === '/project' || to.path === '/schedule') {
+        await new Promise<void>((resolve) => {
+          releases.set(to.path, resolve)
+          if (to.path === '/project')
+            markFirstStarted()
+          else
+            markSecondStarted()
+        })
+      }
+    })
+    const first = router.push('/project')
+    await firstStarted
+    const second = router.push('/schedule?project=a&origin=real')
+    await secondStarted
+    releaseRead()
+    await flushPromises()
+    releases.get('/project')!()
+    await first
+    await flushPromises()
+    releases.get('/schedule')!()
+    await second
+    await flushPromises()
+    expect(router.currentRoute.value.fullPath).toBe('/schedule?project=a&origin=real')
+    wrapper.unmount()
+  })
+
+  it('跳转解析报错时，仍恢复已读取的首页项目地址', async () => {
+    const { wrapper, router } = await open()
+    let releaseRead!: () => void
+    beforeRead = id => id === 'b'
+      ? new Promise((resolve) => {
+          releaseRead = resolve
+        })
+      : Promise.resolve()
+    await wrapper.get('select').setValue('real:b')
+    await flushPromises()
+
+    let releaseNavigation!: () => void
+    let markNavigationStarted!: () => void
+    const started = new Promise<void>((resolve) => {
+      markNavigationStarted = resolve
+    })
+    router.beforeEach(async (to) => {
+      if (to.path === '/project') {
+        markNavigationStarted()
+        await new Promise<void>((resolve) => {
+          releaseNavigation = resolve
+        })
+        throw new Error('合成路由加载失败')
+      }
+    })
+    const navigation = router.push('/project').catch(error => error)
+    await started
+    releaseRead()
+    await flushPromises()
+    releaseNavigation()
+    expect(await navigation).toMatchObject({ message: '合成路由加载失败' })
+    await flushPromises()
+    expect(router.currentRoute.value.query).toMatchObject({ project: 'b', origin: 'real' })
+    wrapper.unmount()
+  })
+
   it('离开首页后迟到的项目读取不得改写新页面地址', async () => {
     const { wrapper, router } = await open()
     let release!: () => void

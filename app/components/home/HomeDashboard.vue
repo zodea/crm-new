@@ -3,6 +3,7 @@ import type { HomeDashboardViewState } from '~/lib/home/dashboard'
 import type { HomeProjectReference, HomeProjectScheduleRead } from '~/lib/home/project-source'
 import type { ScheduleTaskView } from '~/lib/schedule/read-model'
 import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, shallowRef, watch } from 'vue'
+import { onBeforeRouteLeave } from 'vue-router'
 import { summarizeHomeScheduleCoverage } from '~/lib/home/dashboard'
 import { projectProblemFromUnknown } from '~/lib/project/repository'
 import { buildQuantityDrillLocation, scheduleFilterQuery, scheduleReturnContextQuery } from '~/lib/schedule/navigation'
@@ -24,6 +25,8 @@ const forbidden = shallowRef(false)
 const failedProject = shallowRef<HomeProjectReference | null>(null)
 let latestRequest = 0
 let wasDeactivated = false
+let leavingTarget: object | null = null
+let deferredRouteProject: HomeProjectReference | null = null
 
 const includeDemo = computed(() => visibility.includeDemo)
 const projectOptions = computed(() => store.catalog.map(project => ({
@@ -70,11 +73,34 @@ function routeProject() {
 }
 
 async function syncRoute(project: HomeProjectReference) {
+  if (wasDeactivated || route.path !== '/' || router.currentRoute.value.path !== '/')
+    return
+  if (leavingTarget) {
+    deferredRouteProject = project
+    return
+  }
   const origin = project.origin
   if (queryText(route.query.project) === project.id && queryText(route.query.origin) === origin)
     return
   await router.replace({ query: { ...route.query, project: project.id, origin: origin || undefined, group: undefined, task: undefined } })
 }
+
+function finishLeaving(to: object, failed: boolean) {
+  if (leavingTarget !== to)
+    return
+  leavingTarget = null
+  const project = deferredRouteProject
+  deferredRouteProject = null
+  if (failed && project && current.value?.project.key === project.key && !wasDeactivated && route.path === '/' && router.currentRoute.value.path === '/')
+    void syncRoute(project)
+}
+
+// 项目读取可能在离开首页的异步路由尚未解析时完成；此时同步 query 会取消用户导航。
+onBeforeRouteLeave((to) => {
+  leavingTarget = to
+})
+const removeAfterEach = router.afterEach((to, _from, failure) => finishLeaving(to, Boolean(failure)))
+const removeRouteError = router.onError((_error, to) => finishLeaving(to, true))
 
 async function selectProject(project: HomeProjectReference) {
   const request = ++latestRequest
@@ -181,11 +207,15 @@ watch(includeDemo, () => {
 onMounted(initialize)
 onDeactivated(() => {
   wasDeactivated = true
+  leavingTarget = null
+  deferredRouteProject = null
   latestRequest++
   pending.value = false
 })
 onBeforeUnmount(() => {
   latestRequest++
+  removeAfterEach()
+  removeRouteError()
 })
 onActivated(() => {
   if (wasDeactivated) {

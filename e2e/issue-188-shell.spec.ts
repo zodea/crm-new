@@ -46,6 +46,55 @@ test.beforeEach(async ({ page }) => {
   })
 })
 
+test('首页项目读取迟到时，侧栏跳转仍能完成', async ({ page }) => {
+  let releaseProjectRead!: () => void
+  let releaseRouteModule!: () => void
+  let markProjectRead!: () => void
+  let markRouteModule!: () => void
+  const projectRead = new Promise<void>((resolve) => {
+    markProjectRead = resolve
+  })
+  const routeModule = new Promise<void>((resolve) => {
+    markRouteModule = resolve
+  })
+  const projectGate = new Promise<void>((resolve) => {
+    releaseProjectRead = resolve
+  })
+  const routeGate = new Promise<void>((resolve) => {
+    releaseRouteModule = resolve
+  })
+  await page.route(/\/api\/read\/projects\/[^/?]+(?:\?|$)/, async (route) => {
+    markProjectRead()
+    await projectGate
+    await route.continue()
+  })
+  // 只延迟真正的页面模块，不能拦截启动时收集路由元信息的 ?macro=true 请求。
+  await page.route('**/_nuxt/pages/project/index.vue', async (route) => {
+    markRouteModule()
+    await routeGate
+    await route.continue()
+  })
+  try {
+    await page.setViewportSize({ width: 1024, height: 900 })
+    // 受控的异步请求故意保持未完成；按页面可见状态继续，不能等待整个文档 load。
+    await page.goto('/', { waitUntil: 'commit' })
+    await projectRead
+    const sidebar = page.locator('[data-sidebar="sidebar"]').first()
+    await sidebar.getByRole('searchbox', { name: '搜索菜单' }).fill('项目列表')
+    await sidebar.getByRole('link', { name: '项目列表', exact: true }).click()
+    await routeModule
+    releaseProjectRead()
+    await expect(page.getByTestId('project-switcher-trigger')).not.toContainText('正在加载项目')
+    releaseRouteModule()
+    await expect(page).toHaveURL('/project')
+    await expect(page.locator('[data-shell-topbar] h1')).toHaveText('项目列表')
+  }
+  finally {
+    releaseProjectRead()
+    releaseRouteModule()
+  }
+})
+
 test('Issue #188：导航搜索与页签溢出均可由键盘可达控件操作', async ({ page }) => {
   await page.setViewportSize({ width: 1100, height: 800 })
   await page.goto('/')

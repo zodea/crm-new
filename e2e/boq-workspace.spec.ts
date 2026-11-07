@@ -132,9 +132,12 @@ test.describe('Issue #115：BOQ 清单、变更与月度报量', () => {
   test('键盘可在三个工作台标签间移动，并保持直接业务入口可聚焦', async ({ page }) => {
     await page.goto('/contract/boq')
     await page.waitForLoadState('networkidle')
+    await expect(page.getByTestId('boq-contract-number')).toHaveText(INPUT.contractNumber)
 
     const linesTab = page.getByRole('tab', { name: /合同清单/ })
+    await expect(linesTab).toHaveAttribute('data-state', 'active')
     await linesTab.focus()
+    await expect(linesTab).toBeFocused()
     await page.keyboard.press('ArrowRight')
     await expect(page.getByRole('tab', { name: /变更单/ })).toHaveAttribute('data-state', 'active')
     await expect(page.getByRole('link', { name: INPUT.changeNumber, exact: true })).toBeVisible()

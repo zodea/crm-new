@@ -210,9 +210,12 @@ test.describe('Issue #190：项目列表、详情与表单参考旅程', () => {
       await expectInViewport(closeDetail, `${viewport.label} 关闭项目详情操作`)
       await expectNoPageOverflow(page, `${viewport.label} 项目详情`)
     }
+  })
 
-    await page.setViewportSize(desktop)
+  test('项目表单在各宽度保持固定操作条并支持键盘操作', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: VIEWPORT_HEIGHTS[1440] })
     await page.goto('/project/form')
+    const createProject = page.getByRole('button', { name: '新增项目', exact: true })
     const shell = page.locator('[data-ui="entity-form-shell"]')
     const footer = shell.getByRole('group', { name: '表单操作' })
     await expect(shell.getByRole('navigation', { name: '表单分区' }))
@@ -228,13 +231,17 @@ test.describe('Issue #190：项目列表、详情与表单参考旅程', () => {
       [cancel, save],
       '项目表单关键操作',
     )
-    for (const viewport of RESPONSIVE_CASES) {
+    for (const [index, viewport] of RESPONSIVE_CASES.entries()) {
       await page.setViewportSize({
         width: viewport.width,
         height: viewport.height,
       })
-      // 固定操作条按进入时的滚动容器定位，逐宽度重新进入表单
-      await page.goto('/project/form')
+      // 固定操作条按进入时的滚动容器定位；从列表重新进入，避免每档完整冷启动。
+      await cancel.click()
+      if (index === 0)
+        await page.getByRole('dialog', { name: '放弃修改' }).getByRole('button', { name: '放弃修改', exact: true }).click()
+      await expect(page).toHaveURL('/project')
+      await createProject.click()
       await expect(firstField).toBeVisible()
       await expectInViewport(footer, `${viewport.label} 项目表单固定操作条`)
       await expectNoPageOverflow(page, `${viewport.label} 项目表单`)

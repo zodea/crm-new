@@ -104,14 +104,14 @@ jobs:
         run: pnpm generate
 
   e2e:
-    name: e2e (${{ matrix.shard }}/4)
+    name: e2e (${{ matrix.shard }}/8)
     if: ${{ inputs.run_e2e }}
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 35
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
 
     steps:
       - name: Checkout
@@ -156,7 +156,7 @@ jobs:
           pnpm exec playwright test --list --project=chromium --project=chromium-b "${targets[@]}"
           result=0
           for project in chromium chromium-b; do
-            if ! pnpm exec playwright test --project="$project" --shard="$E2E_SHARD/4" --pass-with-no-tests --output="test-results/e2e-$project" "${targets[@]}"; then
+            if ! pnpm exec playwright test --project="$project" --shard="$E2E_SHARD/8" --pass-with-no-tests --reporter=list,github --output="test-results/e2e-$project" "${targets[@]}"; then
               result=1
             fi
           done
