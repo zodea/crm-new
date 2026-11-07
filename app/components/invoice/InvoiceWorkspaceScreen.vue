@@ -3,6 +3,7 @@ import type { InvoicePrintRequest } from '~/lib/invoice/print-layout'
 import type { RecognizedInvoiceFields } from '~/lib/invoice/recognize'
 import type { InvoiceDocStatus } from '~/lib/invoice/status'
 import type { Invoice } from '~/stores/invoice'
+import { onBeforeUnmount, toRaw } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import { useInvoiceRegionTarget } from '~/composables/useInvoiceRegionTarget'
 import { useTabCloseGuard } from '~/composables/useTabCloseGuard'
@@ -62,6 +63,65 @@ interface RecognitionDraft {
   edits: Partial<Invoice>
 }
 const draft = shallowRef<RecognitionDraft | null>(null)
+let draftRevision = 0
+let selectionRevision = 0
+let active = true
+watch(draft, () => {
+  draftRevision++
+}, { flush: 'sync' })
+watch(selectedId, () => {
+  selectionRevision++
+}, { flush: 'sync' })
+onBeforeUnmount(() => {
+  active = false
+})
+
+/** 快照只接受可逐值核对的内存数据；未知类型不能授权放弃。 */
+function copyDraftValue(value: unknown, parents = new Set<object>()): unknown {
+  if (value === null || typeof value !== 'object') {
+    if (typeof value === 'function' || typeof value === 'symbol')
+      throw new Error('草稿包含无法核对的数据')
+    return value
+  }
+  const raw = toRaw(value)
+  const prototype = Object.getPrototypeOf(raw)
+  if ((!Array.isArray(raw) && prototype !== Object.prototype && prototype !== null) || parents.has(raw) || Object.getOwnPropertySymbols(raw).length)
+    throw new Error('草稿包含无法核对的数据')
+  parents.add(raw)
+  try {
+    const copy: Record<string, unknown> | unknown[] = Array.isArray(raw) ? new Array(raw.length) : Object.create(null)
+    for (const key of Object.getOwnPropertyNames(raw)) {
+      if (Array.isArray(raw) && key === 'length')
+        continue
+      const property = Object.getOwnPropertyDescriptor(raw, key)
+      if (!property || !('value' in property))
+        throw new Error('草稿包含无法核对的数据')
+      Object.defineProperty(copy, key, { value: copyDraftValue(property.value, parents), enumerable: property.enumerable, configurable: true, writable: true })
+    }
+    return copy
+  }
+  finally { parents.delete(raw) }
+}
+function sameDraftValue(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right))
+    return true
+  if (left === null || right === null || typeof left !== 'object' || typeof right !== 'object')
+    return false
+  if (Array.isArray(left) !== Array.isArray(right) || (Array.isArray(left) && Array.isArray(right) && left.length !== right.length))
+    return false
+  const leftKeys = Object.getOwnPropertyNames(left).sort()
+  const rightKeys = Object.getOwnPropertyNames(right).sort()
+  return leftKeys.length === rightKeys.length && leftKeys.every((key, index) => key === rightKeys[index]
+    && sameDraftValue((left as Record<string, unknown>)[key], (right as Record<string, unknown>)[key]))
+}
+interface DiscardPermit { draftRevision: number, selectionRevision: number, selectedId: string | null }
+function currentPermit(): DiscardPermit {
+  return { draftRevision, selectionRevision, selectedId: selectedId.value }
+}
+function permitIsCurrent(permit: DiscardPermit) {
+  return active && permit.draftRevision === draftRevision && permit.selectionRevision === selectionRevision
+    && permit.selectedId === selectedId.value && draft.value === null
+}
 
 const draftValues = computed<Invoice | null>(() => draft.value
   ? { ...draft.value.before, ...draft.value.recognized, reviewStatus: 'unreviewed', ...draft.value.edits }
@@ -228,12 +288,32 @@ function editDraft(patch: Partial<Invoice>) {
 /** 存在草稿时先确认放弃；无草稿直接放行。 */
 async function confirmDiscardDraft(message = '重新识别结果尚未保存，确认放弃并保留识别前的值？') {
   if (!draft.value)
-    return true
-  const current = draft.value
+    return currentPermit()
+  const expectedDraftRevision = draftRevision
+  const expectedSelectionRevision = selectionRevision
+  const expectedSelectedId = selectedId.value
+  let snapshot: unknown
+  try {
+    snapshot = copyDraftValue(draft.value)
+  }
+  catch {
+    warning('草稿暂时无法可靠核对，请保留输入后重试。')
+    return null
+  }
   const ok = await confirm({ variant: 'simple', title: '放弃识别结果', message, confirmLabel: '放弃识别结果' })
-  if (ok && draft.value === current)
-    draft.value = null
-  return ok
+  if (!ok || !active || draftRevision !== expectedDraftRevision || selectionRevision !== expectedSelectionRevision
+    || selectedId.value !== expectedSelectedId || !draft.value) {
+    return null
+  }
+  try {
+    if (!sameDraftValue(snapshot, copyDraftValue(draft.value)))
+      return null
+  }
+  catch {
+    return null
+  }
+  draft.value = null
+  return currentPermit()
 }
 
 /** 保存草稿：二次确认列出变动 → 识别结果与人工修改分两次留痕写库。取消返回 false，草稿保留。 */
@@ -284,13 +364,22 @@ async function handleRerecognize() {
       warning(store.recognitionError(id) || '无法重新识别：该票已归档或正在识别中')
     return
   }
-  if (draft.value && !await confirmDiscardDraft('当前还有未保存的重新识别结果，再次识别将放弃它，确认继续？'))
-    return
+  if (draft.value) {
+    const permit = await confirmDiscardDraft('当前还有未保存的重新识别结果，再次识别将放弃它，确认继续？')
+    if (!permit || !permitIsCurrent(permit))
+      return
+  }
+  const startedDraftRevision = draftRevision
+  const startedSelectionRevision = selectionRevision
   const recognized = await promise(store.recognizeDraft(id), {
     loading: '重新识别中…',
     success: result => result ? '识别完成，结果未保存，请核对后保存' : '识别未完成',
     error: () => '识别失败',
   })
+  if (!active || selectedId.value !== id || selectionRevision !== startedSelectionRevision
+    || draftRevision !== startedDraftRevision || draft.value !== null) {
+    return
+  }
   if (!recognized) {
     warning(store.recognitionError(id) || '无法重新识别：该票已归档或正在识别中')
     return
@@ -313,13 +402,17 @@ const selectedModel = computed({
   },
 })
 async function selectInvoice(next: string | null) {
-  if (next === selectedId.value || !await confirmDiscardDraft())
+  if (next === selectedId.value)
+    return
+  const permit = await confirmDiscardDraft()
+  if (!permit || !permitIsCurrent(permit))
     return
   selectedId.value = next
 }
 
 async function canLeave() {
-  return confirmDiscardDraft()
+  const permit = await confirmDiscardDraft()
+  return !!permit && permitIsCurrent(permit)
 }
 useTabCloseGuard(canLeave)
 onBeforeRouteLeave(canLeave)
