@@ -37,6 +37,9 @@ export default defineConfig({
   testIgnore: VISUAL_SPEC,
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
+  // CI 的开发服务器在 HTML 可响应时，客户端模块仍可能在首次按需编译。
+  // 先用隔离浏览器确认外壳就绪，不改变任何业务测试的断言或超时。
+  globalSetup: process.env.CI && process.env.E2E_PROJECT ? './e2e/helpers/warm-dev-server.ts' : undefined,
   retries: process.env.CI ? 2 : 0,
   // 本机冷启动的模块加载可能超过默认 5 秒；仍需等到相同的可观察结果。
   expect: { timeout: 15_000 },

@@ -26,7 +26,7 @@ test.describe('Issue #317：项目分供方六类事实工作台', () => {
     await reset(page.context().request, id)
   })
 
-  test('六类事实、汇总、源单返回与标签刷新恢复闭合', async ({ page }) => {
+  test('六类事实与汇总可见，项目来源刷新后返回工作台', async ({ page }) => {
     await page.goto(WORKBENCH)
     await expect(page.getByRole('heading', { name: '锦绣华庭 × 穗建五金机电经营部' })).toBeVisible({ timeout: 20_000 })
     await expect(page.getByText('¥230,000.00', { exact: true }).first()).toBeVisible()
@@ -43,7 +43,11 @@ test.describe('Issue #317：项目分供方六类事实工作台', () => {
     await page.getByRole('link', { name: '返回项目分供方工作台' }).click()
     await expect(page).toHaveURL(/\/project\/proj_demo_002\/supplier\/sup_demo_004\?origin=demo&tab=overview$/)
     await expect(page.getByRole('heading', { name: '锦绣华庭 × 穗建五金机电经营部' })).toBeVisible()
+  })
 
+  test('分供方来源刷新后返回工作台', async ({ page }) => {
+    await page.goto(WORKBENCH)
+    await expect(page.getByRole('heading', { name: '锦绣华庭 × 穗建五金机电经营部' })).toBeVisible({ timeout: 20_000 })
     const supplierIdentity = page.getByRole('link', { name: '穗建五金机电经营部', exact: true })
     await expect(supplierIdentity).toHaveAttribute('href', /\/base\/supplier\/sup_demo_004\?origin=demo&returnTo=/)
     await supplierIdentity.click()
@@ -54,7 +58,11 @@ test.describe('Issue #317：项目分供方六类事实工作台', () => {
     await page.getByRole('link', { name: '返回项目分供方工作台' }).click()
     await expect(page).toHaveURL(/\/project\/proj_demo_002\/supplier\/sup_demo_004\?origin=demo&tab=overview$/)
     await expect(page.getByRole('heading', { name: '锦绣华庭 × 穗建五金机电经营部' })).toBeVisible()
+  })
 
+  test('合同源单返回后刷新保留标签', async ({ page }) => {
+    await page.goto(WORKBENCH)
+    await expect(page.getByRole('heading', { name: '锦绣华庭 × 穗建五金机电经营部' })).toBeVisible({ timeout: 20_000 })
     await page.getByRole('tab', { name: /^合同/ }).click()
     await expect(page).toHaveURL(/tab=contract/)
     const contractSource = page.getByRole('link', { name: '查看源单' }).first()
@@ -66,7 +74,11 @@ test.describe('Issue #317：项目分供方六类事实工作台', () => {
     await expect(page.getByRole('tab', { name: /^合同/ })).toHaveAttribute('aria-selected', 'true')
     await page.reload()
     await expect(page.getByRole('tab', { name: /^合同/ })).toHaveAttribute('aria-selected', 'true')
+  })
 
+  test('请款刷新恢复及收票、付款、结算显示待核验状态', async ({ page }) => {
+    await page.goto(WORKBENCH)
+    await expect(page.getByRole('heading', { name: '锦绣华庭 × 穗建五金机电经营部' })).toBeVisible({ timeout: 20_000 })
     await page.getByRole('tab', { name: /^请款/ }).click()
     await expect(page.getByText('来源待核验').first()).toBeVisible()
     await expect(page.getByRole('link', { name: '查看源单' })).toHaveCount(0)

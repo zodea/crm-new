@@ -90,10 +90,12 @@ export async function writeProductionSnapshot(page: Page, bytes: number[]): Prom
       request.addEventListener('error', () => reject(request.error), { once: true })
     })
     try {
+      const binary = atob(snapshot)
+      const bytes = Uint8Array.from(binary, character => character.charCodeAt(0))
       await new Promise<void>((resolve, reject) => {
         const transaction = database.transaction(snapshotStore, 'readwrite')
         transaction.objectStore(snapshotStore).put(
-          new Uint8Array(snapshot).buffer,
+          bytes.buffer,
           'production',
         )
         transaction.addEventListener('complete', () => resolve(), { once: true })
@@ -108,7 +110,8 @@ export async function writeProductionSnapshot(page: Page, bytes: number[]): Prom
     databaseName: DATABASE_NAME,
     databaseVersion: DATABASE_VERSION,
     snapshotStore: SNAPSHOT_STORE,
-    snapshot: bytes,
+    // 与读取侧一样使用 base64，避免通过浏览器协议序列化数百万个数字。
+    snapshot: Buffer.from(bytes).toString('base64'),
   })
 }
 

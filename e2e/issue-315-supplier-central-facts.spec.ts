@@ -114,7 +114,7 @@ test.describe('Issue #315：分供方中央详情与四类真实事实', () => {
     await expect(page.getByRole('button', { name: /上传/ })).toHaveCount(0)
   })
 
-  test('真实 HTTP 接缝区分空态、禁止、暂不可用、缺失与来源不匹配', async ({ page }, testInfo) => {
+  test('真实 HTTP 接缝区分演示未开启、空态与无权', async ({ page }, testInfo) => {
     const sessionId = testSession(testInfo)
 
     await page.goto('/base/supplier/credential/sup_demo_004?origin=demo')
@@ -133,7 +133,10 @@ test.describe('Issue #315：分供方中央详情与四类真实事实', () => {
     expect(await forbiddenResponse.json()).toMatchObject({ data: { code: 'forbidden' } })
     await page.reload()
     await expect(page.getByText('无分供方查看权限')).toBeVisible()
+  })
 
+  test('真实 HTTP 接缝与详情页呈现暂不可用并提供重试', async ({ page }, testInfo) => {
+    const sessionId = testSession(testInfo)
     await resetSupplierBackend(page.context().request, sessionId, 'unavailable')
     const unavailableResponse = await page.context().request.get('/api/read/suppliers/sup_demo_004?origin=demo&includeDemo=true', {
       headers: { 'x-ruihang-test-session': sessionId },
@@ -143,8 +146,10 @@ test.describe('Issue #315：分供方中央详情与四类真实事实', () => {
     await page.goto('/base/supplier/sup_demo_004?origin=demo&includeDemo=true')
     await expect(page.getByText('分供方中央读取服务暂时不可用')).toBeVisible()
     await expect(page.getByRole('button', { name: '重新加载' })).toBeVisible()
+  })
 
-    await resetSupplierBackend(page.context().request, sessionId)
+  test('真实 HTTP 接缝区分缺失与来源不匹配', async ({ page }, testInfo) => {
+    const sessionId = testSession(testInfo)
     const missingResponse = await page.context().request.get('/api/read/suppliers/not-there?origin=real', {
       headers: { 'x-ruihang-test-session': sessionId },
     })

@@ -118,6 +118,7 @@ for (const input of [
     await page.waitForLoadState('networkidle')
 
     const tabs = page.getByRole('navigation', { name: '已打开页面' })
+    await expect(tabs.getByRole('button', { name: '开发验证', exact: true })).toBeVisible()
     const initialTabs = await tabs.getByRole('button', { name: /^关闭 / }).count()
     await page.getByRole('button', { name: '打开多表导出配置' }).click()
     await expect(page).toHaveURL(/\/export\/config\/[^/]+$/)
