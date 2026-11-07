@@ -8,6 +8,7 @@
 import type { RecognizedInvoiceFields } from '~/lib/invoice/recognize'
 import type { InvoiceDocStatus } from '~/lib/invoice/status'
 import type { Invoice } from '~/stores/invoice'
+import { onBeforeUnmount } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import { useInvoiceRegionTarget } from '~/composables/useInvoiceRegionTarget'
 import { useTabCloseGuard } from '~/composables/useTabCloseGuard'
@@ -26,6 +27,45 @@ const { confirm, success, warning, error, undoToast } = useKitUI()
 
 const id = computed(() => String(route.params.id))
 const invoice = computed(() => store.byId(id.value))
+const readState = shallowRef<'preparing' | 'idle' | 'loading' | 'missing' | 'error'>(invoice.value ? 'idle' : 'preparing')
+const readTarget = shallowRef<string | null>(invoice.value ? null : id.value)
+let readGeneration = 0
+let active = true
+
+async function readMissingInvoice() {
+  const target = id.value
+  if (readState.value === 'loading' && readTarget.value === target)
+    return
+  const current = ++readGeneration
+  readTarget.value = target
+  readState.value = 'loading'
+  try {
+    await store.load()
+    if (!active || current !== readGeneration || id.value !== target)
+      return
+    if (invoice.value) {
+      resetForm()
+      readState.value = 'idle'
+    }
+    else {
+      readState.value = 'missing'
+    }
+  }
+  catch {
+    if (active && current === readGeneration && id.value === target)
+      readState.value = 'error'
+  }
+  finally {
+    if (active && current === readGeneration && id.value !== target) {
+      readTarget.value = null
+      readState.value = 'idle'
+    }
+  }
+}
+onBeforeUnmount(() => {
+  active = false
+  readGeneration++
+})
 
 function tail8(no: string | undefined) {
   return no ? no.slice(-8) : '—'
@@ -365,19 +405,40 @@ useTabCloseGuard(canLeave)
 onBeforeRouteLeave(canLeave)
 
 onMounted(() => {
-  if (!store.list.length)
-    store.load().then(resetForm)
+  if (readState.value === 'preparing' || !invoice.value)
+    void readMissingInvoice()
 })
 </script>
 
 <template>
-  <!-- 空态：不存在或已删除 -->
-  <div v-if="!invoice" class="panel flex flex-col items-center gap-3 py-10 text-ink-soft">
+  <div v-if="readTarget === id && readState === 'preparing'" role="status" class="panel p-6 text-ink-soft">
+    准备读取发票…
+  </div>
+  <div v-else-if="readTarget === id && readState === 'loading'" role="status" class="panel p-6 text-ink-soft">
+    正在读取发票…
+  </div>
+  <div v-else-if="readTarget === id && readState === 'error'" class="panel flex flex-col items-center gap-3 py-10">
+    <p role="alert" class="m-0 text-danger">
+      发票读取失败，请重试。
+    </p>
+    <button type="button" class="btn-secondary" @click="readMissingInvoice">
+      重新读取
+    </button>
+  </div>
+  <!-- 仅在本次可靠读取后确实无目标时显示空态。 -->
+  <div v-else-if="!invoice && readTarget === id && readState === 'missing'" class="panel flex flex-col items-center gap-3 py-10 text-ink-soft">
     <span class="i-lucide-file-x h-8 w-8 text-ink-faint" aria-hidden="true" />
     <div>该发票不存在或已删除。</div>
     <NuxtLink to="/finance/ledger" class="btn-secondary">
       <span class="i-lucide-arrow-left mr-1 text-13px" aria-hidden="true" />返回台账
     </NuxtLink>
+  </div>
+
+  <div v-else-if="!invoice || (readTarget === id && readState === 'missing')" role="status" class="panel flex flex-col items-center gap-3 py-10 text-ink-soft">
+    <span>当前发票暂不可用，请核对来源。</span>
+    <button type="button" class="btn-secondary" @click="backToLedger">
+      返回台账
+    </button>
   </div>
 
   <div v-else class="invoice-edit-screen flex flex-col gap-3">

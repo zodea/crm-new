@@ -113,6 +113,7 @@
 | [tests/components/FactorSolverState.test.ts](../../../tests/components/FactorSolverState.test.ts) | 组件（jsdom） | 因子工具保存配置兼容 |
 | [tests/components/FactorTaxCalculator.test.ts](../../../tests/components/FactorTaxCalculator.test.ts) | 组件（jsdom） | 共用金额税额栏 |
 | [tests/components/InvoiceEditPage.test.ts](../../../tests/components/InvoiceEditPage.test.ts) | 组件（jsdom） | 编辑页重新识别草稿：只填表单不写库、保存二次确认（取消不写库）、字段角标与读屏原值、放弃恢复、离开保护、失败保留输入；原图比对框、“原图未定位”、聚焦/悬停强调与旋转换算；平时显示原件，无原文件时说明“原件不在本次会话中”且不显示示意图；首次识别聚焦字段临时框出、失焦撤框 |
+| [tests/components/InvoiceLegacyDetailLoading.test.ts](../../../tests/components/InvoiceLegacyDetailLoading.test.ts) | 组件（jsdom）／合成来源 | 旧单票首次准备与读取、失败重试、可靠无票、后续暂不可用和迟到回包；不访问真实旧库 |
 | [tests/components/InvoiceReviewForm.test.ts](../../../tests/components/InvoiceReviewForm.test.ts) | 组件（jsdom） | 识别校对表单草稿模式：修改只交父级不写库，变动字段角标与读屏原值；聚焦/悬停变动字段通知原图强调，读屏说明原图是否框出；首次识别点字段定位聚焦即定位、失焦撤回，未定位字段读屏说明 |
 | [tests/components/InvoiceRegionViewer.test.ts](../../../tests/components/InvoiceRegionViewer.test.ts) | 组件（jsdom） | 发票原图预览器：普通预览缩放与左右旋转、PDF 超页数上限如实提示、渲染/解码失败可解释并重试、点字段定位与比对两种区域模式 |
 | [tests/components/InvoiceRegionViewerDecodeFailure.test.ts](../../../tests/components/InvoiceRegionViewerDecodeFailure.test.ts) | 组件（jsdom） | 合成 PDF 页图解码失败、重试、定位撤销和旧结果迟到 |
@@ -136,6 +137,7 @@
 | [tests/browser/CentralInvoiceLoadInterleaving.test.ts](../../../tests/browser/CentralInvoiceLoadInterleaving.test.ts) | 真实组件／合成传输 | 两视口旧读取成功或网络失败迟到不覆盖新数据或提示，键盘焦点；外部并发使用合成来源 |
 | [tests/browser/CentralInvoiceRegions.test.ts](../../../tests/browser/CentralInvoiceRegions.test.ts) | 真实组件／模拟来源 | 原件定位与撤权 |
 | [tests/browser/InvoiceImageDecodeReadiness.test.ts](../../../tests/browser/InvoiceImageDecodeReadiness.test.ts) | 真实浏览器／合成图片 | 五视口真实图片解码后的定位、旋转及损坏恢复；不读取真实发票 |
+| [tests/browser/InvoiceLegacyDetailLoading.test.ts](../../../tests/browser/InvoiceLegacyDetailLoading.test.ts) | 真实浏览器／合成来源 | 五视口旧单票读取失败、键盘重试与无请求时暂不可用；不验证跨来源草稿恢复 |
 | [tests/browser/InvoicePdfPageDecodeFailure.test.ts](../../../tests/browser/InvoicePdfPageDecodeFailure.test.ts) | 真实浏览器／合成页图 | 五视口 PDF 页图解码失败、键盘重试和焦点返回 |
 | [tests/browser/pdf-preview-real-browser.test.ts](../../../tests/browser/pdf-preview-real-browser.test.ts) | 真实浏览器／合成 PDF | 真实 pdf.js 和 canvas 渲染单页旋转 PDF、图像解码与调用者释放 URL |
 | [tests/browser/CentralInvoiceRerecognition.test.ts](../../../tests/browser/CentralInvoiceRerecognition.test.ts) | 真实组件／模拟来源 | 重识别草稿与交互 |
