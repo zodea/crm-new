@@ -181,7 +181,7 @@
 | [tests/payroll/central-a-amount-integrity.test.ts](../../../tests/payroll/central-a-amount-integrity.test.ts) | 单元／服务／状态 | a 工资公开核算的历史实付完整性 |
 | [tests/payroll/central-a-book-history-gaps.test.ts](../../../tests/payroll/central-a-book-history-gaps.test.ts) | 单元／服务／状态 | 管理已领用途关系及两份原件同时缺损时，不借旧A兼容分支变成零已领 |
 | [tests/payroll/central-a-codec.test.ts](../../../tests/payroll/central-a-codec.test.ts) | 单元／服务／状态 | 工资预览拒绝缺数量/状态权限不符/错目标，金额不能传输时取整成另一笔 |
-| [tests/payroll/central-a-commands.test.ts](../../../tests/payroll/central-a-commands.test.ts) | 单元／服务／状态 | 中央 A 配置、核对与冻结发放事务 |
+| [tests/payroll/central-a-commands.test.ts](../../../tests/payroll/central-a-commands.test.ts) | 单元／服务／状态 | 中央 A 配置、核对与冻结发放；超额及无空鼓零额拒绝后合成库持久事实不变，等额发放原编号重放不重复写入 |
 | [tests/payroll/central-a-diagnostic-location.test.ts](../../../tests/payroll/central-a-diagnostic-location.test.ts) | 单元／服务／状态 | 中央工资损坏来源的原位置读取 |
 | [tests/payroll/central-a-fee-adjustment-calculation.test.ts](../../../tests/payroll/central-a-fee-adjustment-calculation.test.ts) | 单元／服务／状态 | a 费用独立更正计算 |
 | [tests/payroll/central-a-fee-adjustments.test.ts](../../../tests/payroll/central-a-fee-adjustments.test.ts) | 单元／服务／状态 | 后来费用单价变成第三个值时不能以总额近似认作已含原更正 |

@@ -68,9 +68,32 @@ describe('中央 A 配置、核对与冻结发放事务', () => {
     expect(checked.totals.grossAmount.value).toBe(1280)
     const release = (actualAmount: number) => f.command(checked, { kind: 'release-a', release: { actualAmount, allocations: [{ workerId: 'w', amount: actualAmount }, { workerId: 'zero', amount: 0 }] } })
 
-    await expect(f.service.execute(release(1280.01))).rejects.toThrow('实际发放不能超过事务内重新核算的本次应发')
-    await expect(f.service.execute(release(0))).rejects.toThrow('实际发放须为正数并精确到分')
+    // 读取同一合成库中的持久事实，逐项证明失败没有留下部分发放。
+    const snapshot = async () => ({
+      statements: await f.db.select('SELECT * FROM wage_statements ORDER BY id'),
+      allocations: await f.db.select('SELECT * FROM wage_statement_allocations ORDER BY id'),
+      sources: await f.db.select('SELECT * FROM payroll_a_statement_sources ORDER BY statement_id'),
+      receipts: await f.db.select('SELECT * FROM payroll_command_receipts ORDER BY command_id'),
+      revision: await f.db.select('SELECT * FROM payroll_revision ORDER BY singleton'),
+      logs: await f.db.select('SELECT * FROM operation_logs ORDER BY id'),
+    })
+    const before = await snapshot()
+    const excessive = release(1280.01)
+    await expect(f.service.execute(excessive)).rejects.toThrow('实际发放不能超过事务内重新核算的本次应发')
+    expect(await snapshot()).toEqual(before)
+    const zero = release(0)
+    await expect(f.service.execute(zero)).rejects.toThrow('实际发放须为正数并精确到分')
+    expect(await snapshot()).toEqual(before)
+    expect(await f.db.select('SELECT command_id FROM payroll_command_receipts WHERE command_id IN (?,?) ORDER BY command_id', [excessive.commandId, zero.commandId])).toEqual([])
     expect(await f.db.select('SELECT status FROM wage_statements WHERE id=?', [saved.statementId])).toEqual([{ status: 'checked' }])
-    expect((await f.service.execute(release(1280))).outcome).toBe('released')
+    const exact = release(1280)
+    const result = await f.service.execute(exact)
+    expect(result.outcome).toBe('released')
+    expect(await f.db.select('SELECT command_id,action FROM payroll_command_receipts WHERE command_id=?', [exact.commandId])).toEqual([{ command_id: exact.commandId, action: 'release-a' }])
+    expect(await f.db.select('SELECT worker_id,allocated_amount_fen FROM wage_statement_allocations WHERE statement_id=? ORDER BY worker_id', [saved.statementId])).toEqual([{ worker_id: 'w', allocated_amount_fen: 128000 }, { worker_id: 'zero', allocated_amount_fen: 0 }])
+    expect((await f.service.detail({ origin: 'real' }, saved.statementId!)).statement).toMatchObject({ status: 'released', actualAmount: 1280, snapshot: { state: 'complete' } })
+    const after = await snapshot()
+    expect(await f.service.execute(exact)).toEqual(result)
+    expect(await snapshot()).toEqual(after)
   })
 })
