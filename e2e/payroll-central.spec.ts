@@ -153,6 +153,15 @@ test('工资真实八表迁入、完整发放记录、独立来源、缺坏快�
     expect(original.statement.formatFamily).toBe('B')
     await expect(page.getByRole('button', { name: /发放|核对|打印|导出/ })).toHaveCount(0)
   }
+  const final = await readDetail(page, f.healthy.id)
+  expect(final).toEqual(detail)
+  await writeFile(info.outputPath('verification.json'), JSON.stringify({ runId: f.runId, batchId: f.batchId, sourceHash: f.sourceHash, statementId: f.healthy.id, snapshotUnchanged: true, newWrites: 0, scope: '真实SQLite迁入后的完整只读浏览器旅程', widths: [390, 768, 1024, 1280, 1440] }, null, 2))
+})
+
+test('工资来源隔离、缺失记录与空范围建单保护', async ({ page }, info) => {
+  test.setTimeout(360_000)
+  const f = await fixture(page, info)
+  const detail = await readDetail(page, f.healthy.id)
   await page.goto(`/subcontract/payroll/not-found?origin=real&project=${encodeURIComponent(f.independent)}`)
   await expect(page.getByRole('alert')).toBeVisible()
   await capture(page, 'missing-record-no-fallback')
@@ -167,5 +176,5 @@ test('工资真实八表迁入、完整发放记录、独立来源、缺坏快�
   await capture(page, 'new-route-empty-scope-guard')
   const final = await readDetail(page, f.healthy.id)
   expect(final).toEqual(detail)
-  await writeFile(info.outputPath('verification.json'), JSON.stringify({ runId: f.runId, batchId: f.batchId, sourceHash: f.sourceHash, statementId: f.healthy.id, snapshotUnchanged: true, newWrites: 0, scope: '真实SQLite预检、演练、迁入、确认后的完整只读浏览器旅程及空范围建单保护', widths: [390, 768, 1024, 1280, 1440] }, null, 2))
+  await writeFile(info.outputPath('verification.json'), JSON.stringify({ runId: f.runId, batchId: f.batchId, sourceHash: f.sourceHash, statementId: f.healthy.id, snapshotUnchanged: true, newWrites: 0, scope: '真实SQLite迁入后的来源隔离、缺失记录及空范围建单保护', widths: [390, 768, 1024, 1280, 1440] }, null, 2))
 })

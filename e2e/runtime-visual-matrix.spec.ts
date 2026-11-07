@@ -261,6 +261,7 @@ const SAMPLES: VisualSample[] = [
     key: 'notification-sheet',
     path: '/?project=proj_demo_001&origin=demo',
     prepare: async (page, width) => {
+      await expect(page.getByTestId('home-schedule-scroll')).toBeVisible()
       await page.getByRole('button', { name: /打开通知中心/ }).click()
       const sheet = page.getByRole('dialog', { name: '消息中心' })
       await expect(sheet).toBeVisible()
