@@ -308,20 +308,29 @@ test.describe('Issue #327：分包变洽签专属只读链', () => {
     await expect(page.getByRole('link', { name: 'E2E 草稿分包变更' })).toBeFocused()
   })
 
-  test('真实空态、无权限、关系错配与失败重试保持不同语义', async ({ page }, testInfo) => {
+  test('真实空态显示无数据', async ({ page }, testInfo) => {
     const id = session(testInfo)
     await reset(page.context().request, id, 'owner-documents', 'empty')
     await page.goto('/subcontract/change')
     await expect(page.locator('[data-ui="kit-table-empty"]:visible').filter({ hasText: '暂无分包变洽签' })).toBeVisible({ timeout: 20_000 })
+  })
 
+  test('无权限显示权限提示', async ({ page }, testInfo) => {
+    const id = session(testInfo)
     await reset(page.context().request, id, 'owner-documents', 'forbidden')
     await page.goto('/subcontract/change/sub-change-real-327?origin=real')
     await expect(page.getByText('无权查看分包变洽签')).toBeVisible({ timeout: 20_000 })
+  })
 
+  test('来源关系错配显示独立提示', async ({ page }, testInfo) => {
+    const id = session(testInfo)
     await reset(page.context().request, id, 'owner-documents', 'ready')
     await page.goto('/subcontract/change/owner-penalty-real-326?origin=real')
     await expect(page.getByText('单据来源或关系不匹配')).toBeVisible({ timeout: 20_000 })
+  })
 
+  test('读取失败后可重试', async ({ page }, testInfo) => {
+    const id = session(testInfo)
     await reset(page.context().request, id, 'owner-documents', 'unavailable')
     await page.goto('/subcontract/change/sub-change-real-327?origin=real')
     await expect(page.getByText('分包变洽签读取失败')).toBeVisible({ timeout: 20_000 })
