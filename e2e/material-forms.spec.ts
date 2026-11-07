@@ -297,21 +297,23 @@ test.describe('F4 物资领域整页表单', () => {
       .toBeVisible()
   })
 
-  test('十二条整页表单在各宽度无页面级横向溢出', async ({ page }) => {
-    test.setTimeout(90_000)
-    const fixture = fixtures.get(page)!
-    for (const route of responsiveRoutes(fixture)) {
-      await page.goto(route.path)
-      await expect(page.getByRole('heading', { name: route.title })).toBeVisible({
-        timeout: 20_000,
-      })
-      await expect(page.getByRole('group', { name: '表单操作', exact: true })).toBeVisible()
-      for (const width of RESPONSIVE_WIDTHS) {
-        await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
-        await expectNoPageOverflow(page, `${route.path} @ ${width}px`)
+  for (const group of [0, 1, 2, 3]) {
+    test(`整页表单在各宽度无页面级横向溢出：第 ${group + 1} 组`, async ({ page }) => {
+      test.setTimeout(90_000)
+      const fixture = fixtures.get(page)!
+      for (const route of responsiveRoutes(fixture).slice(group * 3, group * 3 + 3)) {
+        await page.goto(route.path)
+        await expect(page.getByRole('heading', { name: route.title })).toBeVisible({
+          timeout: 20_000,
+        })
+        await expect(page.getByRole('group', { name: '表单操作', exact: true })).toBeVisible()
+        for (const width of RESPONSIVE_WIDTHS) {
+          await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
+          await expectNoPageOverflow(page, `${route.path} @ ${width}px`)
+        }
       }
-    }
-    await page.goto('/material/arrival/new')
-    await expect(page.getByRole('heading', { name: '新建 · 材料到货' })).toBeVisible()
-  })
+      await page.goto('/material/arrival/new')
+      await expect(page.getByRole('heading', { name: '新建 · 材料到货' })).toBeVisible()
+    })
+  }
 })
