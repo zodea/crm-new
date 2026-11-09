@@ -3,11 +3,12 @@ import type { CentralInvoiceFields, CentralInvoiceItem, CentralInvoiceRecord, In
 import type { CentralInvoiceFormSnapshot } from '~/lib/invoice/central-form-snapshot'
 import type { createCentralInvoiceWorkspace } from '~/lib/invoice/central-workspace'
 import type { LocalInvoiceCandidate } from '~/lib/invoice/recognize'
-import { computed, onBeforeUnmount, onMounted, shallowRef, useTemplateRef, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, shallowRef, useTemplateRef, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import { useKitUI } from '~/composables/useKitUI'
 import { useTabCloseGuard } from '~/composables/useTabCloseGuard'
 import { invoiceCandidateForCommand } from '~/lib/invoice/central-recognition'
+import { CentralInvoiceUploadNotSubmittedError } from '~/lib/invoice/central-workspace'
 import CentralInvoiceWorkspaceView from './CentralInvoiceWorkspaceView.vue'
 
 type Workspace = ReturnType<typeof createCentralInvoiceWorkspace>
@@ -26,10 +27,14 @@ const dirty = shallowRef(false)
 const error = shallowRef('')
 const pending = shallowRef<{ targetId: string | null, action: string, scopeId?: string } | null>(null)
 const pendingUnavailable = shallowRef(false)
+const batchResults = shallowRef<Array<{ name: string, status: string }> | null>(null)
 const draft = shallowRef<{ invoice: CentralInvoiceRecord, candidate: LocalInvoiceCandidate, before: CentralInvoiceFormSnapshot } | null>(null)
 const recognizedRegions = shallowRef<{ invoice: CentralInvoiceRecord, candidate: LocalInvoiceCandidate } | null>(null)
 const restoredSnapshot = shallowRef<CentralInvoiceFormSnapshot | null>(null)
 const workspaceView = useTemplateRef<InstanceType<typeof CentralInvoiceWorkspaceView>>('workspaceView')
+const screenRoot = useTemplateRef<HTMLDivElement>('screenRoot')
+const batchRegion = useTemplateRef<HTMLElement>('batchRegion')
+const sourceRetry = useTemplateRef<HTMLButtonElement>('sourceRetry')
 const cachedRecords = shallowRef<CentralInvoiceRecord[]>([])
 const missingRecord = shallowRef<CentralInvoiceRecord | null>(null)
 let originalGeneration = 0
@@ -122,14 +127,28 @@ function refreshPending() {
     else pending.value = null
     pendingUnavailable.value = false
   }
-  catch (cause) {
+  catch {
     pending.value = null
     pendingUnavailable.value = true
-    error.value = message(cause)
+    error.value = '无法可靠核对原提交编号，请恢复浏览器存储。'
   }
 }
-watch(() => props.workspace.readState.value, () => {
+function clearBatch() {
+  const hadFocus = typeof document !== 'undefined' && !!batchRegion.value?.contains(document.activeElement)
+  batchResults.value = null
+  if (hadFocus) {
+    void nextTick(() => {
+      if (active && document.activeElement === document.body)
+        (sourceRetry.value && !sourceRetry.value.disabled ? sourceRetry.value : screenRoot.value)?.focus({ preventScroll: true })
+    })
+  }
+}
+watch([() => props.workspace, () => props.workspace.readState.value], () => {
   uploadAuthorityGeneration++
+  if (batchResults.value) {
+    clearBatch()
+    error.value = ''
+  }
   refreshPending()
 }, { flush: 'sync' })
 async function mayLeave() {
@@ -256,30 +275,71 @@ async function upload(files: File[], projectId: string | null) {
     restoredSnapshot.value = null
     dirty.value = false
     await run(async () => {
-      const failures: string[] = []
-      for (const file of files) {
+      batchResults.value = files.map(file => ({ name: file.name, status: '未处理' }))
+      const canContinue = () => {
+        if (!active || props.workspace !== workspace || authorityGeneration !== uploadAuthorityGeneration || workspace.readState.value !== 'ready') {
+          clearBatch()
+          return false
+        }
+        refreshPending()
+        if (pendingUnavailable.value) {
+          clearBatch()
+          error.value = '无法可靠核对原提交编号，请恢复浏览器存储。'
+          return false
+        }
+        return true
+      }
+      const setStatus = (index: number, status: string) => {
+        if (batchResults.value)
+          batchResults.value = batchResults.value.map((item, current) => current === index ? { ...item, status } : item)
+      }
+      const uploadIsCurrent = () => active && props.workspace === workspace
+        && authorityGeneration === uploadAuthorityGeneration && workspace.readState.value === 'ready'
+        && (projectId === null || props.projects.some(project => project.id === projectId))
+      for (const [index, file] of files.entries()) {
+        if (!canContinue() || pending.value)
+          break
+        setStatus(index, '正在上传')
         let invoice: CentralInvoiceRecord
         try {
-          invoice = await workspace.upload(file, projectId)
+          invoice = await workspace.upload(file, projectId, uploadIsCurrent)
         }
         catch (cause) {
-          failures.push(`${file.name}：${message(cause)}`)
+          if (canContinue()) {
+            setStatus(index, cause instanceof CentralInvoiceUploadNotSubmittedError ? '未提交' : '结果未能确认')
+            error.value = message(cause)
+          }
           break
         }
+        if (!canContinue())
+          break
+        if (pending.value) {
+          setStatus(index, '结果未能确认')
+          break
+        }
+        setStatus(index, '原件已回读，正在识别或核对结果')
         selectedId.value = invoice.id
         try {
           const regionEpoch = regionGeneration
           const result = await workspace.recognizeWithCandidate(invoice)
+          if (!canContinue())
+            break
+          if (pending.value) {
+            setStatus(index, '原件已回读，识别未确认')
+            break
+          }
           rememberRegions(invoice, result.record, result.candidate, regionEpoch)
+          setStatus(index, '识别已回读')
         }
         catch (cause) {
-          failures.push(`${file.name}：${message(cause)}`)
-          if (workspace.pending(invoice.id))
+          if (!canContinue())
+            break
+          setStatus(index, pending.value ? '原件已回读，识别未确认' : '原件已回读，识别未完成')
+          error.value = message(cause)
+          if (pending.value)
             break
         }
       }
-      if (failures.length)
-        error.value = failures.join('\n')
     })
   }
   finally {
@@ -467,10 +527,10 @@ async function recover() {
 </script>
 
 <template>
-  <div class="flex h-full min-h-0 flex-col">
+  <div ref="screenRoot" tabindex="-1" class="flex h-full min-h-0 flex-col">
     <div v-if="workspace.readState.value !== 'ready'" class="flex flex-wrap items-center gap-2 p-3" role="status">
       <span>{{ workspace.loading.value ? '正在读取中央发票…' : '发票来源尚不可用。' }}</span>
-      <button type="button" :disabled="busy" class="rounded border border-line px-3 py-1" @click="load">
+      <button ref="sourceRetry" type="button" :disabled="busy" class="rounded border border-line px-3 py-1" @click="load">
         重新读取
       </button>
     </div>
@@ -483,6 +543,19 @@ async function recover() {
         核对上次提交
       </button>
     </div>
+    <section v-if="batchResults" ref="batchRegion" tabindex="0" aria-label="本次上传结果" class="max-h-48 shrink-0 overflow-auto border-b border-line p-3 text-sm">
+      <h2 class="font-medium">
+        本次上传结果
+      </h2>
+      <p v-if="batchResults.some(item => item.status === '结果未能确认' || item.status === '原件已回读，识别未确认')">
+        请先核对上次提交；未显示待核对编号时，请重新读取发票列表并人工核对后再决定是否重新选择文件。
+      </p>
+      <ul aria-live="polite">
+        <li v-for="(item, index) in batchResults" :key="index" class="break-all">
+          {{ item.name }}：{{ item.status }}
+        </li>
+      </ul>
+    </section>
     <CentralInvoiceWorkspaceView v-show="workspace.readState.value === 'ready'" ref="workspaceView" class="min-h-0 flex-1" :records="displayedRecords" :selected-id="selectedId" :original-file="originalFile" :original-loading="originalLoading" :busy="busy || uploadPreflight || !!pending || pendingUnavailable" :selection-unavailable="!!missingRecord" :cloud-available="!!cloudAvailable" :projects="projects" :suppliers="suppliers" :signatories="signatories" :contracts="contracts" :draft-record="draftRecord" :recognition-baseline="draft?.before" :region-candidate="regionCandidate" :restored-snapshot="restoredSnapshot" :error="error" @select="choose" @upload="upload" @manual="navigateTo('/finance/invoice/manual-new')" @attach="attach" @save="save" @review="review" @archive="archive" @discard="discard" @link-contract="linkContract" @confirm-legacy="confirmLegacy" @recognize="recognize" @retry-original="loadOriginal" @dirty="dirty = $event" @save-recognition="draftRecord && saveRecognition(draftRecord.fields, draftRecord.items)" @discard-recognition="discardRecognition" />
     <p v-if="workspace.readState.value !== 'ready' && error" role="alert" class="p-3 text-sm text-danger">
       {{ error }}

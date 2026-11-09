@@ -13,6 +13,13 @@ type Client = ReturnType<typeof createCentralInvoiceHttp>
 interface Context { workspaceId: string, actorId: string, capabilities: readonly string[] }
 type Identity = Pick<Context, 'workspaceId' | 'actorId'>
 
+export class CentralInvoiceUploadNotSubmittedError extends Error {
+  constructor() {
+    super('发票来源、权限或项目已变化，原件未提交。')
+    this.name = 'CentralInvoiceUploadNotSubmittedError'
+  }
+}
+
 /** 工作台与台账共用同一中央事实；页面草稿及文件对象由调用方持有。 */
 export function createCentralInvoiceWorkspace(options: {
   identity: Identity
@@ -134,11 +141,11 @@ export function createCentralInvoiceWorkspace(options: {
         loading.value = false
     }
   }
-  async function execute(command: CentralInvoiceCommand) {
+  async function execute(command: CentralInvoiceCommand, beforeSubmit?: () => boolean) {
     await authorize(true)
     const target = 'invoiceId' in command ? command.invoiceId : null
     return guarded(async () => {
-      const saved = await session(target).submit(command)
+      const saved = await session(target).submit(command, beforeSubmit)
       applyReadBatch([saved.read])
       return saved.read.record
     })
@@ -214,11 +221,17 @@ export function createCentralInvoiceWorkspace(options: {
         return result
       })
     },
-    async upload(file: File, projectId: string | null) {
+    async upload(file: File, projectId: string | null, beforeSubmit?: () => boolean) {
       const original = await prepareInvoiceOriginal(file)
+      const checkCurrent = () => {
+        if (beforeSubmit && !beforeSubmit())
+          throw new CentralInvoiceUploadNotSubmittedError()
+        return true
+      }
+      checkCurrent()
       return projectId === null
-        ? execute({ ...envelope(), action: 'upload', baseVersion: null, ownerKind: 'company', projectId: null, original })
-        : execute({ ...envelope(), action: 'upload', baseVersion: null, projectId, original })
+        ? execute({ ...envelope(), action: 'upload', baseVersion: null, ownerKind: 'company', projectId: null, original }, beforeSubmit ? checkCurrent : undefined)
+        : execute({ ...envelope(), action: 'upload', baseVersion: null, projectId, original }, beforeSubmit ? checkCurrent : undefined)
     },
     async manual(fields: CentralInvoiceFields, items: CentralInvoiceItem[]) {
       return execute({ ...envelope(), action: 'manual', baseVersion: null, fields, items })

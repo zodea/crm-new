@@ -44,9 +44,9 @@ E2E 分三个项目（[E2E 配置](../../playwright.config.ts)）：
 | 项目 | 范围 | 服务与并发 |
 | --- | --- | --- |
 | `chromium`、`chromium-b` | 中央 spec 按文件名排序后交替分组 | 各连一个独立 dev server（默认端口 3100、3102，可用 `PLAYWRIGHT_PORT`、`PLAYWRIGHT_PORT_B` 改；第二个用 `.tmp/e2e-nuxt-b` 作构建与 Vite 缓存目录），组内 1 个 worker |
-| `production` | `production-*.spec.ts` | 各 spec 自启 `.output/server/index.mjs`、空闲端口与 mkdtemp 数据目录，3 个 worker；须先 `pnpm build` 并设 `CRM_PRODUCTION_ACCEPTANCE=1`，否则跳过；只选本项目时不启动 dev server |
+| `production` | `production-*.spec.ts` | 用 `pnpm test:production` 构建并启用全部专项；各 spec 自启生产入口、空闲端口与独立合成数据目录，3 个 worker；单项调试须满足对应显式启用条件；只选本项目时不启动 dev server |
 
-本机生产验收先运行 `pnpm build`，再在 PowerShell 中执行 `$env:CRM_PRODUCTION_ACCEPTANCE='1'; pnpm exec playwright test --project=production`；结束后移除该环境变量。逐项查看报告中的通过、失败和跳过，跳过不计为验收通过。测试使用独立合成目录；目录不会由现有 Playwright 夹具自动清理，须在服务进程退出后按项目临时文件规则核对本次新建目录再清理。手动 CI 的 `production-acceptance` 为独立选择项，普通 `e2e` 只运行两个开发服务项目。
+完整生产验收使用 `pnpm test:production`（[执行入口](../../scripts/run-production-acceptance.mjs)）：先构建默认生产产物，再构建带发票验收层的独立产物，显式启用普通生产、发票、更正和公司付款专项，并创建独立下载目录。全部 production 用例运行后，报告中出现跳过、失败、重试或没有实际执行项均视为未通过。本地与 CI 使用同一入口；单项调试仍保留各 spec 的显式启用及隔离入口校验。合成数据库与原件均位于项目临时目录，不连接用户数据；运行结束后的清理遵循项目临时文件规则。
 
 迁入验收会重置所在 dev server 的默认中央仓库，每案独占重置、接管和回读旅程，因此中央组内只用一个 worker；两组的中央仓库在各自进程内存中，互不可见；截图基线两组共用 `chromium` 文件名。普通页面夹具按测试会话隔离；并行批次须避开迁入仓库。只选一个中央项目时只启动该组服务；大型本地回归应分文件批次重启服务，避免长期运行的开发服务耗尽内存。设置 `PLAYWRIGHT_BASE_URL` 连接外部服务时只保留单个中央项目、1 个 worker。命令行选项目时用 `--project=<名称>`：`--project <名称>` 会把后面的文件路径也当作项目名。
 

@@ -192,29 +192,17 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Install Chromium
         run: pnpm exec playwright install --with-deps chromium
-      - name: Build production application
+      - name: Run complete production acceptance
         env:
           NODE_OPTIONS: --max-old-space-size=4096
-        run: pnpm build
-      - name: Build isolated production acceptance entry
-        env:
-          NODE_OPTIONS: --max-old-space-size=4096
-          NUXT_BUILD_DIR: .tmp/ci-production-nuxt
-          CRM_E2E_BUILD_OUTPUT_DIR: .tmp/ci-production-output
-        run: |
-          mkdir -p .tmp
-          pnpm build
-      - name: Run production acceptance
-        env:
-          CRM_PRODUCTION_ACCEPTANCE: '1'
-          CRM_E2E_SERVER_ENTRY: .tmp/ci-production-output/server/index.mjs
-        run: pnpm exec playwright test --project=production --forbid-only '--reporter=list,github'
+        run: pnpm test:production
       - name: Upload diagnostics
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: production-acceptance-results
-          path: test-results/
+          path: .tmp/production-acceptance-run-*/
+          include-hidden-files: true
           if-no-files-found: ignore
           retention-days: 7
 

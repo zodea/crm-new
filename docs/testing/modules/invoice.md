@@ -77,6 +77,8 @@
 | [tests/components/CentralInvoiceWorkspaceScreen.test.ts](../../../tests/components/CentralInvoiceWorkspaceScreen.test.ts) | 组件（jsdom） | 工作台与原编号恢复 |
 | [tests/components/CentralInvoiceWorkspaceView.test.ts](../../../tests/components/CentralInvoiceWorkspaceView.test.ts) | 组件（jsdom） | 归档归属与来源版本 |
 | [tests/components/CentralInvoiceDragUpload.test.ts](../../../tests/components/CentralInvoiceDragUpload.test.ts) | 组件（jsdom） | 上传确认期间目录、权限和原编号变化阻断 |
+| [tests/components/CentralInvoiceBatchUpload.test.ts](../../../tests/components/CentralInvoiceBatchUpload.test.ts) | 组件（jsdom） | 逐文件上传结果、未处理文件、来源失效与发送前守卫 |
+| [tests/invoice/central-upload-file-authority-race.test.ts](../../../tests/invoice/central-upload-file-authority-race.test.ts) | 单元／服务／状态 | 文件读取及提交授权等待期间来源变化时拒绝迟到上传 |
 | [tests/components/CentralInvoiceCorrectionAuthority.test.ts](../../../tests/components/CentralInvoiceCorrectionAuthority.test.ts) | 组件（jsdom） | 撤权隐藏原票与同身份草稿恢复 |
 | [tests/components/CentralInvoiceCorrectionRoute.test.ts](../../../tests/components/CentralInvoiceCorrectionRoute.test.ts) | 组件（jsdom） | 同路由切票的未保存输入保护 |
 | [tests/components/CentralInvoiceCorrectionScreen.test.ts](../../../tests/components/CentralInvoiceCorrectionScreen.test.ts) | 组件（jsdom） | 更正草稿、提交、打印阻断及原编号 |
@@ -98,6 +100,7 @@
 | --- | --- | --- |
 | [tests/browser/CentralInvoiceArchive.test.ts](../../../tests/browser/CentralInvoiceArchive.test.ts) | 真实组件／模拟来源 | 归档来源及主要视口 |
 | [tests/browser/CentralInvoiceDragUpload.test.ts](../../../tests/browser/CentralInvoiceDragUpload.test.ts) | 真实组件／模拟来源 | 五视口拖放、归属失效与键盘上传入口 |
+| [tests/browser/CentralInvoiceBatchUpload.test.ts](../../../tests/browser/CentralInvoiceBatchUpload.test.ts) | 真实组件／模拟来源 | 五视口中断结果、局部键盘滚动、焦点恢复与失效清除 |
 | [tests/browser/CentralInvoiceLedgerExport.test.ts](../../../tests/browser/CentralInvoiceLedgerExport.test.ts) | 真实组件／模拟来源 | 台账导出与主要视口 |
 | [tests/browser/CentralInvoiceManualCompany.test.ts](../../../tests/browser/CentralInvoiceManualCompany.test.ts) | 真实组件／模拟来源 | 手工公司票归档选择 |
 | [tests/browser/CentralInvoicePendingRecovery.test.ts](../../../tests/browser/CentralInvoicePendingRecovery.test.ts) | 真实组件／模拟来源 | 原编号发现与恢复 |
