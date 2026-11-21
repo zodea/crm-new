@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import type { PayrollC2FormRead, PayrollC2ReleaseDraft } from '~/lib/payroll/central-c2-contract'
+import type { PayrollTierReleaseDraft, PayrollTierReleaseRead } from '~/lib/payroll/release-presentation'
 import { computed, ref, watch } from 'vue'
 import { Button } from '~/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from '~/components/ui/dialog'
-import { c2InputNumber as payrollInputNumber, c2ReleaseDefault as payrollReleaseDefault, c2ReleaseError as payrollReleaseError } from '~/lib/payroll/c2-presentation'
 import { payrollAmount } from '~/lib/payroll/read-presentation'
+import { payrollInputNumber, payrollReleaseDefault, payrollReleaseError } from '~/lib/payroll/release-presentation'
 import PayrollReleaseAdjustmentSummary from './PayrollReleaseAdjustmentSummary.vue'
 
-const props = defineProps<{ open: boolean, read: PayrollC2FormRead, busy: boolean, pending: boolean, awaitingRead?: boolean, error: string, initial?: PayrollC2ReleaseDraft | null, readonly?: boolean }>()
-const emit = defineEmits<{ 'update:open': [value: boolean], 'submit': [value: PayrollC2ReleaseDraft], 'change': [value: PayrollC2ReleaseDraft], 'recover': [] }>()
-const draft = ref<PayrollC2ReleaseDraft>({ actualAmount: null, allocations: [] })
+const props = defineProps<{ open: boolean, read: PayrollTierReleaseRead, busy: boolean, pending: boolean, awaitingRead?: boolean, error: string, initial?: PayrollTierReleaseDraft | null, readonly?: boolean }>()
+const emit = defineEmits<{ 'update:open': [value: boolean], 'submit': [value: PayrollTierReleaseDraft], 'change': [value: PayrollTierReleaseDraft], 'recover': [] }>()
+const draft = ref<PayrollTierReleaseDraft>({ actualAmount: null, allocations: [] })
 const touched = ref(false)
 const locked = computed(() => props.busy || props.pending)
 const validation = computed(() => payrollReleaseError(props.read, draft.value))

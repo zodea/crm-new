@@ -1,7 +1,7 @@
 import type { PayrollC1FormRead, PayrollC1OutputRead, PayrollC1ReleaseDraft, PayrollC1StatementCommandResult } from '~/lib/payroll/central-c1-contract'
 import type { PayrollReleaseAdjustmentApplication } from '~/lib/payroll/central-release-adjustment-contract'
 import { computed, onActivated, onDeactivated, onScopeDispose, shallowRef, watch } from 'vue'
-import { c1ReleaseDefault as payrollReleaseDefault } from '~/lib/payroll/c1-presentation'
+import { payrollReleaseDefault } from '~/lib/payroll/release-presentation'
 import { payrollNeedsRecheckMessage } from '~/lib/payroll/release-recheck-message'
 import { toErrorMessage } from '~/lib/util/error'
 

@@ -27,7 +27,7 @@ describe.each([
       PayrollACommandState: true,
       [`Payroll${format}SourceReview`]: true,
       [`Payroll${format}FrozenPrint`]: true,
-      [`Payroll${format}ReleaseDialog`]: true,
+      PayrollTierReleaseDialog: true,
       SectionHeader: { props: ['title'], template: '<h2>{{ title }}</h2>' },
       NuxtLink: { template: '<a><slot /></a>' },
       KitButton: { template: '<button><slot /></button>' },

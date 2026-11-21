@@ -4,6 +4,7 @@ import { usePayrollC1Statement } from '~/composables/usePayrollC1Statement'
 import { createPayrollC1Workbook } from '~/lib/payroll/c1-export'
 import { toErrorMessage } from '~/lib/util/error'
 import PayrollHollowReview from './PayrollHollowReview.vue'
+import PayrollTierReleaseDialog from './PayrollTierReleaseDialog.vue'
 
 const props = defineProps<{
   statementId: string
@@ -95,6 +96,6 @@ async function print() {
         {{ reason }}
       </p>
     </section>
-    <PayrollC1ReleaseDialog v-if="releaseRead" :open="releaseOpen && active" :read="releaseRead" :busy="busy" :readonly="!writable || !adjustmentsReady" :pending="!!pending" :awaiting-read="pending?.state === 'awaiting-read'" :error="error" :initial="releaseDraft" @change="releaseDraft = $event" @update:open="releaseOpen = $event" @submit="ui.execute('release', $event)" @recover="ui.recover" />
+    <PayrollTierReleaseDialog v-if="releaseRead" :open="releaseOpen && active" :read="releaseRead" :busy="busy" :readonly="!writable || !adjustmentsReady" :pending="!!pending" :awaiting-read="pending?.state === 'awaiting-read'" :error="error" :initial="releaseDraft" @change="releaseDraft = $event" @update:open="releaseOpen = $event" @submit="ui.execute('release', $event)" @recover="ui.recover" />
   </section>
 </template>
