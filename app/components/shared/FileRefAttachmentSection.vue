@@ -3,6 +3,8 @@ import type {
   FileRefDraft,
   FileRefRecord,
 } from '~/lib/forms/file-refs'
+import AttachmentDraftRow from '~/components/shared/AttachmentDraftRow.vue'
+import AttachmentExistingRow from '~/components/shared/AttachmentExistingRow.vue'
 import AttachmentPicker from '~/components/shared/AttachmentPicker.vue'
 import KitButton from '~/components/ui/KitButton.vue'
 
@@ -51,67 +53,50 @@ function inputValue(event: Event): string {
     />
 
     <div v-if="attachments.length || pendingAttachments.length" class="mt-3 grid gap-2">
-      <div
+      <AttachmentExistingRow
         v-for="file in attachments"
         :key="file.id"
-        class="flex items-center gap-2 rounded-[var(--radius-control)] border border-line px-3 py-2"
-        :class="pendingRemoveIds.includes(file.id)
-          ? 'bg-danger-soft opacity-65'
-          : pendingRestoreIds.includes(file.id)
-            ? 'border-brand/30 bg-brand-soft'
-            : file.deletedAt ? 'bg-surface-2 opacity-65' : 'bg-panel'"
+        :file-name="file.fileName"
+        :category="file.category"
+        :deleted="Boolean(file.deletedAt)"
+        :pending-remove="pendingRemoveIds.includes(file.id)"
+        :pending-restore="pendingRestoreIds.includes(file.id)"
+        :readonly="readonly"
       >
-        <span class="i-lucide-paperclip text-ink-faint" aria-hidden="true" />
-        <span class="min-w-0 flex-1 truncate text-12px text-ink">{{ file.fileName }}</span>
-        <span class="text-10px text-ink-faint">{{ file.category || '未分类' }}</span>
-        <span v-if="file.deletedAt" class="text-10px text-danger">已删除</span>
-        <KitButton
-          v-if="canDownload && !file.deletedAt && !pendingRemoveIds.includes(file.id)"
-          type="button"
-          variant="ghost"
-          class="h-7 shrink-0 px-2 text-11px"
-          :aria-label="`下载原件 ${file.fileName}`"
-          @click="emit('download', file.id, $event.currentTarget as HTMLElement)"
-        >
-          下载原件
-        </KitButton>
-        <KitButton
-          v-if="!readonly"
-          variant="ghost"
-          class="h-7 shrink-0 px-2 text-11px"
-          :class="file.deletedAt ? 'text-brand' : 'text-danger'"
-          @click="emit('toggleExisting', file.id)"
-        >
-          {{ file.deletedAt
-            ? pendingRestoreIds.includes(file.id) ? '取消恢复' : '恢复'
-            : pendingRemoveIds.includes(file.id) ? '撤销删除' : '删除' }}
-        </KitButton>
-      </div>
+        <template #download>
+          <KitButton
+            v-if="canDownload && !file.deletedAt && !pendingRemoveIds.includes(file.id)"
+            type="button"
+            variant="ghost"
+            class="h-7 shrink-0 px-2 text-11px"
+            :aria-label="`下载原件 ${file.fileName}`"
+            @click="emit('download', file.id, $event.currentTarget as HTMLElement)"
+          >
+            下载原件
+          </KitButton>
+        </template>
+        <template #toggle="{ label, tone }">
+          <KitButton variant="ghost" class="h-7 shrink-0 px-2 text-11px" :class="tone" @click="emit('toggleExisting', file.id)">
+            {{ label }}
+          </KitButton>
+        </template>
+      </AttachmentExistingRow>
 
-      <div
+      <AttachmentDraftRow
         v-for="file in pendingAttachments"
         :key="file.localId"
-        class="flex flex-wrap items-center gap-2 rounded-[var(--radius-control)] border border-brand/30 bg-brand-soft px-3 py-2"
+        :file-name="file.fileName"
+        :category="file.category"
+        :readonly="readonly"
+        :category-readonly="categoryReadonly"
+        @update-category="emit('patchPending', file.localId, { category: $event })"
       >
-        <span class="i-lucide-file-plus-2 text-brand" aria-hidden="true" />
-        <span class="min-w-36 flex-1 truncate text-12px text-ink">{{ file.fileName }}</span>
-        <input
-          :value="file.category"
-          :disabled="readonly"
-          :readonly="categoryReadonly"
-          class="field-input h-7 w-36 text-11px"
-          aria-label="附件分类"
-          @input="emit('patchPending', file.localId, { category: inputValue($event) })"
-        >
-        <KitButton
-          v-if="!readonly"
-          variant="ghost"
-          class="h-7 shrink-0 px-2 text-11px text-danger"
-          @click="emit('removePending', file.localId)"
-        >
-          移除
-        </KitButton>
-      </div>
+        <template #remove>
+          <KitButton variant="ghost" class="h-7 shrink-0 px-2 text-11px text-danger" @click="emit('removePending', file.localId)">
+            移除
+          </KitButton>
+        </template>
+      </AttachmentDraftRow>
     </div>
 
     <label class="mt-4 block">
