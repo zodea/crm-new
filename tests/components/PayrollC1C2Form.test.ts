@@ -5,10 +5,13 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, reactive } from 'vue'
+import CentralC1DraftFormPage from '~/components/payroll/CentralC1DraftFormPage.vue'
+import CentralC2DraftFormPage from '~/components/payroll/CentralC2DraftFormPage.vue'
 import PayrollC1FormFields from '~/components/payroll/PayrollC1FormFields.vue'
 import PayrollC2FormFields from '~/components/payroll/PayrollC2FormFields.vue'
 import { usePayrollC1Form } from '~/composables/usePayrollC1Form'
 import { usePayrollC2Form } from '~/composables/usePayrollC2Form'
+import { projectProblem, ProjectRepositoryProblem } from '~/lib/project/repository'
 import { c1Form } from '../helpers/payroll-c1-ui'
 import { c2Form } from '../helpers/payroll-c2-ui'
 
@@ -24,9 +27,9 @@ const push = vi.fn()
 const values: FormUi[] = []
 
 describe.each([
-  { format: 'C1', source: '考勤', formula: '按本月考勤与每人正常、加班标准核算', useForm: usePayrollC1Form as () => FormUi, Fields: PayrollC1FormFields, baseRead: c1Form as () => FormRead, store: ['usePayrollC1Store', { loadC1Form: load, saveC1Draft: save, getC1Pending: () => null }] },
-  { format: 'C2', source: '签工', formula: '按本月已确认签工与本请款主体单价核算', useForm: usePayrollC2Form as () => FormUi, Fields: PayrollC2FormFields, baseRead: c2Form as () => FormRead, store: ['usePayrollC2Store', { loadC2Form: load, saveC2Draft: save, getC2Pending: () => null }] },
-] as const)('$format 页面固定草稿', ({ format, source, formula, useForm, Fields, baseRead, store: [storeName, store] }) => {
+  { format: 'C1', source: '考勤', formula: '按本月考勤与每人正常、加班标准核算', configLabel: '个人工资标准', Page: CentralC1DraftFormPage, useForm: usePayrollC1Form as () => FormUi, Fields: PayrollC1FormFields, baseRead: c1Form as () => FormRead, store: ['usePayrollC1Store', { loadC1Form: load, saveC1Draft: save, getC1Pending: () => null }] },
+  { format: 'C2', source: '签工', formula: '按本月已确认签工与本请款主体单价核算', configLabel: 'C2 主体配置', Page: CentralC2DraftFormPage, useForm: usePayrollC2Form as () => FormUi, Fields: PayrollC2FormFields, baseRead: c2Form as () => FormRead, store: ['usePayrollC2Store', { loadC2Form: load, saveC2Draft: save, getC2Pending: () => null }] },
+] as const)('$format 页面固定草稿', ({ format, source, formula, configLabel, Page, useForm, Fields, baseRead, store: [storeName, store] }) => {
   function at(draftKey: string) {
     route.query = { origin: 'real', format, draftKey }
     route.fullPath = `${route.path}?origin=real&format=${format}&draftKey=${draftKey}`
@@ -88,5 +91,48 @@ describe.each([
     expect(view.text()).not.toContain('全部班组 / 未关联班组')
     view.unmount()
     vi.useRealTimers()
+  })
+
+  it('整页表单按新月份重核，并将字段错误及聚焦请求传回原输入', async () => {
+    vi.stubGlobal('useTabTitle', vi.fn())
+    route.query.project = 'p'
+    route.query.month = '2026-08'
+    route.fullPath = `${route.path}?${new URLSearchParams(route.query)}`
+    save.mockRejectedValueOnce(new ProjectRepositoryProblem({
+      ...projectProblem('validation-failed', '工资月份需重新核对'),
+      fieldErrors: { 'draft.month': ['请核对工资月份'] },
+    }))
+    const view = mount(Page, {
+      attachTo: document.body,
+      global: { stubs: {
+        EntityFormShell: { props: ['title'], template: '<main><h1>{{ title }}</h1><slot /><slot name="footer" /></main>' },
+        PayrollACommandState: true,
+        [`Payroll${format}SourceReview`]: true,
+        SectionHeader: true,
+        NuxtLink: { props: ['to'], template: '<a><slot /></a>' },
+      } },
+    })
+    try {
+      await flushPromises()
+      expect(view.get('h1').text()).toBe(`新建 ${format} 工资草稿`)
+      expect(view.get('a').text()).toBe(configLabel)
+      const month = view.get('[aria-label="工资月份"]')
+      const focus = vi.spyOn(month.element, 'focus')
+      await month.setValue('2026-09')
+      await flushPromises()
+      expect(load).toHaveBeenLastCalledWith({ origin: 'real' }, {
+        statementId: null,
+        draftKey: 'a',
+        draft: expect.objectContaining({ projectId: 'p', month: '2026-09' }),
+      })
+      await view.get('form').trigger('submit')
+      await flushPromises()
+      expect(view.text()).toContain('请核对工资月份')
+      expect(focus).toHaveBeenCalledOnce()
+      focus.mockRestore()
+    }
+    finally {
+      view.unmount()
+    }
   })
 })
