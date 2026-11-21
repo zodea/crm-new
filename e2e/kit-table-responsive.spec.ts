@@ -91,7 +91,23 @@ test.describe('KitTable 公共表格规格', () => {
     await page.goto('/base/supplier?search=穗建五金')
     await page.waitForLoadState('networkidle')
 
-    const actionColumn = page.locator('[data-ui="kit-table"] .vxe-table--fixed-right-wrapper').first()
+    const table = page.locator('[data-ui="kit-table"]').first()
+    const headerRow = table.locator('.vxe-table--main-wrapper .vxe-header--row').first()
+    const bodyRow = table.locator('.vxe-table--main-wrapper .vxe-body--row').first()
+    await expect(headerRow).toHaveCSS('height', '32px')
+    await expect(bodyRow).toHaveCSS('height', '32px')
+    await page.getByRole('button', { name: '列设置', exact: true }).click()
+    const settings = page.getByRole('dialog', { name: '列设置', exact: true })
+    const comfortable = settings.getByRole('checkbox', { name: '舒适行高', exact: true })
+    await comfortable.check()
+    await expect(headerRow).toHaveCSS('height', '44px')
+    await expect(bodyRow).toHaveCSS('height', '44px')
+    await comfortable.uncheck()
+    await expect(headerRow).toHaveCSS('height', '32px')
+    await expect(bodyRow).toHaveCSS('height', '32px')
+    await page.keyboard.press('Escape')
+
+    const actionColumn = table.locator('.vxe-table--fixed-right-wrapper').first()
     await expect(actionColumn).toBeVisible()
     const width = (await actionColumn.boundingBox())!.width
     expect(width).toBeGreaterThanOrEqual(32)
@@ -112,7 +128,7 @@ test.describe('KitTable 公共表格规格', () => {
     expect(page.url()).toBe(initialUrl)
     await expect(page.getByRole('alertdialog')).toHaveCount(0)
     await expect(actionColumn.locator('.vxe-cell--col-resizable')).toHaveCount(0)
-    await expectColumnWidthsAligned(page.locator('[data-ui="kit-table"]').first())
+    await expectColumnWidthsAligned(table)
     await expectDocumentDoesNotOverflow(page)
   })
 
