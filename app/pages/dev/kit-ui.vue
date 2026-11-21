@@ -5,6 +5,7 @@ import type { TreeNode } from '~/lib/kit/tree-nav'
 import { useTimeoutFn } from '@vueuse/core'
 import { Button } from '~/components/ui/button'
 import { toErrorMessage } from '~/lib/util/error'
+import { yuan } from '~/lib/util/money'
 
 // 隐藏 dev 演示路由（不在侧边栏 NAV_GROUPS 中）：逐一验证 KitUI 原语。
 // 访问 /dev/kit-ui（ripple 已全域废弃，见 ADR 0004，不提供演示）
@@ -337,7 +338,7 @@ const visibleDemoListRows = computed(() => demoListRows.filter(row =>
   && (demoListViewKey.value === 'all' || row.owner === '我'),
 ))
 const demoListSummary = computed(() => ({
-  变更后合同金额总和: visibleDemoListRows.value.reduce((sum, row) => sum + row.amount, 0),
+  变更后合同金额总和: yuan(visibleDemoListRows.value.reduce((sum, row) => sum + row.amount, 0)),
   合同数量: visibleDemoListRows.value.length,
   当前视图: demoListViews.find(view => view.key === demoListViewKey.value)?.label ?? '全部视图',
 }))
