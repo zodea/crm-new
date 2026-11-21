@@ -195,6 +195,7 @@ describe('甲方与分包单据整页表单状态', () => {
     vi.stubGlobal('ref', ref)
     vi.stubGlobal('shallowRef', shallowRef)
     vi.stubGlobal('useRoute', () => route)
+    vi.stubGlobal('useRouter', () => ({ push: vi.fn().mockResolvedValue(undefined) }))
     vi.stubGlobal('navigateTo', vi.fn())
     vi.stubGlobal('useTabTitle', vi.fn())
     vi.stubGlobal('useTabsStore', () => ({ registerCloseGuard: () => () => {}, tabs: [], close: vi.fn(), open: vi.fn() }))

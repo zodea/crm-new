@@ -103,6 +103,39 @@ describe('浏览器中央 WBS 项目会话与失响应恢复', () => {
     await expect(store.saveTaskPlan('task', { plannedStart: '2026-09-01', plannedFinish: '2026-09-06', manualProgress: 0, floorPlans: [], dependency: null })).rejects.toThrow('其他修改')
     expect(mocks.save.mock.calls[1]![0].sourceVersion).toBe('v1')
   })
+  it('同一工序恢复及移除依赖后按本次回执推进草稿版本', async () => {
+    const dependency = { id: 'dependency', predId: 'previous', succId: 'task', dependencyType: 'FS' as const, lagDays: 0 }
+    const initial = read()
+    initial.snapshot.disabledDependencies = [{ ...dependency, disabledAt: '2026-09-06', disabledReason: 'schedule-conflict', auditLogId: 'log' }]
+    const restored = read('p', 'v2')
+    restored.snapshot.dependencies = [dependency]
+    mocks.read.mockResolvedValueOnce(initial)
+    const store = useScheduleStore()
+    await store.loadProject('p')
+    store.beginPlanEdit('task')
+
+    mocks.save.mockImplementationOnce(async (command: ScheduleCommand) => ({ commandId: command.commandId, projectId: 'p', sourceVersion: 'v2', value: null }))
+    mocks.read.mockResolvedValueOnce(restored)
+    await store.restoreDependency(dependency.id)
+
+    mocks.save.mockImplementationOnce(async (command: ScheduleCommand) => {
+      mocks.read.mockResolvedValueOnce(read('p', 'v3'))
+      await store.recheck()
+      return { commandId: command.commandId, projectId: 'p', sourceVersion: 'v3', value: null }
+    })
+    mocks.read.mockResolvedValueOnce(read('p', 'v3'))
+    await store.removeDependency(dependency.id)
+
+    mocks.save.mockImplementationOnce(async (command: ScheduleCommand) => ({ commandId: command.commandId, projectId: 'p', sourceVersion: 'v4', value: null }))
+    mocks.read.mockResolvedValueOnce(read('p', 'v4'))
+    const draft = { plannedStart: '2026-09-02', plannedFinish: '2026-09-06', manualProgress: 0, floorPlans: [], dependency: null }
+    await store.saveTaskPlan('task', draft)
+    expect(mocks.save.mock.calls.map(([command]) => [command.action.kind, command.sourceVersion])).toEqual([
+      ['restore-dependency', 'v1'],
+      ['remove-dependency', 'v2'],
+      ['save-task-plan', 'v3'],
+    ])
+  })
   it('拖动调整使用当前页面版本，不沿用先前任务草稿的版本', async () => {
     const store = useScheduleStore()
     await store.loadProject('p')
