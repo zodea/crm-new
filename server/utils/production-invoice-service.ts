@@ -2,19 +2,22 @@ import type { TransactionDb } from '../../app/lib/db/coordinator'
 import type { CentralInvoiceCommand, CentralInvoiceCommandResult, CentralInvoiceFields, CentralInvoiceItem, CentralInvoiceOriginalInput, CentralInvoicePrintCommand, CentralInvoicePrintResult, CentralInvoiceRecord, InvoiceContractReference } from '../../app/lib/invoice/central-contract'
 import type { InvoiceCorrectionContent, InvoiceCorrectionDraft, InvoiceCorrectionSubmitCommand } from '../../app/lib/invoice/correction-contract'
 import type { BusinessSession } from './business-session'
+import type { VerificationEvidence, VerificationHistory } from './production-invoice-original-verification'
 import type { ProductionStorage } from './production-storage'
 import { Buffer } from 'node:buffer'
 import { createHash, randomUUID } from 'node:crypto'
-import { CentralInvoiceProblem, INVOICE_ORIGINAL_MAX_BYTES, INVOICE_READ_CAPABILITY, INVOICE_WRITE_CAPABILITY } from '../../app/lib/invoice/central-contract'
+import { CentralInvoiceProblem, CONFIRM_ORIGINAL_VERIFICATION, INVOICE_ORIGINAL_MAX_BYTES, INVOICE_READ_CAPABILITY, INVOICE_WRITE_CAPABILITY, RECORD_ORIGINAL_VERIFICATION } from '../../app/lib/invoice/central-contract'
 import { invoiceCorrectionChanges } from '../../app/lib/invoice/correction-contract'
 import { hasPrintableCentralOriginal } from '../../app/lib/invoice/print-layout'
 import { resolveContractSignatory } from '../../app/lib/our-signatory/storage'
 import { parsePageQuery, resolvePagination } from '../../app/lib/read-model/pagination'
+import { parseInvoiceTextPreservingUnknowns } from '../../app/lib/recognize/invoice-parse'
 import { isISODateDTO } from '../../app/types/read-model'
 import { assertInvoiceContractBuyer, invoiceContractCapability, verifyInvoiceCompanyArchiveReference, verifyInvoiceContractReference } from './production-invoice-contracts'
 import { requireInvoiceCorrectionEligibility } from './production-invoice-correction-eligibility'
 import { validateInvoiceCorrections } from './production-invoice-correction-service'
 import { normalizeLegacyInvoiceItems } from './production-invoice-migration-plan'
+import { appendVerification, confirmVerification, currentVerificationId, describeVerification, hasOriginalVerificationSchema, invoiceVerificationActions, isInvoiceVerificationAction, loadVerificationAudit, matchesVerificationOriginal, readVerificationHistory } from './production-invoice-original-verification'
 import { createReadMeta, withReadMeta } from './read-meta'
 
 type Session = () => BusinessSession
@@ -143,7 +146,7 @@ function importSource(input: unknown) {
 }
 
 function command(value: unknown): CentralInvoiceCommand {
-  if (!object(value) || typeof value.action !== 'string' || !['upload', 'manual', 'import', 'import-replace', 'attach-original', 'link-contract', 'confirm-legacy', 'recognize', 'rerecognize', 'edit', 'edit-archived', 'review', 'archive', 'discard', 'restore'].includes(value.action)
+  if (!object(value) || typeof value.action !== 'string' || !['upload', 'manual', 'import', 'import-replace', 'attach-original', 'link-contract', 'confirm-legacy', 'recognize', 'rerecognize', 'edit', 'edit-archived', 'review', 'archive', 'discard', 'restore', ...invoiceVerificationActions].includes(value.action)
     || typeof value.workspaceId !== 'string' || typeof value.actorId !== 'string' || typeof value.commandId !== 'string'
     || !idPattern.test(value.workspaceId) || !idPattern.test(value.actorId) || !idPattern.test(value.commandId)
     || value.requiredCapability !== INVOICE_WRITE_CAPABILITY) {
@@ -169,19 +172,32 @@ function command(value: unknown): CentralInvoiceCommand {
     importSource(value.source)
   }
   else {
-    const keys = value.action === 'recognize'
-      ? [...common, 'invoiceId', 'fields', 'items', 'source', 'textPages', 'unrecognizedPageIndexes']
-      : value.action === 'rerecognize'
-        ? [...common, 'invoiceId', 'fields', 'items', 'currentFields', 'currentItems', 'source', 'textPages', 'unrecognizedPageIndexes', 'confirmed']
-        : value.action === 'import-replace'
-          ? [...common, 'invoiceId', 'fields', 'items', 'ownerKind', 'projectId', 'supplierId', 'source', 'confirmed']
-          : value.action === 'link-contract' ? [...common, 'invoiceId', 'contract', 'confirmed'] : value.action === 'confirm-legacy' ? [...common, 'invoiceId', 'confirmed'] : value.action === 'attach-original' ? [...common, 'invoiceId', 'original', 'confirmed'] : value.action === 'edit' ? [...common, 'invoiceId', 'fields', 'items'] : value.action === 'edit-archived' ? [...common, 'invoiceId', 'fields', 'items', 'ownerKind', 'projectId', 'supplierId', 'confirmed'] : value.action === 'review' ? [...common, 'invoiceId', 'manualCompletion'] : value.action === 'archive' ? [...common, 'invoiceId', 'ownerKind', 'projectId', 'supplierId'] : [...common, 'invoiceId']
+    const verificationKeys = [...common, 'invoiceId', 'originalId', 'originalSha256']
+    const keys = value.action === RECORD_ORIGINAL_VERIFICATION
+      ? [...verificationKeys, 'source', 'textPages', 'unrecognizedPageIndexes']
+      : value.action === CONFIRM_ORIGINAL_VERIFICATION
+        ? [...verificationKeys, 'candidateId', 'confirmed']
+        : value.action === 'recognize'
+          ? [...common, 'invoiceId', 'fields', 'items', 'source', 'textPages', 'unrecognizedPageIndexes']
+          : value.action === 'rerecognize'
+            ? [...common, 'invoiceId', 'fields', 'items', 'currentFields', 'currentItems', 'source', 'textPages', 'unrecognizedPageIndexes', 'confirmed']
+            : value.action === 'import-replace'
+              ? [...common, 'invoiceId', 'fields', 'items', 'ownerKind', 'projectId', 'supplierId', 'source', 'confirmed']
+              : value.action === 'link-contract' ? [...common, 'invoiceId', 'contract', 'confirmed'] : value.action === 'confirm-legacy' ? [...common, 'invoiceId', 'confirmed'] : value.action === 'attach-original' ? [...common, 'invoiceId', 'original', 'confirmed'] : value.action === 'edit' ? [...common, 'invoiceId', 'fields', 'items'] : value.action === 'edit-archived' ? [...common, 'invoiceId', 'fields', 'items', 'ownerKind', 'projectId', 'supplierId', 'confirmed'] : value.action === 'review' ? [...common, 'invoiceId', 'manualCompletion'] : value.action === 'archive' ? [...common, 'invoiceId', 'ownerKind', 'projectId', 'supplierId'] : [...common, 'invoiceId']
     const supportsTaxConfirmation = value.action === 'archive' || value.action === 'import-replace'
     const contractArchive = value.action === 'archive' && exactKeys(value, [...keys, 'taxNumbersConfirmed', 'taxVerification', 'contract']) && value.taxNumbersConfirmed === true && validTaxVerification(value.taxVerification) && contractReference(value.contract) && object(value.contract)
       && ((value.ownerKind === 'company' && value.contract.domain === 'company') || (value.ownerKind === 'project' && value.contract.domain !== 'company'))
     if (!(exactKeys(value, keys) || (supportsTaxConfirmation && exactKeys(value, [...keys, 'taxNumbersConfirmed', 'taxVerification']) && value.taxNumbersConfirmed === true && validTaxVerification(value.taxVerification)) || contractArchive) || typeof value.invoiceId !== 'string' || !idPattern.test(value.invoiceId)
       || typeof value.baseVersion !== 'string' || !/^[1-9]\d*$/.test(value.baseVersion) || !Number.isSafeInteger(Number(value.baseVersion))) {
       return fail('validation-failed', '发票版本或原始身份无效。')
+    }
+    if (isInvoiceVerificationAction(value.action)) {
+      if (typeof value.originalId !== 'string' || !idPattern.test(value.originalId) || typeof value.originalSha256 !== 'string' || !/^[a-f0-9]{64}$/.test(value.originalSha256))
+        return fail('validation-failed', '发票原件身份或摘要无效。')
+      if (value.action === RECORD_ORIGINAL_VERIFICATION)
+        recognitionEvidence(value, 'validation-failed')
+      else if (value.confirmed !== true || typeof value.candidateId !== 'string' || !idPattern.test(value.candidateId))
+        return fail('validation-failed', '请逐项核对当前候选并明确确认。')
     }
     if (value.action === 'recognize' || value.action === 'rerecognize' || value.action === 'edit' || value.action === 'edit-archived' || value.action === 'import-replace') {
       invoiceFields(value.fields, 'validation-failed')
@@ -227,7 +243,8 @@ function command(value: unknown): CentralInvoiceCommand {
 function parsedReceipt(raw: unknown, commandId: string, invoiceId: string): CentralInvoiceCommandResult {
   try {
     const result: unknown = JSON.parse(String(raw))
-    if (!object(result) || !exactKeys(result, ['invoiceId', 'commandId', 'version', 'updatedAt', 'originalId'])
+    const keys = ['invoiceId', 'commandId', 'version', 'updatedAt', 'originalId']
+    if (!object(result) || !(exactKeys(result, keys) || (exactKeys(result, [...keys, 'verificationSha256']) && typeof result.verificationSha256 === 'string' && /^[a-f0-9]{64}$/.test(result.verificationSha256)))
       || result.commandId !== commandId || result.invoiceId !== invoiceId || typeof result.version !== 'string' || !/^[1-9]\d*$/.test(result.version)
       || !(result.originalId === null || (typeof result.originalId === 'string' && idPattern.test(result.originalId))) || typeof result.updatedAt !== 'string' || !Number.isFinite(Date.parse(result.updatedAt))) {
       throw new Error('invalid')
@@ -383,13 +400,26 @@ export async function readProductionInvoiceFact(tx: Pick<TransactionDb, 'select'
   return rowToRecord(row)
 }
 
-async function verifyRecognitionPages(tx: TransactionDb, invoice: CentralInvoiceRecord, pageCount: number) {
+async function readCheckedOriginal(tx: TransactionDb, invoice: CentralInvoiceRecord) {
   if (!invoice.original)
     fail('conflict', '识别前须先保存可核验的发票原件。')
   const [payload] = await tx.select<{ content: Uint8Array }>('SELECT content FROM file_payloads WHERE file_ref_id=?', [invoice.original.id])
   if (!(payload?.content instanceof Uint8Array) || payload.content.length !== invoice.original.fileSize || digest(payload.content) !== invoice.original.sha256)
-    fail('unavailable', '发票原件正文或摘要损坏，不能核对识别页数。')
-  if (invoice.original.mimeType !== 'application/pdf') {
+    fail('unavailable', '发票原件正文或摘要损坏。')
+  const magic = Buffer.from(payload.content.subarray(0, 8))
+  const mime = magic.subarray(0, 5).toString() === '%PDF-'
+    ? 'application/pdf'
+    : magic.equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
+      ? 'image/png'
+      : magic.subarray(0, 3).equals(Buffer.from([255, 216, 255])) ? 'image/jpeg' : null
+  if (mime !== invoice.original.mimeType)
+    fail('unavailable', '发票原件格式与已登记 MIME 不一致。')
+  return { ...invoice.original, bytes: new Uint8Array(payload.content) }
+}
+
+async function verifyRecognitionPages(tx: TransactionDb, invoice: CentralInvoiceRecord, pageCount: number) {
+  const original = await readCheckedOriginal(tx, invoice)
+  if (original.mimeType !== 'application/pdf') {
     if (pageCount !== 1)
       fail('validation-failed', '图片原件只能提交一页识别结果。')
     return
@@ -397,7 +427,7 @@ async function verifyRecognitionPages(tx: TransactionDb, invoice: CentralInvoice
   let actualCount: number
   try {
     const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
-    const task = pdfjs.getDocument({ data: new Uint8Array(payload.content), isEvalSupported: false, disableFontFace: true, stopAtErrors: true })
+    const task = pdfjs.getDocument({ data: original.bytes, isEvalSupported: false, disableFontFace: true, stopAtErrors: true })
     try {
       const pdf = await task.promise
       actualCount = pdf.numPages
@@ -416,7 +446,7 @@ export async function listProductionInvoiceReferences(tx: TransactionDb, actor: 
   if (invoiceId !== undefined && !idPattern.test(invoiceId))
     fail('validation-failed', '发票身份无效。')
   const [participant] = await tx.select<{ schema_version: number }>('SELECT schema_version FROM production_participants WHERE domain=?', ['invoices'])
-  if (![1, 2, 3].includes(participant?.schema_version ?? 0))
+  if (![1, 2, 3, 4].includes(participant?.schema_version ?? 0))
     fail('unavailable', '发票正式来源尚未接通。')
   const rows = await tx.select<Row>(`${SELECT_RECORD} WHERE i.deleted_at IS NULL AND i.account_status='archived' AND i.dup_status='normal'${invoiceId === undefined ? '' : ' AND i.id=?'} ORDER BY i.id`, invoiceId === undefined ? [] : [invoiceId])
   const references: Record<string, unknown>[] = []
@@ -476,6 +506,8 @@ export async function validateProductionInvoiceJournal(tx: TransactionDb, identi
   }
   const [revision] = await tx.select<{ revision: number }>('SELECT revision FROM invoice_revision WHERE singleton=1')
   const heads = await tx.select<Row>(SELECT_RECORD)
+  const verificationEnabled = await hasOriginalVerificationSchema(tx)
+  const verificationAudit = verificationEnabled ? await loadVerificationAudit(tx) : new Map()
   const receipts = await tx.select<Row>('SELECT * FROM invoice_command_receipts')
   const printReceipts = await tx.select<Row>('SELECT * FROM invoice_print_receipts')
   const printLines = await tx.select<Row>('SELECT * FROM invoice_print_lines')
@@ -547,7 +579,7 @@ export async function validateProductionInvoiceJournal(tx: TransactionDb, identi
   for (const row of receipts) {
     if (row.workspace_id !== identity.workspaceId || row.actor_id !== identity.actorId || typeof row.invoice_id !== 'string'
       || typeof row.command_id !== 'string' || typeof row.fingerprint !== 'string' || !/^[a-f0-9]{64}$/.test(row.fingerprint)
-      || !['upload', 'manual', 'import', 'import-replace', 'attach-original', 'link-contract', 'confirm-legacy', 'recognize', 'rerecognize', 'edit', 'review', 'archive', 'edit-archived', 'correct', 'discard', 'restore', 'legacy-adopt', 'legacy-retire'].includes(String(row.action))
+      || !['upload', 'manual', 'import', 'import-replace', 'attach-original', 'link-contract', 'confirm-legacy', 'recognize', 'rerecognize', 'edit', 'review', 'archive', 'edit-archived', 'correct', 'discard', 'restore', 'legacy-adopt', 'legacy-retire', ...invoiceVerificationActions].includes(String(row.action))
       || !headIds.has(row.invoice_id)) {
       return invalid()
     }
@@ -555,7 +587,7 @@ export async function validateProductionInvoiceJournal(tx: TransactionDb, identi
     group.push(row)
     byInvoice.set(row.invoice_id, group)
     const result = parsedReceipt(row.result_json, row.command_id, row.invoice_id)
-    if (row.created_at !== result.updatedAt)
+    if (row.created_at !== result.updatedAt || (result.verificationSha256 !== undefined) !== isInvoiceVerificationAction(row.action))
       return invalid()
   }
   for (const row of printReceipts) {
@@ -599,6 +631,7 @@ export async function validateProductionInvoiceJournal(tx: TransactionDb, identi
     if (history.length !== Number(head.version) || history[0]?.row.action !== (head.sourceKind === 'scan' ? 'upload' : head.sourceKind === 'excel' ? 'import' : head.sourceKind === 'legacy' ? 'legacy-adopt' : 'manual'))
       return invalid()
     let prior: unknown = null
+    const verificationHistory: VerificationHistory = {}
     let verifiedPageCount: number | null = null
     for (const [index, entry] of history.entries()) {
       if (Number(entry.result.version) !== index + 1)
@@ -606,8 +639,12 @@ export async function validateProductionInvoiceJournal(tx: TransactionDb, identi
       if (entry.printing) {
         const before = parse(entry.printing.line.before_json)
         const after = parse(entry.printing.line.after_json)
+        const verificationId = entry.printing.line.verification_id ?? null
+        const verified = verificationId === null
+          ? object(before) && before.ocrStatus === 'done'
+          : object(before) && typeof verificationId === 'string' && currentVerificationId(before as unknown as CentralInvoiceRecord, verificationHistory) === verificationId
         if (!object(before) || !object(after) || canonical(before) !== canonical(prior) || before.deletedAt !== null
-          || !hasPrintableCentralOriginal(before.sourceKind, before.original) || before.ocrStatus !== 'done' || before.reviewStatus !== 'reviewed' || before.duplicateStatus !== 'normal'
+          || !hasPrintableCentralOriginal(before.sourceKind, before.original) || !verified || before.reviewStatus !== 'reviewed' || before.duplicateStatus !== 'normal'
           || !object(before.fields) || typeof before.fields.totalAmount !== 'number' || before.fields.totalAmount <= 0
           || typeof before.printCount !== 'number' || entry.printing.print.printCount !== before.printCount + 1
           || canonical(after) !== canonical({ ...before, version: entry.result.version, updatedAt: entry.result.updatedAt, printCount: entry.printing.print.printCount, printRotation: entry.printing.print.printRotation })) {
@@ -630,6 +667,32 @@ export async function validateProductionInvoiceJournal(tx: TransactionDb, identi
         if ((object(after.original) ? after.original.id : null) !== entry.result.originalId)
           return invalid()
         prior = after
+      }
+      if (isInvoiceVerificationAction(entry.row.action)) {
+        const row = verificationAudit.get(entry.result.commandId)
+        const before = parse(audits[0]!.before_json) as CentralInvoiceRecord | null
+        const evidence: unknown = row && parse(row.evidence_json)
+        if (!row || !before || !object(evidence) || !object(evidence.request))
+          return invalid()
+        const request = command(evidence.request)
+        if ((request.action !== RECORD_ORIGINAL_VERIFICATION && request.action !== CONFIRM_ORIGINAL_VERIFICATION)
+          || request.action !== entry.row.action || request.workspaceId !== identity.workspaceId || request.actorId !== identity.actorId
+          || request.baseVersion !== before.version || !matchesVerificationOriginal(before, request)
+          || canonical(prior) !== canonical({ ...before, version: entry.result.version, updatedAt: entry.result.updatedAt })) {
+          return invalid()
+        }
+        if (request.action === RECORD_ORIGINAL_VERIFICATION) {
+          if (!exactKeys(evidence, ['request', 'fields', 'items']))
+            return invalid()
+          invoiceFields(evidence.fields, 'unavailable')
+          invoiceItems(evidence.items, 'unavailable')
+          await verifyRecognitionPages(tx, before, request.textPages.length)
+        }
+        else if (canonical(evidence) !== canonical(await confirmVerification(tx, before, request, verificationHistory))) {
+          return invalid()
+        }
+        appendVerification(verificationHistory, row)
+        verificationAudit.delete(entry.result.commandId)
       }
       if (entry.row.action === 'legacy-adopt') {
         const member = legacyMembers.find(row => row.invoice_id === head.id && row.genesis_command_id === entry.row.command_id)
@@ -858,7 +921,7 @@ export async function validateProductionInvoiceJournal(tx: TransactionDb, identi
   }
   const hasCorrections = (await tx.select('SELECT name FROM sqlite_schema WHERE type=\'table\' AND name=\'invoice_corrections\'')).length > 0
   const [invoiceParticipant] = await tx.select<{ schema_version: number }>('SELECT schema_version FROM production_participants WHERE domain=\'invoices\'')
-  if (hasCorrections !== (invoiceParticipant?.schema_version === 3))
+  if (hasCorrections !== [3, 4].includes(invoiceParticipant?.schema_version ?? 0) || verificationAudit.size)
     return invalid()
   if (hasCorrections)
     await validateInvoiceCorrections(tx, identity)
@@ -1013,6 +1076,12 @@ export function createProductionInvoiceService(storage: ProductionStorage, optio
     const asOf = new Date().toISOString()
     return createReadMeta({ session: actor, schemaVersion: 'invoice-read-v1', operation: `invoice:${operation}`, dataOrigin: 'real', asOf, sources: [{ key: 'invoices', state: 'readable', sourceVersion: `invoices:${revision.revision}`, asOf }], coverage: 'complete', scope })
   }
+  async function printableRead(tx: TransactionDb, invoice: CentralInvoiceRecord, enabled: boolean) {
+    if (!enabled || invoice.sourceKind !== 'excel' || !invoice.original || invoice.deletedAt !== null)
+      return invoice
+    const originalVerificationId = currentVerificationId(invoice, await readVerificationHistory(tx, invoice.id))
+    return originalVerificationId ? { ...invoice, originalVerificationId } : invoice
+  }
   return {
     /** Internal transaction port; correction owner commits its own history in the same transaction. */
     correctionPort: {
@@ -1098,13 +1167,27 @@ export function createProductionInvoiceService(storage: ProductionStorage, optio
           fail('unavailable', '发票列表与原件关系不完整，不能显示不完整结果。')
         const items = rows.map(rowToRecord)
         items.forEach(value => ensureReferencesReadable(value, actor))
-        return withReadMeta({ dataOrigin: 'real' as const, items, pagination }, await metadata(tx, actor, 'list', scope))
+        const enabled = await hasOriginalVerificationSchema(tx)
+        const projected = await Promise.all(items.map(invoice => printableRead(tx, invoice, enabled)))
+        return withReadMeta({ dataOrigin: 'real' as const, items: projected, pagination }, await metadata(tx, actor, 'list', scope))
       })
     },
     getRead(invoiceId: string, session: Session, includeDeleted = false) {
       if (!idPattern.test(invoiceId))
         return Promise.reject(new CentralInvoiceProblem('validation-failed', '发票身份无效。'))
-      return run(session, false, async (tx, actor) => withReadMeta({ dataOrigin: 'real' as const, record: await record(tx, invoiceId, includeDeleted, actor) }, await metadata(tx, actor, 'detail', { invoiceId, deleted: includeDeleted })))
+      return run(session, false, async (tx, actor) => {
+        const invoice = await record(tx, invoiceId, includeDeleted, actor)
+        const history = invoice.sourceKind === 'excel' && invoice.original && invoice.deletedAt === null && await hasOriginalVerificationSchema(tx)
+          ? await readVerificationHistory(tx, invoiceId)
+          : {}
+        const originalVerificationId = currentVerificationId(invoice, history)
+        const verification = await describeVerification(tx, invoice, history)
+        return withReadMeta({
+          dataOrigin: 'real' as const,
+          record: originalVerificationId ? { ...invoice, originalVerificationId } : invoice,
+          ...(verification ? { verification } : {}),
+        }, await metadata(tx, actor, 'detail', { invoiceId, deleted: includeDeleted }))
+      })
     },
     list(session: Session, includeDeleted = false) {
       return run(session, false, async (tx, actor) => {
@@ -1129,10 +1212,7 @@ export function createProductionInvoiceService(storage: ProductionStorage, optio
         const owner = await record(tx, invoiceId, false, actor)
         if (!owner.original || owner.original.id !== originalId)
           fail('not-found', '原件不属于当前发票。')
-        const [row] = await tx.select<{ content: Uint8Array }>('SELECT content FROM file_payloads WHERE file_ref_id=?', [originalId])
-        if (!(row?.content instanceof Uint8Array) || row.content.length !== owner.original.fileSize || digest(row.content) !== owner.original.sha256)
-          fail('unavailable', '原件正文或摘要不完整，不能提供损坏文件。')
-        return { ...owner.original, bytes: new Uint8Array(row.content) }
+        return readCheckedOriginal(tx, owner)
       })
     },
     async execute(value: unknown, session: Session): Promise<CentralInvoiceCommandResult> {
@@ -1171,6 +1251,7 @@ export function createProductionInvoiceService(storage: ProductionStorage, optio
         let before: CentralInvoiceRecord | null = null
         let recognition: { fields: CentralInvoiceFields, items: CentralInvoiceItem[], source: 'local' | 'cloud', textPages: string[], unrecognizedPageIndexes: number[] } | null = null
         let recognitionIntermediate: CentralInvoiceRecord | null = null
+        let verification: VerificationEvidence | null = null
         let archiveEvidence: unknown = null
         let imported: CentralInvoiceCommand & { action: 'import' | 'import-replace' } | null = null
         if (request.action === 'upload') {
@@ -1214,7 +1295,7 @@ export function createProductionInvoiceService(storage: ProductionStorage, optio
             fail('conflict', '发票版本已变化，请重新读取后再操作。')
           if ((request.action === 'discard' && before.deletedAt) || (request.action === 'restore' && !before.deletedAt))
             fail('conflict', '发票状态已变化，请重新读取。')
-          if (before.accountStatus === 'archived' && !['attach-original', 'link-contract', 'confirm-legacy', 'edit-archived', 'import-replace', 'discard', 'restore'].includes(request.action))
+          if (before.accountStatus === 'archived' && !['attach-original', 'link-contract', 'confirm-legacy', 'edit-archived', 'import-replace', 'discard', 'restore', ...invoiceVerificationActions].includes(request.action))
             fail('conflict', '已归档发票只能通过归档修改、删除或恢复操作处理。')
           if (before.accountStatus !== 'archived' && request.action === 'edit-archived')
             fail('conflict', '该发票尚未归档，请使用普通编辑。')
@@ -1226,7 +1307,28 @@ export function createProductionInvoiceService(storage: ProductionStorage, optio
           version = Number(before.version) + 1
           if (!Number.isSafeInteger(version))
             fail('unavailable', '发票版本无法可靠递增。')
-          if (request.action === 'confirm-legacy') {
+          if (request.action === RECORD_ORIGINAL_VERIFICATION || request.action === CONFIRM_ORIGINAL_VERIFICATION) {
+            if (!await hasOriginalVerificationSchema(tx))
+              fail('unavailable', '当前发票存储尚不支持已归档原件核验。')
+            if (!matchesVerificationOriginal(before, request))
+              fail('conflict', '只可核验已有同一原件的有效已归档 Excel 发票。')
+            await ensureArchiveReferences(tx, actor, before.projectId, before.supplierId)
+            if (before.contract)
+              await verifyContract(tx, actor, before.contract, before.projectId, before.supplierId)
+            if (request.action === RECORD_ORIGINAL_VERIFICATION) {
+              await verifyRecognitionPages(tx, before, request.textPages.length)
+              const { items, balanced: _balanced, projectHint: _projectHint, calculatedAmounts: _calculatedAmounts, ...fields }
+                = parseInvoiceTextPreservingUnknowns(request.textPages.join('\n\n'))
+              verification = { request, fields: invoiceFields(fields, 'validation-failed'), items: invoiceItems(items, 'validation-failed') }
+            }
+            else {
+              await readCheckedOriginal(tx, before)
+              await ensureArchiveFields(tx, invoiceId, before.fields)
+              verification = await confirmVerification(tx, before, request, await readVerificationHistory(tx, invoiceId))
+            }
+            await tx.execute('UPDATE invoices SET version=?,updated_at=? WHERE id=?', [version, now, invoiceId])
+          }
+          else if (request.action === 'confirm-legacy') {
             if (before.deletedAt || before.sourceKind !== 'legacy' || before.accountStatus !== 'archived' || before.completionMethod !== 'legacy' || (before.legacy?.source === 'scan' && !before.original))
               fail('validation-failed', '请先补齐扫描发票原件并核对历史票面。')
             await ensureArchiveFields(tx, invoiceId, before.fields)
@@ -1366,12 +1468,14 @@ export function createProductionInvoiceService(storage: ProductionStorage, optio
             await tx.execute('UPDATE invoices SET deleted_at=?,version=?,updated_at=? WHERE id=?', [request.action === 'discard' ? now : null, version, now, invoiceId])
           }
         }
-        const result: CentralInvoiceCommandResult = { invoiceId, commandId: request.commandId, version: String(version), updatedAt: now, originalId }
+        const result: CentralInvoiceCommandResult = { invoiceId, commandId: request.commandId, version: String(version), updatedAt: now, originalId, ...(verification ? { verificationSha256: digest(canonical(verification)) } : {}) }
         await tx.execute('INSERT INTO invoice_command_receipts VALUES(?,?,?,?,?,?,?,?)', [request.commandId, actor.workspaceId, actor.actorId, invoiceId, request.action, fingerprint, JSON.stringify(result), now])
         if (imported)
           await tx.execute('INSERT INTO invoice_import_sources VALUES(?,?,?,?,?,?)', [request.commandId, invoiceId, imported.source.fileDigest, imported.source.sheetName, imported.source.rowNumber, JSON.stringify(imported.source)])
         if (recognition)
           await tx.execute('INSERT INTO invoice_recognitions VALUES(?,?,?,?,?,?)', [randomUUID(), invoiceId, request.commandId, actor.actorId, JSON.stringify(recognition), now])
+        if (verification)
+          await tx.execute('INSERT INTO invoice_original_verifications VALUES(?,?,?,?,?,?)', [request.commandId, invoiceId, version, originalId, 'candidateId' in verification.request ? verification.request.candidateId : null, JSON.stringify(verification)])
         if (archiveEvidence)
           await tx.execute('INSERT INTO invoice_archive_evidence VALUES(?,?,?,?,?,?)', [randomUUID(), invoiceId, request.commandId, actor.actorId, JSON.stringify(archiveEvidence), now])
         const after = await record(tx, invoiceId, true, actor)
@@ -1402,28 +1506,41 @@ export function createProductionInvoiceService(storage: ProductionStorage, optio
         }
         if (await correctionCommandOccupied(tx, request.commandId))
           fail('conflict', '该编号属于更正单，不能用于打印。')
-        const before: CentralInvoiceRecord[] = []
+        const verificationEnabled = await hasOriginalVerificationSchema(tx)
+        const before: Array<{ invoice: CentralInvoiceRecord, verificationId: string | null }> = []
         for (const target of request.targets) {
           const invoice = await record(tx, target.invoiceId, false, actor)
           if (invoice.version !== target.baseVersion)
             fail('conflict', '打印列表中发票版本已变化，请重新核对整批。')
-          if (!hasPrintableCentralOriginal(invoice.sourceKind, invoice.original) || invoice.ocrStatus !== 'done' || invoice.reviewStatus !== 'reviewed' || invoice.duplicateStatus !== 'normal'
+          const requiresVerification = verificationEnabled && invoice.sourceKind === 'excel'
+          const verificationId = requiresVerification && invoice.original
+            ? currentVerificationId(invoice, await readVerificationHistory(tx, invoice.id)) ?? null
+            : null
+          if (!hasPrintableCentralOriginal(invoice.sourceKind, invoice.original) || (requiresVerification ? !verificationId : invoice.ocrStatus !== 'done') || invoice.reviewStatus !== 'reviewed' || invoice.duplicateStatus !== 'normal'
             || invoice.fields.totalAmount === null || invoice.fields.totalAmount <= 0) {
             fail('validation-failed', '打印列表包含缺少可打印原件、未完成识别、未核对、重复或缺少有效金额的发票。')
           }
           if (!Number.isSafeInteger(Number(invoice.version) + 1) || !Number.isSafeInteger(invoice.printCount + 1))
             fail('unavailable', '发票版本或打印次数无法可靠递增。')
-          before.push(invoice)
+          if (verificationId) {
+            await readCheckedOriginal(tx, invoice)
+            await ensureArchiveFields(tx, invoice.id, invoice.fields)
+          }
+          before.push({ invoice, verificationId })
         }
         const now = new Date().toISOString()
         const records: CentralInvoicePrintResult['records'] = []
         for (const [index, target] of request.targets.entries()) {
-          const original = before[index]!
+          const { invoice: original, verificationId } = before[index]!
           const nextVersion = String(Number(original.version) + 1)
           await tx.execute('UPDATE invoices SET print_count=print_count+1,print_rotation=?,version=?,updated_at=? WHERE id=?', [target.rotation, Number(nextVersion), now, target.invoiceId])
           const after = await record(tx, target.invoiceId, false, actor)
           records.push({ invoiceId: target.invoiceId, version: nextVersion, printCount: after.printCount, printRotation: after.printRotation })
-          await tx.execute('INSERT INTO invoice_print_lines VALUES(?,?,?,?,?,?)', [request.commandId, target.invoiceId, actor.actorId, JSON.stringify(original), JSON.stringify(after), now])
+          const values = [request.commandId, target.invoiceId, actor.actorId, JSON.stringify(original), JSON.stringify(after), now]
+          if (verificationEnabled)
+            await tx.execute('INSERT INTO invoice_print_lines VALUES(?,?,?,?,?,?,?)', [...values, verificationId])
+          else
+            await tx.execute('INSERT INTO invoice_print_lines VALUES(?,?,?,?,?,?)', values)
         }
         const result = { commandId: request.commandId, updatedAt: now, records }
         await tx.execute('INSERT INTO invoice_print_receipts VALUES(?,?,?,?,?,?)', [request.commandId, actor.workspaceId, actor.actorId, fingerprint, JSON.stringify(result), now])

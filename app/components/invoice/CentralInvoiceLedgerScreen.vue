@@ -3,7 +3,7 @@ import type { CentralInvoicePrintCommand, CentralInvoiceRecord } from '~/lib/inv
 import type { createCentralInvoiceWorkspace } from '~/lib/invoice/central-workspace'
 import type { InvoiceLedgerExportRow, InvoiceXlsxStyleConfig } from '~/lib/invoice/excel'
 import type { InvoicePrintRequest, InvoicePrintViewModel } from '~/lib/invoice/print-layout'
-import { computed, nextTick, onMounted, shallowRef, watch } from 'vue'
+import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, shallowRef, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import { useKitUI } from '~/composables/useKitUI'
 import { useTabCloseGuard } from '~/composables/useTabCloseGuard'
@@ -27,6 +27,9 @@ const printSource = shallowRef<CentralInvoiceRecord[]>([])
 const pendingPrint = shallowRef<InvoicePrintRequest | null>(null)
 const printTargets = shallowRef<CentralInvoicePrintCommand['targets']>([])
 const recoveryPending = shallowRef(false)
+let printGeneration = 0
+onDeactivated(() => printGeneration++)
+onBeforeUnmount(() => printGeneration++)
 const exportOpen = shallowRef(false)
 const exportSaving = shallowRef(false)
 const exportError = shallowRef('')
@@ -66,6 +69,7 @@ const printModels = computed<InvoicePrintViewModel[]>(() => printSource.value.ma
   dupStatus: record.duplicateStatus,
   source: record.sourceKind,
   original: record.original,
+  originalVerificationId: record.originalVerificationId,
 })))
 function message(cause: unknown) {
   return cause instanceof Error ? cause.message : '操作暂时不可用，请稍后重试。'
@@ -80,6 +84,8 @@ function refreshPending() {
   catch (cause) { error.value = message(cause) }
 }
 async function mayLeave() {
+  if (busy.value)
+    return false
   if (!pendingPrint.value)
     return true
   return confirm({ variant: 'simple', title: '离开打印排版', message: '本次打印尚未确认记录。确定离开吗？', confirmLabel: '离开' })
@@ -106,6 +112,10 @@ async function load() {
 onMounted(async () => {
   await load()
   refreshPending()
+})
+onActivated(() => {
+  if (props.workspace.readState.value === 'ready' && !printMode.value)
+    void load()
 })
 function preparePrint(selected: CentralInvoiceRecord[]) {
   if (busy.value || recoveryPending.value || !selected.length || selected.some(record => record.fields.totalAmount === null))
@@ -177,23 +187,31 @@ async function confirmExport(style: InvoiceXlsxStyleConfig) {
 async function print(payload: InvoicePrintRequest) {
   if (busy.value || pendingPrint.value || recoveryPending.value)
     return
-  let targets: CentralInvoicePrintCommand['targets']
-  try {
-    targets = payload.ids.map((id) => {
+  const generation = ++printGeneration
+  let verified: CentralInvoicePrintCommand['targets'] | null = null
+  await run(async () => {
+    const targets = []
+    for (const id of payload.ids) {
       const source = printSource.value.find(record => record.id === id)
       const rotation = payload.rotations[id]
       if (!source || rotation === undefined)
         throw new Error('打印票据身份或角度已变化。')
-      return { invoiceId: id, baseVersion: source.version, rotation }
-    })
-  }
-  catch (cause) {
-    error.value = message(cause)
+      if (source.sourceKind === 'excel') {
+        if (!source.originalVerificationId)
+          throw new Error('Excel 发票须先确认原件核验。')
+        await props.workspace.verifiedOriginal(source, true)
+      }
+      targets.push({ invoiceId: id, baseVersion: source.version, rotation })
+    }
+    verified = targets
+  })
+  if (!verified || generation !== printGeneration || props.workspace.readState.value !== 'ready')
     return
-  }
   pendingPrint.value = payload
-  printTargets.value = targets
+  printTargets.value = verified
   await nextTick()
+  if (generation !== printGeneration)
+    return
   try {
     window.print()
   }

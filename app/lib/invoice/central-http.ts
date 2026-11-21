@@ -1,15 +1,15 @@
 import type { PaginationDTO, ReadMetaDTO } from '../../types/read-model'
-import type { CentralInvoiceCommand, CentralInvoiceCommandResult, CentralInvoiceFields, CentralInvoiceImportSource, CentralInvoiceItem, CentralInvoicePrintCommand, CentralInvoicePrintResult, CentralInvoiceRecord } from './central-contract'
+import type { CentralInvoiceCommand, CentralInvoiceCommandResult, CentralInvoiceFields, CentralInvoiceImportSource, CentralInvoiceItem, CentralInvoicePrintCommand, CentralInvoicePrintResult, CentralInvoiceRecord, InvoiceOriginalVerificationRead } from './central-contract'
 import { isISODateDTO, isISODateTimeDTO } from '../../types/read-model'
 import { hasConsistentReadMeta } from '../read-model/meta'
 import { isPaginationDTO, READ_PAGE_SIZES } from '../read-model/pagination'
-import { CentralInvoiceProblem, INVOICE_ORIGINAL_MAX_BYTES, INVOICE_READ_CAPABILITY } from './central-contract'
+import { CentralInvoiceProblem, CONFIRM_ORIGINAL_VERIFICATION, INVOICE_ORIGINAL_MAX_BYTES, INVOICE_READ_CAPABILITY, RECORD_ORIGINAL_VERIFICATION } from './central-contract'
 
 interface Identity { workspaceId: string, actorId: string }
 type Fetcher = (url: string, options?: { method?: 'GET' | 'POST', query?: Record<string, unknown>, body?: unknown }) => Promise<unknown>
 interface ReadEvidence { dataOrigin: 'real', meta: ReadMetaDTO, asOf: string, sourceVersion: string, capabilities: string[] }
 export type InvoiceListRead = ReadEvidence & { items: CentralInvoiceRecord[], pagination: PaginationDTO }
-export type InvoiceDetailRead = ReadEvidence & { record: CentralInvoiceRecord }
+export type InvoiceDetailRead = ReadEvidence & { record: CentralInvoiceRecord, verification?: InvoiceOriginalVerificationRead }
 export type InvoiceResolution = { outcome: 'applied', result: CentralInvoiceCommandResult } | { outcome: 'not-applied', commandId: string }
 export type InvoicePrintResolution = { outcome: 'applied', result: CentralInvoicePrintResult } | { outcome: 'not-applied', commandId: string }
 export type InvoiceImportPreview = ReadEvidence & { candidates: Array<{ record: CentralInvoiceRecord, matchedBy: Array<'source-row' | 'invoice-number'>, differences: Array<keyof CentralInvoiceFields>, itemsDiffer: boolean }> }
@@ -37,9 +37,10 @@ function invalid(): never {
 }
 
 function receipt(value: unknown, commandId: string, target?: string): CentralInvoiceCommandResult {
-  if (!object(value) || Object.keys(value).sort().join(',') !== 'commandId,invoiceId,originalId,updatedAt,version'
+  if (!object(value) || !['commandId,invoiceId,originalId,updatedAt,version', 'commandId,invoiceId,originalId,updatedAt,verificationSha256,version'].includes(Object.keys(value).sort().join(','))
     || value.commandId !== commandId || !id(value.invoiceId) || (target !== undefined && value.invoiceId !== target)
-    || !version(value.version) || !isISODateTimeDTO(value.updatedAt) || !nullableId(value.originalId)) {
+    || !version(value.version) || !isISODateTimeDTO(value.updatedAt) || !nullableId(value.originalId)
+    || ('verificationSha256' in value && (typeof value.verificationSha256 !== 'string' || !/^[a-f0-9]{64}$/.test(value.verificationSha256) || !id(value.originalId)))) {
     return invalid()
   }
   return value as unknown as CentralInvoiceCommandResult
@@ -103,6 +104,8 @@ function record(value: unknown): value is CentralInvoiceRecord {
   else if (value.legacy !== undefined) {
     return false
   }
+  if ('originalVerificationId' in value && (!id(value.originalVerificationId) || value.sourceKind !== 'excel' || value.accountStatus !== 'archived' || !object(value.original) || value.deletedAt !== null))
+    return false
   if (value.original === null)
     return value.sourceKind === 'manual' || value.sourceKind === 'excel' || value.sourceKind === 'legacy'
   return object(value.original) && id(value.original.id) && typeof value.original.fileName === 'string' && !!value.original.fileName.trim()
@@ -111,6 +114,15 @@ function record(value: unknown): value is CentralInvoiceRecord {
 }
 
 export { record as isCentralInvoiceRecord }
+
+function verificationRead(value: unknown): value is InvoiceOriginalVerificationRead {
+  const fieldValue = (input: unknown) => typeof input === 'string' || optionalNumber(input)
+  return object(value) && id(value.candidateId) && member(value.source, ['local', 'cloud'])
+    && member(value.state, ['incomplete', 'different', 'ready', 'confirmed', 'stale'])
+    && Array.isArray(value.unrecognizedPageIndexes) && value.unrecognizedPageIndexes.every(index => Number.isInteger(index) && index >= 0 && index < 10)
+    && Array.isArray(value.rows) && value.rows.length >= 9 && value.rows.length <= 16_012
+    && value.rows.every(row => object(row) && typeof row.path === 'string' && fieldValue(row.archived) && fieldValue(row.recognized) && member(row.result, ['match', 'missing', 'different']))
+}
 
 function referencesReadable(record: CentralInvoiceRecord, capabilities: string[]) {
   return (!record.projectId || capabilities.includes('project:list:read')) && (!record.supplierId || capabilities.includes('supplier:list:read'))
@@ -147,7 +159,12 @@ export function createCentralInvoiceHttp(fetcher: Fetcher, authority: Identity, 
       const result = await fetcher(`/api/read/invoices/${encodeURIComponent(invoiceId)}`, { query: { deleted: deleted ? 'true' : 'false' } })
       if (!evidence(result, identity) || !record(result.record) || result.record.id !== invoiceId || !referencesReadable(result.record, result.capabilities) || (!deleted && result.record.deletedAt !== null))
         return invalid()
-      return { ...result, record: result.record }
+      const verification = result.verification
+      if (verification !== undefined && (!verificationRead(verification) || result.record.sourceKind !== 'excel' || !result.record.original || result.record.deletedAt !== null
+        || (verification.state === 'confirmed') !== !!result.record.originalVerificationId)) {
+        return invalid()
+      }
+      return { ...result, record: result.record, ...(verification ? { verification } : {}) }
     },
     async previewImport(input: { fields: CentralInvoiceFields, items: CentralInvoiceItem[], source: CentralInvoiceImportSource }): Promise<InvoiceImportPreview> {
       const result = await fetcher('/api/read/invoices/import-preview', { method: 'POST', body: input })
@@ -173,7 +190,12 @@ export function createCentralInvoiceHttp(fetcher: Fetcher, authority: Identity, 
       if (command.workspaceId !== identity.workspaceId || command.actorId !== identity.actorId || !id(command.commandId))
         return invalid()
       const result = await fetcher('/api/commands/invoices', { method: 'POST', body: command })
-      return receipt(result, command.commandId, 'invoiceId' in command ? command.invoiceId : undefined)
+      const response = receipt(result, command.commandId, 'invoiceId' in command ? command.invoiceId : undefined)
+      if ((command.action === RECORD_ORIGINAL_VERIFICATION || command.action === CONFIRM_ORIGINAL_VERIFICATION)
+        && (!response.verificationSha256 || response.originalId !== command.originalId)) {
+        return invalid()
+      }
+      return response
     },
     async resolve(commandId: string): Promise<InvoiceResolution> {
       if (!id(commandId))

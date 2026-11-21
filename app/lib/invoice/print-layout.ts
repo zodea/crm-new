@@ -20,6 +20,7 @@ export interface PrintableInvoice {
   source?: string
   /** 中央读面已核验的原件引用。旧台账路径或文件名不能证明关联成功。 */
   original?: { id: string } | null
+  originalVerificationId?: string
 }
 
 /** 打印只依赖可见票面和打印状态，不要求伪造未识别的其他金额。 */
@@ -70,7 +71,7 @@ export function checkPrintableInvoice(invoice: PrintableInvoice): PrintQueueChec
   const excel = invoice.source === 'excel'
   if (excel && !hasPrintableCentralOriginal(invoice.source, invoice.original))
     return { ok: false, reason: 'Excel 导入的发票没有原件，不能打印' }
-  if ((excel || invoice.ocrStatus != null) && invoice.ocrStatus !== 'done')
+  if ((excel || invoice.ocrStatus != null) && invoice.ocrStatus !== 'done' && !(excel && invoice.originalVerificationId))
     return { ok: false, reason: '识别尚未完成，不能进入打印队列' }
   if ((excel || invoice.reviewStatus != null) && invoice.reviewStatus !== 'reviewed')
     return { ok: false, reason: '当前字段尚未完成人工确认，不能进入打印队列' }

@@ -11,7 +11,7 @@
 | [tests/invoice/central-original-binding.test.ts](../../../tests/invoice/central-original-binding.test.ts) | 单元／状态 | 原件字节与权限核对 |
 | [tests/invoice/central-pending-discovery.test.ts](../../../tests/invoice/central-pending-discovery.test.ts) | 单元／状态 | 原编号发现与身份隔离 |
 | [tests/invoice/central-recognition.test.ts](../../../tests/invoice/central-recognition.test.ts) | 单元／状态 | 写命令保留 OCR 页证据与明示零，排除定位和勾稽建议 |
-| [tests/invoice/central-workspace-recognition.test.ts](../../../tests/invoice/central-workspace-recognition.test.ts) | 单元／状态 | 识别后的身份权限核对 |
+| [tests/invoice/central-workspace-recognition.test.ts](../../../tests/invoice/central-workspace-recognition.test.ts) | 单元／状态 | 识别后的身份权限核对，归档核验提交原件摘要及 OCR 页，取消后拒绝迟到结果 |
 | [tests/stores/invoice-manual-startup.test.ts](../../../tests/stores/invoice-manual-startup.test.ts) | 单元／状态 | 手工原编号刷新与身份隔离 |
 | [tests/invoice/central-migration-bootstrap.test.ts](../../../tests/invoice/central-migration-bootstrap.test.ts) | 单元／服务／状态 | 迁入目录的身份、权限与来源版本 |
 | [tests/invoice/central-migration-pending.test.ts](../../../tests/invoice/central-migration-pending.test.ts) | 单元／状态 | 迁入原编号发现、身份隔离及损坏存储阻断 |
@@ -121,7 +121,7 @@
 | [e2e/production-invoice-manual-recovery.spec.ts](../../../e2e/production-invoice-manual-recovery.spec.ts) | 隔离服务／合成数据 | 手工创建响应丢失、重启重新登录及原编号刷新恢复 |
 | [e2e/production-invoice-ledger-export.spec.ts](../../../e2e/production-invoice-ledger-export.spec.ts) | 隔离服务／合成数据 | 台账筛选导出与隔离冷读 |
 | [e2e/production-invoice-migration.spec.ts](../../../e2e/production-invoice-migration.spec.ts) | 隔离服务／合成数据 | 项目和公司旧票发布、原件及断线原编号恢复 |
-| [e2e/production-invoice-correction.spec.ts](../../../e2e/production-invoice-correction.spec.ts) | 隔离服务／合成数据 | 更正草稿、断线原编号恢复与打印阻断 |
+| [e2e/production-invoice-correction.spec.ts](../../../e2e/production-invoice-correction.spec.ts) | 隔离服务／合成数据 | 更正草稿与原编号冷恢复，归档 Excel 原件差异更正、确认后打印、SQLite 核验证据与打印关联 |
 | [e2e/factor-solver.spec.ts](../../../e2e/factor-solver.spec.ts) | Playwright E2E | 精确因子组合工作台 |
 | [e2e/invoice-export-borders.spec.ts](../../../e2e/invoice-export-borders.spec.ts) | Playwright E2E | Issue #437 发票 Excel 分组边框 |
 | [e2e/invoice-ledger-print-mode.spec.ts](../../../e2e/invoice-ledger-print-mode.spec.ts) | Playwright E2E | 发票台账打印入口：Excel 行可在台账勾选合计但不进入打印，进入双栏选择、打印确认并返回台账 |

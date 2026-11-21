@@ -82,7 +82,7 @@ test('旧票迁入与备份恢复后，以真实中央目录下载台账 Excel',
     const { execFileSync } = await import('node:child_process')
     const restored = JSON.parse(execFileSync(process.execPath, ['--experimental-transform-types', '-e', script, fixture.directory, backupDir, restoreDir, `backup-${randomUUID()}`], { cwd: process.cwd(), encoding: 'utf8', windowsHide: true })) as { restored: { directory: string, inventory: { schemaVersion: number } } }
     expect(restored.restored.directory).toBe(join(restoreDir, 'ledger-cold'))
-    expect(restored.restored.inventory.schemaVersion).toBe(32)
+    expect(restored.restored.inventory.schemaVersion).toBe(33)
     const salt = '0123456789abcdef0123456789abcdef'
     const hash = `scrypt$${salt}$${scryptSync('crew-worker-synthetic-access-only', Buffer.from(salt, 'hex'), 64).toString('hex')}`
     const port = new URL(fixture.origin).port

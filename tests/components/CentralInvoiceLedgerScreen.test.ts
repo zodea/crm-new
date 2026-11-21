@@ -168,7 +168,7 @@ it('项目目录版本变化时不导出旧项目名称', async () => {
   expect(mocks.exportFile).toHaveBeenCalledOnce()
 })
 
-it.each(['scan', 'excel'] as const)('%s 有原件且识别核对完成后，确认已打印才提交原批次，结果未知时核对原任务', async (sourceKind) => {
+it.each(['scan', 'excel'] as const)('%s 具备原件及相应的核对证据后，确认已打印才提交原批次，结果未知时核对原任务', async (sourceKind) => {
   for (const [name, value] of Object.entries({ computed, shallowRef, useTemplateRef, watch }))
     vi.stubGlobal(name, value)
   vi.stubGlobal('useEventListener', vi.fn())
@@ -180,8 +180,8 @@ it.each(['scan', 'excel'] as const)('%s 有原件且识别核对完成后，确�
     fields: { invoiceNumber: '00123', invoiceDate: '2026-01-01', invoiceType: '', buyer: '', buyerTaxNo: '', seller: '合成销售方', sellerTaxNo: '', amount: null, taxAmount: 0, totalAmount: 100, taxRate: '', remark: '' },
     items: [],
     unrecognizedPageIndexes: [],
-    ocrStatus: 'done',
-    completionMethod: 'ocr',
+    ocrStatus: sourceKind === 'excel' ? 'pending' : 'done',
+    completionMethod: sourceKind === 'excel' ? 'manual' : 'ocr',
     reviewStatus: 'reviewed',
     accountStatus: 'archived',
     duplicateStatus: 'normal',
@@ -206,12 +206,24 @@ it.each(['scan', 'excel'] as const)('%s 有原件且识别核对完成后，确�
     pending = false
     return { outcome: 'applied' as const }
   })
-  const workspace = { records: shallowRef([record]), loading: shallowRef(false), readState: shallowRef('ready'), load: vi.fn(async () => {}), pendingPrint: () => pending, recordPrinted, recoverPrint }
+  const verifiedOriginal = vi.fn(async () => new Blob())
+  const workspace = { records: shallowRef([record]), loading: shallowRef(false), readState: shallowRef('ready'), load: vi.fn(async () => {}), pendingPrint: () => pending, recordPrinted, recoverPrint, verifiedOriginal }
   render(CentralInvoiceLedgerScreen, { props: { workspace: workspace as never, projects: [] } })
   await fireEvent.click(await screen.findByLabelText('选择发票 00123'))
+  if (sourceKind === 'excel') {
+    expect(screen.getByRole('button', { name: '打印所选' })).toHaveProperty('disabled', true)
+    workspace.records.value = [{ ...record, originalVerificationId: 'confirmed-verification' }]
+    await screen.findByText('原件已核验')
+  }
   await fireEvent.click(screen.getByRole('button', { name: '打印所选' }))
+  if (sourceKind === 'excel') {
+    verifiedOriginal.mockRejectedValueOnce(new Error('原件摘要已变化'))
+    await fireEvent.click(screen.getByRole('button', { name: /打印选中/ }))
+    await screen.findByText('原件摘要已变化')
+    expect(printed).not.toHaveBeenCalled()
+  }
   await fireEvent.click(screen.getByRole('button', { name: /打印选中/ }))
-  expect(printed).toHaveBeenCalledOnce()
+  await waitFor(() => expect(printed).toHaveBeenCalledOnce())
   expect(recordPrinted).not.toHaveBeenCalled()
   await fireEvent.click(screen.getByRole('button', { name: '已打印' }))
   await waitFor(() => expect(recordPrinted).toHaveBeenCalledWith([{ invoiceId: 'invoice-one', baseVersion: '3', rotation: 0 }]))

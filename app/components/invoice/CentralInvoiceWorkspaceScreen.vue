@@ -3,12 +3,13 @@ import type { CentralInvoiceFields, CentralInvoiceItem, CentralInvoiceRecord, In
 import type { CentralInvoiceFormSnapshot } from '~/lib/invoice/central-form-snapshot'
 import type { createCentralInvoiceWorkspace } from '~/lib/invoice/central-workspace'
 import type { LocalInvoiceCandidate } from '~/lib/invoice/recognize'
-import { computed, nextTick, onBeforeUnmount, onMounted, shallowRef, useTemplateRef, watch } from 'vue'
+import { computed, nextTick, onActivated, onBeforeUnmount, onMounted, shallowRef, useTemplateRef, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import { useKitUI } from '~/composables/useKitUI'
 import { useTabCloseGuard } from '~/composables/useTabCloseGuard'
 import { invoiceCandidateForCommand } from '~/lib/invoice/central-recognition'
 import { CentralInvoiceUploadNotSubmittedError } from '~/lib/invoice/central-workspace'
+import CentralInvoiceOriginalVerification from './CentralInvoiceOriginalVerification.vue'
 import CentralInvoiceWorkspaceView from './CentralInvoiceWorkspaceView.vue'
 
 type Workspace = ReturnType<typeof createCentralInvoiceWorkspace>
@@ -32,6 +33,7 @@ const draft = shallowRef<{ invoice: CentralInvoiceRecord, candidate: LocalInvoic
 const recognizedRegions = shallowRef<{ invoice: CentralInvoiceRecord, candidate: LocalInvoiceCandidate } | null>(null)
 const restoredSnapshot = shallowRef<CentralInvoiceFormSnapshot | null>(null)
 const workspaceView = useTemplateRef<InstanceType<typeof CentralInvoiceWorkspaceView>>('workspaceView')
+const verificationBusy = shallowRef(false)
 const screenRoot = useTemplateRef<HTMLDivElement>('screenRoot')
 const batchRegion = useTemplateRef<HTMLElement>('batchRegion')
 const sourceRetry = useTemplateRef<HTMLButtonElement>('sourceRetry')
@@ -241,6 +243,10 @@ async function load() {
 onMounted(async () => {
   await load()
   refreshPending()
+})
+onActivated(() => {
+  if (selected.value?.sourceKind === 'excel' && selected.value.accountStatus === 'archived')
+    void load()
 })
 async function upload(files: File[], projectId: string | null) {
   if (!active || uploadPreflight.value || busy.value || props.workspace.readState.value !== 'ready')
@@ -556,7 +562,21 @@ async function recover() {
         </li>
       </ul>
     </section>
-    <CentralInvoiceWorkspaceView v-show="workspace.readState.value === 'ready'" ref="workspaceView" class="min-h-0 flex-1" :records="displayedRecords" :selected-id="selectedId" :original-file="originalFile" :original-loading="originalLoading" :busy="busy || uploadPreflight || !!pending || pendingUnavailable" :selection-unavailable="!!missingRecord" :cloud-available="!!cloudAvailable" :projects="projects" :suppliers="suppliers" :signatories="signatories" :contracts="contracts" :draft-record="draftRecord" :recognition-baseline="draft?.before" :region-candidate="regionCandidate" :restored-snapshot="restoredSnapshot" :error="error" @select="choose" @upload="upload" @manual="navigateTo('/finance/invoice/manual-new')" @attach="attach" @save="save" @review="review" @archive="archive" @discard="discard" @link-contract="linkContract" @confirm-legacy="confirmLegacy" @recognize="recognize" @retry-original="loadOriginal" @dirty="dirty = $event" @save-recognition="draftRecord && saveRecognition(draftRecord.fields, draftRecord.items)" @discard-recognition="discardRecognition" />
+    <CentralInvoiceWorkspaceView v-show="workspace.readState.value === 'ready'" ref="workspaceView" class="min-h-0 flex-1" :records="displayedRecords" :selected-id="selectedId" :original-file="originalFile" :original-loading="originalLoading" :busy="busy || uploadPreflight || verificationBusy || !!pending || pendingUnavailable" :selection-unavailable="!!missingRecord" :cloud-available="!!cloudAvailable" :projects="projects" :suppliers="suppliers" :signatories="signatories" :contracts="contracts" :draft-record="draftRecord" :recognition-baseline="draft?.before" :region-candidate="regionCandidate" :restored-snapshot="restoredSnapshot" :error="error" @select="choose" @upload="upload" @manual="navigateTo('/finance/invoice/manual-new')" @attach="attach" @save="save" @review="review" @archive="archive" @discard="discard" @link-contract="linkContract" @confirm-legacy="confirmLegacy" @recognize="recognize" @retry-original="loadOriginal" @dirty="dirty = $event" @save-recognition="draftRecord && saveRecognition(draftRecord.fields, draftRecord.items)" @discard-recognition="discardRecognition">
+      <template #original-verification>
+        <CentralInvoiceOriginalVerification
+          v-if="workspace.readState.value === 'ready' && !missingRecord && selected?.sourceKind === 'excel' && selected.accountStatus === 'archived' && selected.original"
+          :key="selected.id"
+          :invoice="selected"
+          :workspace="workspace"
+          :original-visible="!!originalFile"
+          :disabled="busy || uploadPreflight || !!pending || pendingUnavailable"
+          :cloud-available="cloudAvailable"
+          @busy="verificationBusy = $event"
+          @settled="refreshPending"
+        />
+      </template>
+    </CentralInvoiceWorkspaceView>
     <p v-if="workspace.readState.value !== 'ready' && error" role="alert" class="p-3 text-sm text-danger">
       {{ error }}
     </p>

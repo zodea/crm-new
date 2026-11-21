@@ -2,12 +2,12 @@ import type { RecoveryStorage } from '../forms/command-recovery'
 import type { CentralInvoiceCommand, CentralInvoiceCommandResult, CentralInvoicePrintCommand, CentralInvoicePrintResult } from './central-contract'
 import type { InvoiceDetailRead, InvoicePrintResolution, InvoiceResolution } from './central-http'
 import { commandRecoveryKey, commandVersionAtLeast, createCommandRecoveryStorage } from '../forms/command-recovery'
-import { CentralInvoiceProblem, INVOICE_WRITE_CAPABILITY } from './central-contract'
+import { CentralInvoiceProblem, CONFIRM_ORIGINAL_VERIFICATION, INVOICE_WRITE_CAPABILITY, RECORD_ORIGINAL_VERIFICATION } from './central-contract'
 
 interface Identity { workspaceId: string, actorId: string }
 type Context = Identity & { capabilities: readonly string[] }
 const createActions = ['upload', 'manual', 'import']
-const invoiceActions = ['import-replace', 'attach-original', 'link-contract', 'confirm-legacy', 'recognize', 'rerecognize', 'edit', 'review', 'archive', 'edit-archived', 'discard', 'restore']
+const invoiceActions = ['import-replace', 'attach-original', 'link-contract', 'confirm-legacy', 'recognize', 'rerecognize', 'edit', 'review', 'archive', 'edit-archived', 'discard', 'restore', RECORD_ORIGINAL_VERIFICATION, CONFIRM_ORIGINAL_VERIFICATION]
 function validInvoicePending(value: { action: string, targetId: string | null, scopeId?: string }) {
   if (value.scopeId !== undefined)
     return value.targetId !== null && ['save-draft', 'submit'].includes(value.action)
@@ -75,8 +75,11 @@ export function createCentralInvoiceSession(options: {
       throw new Error('原提交回执与当前发票不一致，请保留原编号。')
     const read = await options.repository.get(result.invoiceId, true)
     await authorize()
+    const pendingAction = recovery.read(key)?.action
     if (read.record.id !== result.invoiceId || !commandVersionAtLeast(read.record.version, result.version)
-      || (result.originalId !== null && read.record.original?.id !== result.originalId)) {
+      || (result.originalId !== null && read.record.original?.id !== result.originalId)
+      || (read.record.version === result.version && ((pendingAction === RECORD_ORIGINAL_VERIFICATION && read.verification?.candidateId !== commandId)
+        || (pendingAction === CONFIRM_ORIGINAL_VERIFICATION && read.record.originalVerificationId !== commandId)))) {
       throw new Error('发票已保存，但尚未可靠回读，请只重试读取。')
     }
     recovery.clear(key, commandId)
