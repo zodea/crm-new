@@ -29,6 +29,44 @@ const ELECTRONIC_INVOICE_TEXT = `
 `
 
 describe('parseInvoiceText', () => {
+  it('归一全角拆字票号与金额标签，开票日期优先于正文日期', () => {
+    const result = parseInvoiceTextPreservingUnknowns([
+      '电子发票（普通发票）',
+      '发 票 号 码：２６０００００００００００００００００１',
+      '备注：2026年1月1日',
+      '开 票 日 期：2026年2月28号',
+      '价 税 合 计（ 小 写 ）：￥113.00',
+    ].join('\n'))
+
+    expect(result).toMatchObject({ invoiceNumber: '26000000000000000001', invoiceDate: '2026-02-28', totalAmount: 113 })
+    expect(parseInvoiceText('开票日期：2026年2月30日\n备注：2026年2月1日').invoiceDate).toBe('')
+  })
+
+  it('识别同行逐字票号和重复的同一票号，冲突的明确票号留待校对', () => {
+    const number = '26000000000000000001'
+    const repeated = `发票号码：${[...number].join(' ')}\n发票号码：${number}`
+
+    expect(parseInvoiceText(repeated).invoiceNumber).toBe(number)
+    expect(parseInvoiceText(`${repeated}\n发票号码：26000000000000000002`).invoiceNumber).toBe('')
+    expect(parseInvoiceText('发票号码\n12345678').invoiceNumber).toBe('12345678')
+    expect(parseInvoiceText('发票号码：1234\n5678').invoiceNumber).toBe('')
+    expect(parseInvoiceText('发票号码：26000000000000000001234567').invoiceNumber).toBe('')
+  })
+
+  it('中央候选区分票面零、未知与勾稽建议，旧工作台沿用预填计算值', () => {
+    const visibleZero = '税额：￥0.00\n价税合计（小写）：￥100.00'
+    expect(parseInvoiceTextPreservingUnknowns(visibleZero)).toMatchObject({
+      amount: null,
+      taxAmount: 0,
+      totalAmount: 100,
+      calculatedAmounts: { amount: 100 },
+    })
+    const unknownTax = parseInvoiceTextPreservingUnknowns('价税合计（小写）：￥100.00')
+    expect(unknownTax).toMatchObject({ amount: null, taxAmount: null, totalAmount: 100 })
+    expect(unknownTax).not.toHaveProperty('calculatedAmounts')
+    expect(parseInvoiceText(visibleZero)).toMatchObject({ amount: 100, taxAmount: 0, totalAmount: 100 })
+  })
+
   it('从电子发票错序文本恢复票号、日期、购销方、税号和价税勾稽', () => {
     const result = parseInvoiceText(ELECTRONIC_INVOICE_TEXT)
 

@@ -10,7 +10,7 @@
 | --- | --- | --- |
 | [tests/invoice/central-original-binding.test.ts](../../../tests/invoice/central-original-binding.test.ts) | 单元／状态 | 原件字节与权限核对 |
 | [tests/invoice/central-pending-discovery.test.ts](../../../tests/invoice/central-pending-discovery.test.ts) | 单元／状态 | 原编号发现与身份隔离 |
-| [tests/invoice/central-recognition.test.ts](../../../tests/invoice/central-recognition.test.ts) | 单元／状态 | 识别区域不进入写命令 |
+| [tests/invoice/central-recognition.test.ts](../../../tests/invoice/central-recognition.test.ts) | 单元／状态 | 写命令保留 OCR 页证据与明示零，排除定位和勾稽建议 |
 | [tests/invoice/central-workspace-recognition.test.ts](../../../tests/invoice/central-workspace-recognition.test.ts) | 单元／状态 | 识别后的身份权限核对 |
 | [tests/stores/invoice-manual-startup.test.ts](../../../tests/stores/invoice-manual-startup.test.ts) | 单元／状态 | 手工原编号刷新与身份隔离 |
 | [tests/invoice/central-migration-bootstrap.test.ts](../../../tests/invoice/central-migration-bootstrap.test.ts) | 单元／服务／状态 | 迁入目录的身份、权限与来源版本 |
@@ -53,7 +53,7 @@
 | [tests/invoice/recognize.test.ts](../../../tests/invoice/recognize.test.ts) | 单元／服务／状态 | confidenceTier:置信度分档(边框色/角标/✓确认 依据) |
 | [tests/invoice/status.test.ts](../../../tests/invoice/status.test.ts) | 单元／服务／状态 | invoiceDocStatus:单一权威的状态优先级 |
 | [tests/recognize/invoice-engine.test.ts](../../../tests/recognize/invoice-engine.test.ts) | 单元／服务／状态 | recognizeInvoice；带版面块坐标时给出字段块级区域，无坐标为空 |
-| [tests/recognize/invoice-parse.test.ts](../../../tests/recognize/invoice-parse.test.ts) | 单元／服务／状态 | 发票字段、价税、重复字及候选明细的零值/未知值；不以部分明细伪造合计或将整票金额分配给猜测的单行 |
+| [tests/recognize/invoice-parse.test.ts](../../../tests/recognize/invoice-parse.test.ts) | 单元／服务／状态 | 发票字段、全角与拆字、票号冲突、显式开票日期、价税与重复字；区分原文零值、未知和勾稽建议，保留已有明细来源 |
 | [tests/stores/invoice-archive.test.ts](../../../tests/stores/invoice-archive.test.ts) | 单元／服务／状态 | invoice store 归档来源留痕 |
 | [tests/stores/invoice-preferences.test.ts](../../../tests/stores/invoice-preferences.test.ts) | 单元／服务／状态 | invoice store 导出样式偏好 |
 | [tests/stores/invoice-printing.test.ts](../../../tests/stores/invoice-printing.test.ts) | 单元／服务／状态 | invoice store 打印计数 |

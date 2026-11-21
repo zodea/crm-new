@@ -16,6 +16,7 @@ import { invoiceCandidateForCommand } from '../../app/lib/invoice/central-recogn
 import { createCentralInvoicePrintSession, createCentralInvoiceSession } from '../../app/lib/invoice/central-session'
 import { prepareInvoiceOriginal } from '../../app/lib/invoice/central-upload'
 import { createCentralInvoiceWorkspace } from '../../app/lib/invoice/central-workspace'
+import { recognizeInvoiceLocally } from '../../app/lib/invoice/recognize'
 import { OUR_SIGNATORY_SCHEMA } from '../../app/lib/our-signatory/schema'
 import { verifyBackupOriginalOwner, verifyInvoiceOriginalReferences } from '../../server/utils/production-backup-manifest'
 import { financeCommandFingerprint } from '../../server/utils/production-finance-request'
@@ -931,8 +932,11 @@ describe('发票中央原件 owner（隔离内存）', () => {
     const path = join(directory, 'invoice.sqlite')
     const first = fixture(path)
     const created = await first.service.execute(first.upload, first.session)
-    const fields = { invoiceNumber: '87654321', invoiceDate: '', invoiceType: '', buyer: '合成购方', buyerTaxNo: '', seller: '', sellerTaxNo: '', amount: null, taxAmount: 0, totalAmount: null, taxRate: '', remark: '' }
-    const recognized = await first.service.execute({ action: 'recognize', invoiceId: created.invoiceId, baseVersion: created.version, workspaceId: first.actor.workspaceId, actorId: first.actor.actorId, requiredCapability: INVOICE_WRITE_CAPABILITY, commandId: 'cold-recognition', fields, items: [], source: 'local', textPages: ['合成文本'], unrecognizedPageIndexes: [] }, first.session)
+    const textPages = ['发 票 号 码：８７６５４３２１\n税额：￥0.00\n价 税 合 计（ 小 写 ）：￥100.00']
+    const candidate = await recognizeInvoiceLocally({ file: new File([new Uint8Array(first.bytes)], 'synthetic.pdf', { type: 'application/pdf' }), basePath: '/' }, {
+      readDocument: async () => ({ pages: textPages, unrecognizedPageIndexes: [] }),
+    })
+    const recognized = await first.service.execute({ action: 'recognize', invoiceId: created.invoiceId, baseVersion: created.version, workspaceId: first.actor.workspaceId, actorId: first.actor.actorId, requiredCapability: INVOICE_WRITE_CAPABILITY, commandId: 'cold-recognition', ...invoiceCandidateForCommand(candidate) }, first.session)
     await first.storage.close()
     databases.splice(databases.indexOf(first.storage), 1)
     const script = `const { DatabaseSync } = require('node:sqlite'); const { createHash } = require('node:crypto');
@@ -944,7 +948,8 @@ describe('发票中央原件 owner（隔离内存）', () => {
         process.stdout.write(JSON.stringify({ integrity,id:row.id,version:row.version,amount:row.amount,taxAmount:row.tax_amount,ocrStatus:row.ocr_status,originalId:row.original_file_id,sha256:row.sha256,actualSha256:createHash('sha256').update(row.content).digest('hex'),receipt:JSON.parse(row.result_json),recognition:JSON.parse(recognition.result_json) }));
       } finally { db.close(); }`
     const output = JSON.parse(execFileSync(process.execPath, ['-e', script, path, created.invoiceId, created.commandId], { encoding: 'utf8', windowsHide: true }))
-    expect(output).toMatchObject({ integrity: 'ok', id: created.invoiceId, version: Number(recognized.version), amount: null, taxAmount: 0, ocrStatus: 'done', originalId: created.originalId, sha256: createHash('sha256').update(first.bytes).digest('hex'), receipt: created, recognition: { fields, items: [], source: 'local', textPages: ['合成文本'], unrecognizedPageIndexes: [] } })
+    expect(output).toMatchObject({ integrity: 'ok', id: created.invoiceId, version: Number(recognized.version), amount: null, taxAmount: 0, ocrStatus: 'done', originalId: created.originalId, sha256: createHash('sha256').update(first.bytes).digest('hex'), receipt: created, recognition: { fields: { invoiceNumber: '87654321', amount: null, taxAmount: 0, totalAmount: 100 }, items: [], source: 'local', textPages, unrecognizedPageIndexes: [] } })
+    expect(output.recognition.fields).not.toHaveProperty('calculatedAmounts')
     expect(output.actualSha256).toBe(output.sha256)
     const reopened = fixture(path, true)
     expect(await reopened.service.execute(reopened.upload, reopened.session)).toEqual(created)
