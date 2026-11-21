@@ -164,15 +164,12 @@ function navigateToSection(key: string) {
 <style scoped>
 .entity-form-shell {
   container: entity-form-shell / inline-size;
+  --form-grid-max-cols: 2;
 }
 
 .entity-form-shell__layout {
   grid-template-columns: minmax(0, 1080px);
   justify-content: center;
-}
-
-.entity-form-shell :deep(.form-fields-grid) {
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, max(280px, calc((100% - 1rem) / 2))), 1fr));
 }
 
 @container entity-form-shell (min-width: 56.25rem) {

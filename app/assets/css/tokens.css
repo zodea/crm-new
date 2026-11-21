@@ -18,6 +18,7 @@
   --z-shell-tabbar: 19;
   --z-shell-header: 20;
   --z-shell-sidebar: 40;
+  --z-page-mask: 50;
   --z-page-fullscreen: 100;
   --z-overlay-plane: 9000;
   --z-overlay-backdrop: var(--z-overlay-plane);
@@ -192,9 +193,13 @@ html {
 /* ── 通用整页表单布局 ──
    合同、资金、物资和归档表单共用；宽度不足时自动回落单列。 */
 .form-fields-grid {
+  --form-grid-min-col: 280px;
+  --form-grid-column-gap: 1rem;
+  --form-grid-limited-width: calc((100% + var(--form-grid-column-gap)) / var(--form-grid-max-cols) - var(--form-grid-column-gap));
+
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
-  gap: 0.75rem 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, max(var(--form-grid-min-col), var(--form-grid-limited-width, 0px))), 1fr));
+  gap: 0.75rem var(--form-grid-column-gap);
 }
 
 .field-block {

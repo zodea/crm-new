@@ -33,15 +33,15 @@
   border-right: 1px solid var(--line);
 }
 
-/* 表头和数据行统一 36px，对齐登录态运行参考的紧凑数据密度。 */
+/* 默认 36px，KitTable 按布局密度为表头与表体提供同一个行高。 */
 .vxe-table .vxe-header--column {
-  height: 36px;
+  height: var(--kit-table-row-height, 36px);
   font-size: 13px;
   font-weight: 700;
 }
 
 .vxe-table .vxe-body--column {
-  height: 36px;
+  height: var(--kit-table-row-height, 36px);
   font-size: 14px;
 }
 

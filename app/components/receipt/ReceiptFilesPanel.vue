@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ReceiptRecord } from '~/lib/receipt/contract'
 import { computed } from 'vue'
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from '~/components/ui/dialog'
+import OriginalFilePreviewDialog from '~/components/shared/OriginalFilePreviewDialog.vue'
 import { useReceiptFiles } from '~/composables/useReceiptFiles'
 
 const props = defineProps<{ record: ReceiptRecord }>()
@@ -36,19 +36,14 @@ const files = computed(() => props.record.attachments.filter(file => file.delete
     <KitButton v-if="busy" class="mt-3" @click="cancel">
       取消附件读取
     </KitButton>
-    <Dialog v-model:open="previewOpen">
-      <DialogContent class="flex h-[85vh] w-[calc(100vw-2rem)] max-w-1100px flex-col gap-3 overflow-hidden p-4" @close-auto-focus="restoreFocus">
-        <DialogTitle class="m-0 pr-8 text-16px font-700">
-          {{ previewTitle }}
-        </DialogTitle>
-        <DialogDescription class="m-0 text-12px text-ink-faint">
-          只读预览，可关闭后下载原文件。
-        </DialogDescription>
-        <StatePanel v-if="problem" kind="error" title="附件暂不可预览" :description="problem" compact />
-        <StatePanel v-else-if="busy" kind="loading" title="正在读取附件" />
-        <img v-else-if="previewUrl && previewMime.startsWith('image/')" :src="previewUrl" :alt="previewTitle" class="min-h-0 max-w-full flex-1 object-contain">
-        <iframe v-else-if="previewUrl" :src="previewUrl" :title="previewTitle" class="min-h-0 w-full flex-1 border-0" />
-      </DialogContent>
-    </Dialog>
+    <OriginalFilePreviewDialog
+      v-model:open="previewOpen"
+      :title="previewTitle"
+      :url="previewUrl"
+      :mime="previewMime"
+      :busy="Boolean(busy)"
+      :problem="problem"
+      @close-auto-focus="restoreFocus"
+    />
   </section>
 </template>

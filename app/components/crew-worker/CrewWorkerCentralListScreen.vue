@@ -4,6 +4,7 @@ import type { KitTableColumn } from '~/lib/kit/table'
 import type { DataOriginDTO, EntityRefDTO, NavigationIntentDTO } from '~/types/read-model'
 import { useDebounceFn } from '@vueuse/core'
 import { computed, onActivated, onDeactivated, onMounted, onScopeDispose, shallowRef, watch } from 'vue'
+import KitStatusTag from '~/components/ui/KitStatusTag.vue'
 import { resolveNavigationTarget } from '~/lib/nav/target-registry'
 import { bindReadAuthority } from '~/lib/read-model/authority'
 import { readProblemTitle } from '~/lib/read-model/state'
@@ -128,7 +129,7 @@ const columns = computed<KitTableColumn[]>(() => props.kind === 'crew'
       { field: 'memberCount', title: '成员', width: 80, align: 'right' },
       { field: 'activeMemberCount', title: '在场', width: 80, align: 'right' },
       { field: 'projectCount', title: '关联项目', width: 95, align: 'right' },
-      { field: 'status', title: '状态', width: 100 },
+      { field: 'status', title: '状态', width: 100, slot: 'status' },
       { title: '操作', type: 'action', width: 80 },
     ]
   : [
@@ -138,9 +139,9 @@ const columns = computed<KitTableColumn[]>(() => props.kind === 'crew'
       { field: 'crew', title: '所属班组', minWidth: 150, slot: 'crew' },
       { field: 'project', title: '当前项目', minWidth: 170, slot: 'project' },
       { field: 'phone', title: '联系电话', width: 130 },
-      { field: 'projectStatus', title: '项目状态', width: 110 },
+      { field: 'projectStatus', title: '项目状态', width: 110, slot: 'projectStatus' },
       { field: 'safetyEducation', title: '安全教育', width: 95, slot: 'safety' },
-      { field: 'status', title: '档案状态', width: 100 },
+      { field: 'status', title: '档案状态', width: 100, slot: 'status' },
       { title: '操作', type: 'action', width: 80 },
     ])
 const summary = computed<Record<string, string | number>>(() => {
@@ -250,9 +251,9 @@ onActivated(() => {
   <div class="grid min-w-0 gap-3">
     <StatePanel v-if="initialLoading" kind="loading" :title="readProblemTitle(problem, `正在加载${kind === 'crew' ? '班组' : '工人'}资料库`)" />
     <StatePanel v-else-if="problem" :kind="['forbidden', 'unauthenticated'].includes(problem.code) ? 'forbidden' : 'error'" :title="readProblemTitle(problem, `${kind === 'crew' ? '班组' : '工人'}列表加载失败`)" :description="problem.message" :action-label="problem.retryable ? '重新加载' : ''" :compact="Boolean(readPage)" @action="load" />
-    <ListShell v-if="!initialLoading && (!problem || readPage)" :summary="summary">
+    <ListShell v-if="!initialLoading && (!problem || readPage)" continuous :summary="summary">
       <template #toolbar>
-        <section class="panel flex min-w-0 flex-wrap items-center gap-2 p-2.5">
+        <section class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
           <div class="mr-auto">
             <h2 class="text-14px font-800 text-ink">
               {{ kind === 'crew' ? '班组资料库' : '工人资料库' }}
@@ -292,8 +293,22 @@ onActivated(() => {
             <template #project="{ row }">
               <EntityLink v-if="row.kind === 'worker'" :id="row.project?.state === 'resolved' ? row.project.id : null" type="project" :label="row.project?.state === 'resolved' ? row.project.label : null" :intent="row.projectNavigation ?? undefined" :return-to="rowReturnTo(row)" />
             </template>
+            <template #status="{ row }">
+              <KitStatusTag v-if="row.status">
+                {{ row.status }}
+              </KitStatusTag>
+              <span v-else>—</span>
+            </template>
+            <template #projectStatus="{ row }">
+              <KitStatusTag v-if="row.kind === 'worker' && row.projectStatus">
+                {{ row.projectStatus }}
+              </KitStatusTag>
+              <span v-else>—</span>
+            </template>
             <template #safety="{ row }">
-              <span v-if="row.kind === 'worker'" :class="row.safetyEducation ? 'chip chip-ok' : 'chip chip-warn'">{{ row.safetyEducation ? '已完成' : '未记录' }}</span>
+              <KitStatusTag v-if="row.kind === 'worker'" :tone="row.safetyEducation ? 'ok' : 'warn'">
+                {{ row.safetyEducation ? '已完成' : '未记录' }}
+              </KitStatusTag>
             </template>
             <template #action="{ row }">
               <NuxtLink v-if="rowTarget(row)" :to="rowTarget(row)!" class="icon-btn" :aria-label="`查看${row.name}详情`">

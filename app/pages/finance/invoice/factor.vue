@@ -51,7 +51,7 @@ const {
       <FactorSolverResults :result="solverResult" :target="resultTarget" :summary="summary" @copy="copyText" />
     </div>
     <Transition enter-active-class="animate-in fade-in-0" leave-active-class="animate-out fade-out-0">
-      <div v-if="showCalculationMask" class="fixed inset-0 z-50 grid place-items-center bg-[rgb(255_255_255/88%)] backdrop-blur-[2px]" role="status" aria-live="polite">
+      <div v-if="showCalculationMask" class="fixed inset-0 z-[var(--z-page-mask)] grid place-items-center bg-[rgb(255_255_255/88%)] backdrop-blur-[2px]" role="status" aria-live="polite">
         <div class="w-64 rounded-[var(--radius-card)] border border-line bg-panel p-6 text-center shadow-[var(--shadow-dialog)]">
           <span class="i-lucide-hourglass text-28px text-brand" />
           <div class="mt-2 text-14px font-700 text-ink">

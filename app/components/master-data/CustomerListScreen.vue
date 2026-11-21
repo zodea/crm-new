@@ -3,6 +3,7 @@ import type { CustomerListPageDTO, CustomerListQueryDTO } from '~/lib/customer/r
 import type { MasterDataFilterValue, MasterDataListFilterField, MasterDataListSort } from '~/lib/master-data/list'
 import { useDebounceFn } from '@vueuse/core'
 import { computed, onActivated, onDeactivated, onMounted, onScopeDispose, shallowRef, watch } from 'vue'
+import EntityPendingRecovery from '~/components/shared/EntityPendingRecovery.vue'
 import { MASTER_DATA_LIST_PROFILES, masterDataStatusLabel } from '~/lib/master-data/list'
 import { readProblemTitle } from '~/lib/read-model/state'
 import { normalizeEnumSelection } from '~/lib/util/enum-selection'
@@ -169,7 +170,12 @@ onScopeDispose(deactivateView)
 
 <template>
   <div ref="listRoot" class="grid min-w-0 gap-3">
-    <CustomerPendingRecovery v-if="readPage?.capabilities.includes('customer:original:write')" />
+    <EntityPendingRecovery
+      v-if="readPage?.capabilities.includes('customer:original:write')"
+      entity-label="客户"
+      description="刷新前的保存结果还未确认。先核对原提交，再填写新的客户资料。"
+      :load-pending-forms="commandStore.pendingForms"
+    />
     <StatePanel
       v-if="problem"
       :kind="['forbidden', 'unauthenticated'].includes(problem.code) ? 'forbidden' : 'error'"

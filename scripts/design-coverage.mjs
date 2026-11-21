@@ -182,13 +182,13 @@ export function pageFileToRoute(relativePath) {
   return `/${mapped.join('/')}`.replace(/\/$/, '') || '/'
 }
 
-/** 枚举 app/pages 下全部 Vue 页面文件，返回相对 app/pages 的稳定路径。 */
+/** 枚举 app/pages 下的 Vue 路由文件，跳过页面私有组件目录。 */
 export function readAppPageFiles(pagesRoot = PAGES_ROOT) {
   function walk(directory) {
     return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
       const path = join(directory, entry.name)
       if (entry.isDirectory())
-        return walk(path)
+        return entry.name === '_components' ? [] : walk(path)
       return extname(entry.name) === '.vue' ? [path] : []
     })
   }

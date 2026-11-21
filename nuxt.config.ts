@@ -63,6 +63,12 @@ export default defineNuxtConfig({
     },
   },
 
+  pages: {
+    // 单个路由 glob 同时用于初始扫描与文件新增时的匹配。
+    // *(*/) 允许任意深度的 _components 目录，私有组件仍由 Vite 监听。
+    pattern: '!(*(*/)_components/**).{js,jsx,mjs,ts,tsx,vue}',
+  },
+
   components: {
     dirs: [
       { path: '~/components', pathPrefix: false, extensions: ['vue'] },
