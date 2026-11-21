@@ -25,8 +25,13 @@ const file = (id = 'file-a'): FileRefRecord => ({ id, ownerType: 'expense_reimbu
 const shell = Vue.defineComponent({ template: '<main><slot name="actions"/><slot/></main>' })
 const fields = Vue.defineComponent({ props: ['draft'], emits: ['patch'], template: '<label>申请人<input aria-label="申请人" :value="draft.applicant" @input="$emit(\'patch\', { applicant: $event.target.value })"></label>' })
 function open() {
-  return render(FinanceFormPage, { props: { kind: 'reimbursement',
-  }, global: { components: { EntityFormShell: shell, FinanceFormFields: fields, FileRefAttachmentSection, FormFooter, KitButton }, stubs: { SectionHeader: true } } })
+  return render(FinanceFormPage, {
+    props: { kind: 'reimbursement' },
+    global: {
+      components: { EntityFormShell: shell, FileRefAttachmentSection, FormFooter, KitButton },
+      stubs: { FinanceFormFields: fields, SectionHeader: true },
+    },
+  })
 }
 function attachment(name: string, body: string) {
   const value = new File([body], name, { type: 'text/plain' })

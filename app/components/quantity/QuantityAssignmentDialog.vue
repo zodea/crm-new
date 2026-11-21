@@ -7,6 +7,8 @@ import type { QuantityAssigneeKind } from '~/lib/quantity/read-model'
 import type { DataOriginDTO } from '~/types/read-model'
 import { useEventListener } from '@vueuse/core'
 import { onBeforeRouteLeave } from 'vue-router'
+import QuantityAssignmentScopePicker from '~/components/quantity/QuantityAssignmentScopePicker.vue'
+import QuantityAssignmentUnitPicker from '~/components/quantity/QuantityAssignmentUnitPicker.vue'
 import KitButton from '~/components/ui/KitButton.vue'
 import {
   parseQuantityAssignmentScopeKey,

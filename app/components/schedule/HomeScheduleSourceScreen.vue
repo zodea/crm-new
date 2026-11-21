@@ -2,6 +2,7 @@
 import type { HomeProjectScheduleRead } from '~/lib/home/project-source'
 import type { ScheduleTaskView } from '~/lib/schedule/read-model'
 import { computed, onActivated, onBeforeUnmount, onDeactivated, shallowRef, watch } from 'vue'
+import HomeScheduleOverview from '~/components/home/HomeScheduleOverview.vue'
 import { Button } from '~/components/ui/button'
 import { summarizeHomeScheduleCoverage } from '~/lib/home/dashboard'
 import { projectProblemFromUnknown } from '~/lib/project/repository'

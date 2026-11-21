@@ -86,6 +86,7 @@ const KitTableStub = defineComponent({
 })
 
 const global = {
+  stubs: { TargetCostSourceReturn: true },
   components: {
     KitTable: KitTableStub,
     NuxtLink: defineComponent({

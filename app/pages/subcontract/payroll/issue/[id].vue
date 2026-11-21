@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import PayrollNumberingScreen from '~/components/payroll/PayrollNumberingScreen.vue'
+
 const route = useRoute()
 </script>
 

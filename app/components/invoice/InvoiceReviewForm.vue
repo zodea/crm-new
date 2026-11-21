@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import type { InvoiceRecognitionFieldMark } from '~/lib/invoice/recognition-changes'
+import type { InvoiceRecognitionFieldMark as InvoiceRecognitionFieldMarkType } from '~/lib/invoice/recognition-changes'
 import type { ConfidenceTier } from '~/lib/invoice/recognize'
 import type { Invoice } from '~/stores/invoice'
+import InvoiceRecognitionFieldMark from '~/components/invoice/InvoiceRecognitionFieldMark.vue'
 import { resolveAttribution } from '~/lib/invoice/batch-pass'
 import { INVOICE_RECOGNITION_FIELDS } from '~/lib/invoice/recognition-changes'
 import { confidenceTier } from '~/lib/invoice/recognize'
@@ -17,7 +18,7 @@ import { invoiceCorrectionPatch } from '~/stores/invoice'
 const props = defineProps<{
   invoice: Invoice
   draft?: boolean
-  marks?: Readonly<Record<string, InvoiceRecognitionFieldMark>>
+  marks?: Readonly<Record<string, InvoiceRecognitionFieldMarkType>>
   /** 原图比对可用时：已在原图框出的字段 key（角标读屏说明“原图已框出 / 原图未定位”） */
   locatedKeys?: readonly string[]
   /** 首次识别点字段定位可用时：原图上能定位的识别字段 key（其余识别字段读屏说明“原图未定位”） */

@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import PayrollAConfigScreen from '~/components/payroll/PayrollAConfigScreen.vue'
+import PayrollC1ConfigScreen from '~/components/payroll/PayrollC1ConfigScreen.vue'
+import PayrollC2ConfigScreen from '~/components/payroll/PayrollC2ConfigScreen.vue'
+
 const route = useRoute()
 </script>
 

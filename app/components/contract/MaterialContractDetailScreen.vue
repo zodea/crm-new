@@ -2,6 +2,8 @@
 import type { MaterialContractDetailReadDTO, MaterialContractFactDTO } from '~/lib/material-contract/repository'
 import type { DataOriginDTO, NavigationIntentDTO, ReadState } from '~/types/read-model'
 import { computed, nextTick, onActivated, ref, watch } from 'vue'
+import ContractOriginalFilesPanel from '~/components/contract/ContractOriginalFilesPanel.vue'
+import MaterialContractFactTable from '~/components/contract/MaterialContractFactTable.vue'
 import KitStatusTag from '~/components/ui/KitStatusTag.vue'
 import { contractStatusTone } from '~/lib/contract/status'
 import { materialContractReferenceLabel } from '~/lib/material-contract/reference-state'

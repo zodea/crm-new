@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { TargetCostDetailRead } from '~/lib/target-cost/central-contract'
+import TargetCostMetricValue from '~/components/target-cost/TargetCostMetricValue.vue'
 import { yuan } from '~/lib/util/money'
 
 defineProps<{ view: TargetCostDetailRead['view'] }>()

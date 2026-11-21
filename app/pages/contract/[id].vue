@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import type { F2FormKind } from '~/lib/contract/forms'
 import type { DataOriginDTO } from '~/types/read-model'
+import ConstructionContractDetailScreen from '~/components/contract/ConstructionContractDetailScreen.vue'
+import ContractDetailDocuments from '~/components/contract/ContractDetailDocuments.vue'
+import ContractDetailFiles from '~/components/contract/ContractDetailFiles.vue'
+import ContractDetailLineItems from '~/components/contract/ContractDetailLineItems.vue'
+import ContractLifecycle from '~/components/contract/ContractLifecycle.vue'
+import MaterialContractDetailScreen from '~/components/contract/MaterialContractDetailScreen.vue'
+import SubcontractContractDetailScreen from '~/components/contract/SubcontractContractDetailScreen.vue'
 import KitStatusTag from '~/components/ui/KitStatusTag.vue'
 import { useProjectSupplierReturnContext } from '~/composables/useProjectSupplierReturnContext'
 import { contractStages } from '~/lib/contract/detail'

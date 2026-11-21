@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import PayrollActualLedgerSection from '~/components/payroll/PayrollActualLedgerSection.vue'
 import { usePayrollRead } from '~/composables/usePayrollRead'
 import { isStableRouteIdentity } from '~/lib/util/stable-route-identity'
 

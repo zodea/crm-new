@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import PayrollACommandState from '~/components/payroll/PayrollACommandState.vue'
+import PayrollOriginalWageSummary from '~/components/payroll/PayrollOriginalWageSummary.vue'
 import { usePayrollRecordingReversalForm } from '~/composables/usePayrollActualPaymentForm'
 import { payrollAmount } from '~/lib/payroll/read-presentation'
 

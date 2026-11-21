@@ -55,8 +55,8 @@ async function open(location = '/') {
   const shell = defineComponent({ template: '<RouterView v-slot="{ Component }"><KeepAlive><component :is="Component" /></KeepAlive></RouterView>' })
   const wrapper = mount(shell, { global: {
     plugins: [createPinia(), router],
-    components: { NuxtLink: RouterLink, ProjectSwitcher, HomeDashboardSurface, StatePanel },
-    stubs: { HomeScheduleOverview: true },
+    components: { NuxtLink: RouterLink, HomeDashboardSurface, StatePanel },
+    stubs: { HomeScheduleOverview: true, ProjectSwitcher },
   } })
   await flushPromises()
   return { router, wrapper }

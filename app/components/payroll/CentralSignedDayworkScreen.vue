@@ -1,5 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import PayrollC2SourceReturn from '~/components/payroll/PayrollC2SourceReturn.vue'
+import PayrollDayworkConfirmDialog from '~/components/payroll/PayrollDayworkConfirmDialog.vue'
+import PayrollDayworkLocks from '~/components/payroll/PayrollDayworkLocks.vue'
+import PayrollDayworkTable from '~/components/payroll/PayrollDayworkTable.vue'
+import PayrollSourceEvidence from '~/components/payroll/PayrollSourceEvidence.vue'
 import LookupSelect from '~/components/ui/LookupSelect.vue'
 import { useCentralDaywork } from '~/composables/useCentralDaywork'
 import { payrollC2Lookup } from '~/lib/payroll/c2-presentation'

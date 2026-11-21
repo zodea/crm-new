@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CrewWorkerCentralDetailScreen from '~/components/crew-worker/CrewWorkerCentralDetailScreen.vue'
 import { isDataOriginDTO } from '~/types/read-model'
 
 const route = useRoute()

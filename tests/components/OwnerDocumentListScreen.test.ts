@@ -121,7 +121,6 @@ const global = {
     EntityLink: defineComponent({ props: ['label', 'intent'], template: '<a href="#" :data-entity="intent?.subject?.entity">{{ label }}</a>' }),
     KitTable: KitTableStub,
     NuxtLink: defineComponent({ props: ['to'], template: '<a :href="to"><slot /></a>' }),
-    OwnerDocumentListToolbar: ToolbarStub,
     RowActionMenu: true,
     TargetCostSourceReturn: true,
     StatePanel: defineComponent({
@@ -130,6 +129,7 @@ const global = {
       template: '<div role="alert">{{ title }}<button @click="$emit(\'action\')">{{ actionLabel }}</button></div>',
     }),
   },
+  stubs: { OwnerDocumentListToolbar: ToolbarStub },
 }
 
 describe('owner document list screen', () => {

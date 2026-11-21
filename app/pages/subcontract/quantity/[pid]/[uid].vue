@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import CrewWorkerRelationFactDetailScreen from '~/components/crew-worker/CrewWorkerRelationFactDetailScreen.vue'
+import QuantityUnitDetailScreen from '~/components/quantity/QuantityUnitDetailScreen.vue'
 import { validateCrewWorkerReturnTo } from '~/lib/crew-worker/return-context'
 import { quantityUnitReturnPath, readQuantityOrigin } from '~/lib/quantity/navigation'
 import { isDataOriginDTO } from '~/types/read-model'

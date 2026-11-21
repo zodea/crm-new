@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { NavigationIntentDTO } from '~/types/read-model'
+import ProjectSupplierSourceLink from '~/components/project-supplier/ProjectSupplierSourceLink.vue'
 
 interface ProjectSupplierFactTableRow {
   id: string

@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, shallowRef } from 'vue'
+import PayrollACommandState from '~/components/payroll/PayrollACommandState.vue'
+import PayrollSourceEvidence from '~/components/payroll/PayrollSourceEvidence.vue'
 import LookupSelect from '~/components/ui/LookupSelect.vue'
 import { usePayrollC2Config } from '~/composables/usePayrollC2Config'
 import { c2InputNumber, c2Number, payrollC2Lookup } from '~/lib/payroll/c2-presentation'

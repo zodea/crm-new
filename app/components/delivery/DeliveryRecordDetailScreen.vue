@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import type { KitTableColumn } from '~/lib/kit/table'
 import { computed, onActivated, onBeforeUnmount, onDeactivated, shallowRef, watch } from 'vue'
+import DeliveryRecordHistory from '~/components/delivery/DeliveryRecordHistory.vue'
+import DeliveryRecordSourcePanel from '~/components/delivery/DeliveryRecordSourcePanel.vue'
+import DeliveryRecordSummary from '~/components/delivery/DeliveryRecordSummary.vue'
 import { yuan } from '~/lib/util/money'
 
 const route = useRoute()

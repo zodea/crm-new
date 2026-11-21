@@ -2,6 +2,12 @@
 import type { PayrollSourcesRead } from '~/lib/payroll/central-contract'
 import type { PayrollViewScope } from '~/lib/payroll/central-navigation'
 import { computed } from 'vue'
+import PayrollEvidenceTable from '~/components/payroll/PayrollEvidenceTable.vue'
+import PayrollReadDiagnostics from '~/components/payroll/PayrollReadDiagnostics.vue'
+import PayrollReadFilters from '~/components/payroll/PayrollReadFilters.vue'
+import PayrollReadHistory from '~/components/payroll/PayrollReadHistory.vue'
+import PayrollReadNotice from '~/components/payroll/PayrollReadNotice.vue'
+import PayrollSourceEvidence from '~/components/payroll/PayrollSourceEvidence.vue'
 import { usePayrollRead } from '~/composables/usePayrollRead'
 import { payrollReadQuery, payrollReturnTo, payrollSourceReturnTo, payrollViewQuery, payrollViewScope } from '~/lib/payroll/central-navigation'
 

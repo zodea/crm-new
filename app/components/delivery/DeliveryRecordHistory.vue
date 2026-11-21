@@ -2,6 +2,7 @@
 import type { DeliveryRevision } from '~/lib/delivery-record/contract'
 import type { KitTableColumn } from '~/lib/kit/table'
 import { computed, onActivated, onBeforeUnmount, onDeactivated, shallowRef, watch } from 'vue'
+import DeliveryRecordSourcePanel from '~/components/delivery/DeliveryRecordSourcePanel.vue'
 import { yuan } from '~/lib/util/money'
 
 const props = defineProps<{ recordId: string, currentVersion?: string }>()

@@ -55,7 +55,7 @@ describe('项目分供方合作文件', () => {
         returnTo: '/project/project-1/supplier/supplier-1?tab=contract',
       },
       global: {
-        components: {
+        stubs: {
           ProjectSupplierSourceLink: EntityLinkStub,
         },
       },

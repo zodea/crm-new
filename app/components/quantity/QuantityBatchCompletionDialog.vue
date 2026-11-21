@@ -6,6 +6,7 @@ import type {
 import type { DataOriginDTO } from '~/types/read-model'
 import { useEventListener } from '@vueuse/core'
 import { onBeforeRouteLeave } from 'vue-router'
+import QuantityAssignmentUnitPicker from '~/components/quantity/QuantityAssignmentUnitPicker.vue'
 import KitButton from '~/components/ui/KitButton.vue'
 import { ALL_QUANTITY_FILTER } from '~/lib/quantity/matrix'
 import { toErrorMessage } from '~/lib/util/error'

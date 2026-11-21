@@ -2,6 +2,7 @@
 import type { FileRefDraft } from '~/lib/forms/file-refs'
 import type { ProjectSupplierImportItem } from '~/lib/supplier/import'
 import { computed, shallowRef } from 'vue'
+import ProjectSupplierImportWizard from '~/components/project-supplier/ProjectSupplierImportWizard.vue'
 import { fileRefDraftFromFile } from '~/lib/forms/file-refs'
 import { toErrorMessage } from '~/lib/util/error'
 

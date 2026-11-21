@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import ScheduleCommandRecovery from '~/components/schedule/ScheduleCommandRecovery.vue'
+import ScheduleTemplateGanttEditor from '~/components/schedule/ScheduleTemplateGanttEditor.vue'
 import { useScheduleGroupWizard } from '~/composables/useScheduleGroupWizard'
 import { processLibraryNavigationQuery } from '~/lib/schedule/process-library-navigation'
 

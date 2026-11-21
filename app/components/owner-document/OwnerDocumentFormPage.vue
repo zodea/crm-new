@@ -8,6 +8,8 @@ import type {
   OwnerDocumentSaveAction,
 } from '~/lib/owner-document/forms'
 import { useDebounceFn } from '@vueuse/core'
+import OwnerDocumentFormFields from '~/components/owner-document/OwnerDocumentFormFields.vue'
+import OwnerDocumentLineGrid from '~/components/owner-document/OwnerDocumentLineGrid.vue'
 import { useTabCloseGuard } from '~/composables/useTabCloseGuard'
 import { OwnerCommercialDocumentRepositoryProblem } from '~/lib/owner-document/central-repository'
 import {

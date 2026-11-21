@@ -4,6 +4,7 @@ import type { MaterialContractListPageDTO } from '~/lib/material-contract/reposi
 import type { NavigationIntentDTO, ReadState } from '~/types/read-model'
 import { useDebounceFn } from '@vueuse/core'
 import { onBeforeUnmount, onDeactivated, useTemplateRef } from 'vue'
+import TargetCostSourceReturn from '~/components/target-cost/TargetCostSourceReturn.vue'
 import KitColumnHeader from '~/components/ui/KitColumnHeader.vue'
 import KitMultiSelectFilter from '~/components/ui/KitMultiSelectFilter.vue'
 import KitStatusTag from '~/components/ui/KitStatusTag.vue'

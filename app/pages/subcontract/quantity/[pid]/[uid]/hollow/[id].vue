@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import QuantityHollowDetailScreen from '~/components/quantity/QuantityHollowDetailScreen.vue'
+
 const route = useRoute()
 </script>
 

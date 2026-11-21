@@ -1,5 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import PayrollAdjustmentApplications from '~/components/payroll/PayrollAdjustmentApplications.vue'
+import PayrollAdjustmentBasisFields from '~/components/payroll/PayrollAdjustmentBasisFields.vue'
+import PayrollConfirmationOutput from '~/components/payroll/PayrollConfirmationOutput.vue'
+import PayrollOriginalWageSummary from '~/components/payroll/PayrollOriginalWageSummary.vue'
 import { usePayrollRead } from '~/composables/usePayrollRead'
 import { payrollAdjustmentLocation, payrollAdjustmentReturn } from '~/lib/payroll/adjustment-navigation'
 import { payrollAdjustmentConfirmation } from '~/lib/payroll/adjustment-output'

@@ -4,6 +4,17 @@ import type { QuantityMatrixCell, QuantityMatrixViewMode, QuantityOption } from 
 import type { QuantityProjectSnapshot } from '~/lib/quantity/read-model'
 import type { DataOriginDTO } from '~/types/read-model'
 import { onActivated, onDeactivated } from 'vue'
+import PayrollACreateFromQuantity from '~/components/payroll/PayrollACreateFromQuantity.vue'
+import PayrollASourceReturn from '~/components/payroll/PayrollASourceReturn.vue'
+import QuantityAssignmentDialog from '~/components/quantity/QuantityAssignmentDialog.vue'
+import QuantityBatchCompletionDialog from '~/components/quantity/QuantityBatchCompletionDialog.vue'
+import QuantityCommandRecovery from '~/components/quantity/QuantityCommandRecovery.vue'
+
+import QuantityCompletionDialog from '~/components/quantity/QuantityCompletionDialog.vue'
+import QuantityProgressCards from '~/components/quantity/QuantityProgressCards.vue'
+import QuantityToolbar from '~/components/quantity/QuantityToolbar.vue'
+import QuantityVarianceDialog from '~/components/quantity/QuantityVarianceDialog.vue'
+import QuantityWorkspace from '~/components/quantity/QuantityWorkspace.vue'
 import KitButton from '~/components/ui/KitButton.vue'
 import { payrollSourceQuery } from '~/lib/payroll/a-navigation'
 import { createQuantityCategoryExport, createQuantityLedgerExport } from '~/lib/quantity/export'
@@ -15,7 +26,6 @@ import {
   quantityTradeOptions,
 } from '~/lib/quantity/matrix'
 import { buildQuantityFilterQuery, quantityMatrixReturnPath, readQuantityFilterQuery, readQuantityOrigin } from '~/lib/quantity/navigation'
-
 import { buildScheduleReturnLocation, parseScheduleDrillContext, scheduleSourceQuery, validateScheduleDrillContext } from '~/lib/schedule/navigation'
 import { toErrorMessage } from '~/lib/util/error'
 

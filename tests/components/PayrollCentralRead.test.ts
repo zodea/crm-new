@@ -17,7 +17,20 @@ import { payrollDetailFixture, payrollListFixture, payrollSourcesFixture } from 
 const table = defineComponent({ props: ['columns', 'data', 'empty'], template: '<div role="table"><div v-for="row in data"><span v-for="column in columns"><slot v-if="column.slot" :name="column.slot" :row="row"/><template v-else>{{ row[column.field] }}</template></span></div></div>' })
 const link = defineComponent({ props: ['to'], setup: (props, { slots }) => () => h('a', { href: typeof props.to === 'string' ? props.to : `${props.to.path}?${new URLSearchParams(props.to.query)}` }, slots.default?.()) })
 const components = { PayrollReadNotice, PayrollReadDiagnostics, PayrollReadFilters, PayrollReadHistory, PayrollEvidenceTable, PayrollSnapshotEvidence, PayrollSourceEvidence, KitStatusTag }
-const stubs = { KitTable: table, SectionHeader: { props: ['title'], template: '<h2>{{title}}</h2>' }, KitButton: { template: '<button><slot /></button>' }, KitMultiSelectFilter: defineComponent({ props: ['label', 'modelValue'], setup: props => () => h('button', { 'aria-label': `${props.label}，已选 ${props.modelValue.length} 项` }, props.label) }), PayrollBatchDialog: { props: ['open', 'rows', 'projectId', 'month'], template: '<div v-if="open" data-testid="batch-dialog">{{projectId}}/{{month}}/{{rows.length}}</div>' }, PayrollWorkbookArchiveDialog: { props: ['open'], template: '<div v-if="open" data-testid="archive-dialog" />' }, NuxtLink: link }
+const stubs = {
+  KitTable: table,
+  SectionHeader: { props: ['title'], template: '<h2>{{title}}</h2>' },
+  KitButton: { template: '<button><slot /></button>' },
+  KitMultiSelectFilter: defineComponent({ props: ['label', 'modelValue'], setup: props => () => h('button', { 'aria-label': `${props.label}，已选 ${props.modelValue.length} 项` }, props.label) }),
+  PayrollBatchDialog: { props: ['open', 'rows', 'projectId', 'month'], template: '<div v-if="open" data-testid="batch-dialog">{{projectId}}/{{month}}/{{rows.length}}</div>' },
+  PayrollWorkbookArchiveDialog: { props: ['open'], template: '<div v-if="open" data-testid="archive-dialog" />' },
+  PayrollAStatementWorkspace: true,
+  PayrollC1StatementWorkspace: true,
+  PayrollC2StatementWorkspace: true,
+  PayrollAdjustmentHistorySection: true,
+  PayrollActualLedgerSection: true,
+  NuxtLink: link,
+}
 let route: ReturnType<typeof makeRoute>
 const detailRead = vi.fn()
 const listRead = vi.fn()

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { PayrollC2FrozenDocument } from '~/lib/payroll/central-c2-contract'
 import type { PayrollOfficialIssue } from '~/lib/payroll/central-numbering-contract'
+import PayrollOfficialIdentity from '~/components/payroll/PayrollOfficialIdentity.vue'
 import { c2Number } from '~/lib/payroll/c2-presentation'
 import { payrollAmount } from '~/lib/payroll/read-presentation'
 import PayrollHollowFrozenSection from './PayrollHollowFrozenSection.vue'

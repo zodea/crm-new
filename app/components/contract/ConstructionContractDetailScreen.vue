@@ -2,6 +2,7 @@
 import type { ConstructionContractDetailFocusDTO, ConstructionContractDetailReadDTO } from '~/lib/construction-contract/repository'
 import type { DataOriginDTO, NavigationIntentDTO, ReadState } from '~/types/read-model'
 import { useTimeoutFn } from '@vueuse/core'
+import ConstructionContractFactTable from '~/components/contract/ConstructionContractFactTable.vue'
 import ConstructionManagementFeeConfiguration from '~/components/contract/ConstructionManagementFeeConfiguration.vue'
 import ConstructionSpendingPanel from '~/components/contract/ConstructionSpendingPanel.vue'
 import ContractOriginalFilesPanel from '~/components/contract/ContractOriginalFilesPanel.vue'

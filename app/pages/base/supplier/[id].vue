@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SupplierDetailScreen from '~/components/supplier/SupplierDetailScreen.vue'
 import { isDataOriginDTO } from '~/types/read-model'
 
 const route = useRoute()

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { KitTableColumn } from '~/lib/kit/table'
 import type { OtherSettlementDTO } from '~/lib/other-settlement/contract'
+import TargetCostSourceReturn from '~/components/target-cost/TargetCostSourceReturn.vue'
 import KitMultiSelectFilter from '~/components/ui/KitMultiSelectFilter.vue'
 import { validateAuxiliaryReturnTo } from '~/lib/auxiliary-contract/navigation'
 import { auxiliaryMoney } from '~/lib/auxiliary-contract/presentation'

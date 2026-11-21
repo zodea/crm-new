@@ -3,6 +3,7 @@ import type { SubcontractContractDetailReadDTO } from '~/lib/subcontract-contrac
 import type { DataOriginDTO, NavigationIntentDTO, ReadState } from '~/types/read-model'
 import { computed, onActivated, watch } from 'vue'
 import ContractOriginalFilesPanel from '~/components/contract/ContractOriginalFilesPanel.vue'
+import SubcontractContractFactTable from '~/components/contract/SubcontractContractFactTable.vue'
 import KitStatusTag from '~/components/ui/KitStatusTag.vue'
 import { contractStatusTone } from '~/lib/contract/status'
 import { resolveNavigationTarget } from '~/lib/nav/target-registry'

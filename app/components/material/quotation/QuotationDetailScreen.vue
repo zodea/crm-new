@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { QuotationRecord } from '~/lib/material-quotation/contract'
+import QuotationOriginalFiles from '~/components/material/quotation/QuotationOriginalFiles.vue'
 import { bindReadAuthority } from '~/lib/read-model/authority'
 
 const route = useRoute()

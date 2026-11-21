@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import PayrollWorkbookHistory from '~/components/payroll/PayrollWorkbookHistory.vue'
+import PayrollWorkbookPreview from '~/components/payroll/PayrollWorkbookPreview.vue'
+import PayrollWorkbookSelection from '~/components/payroll/PayrollWorkbookSelection.vue'
 import { usePayrollWorkbook } from '~/composables/usePayrollWorkbook'
 
 const ui = usePayrollWorkbook()

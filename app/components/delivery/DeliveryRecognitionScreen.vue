@@ -1,4 +1,10 @@
 <script setup lang="ts">
+import DeliveryDuplicateReviewPanel from '~/components/delivery/DeliveryDuplicateReviewPanel.vue'
+import DeliveryOriginalPanel from '~/components/delivery/DeliveryOriginalPanel.vue'
+import DeliveryQueuePanel from '~/components/delivery/DeliveryQueuePanel.vue'
+import DeliveryReviewPanel from '~/components/delivery/DeliveryReviewPanel.vue'
+import DeliveryWorkbenchHeader from '~/components/delivery/DeliveryWorkbenchHeader.vue'
+
 type WorkbenchPane = 'queue' | 'source' | 'review'
 
 const pageRef = useTemplateRef<HTMLElement>('pageRef')

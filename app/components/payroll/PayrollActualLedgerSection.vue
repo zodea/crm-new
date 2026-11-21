@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import PayrollActualFactsTable from '~/components/payroll/PayrollActualFactsTable.vue'
 import { usePayrollRead } from '~/composables/usePayrollRead'
 import { payrollAmount } from '~/lib/payroll/read-presentation'
 import { isStableRouteIdentity } from '~/lib/util/stable-route-identity'

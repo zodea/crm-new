@@ -7,6 +7,7 @@ import type {
   SupplierProjectDTO,
   SupplierSettlementDTO,
 } from '~/lib/supplier/repository'
+import SupplierRelationLink from '~/components/supplier/SupplierRelationLink.vue'
 import { AUXILIARY_LABELS } from '~/lib/auxiliary-contract/contract'
 import { approvalAmountLabel } from '~/lib/finance/approval-amount'
 import { yuan } from '~/lib/util/money'

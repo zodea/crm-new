@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import QuantityRegionFormPage from '~/components/quantity/QuantityRegionFormPage.vue'
 import { readQuantityOrigin } from '~/lib/quantity/navigation'
 
 const route = useRoute()

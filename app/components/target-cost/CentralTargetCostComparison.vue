@@ -2,6 +2,7 @@
 import type { KitTableColumn } from '~/lib/kit/table'
 import type { TargetCostCategory } from '~/lib/target-cost/central-contract'
 import type { NavigationIntentDTO } from '~/types/read-model'
+import TargetCostMetricValue from '~/components/target-cost/TargetCostMetricValue.vue'
 import { resolveNavigationTarget } from '~/lib/nav/target-registry'
 
 const props = defineProps<{ categories: readonly TargetCostCategory[], returnTo: string }>()

@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import CentralC1DraftFormPage from '~/components/payroll/CentralC1DraftFormPage.vue'
+import CentralC2DraftFormPage from '~/components/payroll/CentralC2DraftFormPage.vue'
+import CentralPayrollDraftFormPage from '~/components/payroll/CentralPayrollDraftFormPage.vue'
 import { usePayrollRead } from '~/composables/usePayrollRead'
 import { payrollViewScope } from '~/lib/payroll/central-navigation'
 import { isStableRouteIdentity } from '~/lib/util/stable-route-identity'

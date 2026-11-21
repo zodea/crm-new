@@ -4,6 +4,7 @@ import type {
   ConfiguredExportSettings,
   ConfiguredExportSource,
 } from '~/lib/kit/export'
+import ExportConfigForm from '~/components/export/ExportConfigForm.vue'
 import { Button } from '~/components/ui/button'
 
 const EMPTY_SOURCE: ConfiguredExportSource = {

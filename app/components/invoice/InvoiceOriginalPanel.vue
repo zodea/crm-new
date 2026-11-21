@@ -2,6 +2,8 @@
 import type { InvoiceRecognitionField } from '~/lib/invoice/recognition-changes'
 import type { InvoiceRegionHighlightGroup } from '~/lib/invoice/recognition-regions'
 import type { Invoice } from '~/stores/invoice'
+import InvoiceOriginalMissing from '~/components/invoice/InvoiceOriginalMissing.vue'
+import InvoiceRegionViewer from '~/components/invoice/InvoiceRegionViewer.vue'
 
 defineProps<{
   invoice?: Invoice

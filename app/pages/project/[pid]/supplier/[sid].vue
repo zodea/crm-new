@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import ProjectSupplierWorkbench from '~/components/project-supplier/ProjectSupplierWorkbench.vue'
+
 const route = useRoute()
 const projectId = computed(() => String(route.params.pid ?? ''))
 const supplierId = computed(() => String(route.params.sid ?? ''))

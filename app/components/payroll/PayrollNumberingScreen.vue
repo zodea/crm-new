@@ -1,5 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import PayrollAFrozenPrint from '~/components/payroll/PayrollAFrozenPrint.vue'
+import PayrollC1FrozenPrint from '~/components/payroll/PayrollC1FrozenPrint.vue'
+import PayrollC2FrozenPrint from '~/components/payroll/PayrollC2FrozenPrint.vue'
+import PayrollEvidenceTable from '~/components/payroll/PayrollEvidenceTable.vue'
+import PayrollOfficialIdentity from '~/components/payroll/PayrollOfficialIdentity.vue'
 import { usePayrollNumbering } from '~/composables/usePayrollNumbering'
 import { payrollAdjustmentReturn } from '~/lib/payroll/adjustment-navigation'
 import { payrollAmount } from '~/lib/payroll/read-presentation'

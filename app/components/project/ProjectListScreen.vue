@@ -6,6 +6,7 @@ import type { ProjectListPageDTO, ProjectListQueryDTO } from '~/lib/project/repo
 import type { MetricDTO } from '~/types/read-model'
 import { useDebounceFn } from '@vueuse/core'
 import * as XLSX from 'xlsx'
+import ProjectListToolbar from '~/components/project/ProjectListToolbar.vue'
 import EntityDeletedList from '~/components/shared/EntityDeletedList.vue'
 import EntityPendingRecovery from '~/components/shared/EntityPendingRecovery.vue'
 import KitStatusTag from '~/components/ui/KitStatusTag.vue'

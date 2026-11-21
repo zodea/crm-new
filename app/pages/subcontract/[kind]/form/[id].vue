@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import OwnerDocumentFormPage from '~/components/owner-document/OwnerDocumentFormPage.vue'
 import { ownerDocumentKindFromRoute } from '~/lib/owner-document/page'
 
 const route = useRoute()

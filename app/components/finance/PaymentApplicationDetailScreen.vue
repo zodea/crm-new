@@ -3,6 +3,7 @@ import type {
   PaymentApplicationDetail,
 } from '~/lib/finance/payment-detail'
 import { onBeforeUnmount } from 'vue'
+import PaymentApplicationInsightPanel from '~/components/finance/PaymentApplicationInsightPanel.vue'
 import { useProjectSupplierReturnContext } from '~/composables/useProjectSupplierReturnContext'
 import { approvalAmountLabel } from '~/lib/finance/approval-amount'
 import { financeStatusLabel } from '~/lib/finance/status'

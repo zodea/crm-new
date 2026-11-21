@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import HomeScheduleSourceScreen from '~/components/schedule/HomeScheduleSourceScreen.vue'
+import ScheduleScreen from '~/components/schedule/ScheduleScreen.vue'
+
 const route = useRoute()
 </script>
 

@@ -8,6 +8,7 @@ import type { BoqAttachmentView, BoqChangeOrderView, BoqLineView } from '~/lib/b
 import type { ExportFileOptions } from '~/lib/kit/export'
 import type { QuantityBasis } from '~/lib/quantity/basis'
 import type { BoqAttachmentDraft } from '~/stores/boq'
+import ProjectSwitcher from '~/components/project/ProjectSwitcher.vue'
 import { createBoqWorkbookExport, createMonthlyStatementExport } from '~/lib/boq/export'
 import { quantityBasisLabel } from '~/lib/quantity/basis'
 import { toErrorMessage } from '~/lib/util/error'

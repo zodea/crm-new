@@ -14,6 +14,8 @@ import type {
 } from '~/lib/master-data/page'
 import { onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router'
 import ConstructionScopeSelector from '~/components/contract/ConstructionScopeSelector.vue'
+import FinanceFormFields from '~/components/finance/FinanceFormFields.vue'
+import FinancePaymentTypeStep from '~/components/finance/FinancePaymentTypeStep.vue'
 import { useTabCloseGuard } from '~/composables/useTabCloseGuard'
 import { decodeConstructionMainSelection } from '~/lib/construction-scope/contract'
 import { verifyFinanceAttachments } from '~/lib/finance/attachment-proof'

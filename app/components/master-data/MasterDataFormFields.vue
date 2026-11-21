@@ -2,6 +2,12 @@
 import type { LookupOption } from '~/lib/kit/lookup'
 import type { MasterDataOwnerType } from '~/lib/master-data/forms'
 import type { MasterDataPageDraft } from '~/lib/master-data/page'
+import CrewFormFields from '~/components/master-data/CrewFormFields.vue'
+import CustomerFormFields from '~/components/master-data/CustomerFormFields.vue'
+import ProjectMasterDataFormFields from '~/components/master-data/ProjectMasterDataFormFields.vue'
+import SupplierFormFields from '~/components/master-data/SupplierFormFields.vue'
+import TargetCostFormFields from '~/components/master-data/TargetCostFormFields.vue'
+import WorkerFormFields from '~/components/master-data/WorkerFormFields.vue'
 
 defineProps<{
   kind: MasterDataOwnerType

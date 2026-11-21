@@ -8,6 +8,9 @@ import type {
   ProjectContractFormDraft,
 } from '~/lib/contract/forms'
 import type { FormFooterAction } from '~/lib/master-data/page'
+import ContractAttachmentSection from '~/components/contract/ContractAttachmentSection.vue'
+import ContractFormFields from '~/components/contract/ContractFormFields.vue'
+import ContractLineItemsEditor from '~/components/contract/ContractLineItemsEditor.vue'
 import KitStatusTag from '~/components/ui/KitStatusTag.vue'
 import { useTabCloseGuard } from '~/composables/useTabCloseGuard'
 import { contractAuxStatusTone } from '~/lib/contract/aux-list'

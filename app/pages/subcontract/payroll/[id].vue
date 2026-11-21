@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import CrewWorkerRelationFactDetailScreen from '~/components/crew-worker/CrewWorkerRelationFactDetailScreen.vue'
+import PayrollStatementDetailScreen from '~/components/payroll/PayrollStatementDetailScreen.vue'
 import { validateCrewWorkerReturnTo } from '~/lib/crew-worker/return-context'
 import { isDataOriginDTO } from '~/types/read-model'
 

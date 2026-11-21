@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { OtherSettlementDetail } from '~/lib/other-settlement/contract'
 import type { EntityRefDTO } from '~/types/read-model'
+import OtherSettlementOriginalFiles from '~/components/other-settlement/OtherSettlementOriginalFiles.vue'
 import { auxiliaryMoney } from '~/lib/auxiliary-contract/presentation'
 import { resolveNavigationTarget } from '~/lib/nav/target-registry'
 import { OTHER_SETTLEMENT_AMOUNT_LABELS } from '~/lib/other-settlement/contract'

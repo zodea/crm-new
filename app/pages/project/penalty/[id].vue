@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import CrewWorkerRelationFactDetailScreen from '~/components/crew-worker/CrewWorkerRelationFactDetailScreen.vue'
+import ProjectPenaltyDetailScreen from '~/components/owner-document/ProjectPenaltyDetailScreen.vue'
 import { validateCrewWorkerReturnTo } from '~/lib/crew-worker/return-context'
 import { isDataOriginDTO } from '~/types/read-model'
 

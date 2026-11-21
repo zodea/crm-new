@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, shallowRef, watch } from 'vue'
+import PayrollAdjustmentApplications from '~/components/payroll/PayrollAdjustmentApplications.vue'
 import { usePayrollRead } from '~/composables/usePayrollRead'
 import { payrollAdjustmentLocation } from '~/lib/payroll/adjustment-navigation'
 import { payrollAmount } from '~/lib/payroll/read-presentation'

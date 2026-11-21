@@ -4,6 +4,8 @@ import type { ProcessLibraryReadVersion } from '~/lib/schedule/process-library-s
 import { storeToRefs } from 'pinia'
 import { computed, nextTick, onActivated, onDeactivated, onScopeDispose, ref, shallowRef, useTemplateRef, watch } from 'vue'
 import { onBeforeRouteUpdate } from 'vue-router'
+import ScheduleProcessLibraryTaskEditor from '~/components/schedule/ScheduleProcessLibraryTaskEditor.vue'
+import ScheduleTemplateGanttEditor from '~/components/schedule/ScheduleTemplateGanttEditor.vue'
 import { Button } from '~/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '~/components/ui/dialog'
 import StatePanel from '~/components/ui/StatePanel.vue'

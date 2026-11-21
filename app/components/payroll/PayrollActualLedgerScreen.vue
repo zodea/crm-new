@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import PayrollActualLedgerSection from '~/components/payroll/PayrollActualLedgerSection.vue'
+import TargetCostSourceReturn from '~/components/target-cost/TargetCostSourceReturn.vue'
 import { usePayrollRead } from '~/composables/usePayrollRead'
 import { payrollAdjustmentReturn } from '~/lib/payroll/adjustment-navigation'
 

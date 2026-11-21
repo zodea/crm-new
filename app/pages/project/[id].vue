@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import ProjectDetailScreen from '~/components/project/ProjectDetailScreen.vue'
+import TargetCostProjectReturn from '~/components/target-cost/TargetCostProjectReturn.vue'
 import { validateAuxiliaryDetailReturnTo } from '~/lib/auxiliary-contract/navigation'
 import { validateCrewWorkerReturnTo } from '~/lib/crew-worker/return-context'
 import { validateCustomerDetailReturnTo } from '~/lib/customer/return-context'

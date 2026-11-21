@@ -3,6 +3,7 @@ import type { CustomerListPageDTO, CustomerListQueryDTO } from '~/lib/customer/r
 import type { MasterDataFilterValue, MasterDataListFilterField, MasterDataListSort } from '~/lib/master-data/list'
 import { useDebounceFn } from '@vueuse/core'
 import { computed, onActivated, onDeactivated, onMounted, onScopeDispose, shallowRef, watch } from 'vue'
+import MasterDataListToolbar from '~/components/master-data/MasterDataListToolbar.vue'
 import EntityDeletedList from '~/components/shared/EntityDeletedList.vue'
 import EntityPendingRecovery from '~/components/shared/EntityPendingRecovery.vue'
 import { MASTER_DATA_LIST_PROFILES, masterDataStatusLabel } from '~/lib/master-data/list'

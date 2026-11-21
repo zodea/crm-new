@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import PayrollACommandState from '~/components/payroll/PayrollACommandState.vue'
+import PayrollAdjustmentBasisFields from '~/components/payroll/PayrollAdjustmentBasisFields.vue'
+import PayrollOriginalWageSummary from '~/components/payroll/PayrollOriginalWageSummary.vue'
 import { usePayrollAdjustmentForm } from '~/composables/usePayrollAdjustmentForm'
 import { payrollAmount } from '~/lib/payroll/read-presentation'
 

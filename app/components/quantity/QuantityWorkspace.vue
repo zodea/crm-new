@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { QuantityMatrixCell, QuantityMatrixView } from '~/lib/quantity/matrix'
+import QuantityMatrix from '~/components/quantity/QuantityMatrix.vue'
 
 defineProps<{
   matrix: QuantityMatrixView

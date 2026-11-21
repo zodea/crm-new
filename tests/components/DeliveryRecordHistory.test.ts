@@ -13,6 +13,7 @@ function mount() {
   return render(DeliveryRecordHistory, { props: { recordId: 'record', currentVersion: '2' }, global: { components: {
     KitButton: defineComponent({ props: ['disabled', 'loading'], template: '<button :disabled="disabled || loading"><slot /></button>' }),
     KitTable: defineComponent({ props: ['data'], setup: props => () => h('div', { 'aria-label': '历史材料' }, props.data.map((row: { qty: number }) => `数量 ${row.qty}`).join(',')) }),
+  }, stubs: {
     DeliveryRecordSourcePanel: defineComponent({ props: { recordId: String, assetId: String, readOnly: Boolean }, setup: props => () => h('div', { 'aria-label': '历史原件', 'data-asset': props.assetId ?? 'missing', 'data-readonly': String(props.readOnly) }, props.assetId ? '关联原件' : '历史未关联原件') }),
   } } })
 }

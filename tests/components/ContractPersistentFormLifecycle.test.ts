@@ -22,10 +22,12 @@ function deferred<T>() {
   })
   return { promise, resolve, reject }
 }
-const components = {
+const stubs = {
   EntityFormShell: defineComponent({ props: ['title'], setup: (props, { slots }) => () => h('main', [h('h1', props.title), slots.default?.()]) }),
   ContractFormFields: defineComponent({ props: ['draft'], setup: props => () => h('input', { 'aria-label': '合同名称', 'value': props.draft.name }) }),
   FormFooter: defineComponent({ emits: ['action'], setup: (_props, { emit }) => () => h('button', { onClick: () => emit('action', 'draft') }, '保存草稿') }),
+  ContractAttachmentSection: true,
+  CommandRecoveryPanel: true,
 }
 
 afterEach(() => vi.unstubAllGlobals())
@@ -71,7 +73,7 @@ describe.each([{ kind: 'construction' as const, component: ConstructionForm }, {
   it('旧目标迟到的hydrate不能替换新目标，读取失败也不能泄露旧提示', async () => {
     const old = deferred<any>()
     mocks.currentStore.hydrate.mockImplementationOnce(() => old.promise)
-    render(component, { global: { components, stubs: { ContractAttachmentSection: true, CommandRecoveryPanel: true } } })
+    render(component, { global: { stubs } })
     route.params.id = 'B'
     route.fullPath = `/contract/${kind}/form/B`
     await waitFor(() => expect((screen.getByLabelText('合同名称') as HTMLInputElement).value).toBe('合同B'))
@@ -84,7 +86,7 @@ describe.each([{ kind: 'construction' as const, component: ConstructionForm }, {
   it('保存结果未知时切换目标，迟到失败不改变新页；卸载仍保留原恢复编号', async () => {
     const saving = deferred<any>()
     mocks.currentStore.saveForm.mockImplementation(() => saving.promise)
-    const view = render(component, { global: { components, stubs: { ContractAttachmentSection: true, CommandRecoveryPanel: true } } })
+    const view = render(component, { global: { stubs } })
     await waitFor(() => expect((screen.getByLabelText('合同名称') as HTMLInputElement).value).toBe('合同A'))
     await fireEvent.click(screen.getByText('保存草稿'))
     expect(mocks.currentStore.saveForm).toHaveBeenCalledOnce()

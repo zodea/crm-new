@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { OtherSettlementFact } from '~/lib/other-settlement/contract'
 import { TabsContent, TabsList, TabsRoot, TabsTrigger } from 'reka-ui'
+import OtherSettlementFacts from '~/components/other-settlement/OtherSettlementFacts.vue'
+import OtherSettlementInfo from '~/components/other-settlement/OtherSettlementInfo.vue'
 import { validateAuxiliaryReturnTo } from '~/lib/auxiliary-contract/navigation'
 import { auxiliaryMoney } from '~/lib/auxiliary-contract/presentation'
 import { isConfirmedExpenditureSettlement } from '~/lib/contract/effective-status'

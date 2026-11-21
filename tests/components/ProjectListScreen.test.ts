@@ -234,6 +234,7 @@ const ProjectListToolbarStub = defineComponent({
 })
 
 const global = {
+  stubs: { ProjectListToolbar: ProjectListToolbarStub },
   components: {
     EntityLink: defineComponent({
       props: ['id', 'label', 'returnTo', 'returnContextId'],
@@ -251,7 +252,6 @@ const global = {
     KitTable: KitTableStub,
     ListShell,
     NuxtLink: defineComponent({ props: ['to'], template: '<a :href="to"><slot /></a>' }),
-    ProjectListToolbar: ProjectListToolbarStub,
     SelectFilter: defineComponent({
       props: ['modelValue', 'options'],
       emits: ['update:modelValue'],

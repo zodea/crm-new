@@ -1,7 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, reactive } from 'vue'
-import CustomerDetailRelations from '~/components/master-data/CustomerDetailRelations.vue'
 import CustomerDetailScreen from '~/components/master-data/CustomerDetailScreen.vue'
 import StatePanel from '~/components/ui/StatePanel.vue'
 
@@ -160,12 +159,11 @@ describe('客户详情业务页签', () => {
     render(CustomerDetailScreen, {
       props: { customerId: 'customer-1', origin: 'real', includeDemo: false },
       global: {
+        stubs: { CustomerDetailOverview: defineComponent({ template: '<section />' }) },
         components: {
           EntityDetailShell: EntityDetailShellStub,
           SegTab: SegTabStub,
           StatePanel,
-          CustomerDetailRelations,
-          CustomerDetailOverview: defineComponent({ template: '<section />' }),
           KitTable: defineComponent({ template: '<section data-testid="project-table">暂无名下项目</section>' }),
           MetricGrid: defineComponent({ template: '<div><slot /></div>' }),
           Metric: defineComponent({ props: ['label', 'value'], template: '<span>{{ label }}：{{ value }}</span>' }),
@@ -200,12 +198,10 @@ describe('客户详情业务页签', () => {
     }
     render(CustomerDetailScreen, {
       props: { customerId: 'customer-1', origin: 'real', includeDemo: false },
-      global: { components: {
+      global: { stubs: { CustomerDetailOverview: defineComponent({ template: '<section />' }) }, components: {
         EntityDetailShell: EntityDetailShellStub,
         SegTab: SegTabStub,
         StatePanel,
-        CustomerDetailRelations,
-        CustomerDetailOverview: defineComponent({ template: '<section />' }),
         KitTable: defineComponent({ template: '<section data-testid="contract-table">暂无施工合同</section>' }),
         MetricGrid: defineComponent({ template: '<div><slot /></div>' }),
         Metric: defineComponent({ props: ['label', 'value'], template: '<span>{{ label }}：{{ value }}</span>' }),
@@ -240,12 +236,10 @@ describe('客户详情业务页签', () => {
     }
     render(CustomerDetailScreen, {
       props: { customerId: 'customer-1', origin: 'real', includeDemo: false },
-      global: { components: {
+      global: { stubs: { CustomerDetailOverview: defineComponent({ template: '<section />' }) }, components: {
         EntityDetailShell: EntityDetailShellStub,
         SegTab: SegTabStub,
         StatePanel,
-        CustomerDetailRelations,
-        CustomerDetailOverview: defineComponent({ template: '<section />' }),
         KitTable: defineComponent({ template: '<section data-testid="receipt-table">暂无收款记录</section>' }),
         MetricGrid: defineComponent({ template: '<div><slot /></div>' }),
         Metric: defineComponent({ props: ['label', 'value'], template: '<span>{{ label }}：{{ value }}</span>' }),
@@ -272,14 +266,16 @@ describe('客户详情业务页签', () => {
     render(CustomerDetailScreen, {
       props: { customerId: 'customer-1', origin: 'real', includeDemo: false },
       global: {
-        components: {
-          EntityDetailShell: EntityDetailShellStub,
-          SegTab: SegTabStub,
+        stubs: {
           CustomerDetailOverview: defineComponent({ template: '<section>客户概览</section>' }),
           CustomerDetailRelations: defineComponent({
             props: ['tab'],
             template: '<section data-testid="active-relation">{{ tab }}</section>',
           }),
+        },
+        components: {
+          EntityDetailShell: EntityDetailShellStub,
+          SegTab: SegTabStub,
           MetricGrid: defineComponent({ template: '<div><slot /></div>' }),
           Metric: defineComponent({ template: '<span />' }),
           NuxtLink: defineComponent({ template: '<a><slot /></a>' }),
@@ -309,14 +305,16 @@ describe('客户详情业务页签', () => {
     render(CustomerDetailScreen, {
       props: { customerId: 'customer-1', origin: 'real', includeDemo: false },
       global: {
-        components: {
-          EntityDetailShell: EntityDetailShellStub,
-          SegTab: SegTabStub,
+        stubs: {
           CustomerDetailOverview: defineComponent({ template: '<section />' }),
           CustomerDetailRelations: defineComponent({
             props: ['tab'],
             template: '<section data-testid="active-relation">{{ tab }}</section>',
           }),
+        },
+        components: {
+          EntityDetailShell: EntityDetailShellStub,
+          SegTab: SegTabStub,
           MetricGrid: defineComponent({ template: '<div><slot /></div>' }),
           Metric: defineComponent({ template: '<span />' }),
           NuxtLink: defineComponent({ template: '<a><slot /></a>' }),
@@ -336,6 +334,10 @@ describe('客户详情业务页签', () => {
     render(CustomerDetailScreen, {
       props: { customerId: 'customer-1', origin: 'real', includeDemo: false },
       global: {
+        stubs: {
+          CustomerDetailOverview: defineComponent({ template: '<section>客户概览仍可见</section>' }),
+          CustomerDetailRelations: defineComponent({ template: '<section />' }),
+        },
         components: {
           EntityDetailShell: EntityDetailShellStub,
           SegTab: SegTabStub,
@@ -343,8 +345,6 @@ describe('客户详情业务页签', () => {
             props: ['title', 'description'],
             template: '<div role="alert">{{ title }}：{{ description }}</div>',
           }),
-          CustomerDetailOverview: defineComponent({ template: '<section>客户概览仍可见</section>' }),
-          CustomerDetailRelations: defineComponent({ template: '<section />' }),
           MetricGrid: defineComponent({ template: '<div><slot /></div>' }),
           Metric: defineComponent({ template: '<span />' }),
           NuxtLink: defineComponent({ template: '<a><slot /></a>' }),

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { LookupOption } from '~/lib/kit/lookup'
 import type { WorkerFormDraft } from '~/lib/master-data/forms'
+import MasterDataCapabilityFields from '~/components/master-data/MasterDataCapabilityFields.vue'
 
 const props = defineProps<{
   fieldErrors: Record<string, string>

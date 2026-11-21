@@ -2,6 +2,7 @@
 import type { DataOriginDTO } from '~/types/read-model'
 import { onActivated, onDeactivated } from 'vue'
 import { onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router'
+import QuantityCommandRecovery from '~/components/quantity/QuantityCommandRecovery.vue'
 import KitButton from '~/components/ui/KitButton.vue'
 import { confirmQuantityRegionLeave } from '~/lib/quantity/region'
 import { toErrorMessage } from '~/lib/util/error'

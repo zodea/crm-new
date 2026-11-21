@@ -3,6 +3,7 @@ import type { QuantityStageDraft, QuantityStageWorkspace } from '~/lib/quantity/
 import type { DataOriginDTO } from '~/types/read-model'
 import { computed, onActivated, onDeactivated, ref, watch } from 'vue'
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRouter } from 'vue-router'
+import QuantityCommandRecovery from '~/components/quantity/QuantityCommandRecovery.vue'
 import QuantityStageFields from '~/components/quantity/QuantityStageFields.vue'
 import QuantityStageReporting from '~/components/quantity/QuantityStageReporting.vue'
 import EntityFormShell from '~/components/ui/EntityFormShell.vue'

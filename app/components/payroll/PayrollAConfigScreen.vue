@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import type { PayrollAPriceRevision } from '~/lib/payroll/central-a-contract'
 import { computed, shallowRef } from 'vue'
+import PayrollACommandState from '~/components/payroll/PayrollACommandState.vue'
+import PayrollAFeesConfigSection from '~/components/payroll/PayrollAFeesConfigSection.vue'
+import PayrollAPriceEditor from '~/components/payroll/PayrollAPriceEditor.vue'
+import PayrollARoundingSection from '~/components/payroll/PayrollARoundingSection.vue'
+import PayrollReadHistory from '~/components/payroll/PayrollReadHistory.vue'
 import { usePayrollAConfig } from '~/composables/usePayrollAConfig'
 import { payrollInputNumber } from '~/lib/payroll/a-presentation'
 import { payrollAmount } from '~/lib/payroll/read-presentation'

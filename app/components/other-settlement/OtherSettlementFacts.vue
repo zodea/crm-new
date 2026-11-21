@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { OtherSettlementFact } from '~/lib/other-settlement/contract'
+import OtherSettlementSourceDetail from '~/components/other-settlement/OtherSettlementSourceDetail.vue'
 import { auxiliaryMoney } from '~/lib/auxiliary-contract/presentation'
 import { financeStatusLabel } from '~/lib/finance/status'
 import { isEffectiveSettlementFact } from '~/lib/other-settlement/facts'

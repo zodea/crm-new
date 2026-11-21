@@ -2,6 +2,7 @@
 import type { AuxiliaryContractDTO, AuxiliaryContractKind, AuxiliaryImportCommand, AuxiliaryImportPreview, AuxiliaryImportResult } from '~/lib/auxiliary-contract/contract'
 import type { CommandRecoveryDescriptor } from '~/lib/forms/command-recovery'
 import { useMutationObserver } from '@vueuse/core'
+import TargetCostSourceReturn from '~/components/target-cost/TargetCostSourceReturn.vue'
 import KitEnumFilterOptions from '~/components/ui/KitEnumFilterOptions.vue'
 import KitMultiSelectFilter from '~/components/ui/KitMultiSelectFilter.vue'
 import { AUXILIARY_CATEGORIES, AUXILIARY_LABELS, auxiliaryListPath } from '~/lib/auxiliary-contract/contract'

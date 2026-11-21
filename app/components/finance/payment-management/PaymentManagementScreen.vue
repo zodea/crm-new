@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import type {
   PaymentManagementRow,
-  PaymentManagementSummary,
+  PaymentManagementSummary as PaymentManagementSummaryType,
 } from '~/stores/payment-management'
+import PaymentManagementSummary from '~/components/finance/payment-management/PaymentManagementSummary.vue'
+import PaymentManagementTable from '~/components/finance/payment-management/PaymentManagementTable.vue'
+import PaymentManagementToolbar from '~/components/finance/payment-management/PaymentManagementToolbar.vue'
+import PaymentPayrollSection from '~/components/finance/payment-management/PaymentPayrollSection.vue'
 import KitMultiSelectFilter from '~/components/ui/KitMultiSelectFilter.vue'
 import StatePanel from '~/components/ui/StatePanel.vue'
 import { financeDetailPath } from '~/lib/finance/page'
@@ -54,7 +58,7 @@ const filteredRows = computed(() => scopedRows.value.filter(row =>
   || (view.value.includes('paid') && row.paymentStatus === '已付清'),
 ))
 
-const summary = computed<PaymentManagementSummary>(() => summarizePayments(filteredRows.value))
+const summary = computed<PaymentManagementSummaryType>(() => summarizePayments(filteredRows.value))
 
 const currentPage = computed(() =>
   clampPage(page.value, filteredRows.value.length, pageSize.value),

@@ -149,6 +149,10 @@ function renderDetail(props: Record<string, unknown>) {
     global: {
       components: {
         NuxtLink: NuxtLinkStub,
+        StatePanel: StatePanelStub,
+      },
+      stubs: {
+        AuxiliaryContractJourney: true,
         ProjectDetailTab: defineComponent({
           props: ['project'],
           template: '<section aria-label="中央详情字段">{{ project.name }}</section>',
@@ -157,7 +161,6 @@ function renderDetail(props: Record<string, unknown>) {
           props: ['relationships'],
           template: '<aside aria-label="中央项目分供方">{{ relationships.length }} 家</aside>',
         }),
-        StatePanel: StatePanelStub,
       },
     },
   })

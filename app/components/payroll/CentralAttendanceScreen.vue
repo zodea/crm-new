@@ -1,5 +1,9 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
+import CentralAttendanceGrid from '~/components/payroll/CentralAttendanceGrid.vue'
+import PayrollAttendanceCellDialog from '~/components/payroll/PayrollAttendanceCellDialog.vue'
+import PayrollC1SourceReturn from '~/components/payroll/PayrollC1SourceReturn.vue'
+import PayrollSourceEvidence from '~/components/payroll/PayrollSourceEvidence.vue'
 import { useCentralAttendance } from '~/composables/useCentralAttendance'
 import { payrollReadLocation, payrollViewQuery } from '~/lib/payroll/central-navigation'
 

@@ -3,6 +3,7 @@ import type {
   ContractAuxListKind,
   ContractAuxRow,
 } from '~/lib/contract/aux-list'
+import ContractAuxListToolbar from '~/components/contract/ContractAuxListToolbar.vue'
 import KitStatusTag from '~/components/ui/KitStatusTag.vue'
 import {
   CONTRACT_AUX_LIST_CONFIG,

@@ -7,6 +7,7 @@ import type {
 } from '~/lib/contract/forms'
 import type { LookupOption } from '~/lib/kit/lookup'
 import { computed } from 'vue'
+import ContractSignatoryField from '~/components/contract/ContractSignatoryField.vue'
 
 type PageDraft
   = ProjectContractFormDraft

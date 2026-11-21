@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { usePayrollANegativeLines } from '~/composables/usePayrollANegativeLines'
+import PayrollACommandState from '~/components/payroll/PayrollACommandState.vue'
 import PayrollANegativeLineEditor from './PayrollANegativeLineEditor.vue'
 
 const props = defineProps<{ ui: ReturnType<typeof usePayrollANegativeLines> }>()

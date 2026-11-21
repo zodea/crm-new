@@ -1,5 +1,11 @@
 <script setup lang="ts">
 import { computed, shallowRef, watch } from 'vue'
+import CentralTargetCostComparison from '~/components/target-cost/CentralTargetCostComparison.vue'
+import CentralTargetCostSummary from '~/components/target-cost/CentralTargetCostSummary.vue'
+import TargetCostAttachments from '~/components/target-cost/TargetCostAttachments.vue'
+import TargetCostCommandState from '~/components/target-cost/TargetCostCommandState.vue'
+import TargetCostItemEditor from '~/components/target-cost/TargetCostItemEditor.vue'
+import TargetCostItemTable from '~/components/target-cost/TargetCostItemTable.vue'
 import { useTargetCostDetail } from '~/composables/useTargetCostDetail'
 import { useTargetCostFiles } from '~/composables/useTargetCostFiles'
 import { presentTargetCostHistory } from '~/lib/target-cost/history-presentation'

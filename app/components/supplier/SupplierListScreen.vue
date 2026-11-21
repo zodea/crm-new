@@ -5,6 +5,7 @@ import type { SupplierListColumnFilters, SupplierListNumericField, SupplierListP
 import { useDebounceFn, useMediaQuery, useStorage } from '@vueuse/core'
 import { computed, nextTick, onActivated, onDeactivated, onMounted, onScopeDispose, shallowRef, watch } from 'vue'
 import EntityPendingRecovery from '~/components/shared/EntityPendingRecovery.vue'
+import SupplierListControls from '~/components/supplier/SupplierListControls.vue'
 import { readProblemTitle, readStateData, readStateProblem } from '~/lib/read-model/state'
 import { SUPPLIER_LIST_NUMERIC_FIELDS, SUPPLIER_NUMERIC_SOURCE } from '~/lib/supplier/read-contract'
 import { normalizeSupplierEnumSelection } from '~/lib/supplier/read-query'

@@ -1,5 +1,9 @@
 <script setup lang="ts">
 import type { ImportRunResult } from '~/composables/useImportRunner'
+import ImportMappingStep from '~/components/import/ImportMappingStep.vue'
+import ImportPreviewStep from '~/components/import/ImportPreviewStep.vue'
+import ImportUploadStep from '~/components/import/ImportUploadStep.vue'
+import ProjectImportReview from '~/components/project/ProjectImportReview.vue'
 import { Button } from '~/components/ui/button'
 
 const flow = useProjectImport()

@@ -13,6 +13,7 @@ import {
   PopoverRoot,
   PopoverTrigger,
 } from 'reka-ui'
+import ProjectSwitcherPanel from '~/components/project/ProjectSwitcherPanel.vue'
 import { useModalLayerRegistration, useOwnedOverlayLayerStyle } from '~/composables/useOverlayStack'
 
 interface ProjectOption {

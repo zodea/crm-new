@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import PayrollACommandState from '~/components/payroll/PayrollACommandState.vue'
+import PayrollActualPaymentFields from '~/components/payroll/PayrollActualPaymentFields.vue'
+import PayrollOriginalWageSummary from '~/components/payroll/PayrollOriginalWageSummary.vue'
 import { usePayrollActualPaymentForm } from '~/composables/usePayrollActualPaymentForm'
 
 const route = useRoute()

@@ -46,7 +46,9 @@ function openDetail(value = workspace()) {
     global: {
       stubs: {
         ContextHelp: true,
+        QuantityCommandRecovery: true,
         QuantityCompletionDialog: true,
+        QuantityHollowSection: true,
         Dialog: true,
         DialogContent: true,
         DialogTitle: true,

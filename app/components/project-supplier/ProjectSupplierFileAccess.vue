@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ProjectSupplierFilesContext } from '~/composables/useProjectSupplierFiles'
 import type { ProjectSupplierFileDTO } from '~/lib/project-supplier/read-contract'
+import ProjectSupplierFilePanel from '~/components/project-supplier/ProjectSupplierFilePanel.vue'
 import { useProjectSupplierFiles } from '~/composables/useProjectSupplierFiles'
 
 const props = defineProps<{

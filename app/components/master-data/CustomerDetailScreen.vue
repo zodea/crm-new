@@ -2,6 +2,8 @@
 import type { CustomerRelationTab } from './CustomerDetailRelations.vue'
 import type { DataOriginDTO } from '~/types/read-model'
 import { computed, nextTick, onActivated, shallowRef, watch } from 'vue'
+import CustomerDetailOverview from '~/components/master-data/CustomerDetailOverview.vue'
+import CustomerDetailRelations from '~/components/master-data/CustomerDetailRelations.vue'
 import EntityStorageActions from '~/components/shared/EntityStorageActions.vue'
 import { useCustomerRelationReturnContext } from '~/composables/useCustomerRelationReturnContext'
 import {

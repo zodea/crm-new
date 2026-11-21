@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { PayrollAConfigRead, PayrollALine, PayrollAPriceDraft, PayrollAPriceRevision, PayrollAPriceScope } from '~/lib/payroll/central-a-contract'
 import { computed, onActivated, onDeactivated, onScopeDispose, ref, shallowRef, watch } from 'vue'
+import PayrollAPriceEditor from '~/components/payroll/PayrollAPriceEditor.vue'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from '~/components/ui/dialog'
 import { toErrorMessage } from '~/lib/util/error'
 

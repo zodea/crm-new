@@ -2,6 +2,8 @@
 import type { usePayrollAFeesConfig } from '~/composables/usePayrollAFeesConfig'
 import type { PayrollAPeriodKind } from '~/lib/payroll/central-a-contract'
 import { computed, nextTick, onActivated, onDeactivated, onScopeDispose, shallowRef, watch } from 'vue'
+import PayrollACommandState from '~/components/payroll/PayrollACommandState.vue'
+import PayrollReadHistory from '~/components/payroll/PayrollReadHistory.vue'
 import { payrollAmount } from '~/lib/payroll/read-presentation'
 import PayrollAFeeEditor from './PayrollAFeeEditor.vue'
 import PayrollAManagementBookEditor from './PayrollAManagementBookEditor.vue'

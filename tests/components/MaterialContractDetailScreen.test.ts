@@ -69,7 +69,7 @@ const tabs = defineComponent({
   template: '<div><button v-for="tab in tabs" :key="tab.key" role="tab" @click="$emit(\'update:modelValue\', tab.key)">{{ tab.label }}</button></div>',
 })
 const common = {
-  global: { components: {
+  global: { stubs: {
     EntityDetailShell: defineComponent({
       props: ['title', 'state', 'stateDescription'],
       template: '<div><h2>{{ title }}</h2><slot name="status"/><slot name="actions"/><slot name="summary"/><slot v-if="state === \'ready\'"/><div v-else role="alert">{{ stateDescription }}</div></div>',

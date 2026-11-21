@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WorkerRosterMemberTable from '~/components/worker/WorkerRosterMemberTable.vue'
 import { useWorkerRosterArchive } from '~/composables/useWorkerRosterArchive'
 
 const ui = useWorkerRosterArchive()

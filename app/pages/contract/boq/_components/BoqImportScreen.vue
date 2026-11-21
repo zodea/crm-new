@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { BoqFormatClass, BoqImportRow } from '~/lib/boq/import'
 import type { BoqOriginalInput } from '~/lib/boq/production-contract'
+import ProjectSwitcher from '~/components/project/ProjectSwitcher.vue'
 import { readBoqSourceImportRecoveryForRoute } from '~/lib/boq/command-recovery'
 import { toErrorMessage } from '~/lib/util/error'
 import BoqImportWizard from './BoqImportWizard.vue'

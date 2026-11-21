@@ -4,6 +4,8 @@ import type { HomeProjectReference, HomeProjectScheduleRead } from '~/lib/home/p
 import type { ScheduleTaskView } from '~/lib/schedule/read-model'
 import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, shallowRef, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
+import HomeDashboardSurface from '~/components/home/HomeDashboardSurface.vue'
+import ProjectSwitcher from '~/components/project/ProjectSwitcher.vue'
 import { summarizeHomeScheduleCoverage } from '~/lib/home/dashboard'
 import { projectProblemFromUnknown } from '~/lib/project/repository'
 import { buildQuantityDrillLocation, scheduleFilterQuery, scheduleReturnContextQuery } from '~/lib/schedule/navigation'

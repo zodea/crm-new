@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { DataOriginDTO } from '~/types/read-model'
 import { computed } from 'vue'
+import QuantityHollowCommandRecovery from '~/components/quantity/QuantityHollowCommandRecovery.vue'
 import KitButton from '~/components/ui/KitButton.vue'
 import SectionHeader from '~/components/ui/SectionHeader.vue'
 import { useQuantityHollowRead } from '~/composables/useQuantityHollowRead'

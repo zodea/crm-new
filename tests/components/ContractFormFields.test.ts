@@ -75,6 +75,7 @@ function mountFields(
         SelectFilter,
         SectionHeader,
       },
+      stubs: { ContractSignatoryField: true },
     },
   })
 }
@@ -194,7 +195,8 @@ describe('contractFormFields lookup data flow', () => {
         fetchOtherExpenseContracts: fetchLookup,
       },
       global: {
-        components: { LookupSelect, SelectFilter, SectionHeader },
+        components: { LookupSelect, NuxtLink, SelectFilter, SectionHeader },
+        stubs: { ContractSignatoryField: true },
       },
     })
 

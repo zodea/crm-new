@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ProjectSupplierFileDTO } from '~/lib/project-supplier/repository'
 import { computed, shallowRef } from 'vue'
+import ProjectSupplierSourceLink from '~/components/project-supplier/ProjectSupplierSourceLink.vue'
 import { formatFileSize } from '~/lib/util/file'
 
 const props = defineProps<{

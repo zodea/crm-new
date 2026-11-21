@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, shallowRef } from 'vue'
+import PayrollACommandState from '~/components/payroll/PayrollACommandState.vue'
+import PayrollC1RateEditor from '~/components/payroll/PayrollC1RateEditor.vue'
 import LookupSelect from '~/components/ui/LookupSelect.vue'
 import { usePayrollC1Config } from '~/composables/usePayrollC1Config'
 import PayrollHollowConfigSection from './PayrollHollowConfigSection.vue'

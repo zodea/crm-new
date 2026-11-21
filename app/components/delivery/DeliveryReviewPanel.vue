@@ -3,6 +3,8 @@ import type { DeepReadonly } from 'vue'
 import type { ProjectMatchCandidate, SupplierMatch, SupplierMatchCandidate } from '~/lib/delivery/match'
 import type { DeliveryAmountSummary, DeliveryReviewIssue } from '~/lib/delivery/review'
 import type { DeliveryDoc, DeliveryFile, DeliveryItem, DeliveryReviewInput } from '~/stores/delivery'
+import DeliveryDocumentFields from '~/components/delivery/DeliveryDocumentFields.vue'
+import DeliveryItemsEditor from '~/components/delivery/DeliveryItemsEditor.vue'
 
 type DraftPatch = Partial<Omit<DeliveryReviewInput, 'items'>>
 type ItemTextPatch = Partial<Pick<DeliveryItem, 'name' | 'spec' | 'unit' | 'note'>>

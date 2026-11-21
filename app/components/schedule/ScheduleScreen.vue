@@ -1,5 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import ProjectSwitcher from '~/components/project/ProjectSwitcher.vue'
+import ScheduleBoard from '~/components/schedule/ScheduleBoard.vue'
+import ScheduleDependencyDialog from '~/components/schedule/ScheduleDependencyDialog.vue'
+import ScheduleHistoryPanel from '~/components/schedule/ScheduleHistoryPanel.vue'
+import ScheduleTaskDialog from '~/components/schedule/ScheduleTaskDialog.vue'
 import { Button } from '~/components/ui/button'
 import ContextHelp from '~/components/ui/ContextHelp.vue'
 import { useScheduleWorkspace } from '~/composables/useScheduleWorkspace'

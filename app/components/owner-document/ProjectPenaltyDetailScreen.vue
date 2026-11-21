@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import type { DataOriginDTO, NavigationIntentDTO } from '~/types/read-model'
+import ProjectPenaltyActionDialog from '~/components/owner-document/ProjectPenaltyActionDialog.vue'
+import ProjectPenaltyHistory from '~/components/owner-document/ProjectPenaltyHistory.vue'
 import { useProjectPenaltyDetail } from '~/composables/useProjectPenaltyDetail'
 import { yuan } from '~/lib/util/money'
 
