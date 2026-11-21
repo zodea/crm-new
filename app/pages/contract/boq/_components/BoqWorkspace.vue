@@ -12,6 +12,10 @@ import { createBoqWorkbookExport, createMonthlyStatementExport } from '~/lib/boq
 import { quantityBasisLabel } from '~/lib/quantity/basis'
 import { toErrorMessage } from '~/lib/util/error'
 import { yuan } from '~/lib/util/money'
+import BoqCatalogTree from './BoqCatalogTree.vue'
+import BoqChangeWorkspace from './BoqChangeWorkspace.vue'
+import BoqLinesTable from './BoqLinesTable.vue'
+import BoqMonthlyWorkspace from './BoqMonthlyWorkspace.vue'
 
 type BoqTab = 'lines' | 'changes' | 'monthly'
 

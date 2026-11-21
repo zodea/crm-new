@@ -3,7 +3,7 @@ import type { BoqWorkspace } from '~/lib/boq/read-model'
 import { fireEvent, render, screen } from '@testing-library/vue'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h } from 'vue'
-import BoqMonthlyWorkspace from '~/components/boq/BoqMonthlyWorkspace.vue'
+import BoqMonthlyWorkspace from '~/pages/contract/boq/_components/BoqMonthlyWorkspace.vue'
 
 const statement: MonthlyStatementView = {
   id: 'statement-1',

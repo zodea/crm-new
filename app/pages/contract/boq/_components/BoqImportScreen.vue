@@ -3,6 +3,8 @@ import type { BoqFormatClass, BoqImportRow } from '~/lib/boq/import'
 import type { BoqOriginalInput } from '~/lib/boq/production-contract'
 import { readBoqSourceImportRecoveryForRoute } from '~/lib/boq/command-recovery'
 import { toErrorMessage } from '~/lib/util/error'
+import BoqImportWizard from './BoqImportWizard.vue'
+import BoqSourceImport from './BoqSourceImport.vue'
 
 const route = useRoute()
 const router = useRouter()

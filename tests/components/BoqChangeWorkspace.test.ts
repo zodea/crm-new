@@ -2,8 +2,8 @@ import type { BoqChangeOrderView, BoqWorkspace } from '~/lib/boq/read-model'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/vue'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { computed, defineComponent, h, shallowRef } from 'vue'
-import BoqChangeWorkspace from '~/components/boq/BoqChangeWorkspace.vue'
 import RowActionMenu from '~/components/ui/RowActionMenu.vue'
+import BoqChangeWorkspace from '~/pages/contract/boq/_components/BoqChangeWorkspace.vue'
 
 vi.mock('@vueuse/core', async importOriginal => ({
   ...await importOriginal<typeof import('@vueuse/core')>(),
