@@ -15,7 +15,7 @@ const view = defineModel<'table' | 'card'>('view', { required: true })
 </script>
 
 <template>
-  <section class="panel flex flex-wrap items-center gap-3 p-3.5">
+  <section class="flex min-w-0 flex-wrap items-center gap-3">
     <div class="mr-1 flex flex-none items-baseline gap-2">
       <h2 class="text-14px font-800 text-ink">
         发票台账
@@ -26,7 +26,7 @@ const view = defineModel<'table' | 'card'>('view', { required: true })
       </span>
     </div>
 
-    <div class="ml-auto flex flex-wrap items-center gap-2.5">
+    <div class="ml-auto flex min-w-0 flex-wrap items-center gap-2.5">
       <button type="button" class="btn-secondary" @click="emit('import')">
         <span class="i-lucide-file-input mr-1 text-13px" aria-hidden="true" />
         导入 Excel

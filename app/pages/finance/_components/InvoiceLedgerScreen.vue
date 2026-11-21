@@ -12,6 +12,8 @@ import type { Invoice } from '~/stores/invoice'
 import InvoiceExportPreview from '~/components/invoice/InvoiceExportPreview.vue'
 import InvoicePreviewSvg from '~/components/invoice/InvoicePreviewSvg.vue'
 import InvoicePrintLayout from '~/components/invoice/InvoicePrintLayout.vue'
+import KitStatusTag from '~/components/ui/KitStatusTag.vue'
+import ListShell from '~/components/ui/ListShell.vue'
 import { createInvoiceLedgerXlsxFromRows, INVOICE_XLSX_MIME, invoiceLedgerRows, invoiceLedgerTotal } from '~/lib/invoice/excel'
 import { ledgerNodeFromQuery, projectGroupKeyFromNode, projectTreeNodeKey } from '~/lib/invoice/ledger-nodes'
 import { checkPrintableInvoice } from '~/lib/invoice/print-layout'
@@ -358,139 +360,150 @@ onMounted(() => {
     />
 
     <template v-else>
-      <InvoiceLedgerToolbar
-        v-model:search="searchText"
-        v-model:view="view"
-        :total="allRows.length"
-        :visible="tableFilteredRows.length"
-        @import="openImport"
-        @print="openPrint"
-        @export="openExportPreview"
-      />
+      <ListShell continuous data-testid="invoice-ledger-list">
+        <template #toolbar>
+          <InvoiceLedgerToolbar
+            v-model:search="searchText"
+            v-model:view="view"
+            :total="allRows.length"
+            :visible="tableFilteredRows.length"
+            @import="openImport"
+            @print="openPrint"
+            @export="openExportPreview"
+          />
+        </template>
 
-      <!-- 左树右表 -->
-      <div class="grid grid-cols-1 items-start gap-3.5 md:grid-cols-[220px_minmax(0,1fr)]">
-        <TreeNav v-model="node" title="按归属" :items="treeItems" />
+        <template #table>
+          <div class="grid grid-cols-1 items-start md:grid-cols-[220px_minmax(0,1fr)]">
+            <div class="min-w-0 p-2">
+              <TreeNav v-model="node" title="按归属" :items="treeItems" />
+            </div>
 
-        <div class="min-w-0 flex flex-col">
-          <!-- 表格视图 -->
-          <KitTable
-            v-if="view === 'table'"
-            ref="tableEl"
-            :columns="columns"
-            :data="rows"
-            :loading="store.loading"
-            empty="该归属下暂无发票。"
-            @checkbox-change="(list: Invoice[]) => checkedRows = list"
-            @filter-change="onLedgerFilterChange"
-          >
-            <template #number="{ row }">
-              <button
-                type="button"
-                class="border-0 bg-transparent p-0 font-mono text-13px font-700 text-brand cursor-pointer hover:text-brand-deep"
-                title="编辑（开页签）"
-                @click="openEdit(row)"
+            <div class="min-w-0 flex flex-col">
+              <!-- 表格视图 -->
+              <KitTable
+                v-if="view === 'table'"
+                ref="tableEl"
+                :columns="columns"
+                :data="rows"
+                :loading="store.loading"
+                empty="该归属下暂无发票。"
+                @checkbox-change="(list: Invoice[]) => checkedRows = list"
+                @filter-change="onLedgerFilterChange"
               >
-                {{ tail8(row.invoiceNumber) }}
-              </button>
-            </template>
-            <template #type="{ row }">
-              <span class="text-ink-soft">{{ typeShort(row.invoiceType) }}</span>
-            </template>
-            <template #source="{ row }">
-              <span :class="row.source === 'scan' ? 'chip-brand' : 'chip bg-surface-3 text-ink-soft'">
-                {{ row.source === 'scan' ? '扫描' : '导入' }}
-              </span>
-            </template>
-            <template #seller="{ row }">
-              <EntityLink :id="supplierIdByName.get(row.seller)" type="supplier" :label="row.seller" />
-            </template>
-            <template #owner="{ row }">
-              <span v-if="row.ownerKind === 'personal'" class="text-brand-deep">个人开支</span>
-              <EntityLink v-else-if="row.projectName" :id="row.projectId" type="project" :label="row.projectName" />
-              <span v-else class="chip-warn">待归档</span>
-            </template>
-            <template #print="{ row }">
-              <span v-if="row.printCount > 0" class="chip-ok">{{ row.printCount }} 次</span>
-              <span v-else class="chip-warn">未打印</span>
-            </template>
-            <template #action="{ row }">
-              <div class="flex items-center gap-1">
-                <button v-if="row.accountStatus === 'none'" class="icon-btn" title="归档" @click="archiveFlow(row)">
-                  <span class="i-lucide-archive text-14px" aria-hidden="true" />
-                </button>
-                <button class="icon-btn" title="编辑（开页签）" @click="openEdit(row)">
-                  <span class="i-lucide-square-pen text-14px" aria-hidden="true" />
-                </button>
-                <button class="icon-btn-danger" title="删除" @click="del(row)">
-                  <span class="i-lucide-trash-2 text-14px" aria-hidden="true" />
-                </button>
-              </div>
-            </template>
-          </KitTable>
-
-          <!-- 卡片视图（发票预览大图，快速删除） -->
-          <div v-else class="panel p-3.5">
-            <div class="grid grid-cols-1 gap-3 lg:grid-cols-3 sm:grid-cols-2">
-              <div
-                v-for="inv in rows"
-                :key="inv.id"
-                class="panel panel-hover flex flex-col overflow-hidden"
-              >
-                <div
-                  class="grid cursor-pointer place-items-center border-b border-line bg-surface-2 p-2.5"
-                  @click="openEdit(inv)"
-                >
-                  <div class="w-4/5">
-                    <InvoicePreviewSvg :invoice="inv" />
-                  </div>
-                </div>
-                <div class="flex flex-col gap-1.5 p-3">
-                  <div class="flex items-center justify-between gap-1.5">
-                    <button
-                      type="button"
-                      class="border-0 bg-transparent p-0 font-mono text-14px font-800 text-brand cursor-pointer"
-                      @click="openEdit(inv)"
-                    >
-                      {{ tail8(inv.invoiceNumber) }}
+                <template #number="{ row }">
+                  <button
+                    type="button"
+                    class="border-0 bg-transparent p-0 font-mono text-13px font-700 text-brand cursor-pointer hover:text-brand-deep"
+                    title="编辑（开页签）"
+                    @click="openEdit(row)"
+                  >
+                    {{ tail8(row.invoiceNumber) }}
+                  </button>
+                </template>
+                <template #type="{ row }">
+                  <span class="text-ink-soft">{{ typeShort(row.invoiceType) }}</span>
+                </template>
+                <template #source="{ row }">
+                  <KitStatusTag :tone="row.source === 'scan' ? 'brand' : 'neutral'">
+                    {{ row.source === 'scan' ? '扫描' : '导入' }}
+                  </KitStatusTag>
+                </template>
+                <template #seller="{ row }">
+                  <EntityLink :id="supplierIdByName.get(row.seller)" type="supplier" :label="row.seller" />
+                </template>
+                <template #owner="{ row }">
+                  <span v-if="row.ownerKind === 'personal'" class="text-brand-deep">个人开支</span>
+                  <EntityLink v-else-if="row.projectName" :id="row.projectId" type="project" :label="row.projectName" />
+                  <KitStatusTag v-else tone="warn">
+                    待归档
+                  </KitStatusTag>
+                </template>
+                <template #print="{ row }">
+                  <KitStatusTag :tone="row.printCount > 0 ? 'ok' : 'warn'">
+                    {{ row.printCount > 0 ? `${row.printCount} 次` : '未打印' }}
+                  </KitStatusTag>
+                </template>
+                <template #action="{ row }">
+                  <div class="flex items-center gap-1">
+                    <button v-if="row.accountStatus === 'none'" class="icon-btn" title="归档" @click="archiveFlow(row)">
+                      <span class="i-lucide-archive text-14px" aria-hidden="true" />
                     </button>
-                    <span class="font-mono text-15px font-800">{{ yuan(inv.totalAmount) }}</span>
-                  </div>
-                  <div class="truncate text-12px text-ink-soft">
-                    {{ inv.seller }}
-                  </div>
-                  <div class="flex flex-wrap items-center gap-1.5">
-                    <span v-if="inv.ownerKind === 'personal'" class="chip-brand">个人开支</span>
-                    <span v-else-if="inv.projectName" class="chip bg-surface-3 text-ink-soft">{{ inv.projectName }}</span>
-                    <span v-else class="chip-warn">待归档</span>
-                    <span class="font-mono text-11px text-ink-faint">{{ inv.invoiceDate }}</span>
-                  </div>
-                  <div class="mt-0.5 flex items-center gap-1.5">
-                    <button class="btn-secondary text-12px" @click="openEdit(inv)">
-                      <span class="i-lucide-square-pen mr-1 text-12px" aria-hidden="true" />编辑
+                    <button class="icon-btn" title="编辑（开页签）" @click="openEdit(row)">
+                      <span class="i-lucide-square-pen text-14px" aria-hidden="true" />
                     </button>
-                    <button class="icon-btn-danger" title="删除" @click="del(inv)">
+                    <button class="icon-btn-danger" title="删除" @click="del(row)">
                       <span class="i-lucide-trash-2 text-14px" aria-hidden="true" />
                     </button>
                   </div>
+                </template>
+              </KitTable>
+
+              <!-- 卡片视图（发票预览大图，快速删除） -->
+              <div v-else class="min-w-0 p-3.5">
+                <div class="grid grid-cols-1 gap-3 lg:grid-cols-3 sm:grid-cols-2">
+                  <div
+                    v-for="inv in rows"
+                    :key="inv.id"
+                    class="panel panel-hover flex flex-col overflow-hidden"
+                  >
+                    <div
+                      class="grid cursor-pointer place-items-center border-b border-line bg-surface-2 p-2.5"
+                      @click="openEdit(inv)"
+                    >
+                      <div class="w-4/5">
+                        <InvoicePreviewSvg :invoice="inv" />
+                      </div>
+                    </div>
+                    <div class="flex flex-col gap-1.5 p-3">
+                      <div class="flex items-center justify-between gap-1.5">
+                        <button
+                          type="button"
+                          class="border-0 bg-transparent p-0 font-mono text-14px font-800 text-brand cursor-pointer"
+                          @click="openEdit(inv)"
+                        >
+                          {{ tail8(inv.invoiceNumber) }}
+                        </button>
+                        <span class="font-mono text-15px font-800">{{ yuan(inv.totalAmount) }}</span>
+                      </div>
+                      <div class="truncate text-12px text-ink-soft">
+                        {{ inv.seller }}
+                      </div>
+                      <div class="flex flex-wrap items-center gap-1.5">
+                        <span v-if="inv.ownerKind === 'personal'" class="chip-brand">个人开支</span>
+                        <span v-else-if="inv.projectName" class="chip bg-surface-3 text-ink-soft">{{ inv.projectName }}</span>
+                        <KitStatusTag v-else tone="warn">
+                          待归档
+                        </KitStatusTag>
+                        <span class="font-mono text-11px text-ink-faint">{{ inv.invoiceDate }}</span>
+                      </div>
+                      <div class="mt-0.5 flex items-center gap-1.5">
+                        <button class="btn-secondary text-12px" @click="openEdit(inv)">
+                          <span class="i-lucide-square-pen mr-1 text-12px" aria-hidden="true" />编辑
+                        </button>
+                        <button class="icon-btn-danger" title="删除" @click="del(inv)">
+                          <span class="i-lucide-trash-2 text-14px" aria-hidden="true" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <div v-if="rows.length === 0" class="col-span-full py-8 text-center text-ink-soft">
+                    该归属下暂无发票。
+                  </div>
                 </div>
-              </div>
-              <div v-if="rows.length === 0" class="col-span-full py-8 text-center text-ink-soft">
-                该归属下暂无发票。
               </div>
             </div>
           </div>
+        </template>
 
-          <!-- 底部：勾选才浮出合计（无常驻汇总） -->
-          <div class="mt-2 flex flex-wrap items-center justify-between gap-2.5 border border-line rounded-[var(--radius-card)] bg-surface-2 px-4 py-2.5 text-13px text-ink-soft shadow-[var(--shadow-card)]">
-            <span v-if="checkedRows.length > 0" class="rounded-full bg-brand-soft px-2.5 py-0.5 text-brand-deep">
-              已选 <b class="font-mono">{{ checkedRows.length }}</b> 张 · 合计 <b class="font-mono">{{ yuan(checkedTotal) }}</b>
-            </span>
-            <span v-else class="text-ink-faint">勾选发票后显示合计</span>
-            <span class="text-12px">共 {{ rows.length }} 条</span>
-          </div>
-        </div>
-      </div>
+        <template #summary>
+          <span v-if="checkedRows.length > 0">
+            已选 <b class="font-mono">{{ checkedRows.length }}</b> 张 · 合计 <b class="font-mono">{{ yuan(checkedTotal) }}</b>
+          </span>
+          <span v-else class="text-ink-faint">勾选发票后显示合计</span>
+          <span class="ml-auto">共 {{ rows.length }} 条</span>
+        </template>
+      </ListShell>
 
       <InvoiceExportPreview
         v-model:open="exportPreviewOpen"
