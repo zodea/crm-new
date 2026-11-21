@@ -181,14 +181,17 @@ describe('送货单归档库导出', () => {
     await screen.findByText('中央项目')
     await fireEvent.click(screen.getByRole('button', { name: '筛选中央分供方' }))
     expect(screen.getByRole('link', { name: 'SH-001' }).getAttribute('href')).toBe('/material/delivery/archive/d%3A1?origin=real')
+    expect(screen.getByRole('status', { name: '列表汇总' }).textContent).toContain('金额合计')
     central.load.mockRejectedValueOnce(new Error('关联权限已撤销'))
     await fireEvent.click(screen.getByRole('button', { name: '刷新' }))
     await screen.findByRole('alert')
+    expect(screen.queryByRole('status', { name: '列表汇总' })).toBeNull()
     expect(screen.queryByText('SH-001')).toBeNull()
     expect(screen.queryByRole('link', { name: /新增送货单/ })).toBeNull()
     expect(screen.getByRole('button', { name: '导出原件包' }).hasAttribute('disabled')).toBe(true)
     await fireEvent.click(screen.getByRole('button', { name: '重新读取' }))
     await screen.findByText('SH-001')
+    expect(screen.getByRole('status', { name: '列表汇总' }).textContent).toContain('金额合计')
   })
 
   it('等待目录选择时切换来源，取消当前导出且不再读取迟到原件', async () => {

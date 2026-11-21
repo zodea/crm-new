@@ -4,6 +4,8 @@ import type { TreeNode } from '~/lib/kit/tree-nav'
 import type { MaterialContractInput } from '~/lib/material/price-analysis'
 import type { DeliveryRecord } from '~/stores/delivery-record'
 import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, shallowRef, watch } from 'vue'
+import KitStatusTag from '~/components/ui/KitStatusTag.vue'
+import ListShell from '~/components/ui/ListShell.vue'
 import { readDeliveryMaterialContracts } from '~/lib/delivery-record/material-contracts'
 import { createDeliveryArchiveZip, DELIVERY_ZIP_MIME } from '~/lib/delivery/export'
 import { clampPage, paginate } from '~/lib/kit/table'
@@ -312,145 +314,156 @@ watch(() => store.origin, () => {
 </script>
 
 <template>
-  <div class="delivery-archive-screen flex min-w-0 flex-col gap-4">
-    <div class="delivery-archive__toolbar panel flex items-center gap-3 px-4 py-3">
-      <div class="min-w-0">
-        <div class="text-16px font-800 text-ink">
-          送货单归档库
+  <ListShell continuous class="delivery-archive-screen" data-testid="delivery-archive-list">
+    <template #toolbar>
+      <div class="delivery-archive__toolbar flex min-w-0 flex-wrap items-center gap-3">
+        <div class="min-w-0">
+          <div class="text-16px font-800 text-ink">
+            送货单归档库
+          </div>
+          <div class="mt-0.5 text-12px text-ink-faint">
+            手工录入 · 项目 → 分供方 · 详情与材料明细
+          </div>
         </div>
-        <div class="mt-0.5 text-12px text-ink-faint">
-          手工录入 · 项目 → 分供方 · 详情与材料明细
+        <div class="delivery-archive__actions ml-auto flex min-w-0 flex-wrap items-center justify-end gap-3">
+          <SearchInput
+            v-model="search"
+            class="delivery-archive__search max-w-full"
+            placeholder="搜索单号、项目、分供方、材料"
+            :width="288"
+          />
+          <label class="inline-flex items-center gap-1.5 text-11px text-ink-soft">
+            <span>从</span>
+            <input v-model="dateFrom" type="date" class="field-input h-8 text-11px" aria-label="开始日期">
+          </label>
+          <label class="inline-flex items-center gap-1.5 text-11px text-ink-soft">
+            <span>至</span>
+            <input v-model="dateTo" type="date" class="field-input h-8 text-11px" aria-label="结束日期">
+          </label>
+          <button class="btn-secondary" :disabled="reading || store.loading" @click="refresh">
+            <span class="i-lucide-refresh-cw mr-1 text-13px" /> 刷新
+          </button>
+          <label class="inline-flex items-center gap-1.5 text-11px text-ink-soft" title="勾选后另行生成仅含图片原件的 PDF；PDF 原件始终整份原样保留，不参与当前图片合并">
+            <input v-model="convertImagesToPdf" type="checkbox">
+            <span>图片另生成 PDF</span>
+          </label>
+          <button class="btn-secondary" :disabled="!ready || store.loading || exportingArchive || !filtered.length" @click="exportArchive">
+            <span class="i-lucide-file-archive mr-1 text-13px" /> {{ exportingArchive ? '正在生成…' : '导出原件包' }}
+          </button>
+          <KitButton v-if="exportingArchive" variant="secondary" @click="cancelExport">
+            取消导出
+          </KitButton>
+          <NuxtLink v-if="canWrite" :to="entityPath('/material/delivery/archive/form')" class="btn-accent">
+            <span class="i-lucide-plus mr-1 text-13px" /> 新增送货单
+          </NuxtLink>
         </div>
       </div>
-      <div class="delivery-archive__actions ml-auto flex min-w-0 flex-wrap items-center justify-end gap-3">
-        <SearchInput
-          v-model="search"
-          class="delivery-archive__search max-w-full"
-          placeholder="搜索单号、项目、分供方、材料"
-          :width="288"
-        />
-        <label class="inline-flex items-center gap-1.5 text-11px text-ink-soft">
-          <span>从</span>
-          <input v-model="dateFrom" type="date" class="field-input h-8 text-11px" aria-label="开始日期">
-        </label>
-        <label class="inline-flex items-center gap-1.5 text-11px text-ink-soft">
-          <span>至</span>
-          <input v-model="dateTo" type="date" class="field-input h-8 text-11px" aria-label="结束日期">
-        </label>
-        <button class="btn-secondary" :disabled="reading || store.loading" @click="refresh">
-          <span class="i-lucide-refresh-cw mr-1 text-13px" /> 刷新
-        </button>
-        <label class="inline-flex items-center gap-1.5 text-11px text-ink-soft" title="勾选后另行生成仅含图片原件的 PDF；PDF 原件始终整份原样保留，不参与当前图片合并">
-          <input v-model="convertImagesToPdf" type="checkbox">
-          <span>图片另生成 PDF</span>
-        </label>
-        <button class="btn-secondary" :disabled="!ready || store.loading || exportingArchive || !filtered.length" @click="exportArchive">
-          <span class="i-lucide-file-archive mr-1 text-13px" /> {{ exportingArchive ? '正在生成…' : '导出原件包' }}
-        </button>
-        <KitButton v-if="exportingArchive" variant="secondary" @click="cancelExport">
-          取消导出
-        </KitButton>
-        <NuxtLink v-if="canWrite" :to="entityPath('/material/delivery/archive/form')" class="btn-accent">
-          <span class="i-lucide-plus mr-1 text-13px" /> 新增送货单
-        </NuxtLink>
-      </div>
-    </div>
+    </template>
 
-    <div v-if="readError" role="alert" class="panel flex flex-wrap items-center gap-3 p-4 text-danger">
-      <span>{{ readError }}</span>
-      <KitButton variant="secondary" @click="refresh">
-        重新读取
-      </KitButton>
-    </div>
-    <div v-if="ready && contractReadError" role="status" class="panel flex flex-wrap items-center gap-3 p-4 text-warn">
-      <span>{{ contractReadError }}。分供方暂按名称排序。</span>
-      <KitButton variant="secondary" @click="refresh">
-        重新读取合同日期
-      </KitButton>
-    </div>
-
-    <div class="delivery-archive__layout flex items-start gap-3">
+    <template #filters>
       <ArchiveScopePicker v-model="selectedNode" class="delivery-archive__mobile-scope" :items="treeItems" />
+    </template>
 
-      <div class="delivery-archive__desktop-tree w-64 shrink-0">
-        <TreeNav v-model="selectedNode" title="归档库 · 项目 → 分供方" :items="treeItems" />
+    <template #table>
+      <div v-if="readError" role="alert" class="flex flex-wrap items-center gap-3 px-3 py-2 text-danger">
+        <span>{{ readError }}</span>
+        <KitButton variant="secondary" @click="refresh">
+          重新读取
+        </KitButton>
+      </div>
+      <div v-if="ready && contractReadError" role="status" class="flex flex-wrap items-center gap-3 px-3 py-2 text-warn">
+        <span>{{ contractReadError }}。分供方暂按名称排序。</span>
+        <KitButton variant="secondary" @click="refresh">
+          重新读取合同日期
+        </KitButton>
       </div>
 
-      <div class="min-w-0 flex-1">
-        <KitTable
-          data-testid="delivery-archive-table"
-          :columns="columns"
-          :data="pageRows"
-          :loading="reading || store.loading"
-          :page="{ page: currentPage, pageSize, total: filtered.length }"
-          empty="当前节点暂无送货单"
-          @page-change="onPageChange"
-        >
-          <template #orderNo="{ row }">
-            <NuxtLink :to="entityPath('/material/delivery/archive', row.id)" class="cell--link font-mono">
-              {{ row.orderNo || '未编号送货单' }}
-            </NuxtLink>
-          </template>
-          <template #project="{ row }">
-            <NuxtLink :to="entityPath('/project', row.projectId)" class="cell--link">
-              {{ projectName(row.projectId) }}
-            </NuxtLink>
-          </template>
-          <template #supplier="{ row }">
-            <NuxtLink v-if="row.supplierId" :to="entityPath('/base/supplier', row.supplierId)" class="cell--link">
-              {{ supplierName(row.supplierId) }}
-            </NuxtLink>
-            <span v-else class="chip-warn">未区分分供方</span>
-          </template>
-          <template #materials="{ row }">
-            <span :title="row.lines.map(line => `${line.materialName} ${line.spec}`).join('、')">
-              {{ materialSummary(row) }}
-            </span>
-          </template>
-          <template #source="{ row }">
-            <span v-if="row.hasSourceFile" class="chip-ok">可核对</span>
-            <span v-else class="chip-danger">缺原件</span>
-          </template>
-          <template #action="{ row }">
-            <div class="flex items-center gap-1">
-              <NuxtLink
-                :to="entityPath('/material/delivery/archive', row.id)"
-                class="icon-btn"
-                title="详情"
-                :aria-label="`查看送货单 ${row.orderNo || row.id}`"
-              >
-                <span class="i-lucide-file-text text-14px" />
-              </NuxtLink>
-              <NuxtLink
-                v-if="canWrite"
-                :to="entityPath('/material/delivery/archive/form', row.id)"
-                class="icon-btn"
-                title="编辑"
-                :aria-label="`编辑送货单 ${row.orderNo || row.id}`"
-              >
-                <span class="i-lucide-square-pen text-14px" />
-              </NuxtLink>
-              <button
-                v-if="canWrite"
-                :disabled="!!deleting"
-                class="icon-btn-danger"
-                title="删除"
-                :aria-label="`删除送货单 ${row.orderNo || row.id}`"
-                @click="handleDelete(row)"
-              >
-                <span class="i-lucide-trash-2 text-14px" />
-              </button>
-            </div>
-          </template>
-        </KitTable>
+      <div class="delivery-archive__layout flex items-start">
+        <div class="delivery-archive__desktop-tree w-64 shrink-0 p-2">
+          <TreeNav v-model="selectedNode" title="归档库 · 项目 → 分供方" :items="treeItems" />
+        </div>
 
-        <div class="mt-2 flex flex-wrap items-center justify-end gap-x-6 gap-y-2 rounded-[var(--radius-card)] bg-surface-2 px-4 py-2 text-12px text-ink-soft">
-          <span>当前筛选：<b class="font-mono text-ink">{{ filtered.length }}</b> 份</span>
-          <span>金额合计：<b class="font-mono text-ink">{{ yuan(totalAmount) }}</b></span>
+        <div class="min-w-0 flex-1">
+          <KitTable
+            data-testid="delivery-archive-table"
+            :columns="columns"
+            :data="pageRows"
+            :loading="reading || store.loading"
+            :page="{ page: currentPage, pageSize, total: filtered.length }"
+            empty="当前节点暂无送货单"
+            @page-change="onPageChange"
+          >
+            <template #orderNo="{ row }">
+              <NuxtLink :to="entityPath('/material/delivery/archive', row.id)" class="cell--link font-mono">
+                {{ row.orderNo || '未编号送货单' }}
+              </NuxtLink>
+            </template>
+            <template #project="{ row }">
+              <NuxtLink :to="entityPath('/project', row.projectId)" class="cell--link">
+                {{ projectName(row.projectId) }}
+              </NuxtLink>
+            </template>
+            <template #supplier="{ row }">
+              <NuxtLink v-if="row.supplierId" :to="entityPath('/base/supplier', row.supplierId)" class="cell--link">
+                {{ supplierName(row.supplierId) }}
+              </NuxtLink>
+              <KitStatusTag v-else tone="warn">
+                未区分分供方
+              </KitStatusTag>
+            </template>
+            <template #materials="{ row }">
+              <span :title="row.lines.map(line => `${line.materialName} ${line.spec}`).join('、')">
+                {{ materialSummary(row) }}
+              </span>
+            </template>
+            <template #source="{ row }">
+              <KitStatusTag :tone="row.hasSourceFile ? 'ok' : 'danger'">
+                {{ row.hasSourceFile ? '可核对' : '缺原件' }}
+              </KitStatusTag>
+            </template>
+            <template #action="{ row }">
+              <div class="flex items-center gap-1">
+                <NuxtLink
+                  :to="entityPath('/material/delivery/archive', row.id)"
+                  class="icon-btn"
+                  title="详情"
+                  :aria-label="`查看送货单 ${row.orderNo || row.id}`"
+                >
+                  <span class="i-lucide-file-text text-14px" />
+                </NuxtLink>
+                <NuxtLink
+                  v-if="canWrite"
+                  :to="entityPath('/material/delivery/archive/form', row.id)"
+                  class="icon-btn"
+                  title="编辑"
+                  :aria-label="`编辑送货单 ${row.orderNo || row.id}`"
+                >
+                  <span class="i-lucide-square-pen text-14px" />
+                </NuxtLink>
+                <button
+                  v-if="canWrite"
+                  :disabled="!!deleting"
+                  class="icon-btn-danger"
+                  title="删除"
+                  :aria-label="`删除送货单 ${row.orderNo || row.id}`"
+                  @click="handleDelete(row)"
+                >
+                  <span class="i-lucide-trash-2 text-14px" />
+                </button>
+              </div>
+            </template>
+          </KitTable>
         </div>
       </div>
-    </div>
-  </div>
+    </template>
+
+    <template v-if="ready" #summary>
+      <div class="ml-auto flex flex-wrap justify-end gap-x-6 gap-y-1">
+        <span>当前筛选：<b class="font-mono text-ink">{{ filtered.length }}</b> 份</span>
+        <span>金额合计：<b class="font-mono text-ink">{{ yuan(totalAmount) }}</b></span>
+      </div>
+    </template>
+  </ListShell>
 </template>
 
 <style scoped>
@@ -460,6 +473,12 @@ watch(() => store.origin, () => {
 
 .delivery-archive__mobile-scope {
   display: none;
+}
+
+@container (min-width: 60rem) {
+  .delivery-archive-screen :deep([data-list-shell-filters]) {
+    display: none;
+  }
 }
 
 @container (max-width: 59.999rem) {
@@ -473,7 +492,6 @@ watch(() => store.origin, () => {
 
   .delivery-archive__mobile-scope {
     display: block;
-    margin-bottom: 0.75rem;
   }
 }
 
