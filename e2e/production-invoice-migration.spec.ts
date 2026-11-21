@@ -10,7 +10,7 @@ import { createCrewWorkerProductionFixture } from './helpers/crew-worker-product
 
 test.skip(process.env.CRM_INVOICE_ACCEPTANCE !== '1', '只在明确指定的独立构建和合成数据库中运行')
 
-test('旧发票使用真实项目目录迁入，断线后经独立进程恢复原编号和原件', async ({ page }, info) => {
+test('旧发票使用真实项目目录迁入，断线后经独立进程恢复原编号和原件', { tag: '@migration' }, async ({ page }, info) => {
   test.setTimeout(240_000)
   const entry = process.env.CRM_INVOICE_E2E_ENTRY
   if (!entry)
@@ -91,7 +91,7 @@ test('旧发票使用真实项目目录迁入，断线后经独立进程恢复�
   }
 })
 
-test('旧公司票逐项核对同源合同与主体，断线重启后恢复原提交', async ({ page }, info) => {
+test('旧公司票逐项核对同源合同与主体，断线重启后恢复原提交', { tag: '@migration' }, async ({ page }, info) => {
   test.setTimeout(240_000)
   const entry = process.env.CRM_INVOICE_E2E_ENTRY
   if (!entry)

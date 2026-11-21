@@ -150,18 +150,9 @@
 | --- | --- | --- |
 | [e2e/form-footer.spec.ts](../../../e2e/form-footer.spec.ts) | Playwright E2E | FormFooter 表单保存动作组 |
 | [e2e/issue-110-reference-density.spec.ts](../../../e2e/issue-110-reference-density.spec.ts) | Playwright E2E | Issues #110/#183 reference density and token contract |
-| [e2e/issue-168-overlay-contract.spec.ts](../../../e2e/issue-168-overlay-contract.spec.ts) | Playwright E2E | Issue #168：浮层组合契约扩展底座 |
-| [e2e/issue-170-dialog-layering.spec.ts](../../../e2e/issue-170-dialog-layering.spec.ts) | Playwright E2E | Issue #170：Dialog 子浮层与嵌套确认 |
-| [e2e/issue-171-sheet-project-switcher.spec.ts](../../../e2e/issue-171-sheet-project-switcher.spec.ts) | Playwright E2E | Issue #171：Sheet、通知抽屉与项目切换器 |
-| [e2e/issue-172-overlay-contract.spec.ts](../../../e2e/issue-172-overlay-contract.spec.ts) | Playwright E2E | Issue #172：全局浮层契约收缩 |
+| [e2e/issue-168-overlay-contract.spec.ts](../../../e2e/issue-168-overlay-contract.spec.ts) | Playwright E2E | Issue #168：浮层组合契约扩展底座；Issue #170：Dialog 子浮层与嵌套确认；Issue #171：Sheet、通知抽屉与项目切换器；Issue #172：全局浮层契约收缩 |
 | [e2e/issue-185-page-states.spec.ts](../../../e2e/issue-185-page-states.spec.ts) | Playwright E2E | Issue #185：项目页面状态与恢复旅程 |
-| [e2e/issue-186-detail-shell.spec.ts](../../../e2e/issue-186-detail-shell.spec.ts) | Playwright E2E | Issue #186：统一实体详情壳 |
-| [e2e/issue-187-form-shell.spec.ts](../../../e2e/issue-187-form-shell.spec.ts) | Playwright E2E | Issue #187：统一整页表单壳 |
-| [e2e/kit-button.spec.ts](../../../e2e/kit-button.spec.ts) | Playwright E2E | KitButton 三态原语 |
-| [e2e/kit-table-responsive.spec.ts](../../../e2e/kit-table-responsive.spec.ts) | Playwright E2E | KitTable 公共表格规格 |
-| [e2e/kit-type-select.spec.ts](../../../e2e/kit-type-select.spec.ts) | Playwright E2E | KitUI typeSelect：8 类付款申请、键盘确定与取消返回值 |
-| [e2e/kit-ui-keyboard.spec.ts](../../../e2e/kit-ui-keyboard.spec.ts) | Playwright E2E | KitUI real-browser keyboard contracts |
-| [e2e/kit-shared-primitives-dc.spec.ts](../../../e2e/kit-shared-primitives-dc.spec.ts) | Playwright E2E | DC 真实公共源码、条件函数调用、共享指标、菜单键盘/焦点/局部裁切与五档视口 |
-| [e2e/kit-ui-motion.spec.ts](../../../e2e/kit-ui-motion.spec.ts) | Playwright E2E | KitUI 浮层几何稳定性 |
+| [e2e/kit-table-responsive.spec.ts](../../../e2e/kit-table-responsive.spec.ts) | Playwright E2E | KitTable 公共表格规格；DC 真实公共源码、条件函数调用、共享指标、菜单键盘/焦点/局部裁切与五档视口 |
+| [e2e/kit-ui-keyboard.spec.ts](../../../e2e/kit-ui-keyboard.spec.ts) | Playwright E2E | KitButton 三态原语；KitUI typeSelect：8 类付款申请、键盘确定与取消返回值；KitUI real-browser keyboard contracts；KitUI 浮层几何稳定性 |
 | [e2e/lookup-select.spec.ts](../../../e2e/lookup-select.spec.ts) | Playwright E2E | LookupSelect 检索下拉原语 |
 | [e2e/responsive-primitives.spec.ts](../../../e2e/responsive-primitives.spec.ts) | Playwright E2E | Issue #112 R1：共享响应式原语 |

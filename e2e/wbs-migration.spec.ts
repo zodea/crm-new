@@ -8,7 +8,7 @@ import process from 'node:process'
 import { promisify } from 'node:util'
 import { expect, test } from '@playwright/test'
 
-test('完整旧 WBS 经真实 HTTP 接管，冻结绑定历史与冷读一致，重复确认保更正，独立新组阻止危险恢复', async ({ request }, info) => {
+test('完整旧 WBS 经真实 HTTP 接管，冻结绑定历史与冷读一致，重复确认保更正，独立新组阻止危险恢复', { tag: '@migration' }, async ({ request }, info) => {
   test.setTimeout(120_000)
   const reset = () => request.post('/api/testing/core-migration/reset', { headers: { 'x-ruihang-test-reset': '1' } })
   expect((await reset()).ok()).toBe(true)

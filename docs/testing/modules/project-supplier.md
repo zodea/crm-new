@@ -23,20 +23,17 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
-| [tests/components/ProjectSupplierFactTable.test.ts](../../../tests/components/ProjectSupplierFactTable.test.ts) | 组件（jsdom） | 项目分供方事实表 |
 | [tests/components/ProjectSupplierFileAccess.test.ts](../../../tests/components/ProjectSupplierFileAccess.test.ts) | 组件（jsdom） | 合作原件工作台动作 |
 | [tests/components/ProjectSupplierFilePanel.test.ts](../../../tests/components/ProjectSupplierFilePanel.test.ts) | 组件（jsdom） | 项目分供方合作文件 |
 | [tests/components/ProjectSupplierImportWizard.test.ts](../../../tests/components/ProjectSupplierImportWizard.test.ts) | 组件（jsdom） | project supplier import wizard |
 | [tests/components/ProjectSupplierLinksPanel.test.ts](../../../tests/components/ProjectSupplierLinksPanel.test.ts) | 组件（jsdom） | 项目详情分供方入口 |
-| [tests/components/ProjectSupplierOverview.test.ts](../../../tests/components/ProjectSupplierOverview.test.ts) | 组件（jsdom） | 项目分供方身份概览 |
+| [tests/components/ProjectSupplierOverview.test.ts](../../../tests/components/ProjectSupplierOverview.test.ts) | 组件（jsdom） | 项目分供方事实表；项目分供方身份概览 |
 
 ## Playwright E2E
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
-| [e2e/issue-192-project-supplier.spec.ts](../../../e2e/issue-192-project-supplier.spec.ts) | Playwright E2E | Issue #192：项目×分供方工作台与文件导入 |
-| [e2e/issue-317-project-supplier-facts.spec.ts](../../../e2e/issue-317-project-supplier-facts.spec.ts) | Playwright E2E | Issue #317：项目分供方六类事实工作台 |
-| [e2e/issue-319-project-material-supplier-journey.spec.ts](../../../e2e/issue-319-project-material-supplier-journey.spec.ts) | Playwright E2E | 关联物资：项目供应商穿透流程 |
+| [e2e/project-supplier.spec.ts](../../../e2e/project-supplier.spec.ts) | Playwright E2E | Issue #192：项目×分供方工作台与文件导入；Issue #317：项目分供方六类事实工作台 |
 | [e2e/project-supplier-files.spec.ts](../../../e2e/project-supplier-files.spec.ts) | Playwright E2E | Issue #438 合作档案中央原件 |
 
 ## 辅助文件与配置（非独立测试）

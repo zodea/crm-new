@@ -10,7 +10,7 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
-| [tests/finance/payment-contract.test.ts](../../../tests/finance/payment-contract.test.ts) | 单元／服务／状态 | 付款合同领域、身份与版本 |
+| [tests/finance/payment-contract.test.ts](../../../tests/finance/payment-contract.test.ts) | 单元／服务／状态 | 付款合同领域、身份与版本；历史核验输入和只读证明的严格解码、真实零与未知、原件身份及客户端资格伪造拒绝 |
 | [tests/production/finance-application-actions.test.ts](../../../tests/production/finance-application-actions.test.ts) | 隔离 SQLite／服务 | 付款申请新增、编辑、重复删除和原回执 |
 | [tests/production/finance-contract-upgrade.test.ts](../../../tests/production/finance-contract-upgrade.test.ts) | 隔离 SQLite／升级 | 旧合同身份未知、历史冻结与升级回滚 |
 | [tests/production/finance-invoice-adoption.test.ts](../../../tests/production/finance-invoice-adoption.test.ts) | 隔离 SQLite／真实来源 | 发票采用版本冻结与合同变更后的历史 |
@@ -32,7 +32,6 @@
 | [tests/finance/party-references.test.ts](../../../tests/finance/party-references.test.ts) | 单元／服务／状态 | v56 工人／分供方稳定引用迁移、真实磁盘冷重跑、原文原件和审计保全 |
 | [tests/finance/payment-approval-source.test.ts](../../../tests/finance/payment-approval-source.test.ts) | 单元／服务／状态 | 付款源单迁移批复来源 |
 | [tests/finance/payment-approval.test.ts](../../../tests/finance/payment-approval.test.ts) | 单元／服务／状态 | 付款批复输入意图 |
-| [tests/finance/payment-verification.test.ts](../../../tests/finance/payment-verification.test.ts) | 单元／服务／状态 | 历史核验输入和只读证明的严格解码、真实零与未知、原件身份及客户端资格伪造拒绝 |
 | [tests/finance/payment-boundary.test.ts](../../../tests/finance/payment-boundary.test.ts) | 单元／服务／状态 | 付款申请付款对象边界 |
 | [tests/finance/payment-detail.test.ts](../../../tests/finance/payment-detail.test.ts) | 单元／服务／状态 | 付款申请真实关联与洞察；三类回票义务、损坏原类型及真实零保留差额与已确认现金 |
 | [tests/finance/status.test.ts](../../../tests/finance/status.test.ts) | 单元／服务／状态 | 财务状态展示 |
@@ -59,7 +58,7 @@
 | [tests/components/FinanceMigrationDeclarations.test.ts](../../../tests/components/FinanceMigrationDeclarations.test.ts) | 组件（jsdom；隔离 inspector／HTTP） | 精确旧清偿声明控件、原大小未知、理由必填、最小原键及已知回执后读失败只 GET；不证明真实 Native 图或正式迁入持久化 |
 | [tests/components/FinanceIncomingFormFields.test.ts](../../../tests/components/FinanceIncomingFormFields.test.ts) | 组件（jsdom） | financeIncomingFormFields 收款登记 |
 | [tests/components/FinanceListScreen.test.ts](../../../tests/components/FinanceListScreen.test.ts) | 组件（jsdom） | 原收款来源、工具栏及分页筛选，未知合计与只读重读 |
-| [tests/components/PaymentApplicationInsightPanel.test.ts](../../../tests/components/PaymentApplicationInsightPanel.test.ts) | 组件（jsdom） | 付款申请洞察说明 |
+| [tests/components/PaymentApplicationInsightPanel.test.ts](../../../tests/components/PaymentApplicationInsightPanel.test.ts) | 组件（jsdom） | 付款申请洞察说明；关联工资：付款页中的工资区块 |
 | [tests/components/PaymentApprovalReturn.test.ts](../../../tests/components/PaymentApprovalReturn.test.ts) | 组件（jsdom） | 编辑保存后返回同 ID 缓存详情，批复和余额读取最新值；对应回票指标、真实零及未知显示 |
 | [tests/components/PaymentManagementToolbar.test.ts](../../../tests/components/PaymentManagementToolbar.test.ts) | 组件（jsdom） | payment management toolbar |
 | [tests/components/ReceiptDetailScreen.test.ts](../../../tests/components/ReceiptDetailScreen.test.ts) | 组件（jsdom） | 收款只读详情的当前来源 |

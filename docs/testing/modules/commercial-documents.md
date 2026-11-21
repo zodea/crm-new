@@ -49,13 +49,8 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
-| [e2e/issue-283-owner-document-readonly-details.spec.ts](../../../e2e/issue-283-owner-document-readonly-details.spec.ts) | Playwright E2E | Issue #283：甲方六类单据专属只读详情与双视图 |
-| [e2e/issue-323-owner-commercial-document-detail.spec.ts](../../../e2e/issue-323-owner-commercial-document-detail.spec.ts) | Playwright E2E | Issue #323：甲方变洽签与月度报量专属中央详情 |
-| [e2e/issue-324-acceptance-warranty-canonical.spec.ts](../../../e2e/issue-324-acceptance-warranty-canonical.spec.ts) | Playwright E2E | Issue #324：验收—保修 canonical 双视图 |
-| [e2e/issue-325-owner-final-settlement-canonical.spec.ts](../../../e2e/issue-325-owner-final-settlement-canonical.spec.ts) | Playwright E2E | Issue #325：甲方最终结算专属只读链 |
-| [e2e/issue-326-owner-penalty-readonly.spec.ts](../../../e2e/issue-326-owner-penalty-readonly.spec.ts) | Playwright E2E | Issue #326：甲方罚扣专属只读链 |
-| [e2e/issue-327-subcontract-change-readonly.spec.ts](../../../e2e/issue-327-subcontract-change-readonly.spec.ts) | Playwright E2E | Issue #327：分包变洽签专属只读链 |
-| [e2e/issue-328-subcontract-settlement-readonly.spec.ts](../../../e2e/issue-328-subcontract-settlement-readonly.spec.ts) | Playwright E2E | AX02 分包结算中央只读链 |
+| [e2e/owner-document-readonly.spec.ts](../../../e2e/owner-document-readonly.spec.ts) | Playwright E2E | Issue #283：甲方六类单据专属只读详情与双视图；Issue #323：甲方变洽签与月度报量专属中央详情；Issue #324：验收—保修 canonical 双视图；Issue #325：甲方最终结算专属只读链；Issue #326：甲方罚扣专属只读链 |
+| [e2e/subcontract-documents.spec.ts](../../../e2e/subcontract-documents.spec.ts) | Playwright E2E | Issue #327：分包变洽签专属只读链；AX02 分包结算中央只读链 |
 | [e2e/issue-329-project-penalty.spec.ts](../../../e2e/issue-329-project-penalty.spec.ts) | Playwright E2E | AX03 项目罚扣真实结算抵扣 |
 | [e2e/owner-document-forms.spec.ts](../../../e2e/owner-document-forms.spec.ts) | Playwright E2E | Issue #197：甲方、分包单据与项目罚扣 |
 | [e2e/owner-document-lists.spec.ts](../../../e2e/owner-document-lists.spec.ts) | Playwright E2E | ${width}px 单据列表 |

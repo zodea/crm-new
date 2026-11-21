@@ -85,7 +85,7 @@ flowchart LR
 - [真实浏览器流程](../../../../e2e/process-library-central.spec.ts)：真实 SQLite 迁入、幂等迁入/确认、软删除占号、任意旧版复制、调序键盘取消/确认、响应丢失重试原命令、并发显式重读、伪造身份/演示写入拒绝、危险回滚拒绝、建组往返保稿及同源刷新保表格/横滚。三个测试结束后，工序库与核心迁移合成会话均完成清理。
 - [源导出](../../../../tests/migration/process-library-source.test.ts)、[迁移准备](../../../../tests/schedule/process-library-migration.test.ts)、[中央迁移集成](../../../../tests/schedule/process-library-core-integration.test.ts)：完整旧图与失败原子性。
 - [HTTP 输入](../../../../tests/schedule/process-library-request.test.ts)、[Repository](../../../../tests/schedule/process-library-repository.test.ts)、[领域命令](../../../../tests/schedule/process-library-central.test.ts)：输入白名单、权限、来源、幂等、不可变版本和失败边界。
-- [页面状态](../../../../tests/stores/process-library-central-state.test.ts)、[真实页签守卫](../../../../tests/components/ScheduleProcessLibraryFormTabGuard.test.ts)、[调序交互](../../../../tests/components/ScheduleProcessLibraryReorder.test.ts)、[返回上下文](../../../../tests/schedule/process-library-navigation.test.ts)：迟到读取/保存保护、人工稿、页面切换与关系取消语义。
+- [页面状态](../../../../tests/stores/process-library-central-state.test.ts)、[真实页签守卫](../../../../tests/components/ScheduleProcessLibraryFormTabGuard.test.ts)、[调序交互](../../../../tests/components/ScheduleProcessLibraryReorder.test.ts)、[返回上下文](../../../../tests/schedule/navigation.test.ts)：迟到读取/保存保护、人工稿、页面切换与关系取消语义。
 - [浏览器 WBS 同源接缝](../../../../tests/stores/schedule-central-library-source.test.ts)：候选与复核只走中央库；尚未接管的中央 WBS 写入明确拒绝且不落旧库。
 - [测试状态清理权限](../../../../tests/schedule/process-library-test-reset.test.ts)：生产 404、无测试证明 403、只清指定合成工作区/会话。
 

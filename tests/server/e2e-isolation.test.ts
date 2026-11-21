@@ -1,7 +1,8 @@
 import { mkdir, mkdtemp, symlink, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
-import { expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { isolatedFreshBuildPaths, isolatedInheritedEnvironment, isolatedServerEntry } from '../../scripts/e2e-isolation'
+import { createDemoWorkspaceTestInstance } from '../../server/utils/demo-workspace-test-instance'
 import { testTempRoot } from '../helpers/test-temp-root'
 
 async function fixture() {
@@ -38,4 +39,27 @@ it('正式验收只可启动已生成的独立服务入口，拒绝链接、旧�
 
 it('子进程不会继承用户 CRM 配置，其余常规执行环境保持可用', () => {
   expect(isolatedInheritedEnvironment({ CRM_DATA_DIRECTORY: 'user-path', crm_access_code_hash: 'secret', PATH: 'runtime-path', NODE_OPTIONS: '--max-old-space-size=3072' })).toEqual({ PATH: 'runtime-path', NODE_OPTIONS: '--max-old-space-size=3072' })
+})
+
+describe('global demo workspace capability boundary', () => {
+  it('只按会话 capability override 授权，不消费项目读场景', () => {
+    const instance = createDemoWorkspaceTestInstance()
+
+    expect(instance.workspace('ready')).toEqual({ allowed: true })
+    instance.reset('forbidden', 'denied')
+    expect(instance.workspace('denied')).toEqual({ allowed: false })
+    expect(instance.workspace('project-forbidden')).toEqual({ allowed: true })
+    expect(instance.workspace('project-unavailable')).toEqual({ allowed: true })
+  })
+
+  it('分供方敏感资料权限只授予指定会话，撤销后立即失效', () => {
+    const instance = createDemoWorkspaceTestInstance()
+    expect(instance.capabilities('a')).not.toContain('supplier:sensitive:read')
+    instance.setSupplierPrivateRead('a', true)
+    expect(instance.capabilities('a')).toContain('supplier:sensitive:read')
+    expect(instance.capabilities('b')).not.toContain('supplier:sensitive:read')
+    expect(instance.capabilities()).not.toContain('supplier:sensitive:read')
+    instance.setSupplierPrivateRead('a', false)
+    expect(instance.capabilities('a')).not.toContain('supplier:sensitive:read')
+  })
 })

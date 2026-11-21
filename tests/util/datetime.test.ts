@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { formatShanghaiDateTime } from '~/lib/util/datetime'
+import { toLocalDateInputValue } from '~/lib/util/local-date'
 
 describe('datetime formatting', () => {
   it('把固定 UTC 时间转换为 Asia/Shanghai 本地时间', () => {
@@ -17,5 +18,13 @@ describe('datetime formatting', () => {
     { case: '\'invalid\' / \'未记录时间\'', input: 'invalid', argument2: '未记录时间', expected: '未记录时间' },
   ])('空值或无效时间使用回退文案 / formatShanghaiDateTime：$case', ({ input, argument2, expected }) => {
     expect(formatShanghaiDateTime(input, argument2)).toBe(expected)
+  })
+})
+
+describe('toLocalDateInputValue', () => {
+  it('使用本地日历年月日，不经过 UTC 截断', () => {
+    const localMidnight = new Date(2026, 6, 21, 0, 30)
+
+    expect(toLocalDateInputValue(localMidnight)).toBe('2026-07-21')
   })
 })

@@ -23,5 +23,4 @@
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
 | [e2e/home-schedule.spec.ts](../../../e2e/home-schedule.spec.ts) | Playwright E2E | 关联进度／工程量：首页项目上下文与下钻返回 |
-| [e2e/issue-189-home-dashboard.spec.ts](../../../e2e/issue-189-home-dashboard.spec.ts) | Playwright E2E | Issue #189：首页默认工作台只展示真实排程并保持项目、分组与下钻入口可达 |
-| [e2e/issue-434-home-project-source.spec.ts](../../../e2e/issue-434-home-project-source.spec.ts) | Playwright E2E | ${width}px 中央新项目进入首页，缺源只读查看并返回同一身份 |
+| [e2e/home.spec.ts](../../../e2e/home.spec.ts) | Playwright E2E | Issue #189：首页默认工作台只展示真实排程并保持项目、分组与下钻入口可达；${width}px 中央新项目进入首页，缺源只读查看并返回同一身份 |

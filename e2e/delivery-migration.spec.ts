@@ -9,7 +9,7 @@ import { expect, test } from '@playwright/test'
 
 const BACKUP_INPUT = { createdAt: '2026-09-15T00:00:00.000Z' }
 
-test('真实 SQLite 送货头行原件打印与历史通过 HTTP 迁移、重试和回滚', async ({ request }, info) => {
+test('真实 SQLite 送货头行原件打印与历史通过 HTTP 迁移、重试和回滚', { tag: '@migration' }, async ({ request }, info) => {
   test.setTimeout(120_000)
   const reset = await request.post('/api/testing/core-migration/reset', { headers: { 'x-ruihang-test-reset': '1' } })
   expect(reset.ok(), await reset.text()).toBe(true)

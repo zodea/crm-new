@@ -81,8 +81,7 @@
 - 纯规则：`tests/home/dashboard.test.ts`
 - 状态面：`tests/components/HomeDashboardSurface.test.ts`
 - 中央项目来源与跨页回读：`tests/home/project-source.test.ts`、`tests/components/HomeProjectSourceNavigation.test.ts`
-- 中央新建到首页与来源返回：`e2e/issue-434-home-project-source.spec.ts`
-- 首页流程：`e2e/issue-189-home-dashboard.spec.ts`
+- 首页流程、中央新建到首页与来源返回见 [`e2e/home.spec.ts`](../../../e2e/home.spec.ts)。
 - 原施工进度闭环：`e2e/home-schedule.spec.ts`
 - 五种状态四档视觉：`e2e/runtime-visual-matrix.spec.ts`
 - 稳定状态预览（仅开发验证，不计生产路由）：`/dev/home-dashboard?state=loading|schedule-empty|partial|error`

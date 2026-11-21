@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import credentialsSeed from '~/lib/db/seed/supplier_credentials.json'
 import suppliersSeed from '~/lib/db/seed/suppliers.json'
-import {
-  resolveCredentialStatus,
-} from '~/lib/supplier/detail'
+import { resolveCredentialStatus } from '~/lib/supplier/detail'
+import { SUPPLIER_CATEGORIES } from '~/lib/supplier/status'
 
 describe('分供方详情纯聚合', () => {
   it.each([
@@ -18,5 +17,19 @@ describe('分供方详情纯聚合', () => {
       .filter(credential => credential.supplier_id === supplier.id)
       .map(credential => credential.category)
     expect(['incomplete', 'reviewing']).toContain(resolveCredentialStatus(categories))
+  })
+})
+
+describe('分供方类别', () => {
+  it('与权威七类保持一致并包含检测供应商', () => {
+    expect(SUPPLIER_CATEGORIES).toEqual([
+      '材料供应商',
+      '劳务分包商',
+      '专业分包商',
+      '设备供应商',
+      '检测供应商',
+      '个人',
+      '其他',
+    ])
   })
 })

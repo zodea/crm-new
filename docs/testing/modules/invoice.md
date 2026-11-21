@@ -8,18 +8,13 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
-| [tests/invoice/central-original-binding.test.ts](../../../tests/invoice/central-original-binding.test.ts) | 单元／状态 | 原件字节与权限核对 |
+| [tests/invoice/central-workspace.test.ts](../../../tests/invoice/central-workspace.test.ts) | 单元／状态 | 原件字节与识别权限核对，归档核验提交原件摘要及 OCR 页，取消后拒绝迟到结果 |
 | [tests/invoice/central-pending-discovery.test.ts](../../../tests/invoice/central-pending-discovery.test.ts) | 单元／状态 | 原编号发现与身份隔离 |
-| [tests/invoice/central-recognition.test.ts](../../../tests/invoice/central-recognition.test.ts) | 单元／状态 | 写命令保留 OCR 页证据与明示零，排除定位和勾稽建议 |
-| [tests/invoice/central-workspace-recognition.test.ts](../../../tests/invoice/central-workspace-recognition.test.ts) | 单元／状态 | 识别后的身份权限核对，归档核验提交原件摘要及 OCR 页，取消后拒绝迟到结果 |
 | [tests/stores/invoice-manual-startup.test.ts](../../../tests/stores/invoice-manual-startup.test.ts) | 单元／状态 | 手工原编号刷新与身份隔离 |
 | [tests/invoice/central-migration-bootstrap.test.ts](../../../tests/invoice/central-migration-bootstrap.test.ts) | 单元／服务／状态 | 迁入目录的身份、权限与来源版本 |
 | [tests/invoice/central-migration-pending.test.ts](../../../tests/invoice/central-migration-pending.test.ts) | 单元／状态 | 迁入原编号发现、身份隔离及损坏存储阻断 |
-| [tests/invoice/correction-contract.test.ts](../../../tests/invoice/correction-contract.test.ts) | 单元／服务／状态 | 更正差异、未知和真实零 |
-| [tests/invoice/correction-http.test.ts](../../../tests/invoice/correction-http.test.ts) | 单元／服务／状态 | 更正读取与回执身份、权限、版本 |
-| [tests/invoice/correction-session.test.ts](../../../tests/invoice/correction-session.test.ts) | 单元／服务／状态 | 更正未知结果及回读失败保留原编号 |
-| [tests/production/invoice-migration-catalog-client.test.ts](../../../tests/production/invoice-migration-catalog-client.test.ts) | 单元／客户端 | 目录来源、版本及身份权限 |
-| [tests/production/invoice-migration-catalog-integration.test.ts](../../../tests/production/invoice-migration-catalog-integration.test.ts) | 隔离 SQLite／服务 | 真实项目目录与客户端核验 |
+| [tests/invoice/correction.test.ts](../../../tests/invoice/correction.test.ts) | 单元／服务／状态 | 更正差异、未知和真实零；更正读取与回执身份、权限、版本；更正未知结果及回读失败保留原编号 |
+| [tests/production/invoice-migration-catalog-client.test.ts](../../../tests/production/invoice-migration-catalog-client.test.ts) | 单元／客户端 | 目录来源、版本及身份权限；真实项目目录与客户端核验 |
 | [tests/production/invoice-access.test.ts](../../../tests/production/invoice-access.test.ts) | 路由边界 | 正式发票与更正 API 方法及范围 |
 | [tests/production/invoice-owner.test.ts](../../../tests/production/invoice-owner.test.ts) | 隔离 SQLite／服务 | 发票原件、核对、归档、回执及冷读取 |
 | [tests/production/invoice-contracts.test.ts](../../../tests/production/invoice-contracts.test.ts) | 隔离 SQLite／服务 | 其他支出合同来源核验 |
@@ -50,7 +45,7 @@
 | [tests/invoice/recognition-changes.test.ts](../../../tests/invoice/recognition-changes.test.ts) | 单元／服务／状态 | 重新识别前后的字段差异：人工值被覆盖、清空、补出均列出，长票号按文本比较；草稿字段标记与保存确认正文 |
 | [tests/invoice/recognition-regions.test.ts](../../../tests/invoice/recognition-regions.test.ts) | 单元／服务／状态 | 识别字段 → OCR 版面块区域：归一化、金额数字边界、标签消歧、不造框条件、180° 翻转与多页；旋转/缩放坐标换算；变动字段按块合并与“原图未定位”清单；首次识别点字段定位只框当前字段 |
 | [tests/recognize/local-document.test.ts](../../../tests/recognize/local-document.test.ts) | 单元／服务／状态 | 本机 OCR 合成结果的文本与真实多边形：源帧核验、越界/歧义拒绝、混合 PDF 页码与缺口 |
-| [tests/invoice/recognize.test.ts](../../../tests/invoice/recognize.test.ts) | 单元／服务／状态 | confidenceTier:置信度分档(边框色/角标/✓确认 依据) |
+| [tests/invoice/recognize.test.ts](../../../tests/invoice/recognize.test.ts) | 单元／服务／状态 | 置信度分档与识别文件类型，中央写命令保留 OCR 页证据与明示零，排除定位、源帧和勾稽建议 |
 | [tests/invoice/status.test.ts](../../../tests/invoice/status.test.ts) | 单元／服务／状态 | invoiceDocStatus:单一权威的状态优先级 |
 | [tests/recognize/invoice-engine.test.ts](../../../tests/recognize/invoice-engine.test.ts) | 单元／服务／状态 | recognizeInvoice；带版面块坐标时给出字段块级区域，无坐标为空 |
 | [tests/recognize/invoice-parse.test.ts](../../../tests/recognize/invoice-parse.test.ts) | 单元／服务／状态 | 发票字段、全角与拆字、票号冲突、显式开票日期、价税与重复字；区分原文零值、未知和勾稽建议，保留已有明细来源 |

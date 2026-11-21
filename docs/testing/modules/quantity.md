@@ -74,13 +74,11 @@
 | [tests/components/QuantityCompletionPhotoRace.test.ts](../../../tests/components/QuantityCompletionPhotoRace.test.ts) | 组件（jsdom） | 照片仍在读取时切换阶段，旧文件迟到不会加入新阶段草稿 |
 | [tests/components/QuantityFieldFormulaCell.test.ts](../../../tests/components/QuantityFieldFormulaCell.test.ts) | 组件（jsdom） | quantity field formula cell |
 | [tests/components/QuantityHollowFormState.test.ts](../../../tests/components/QuantityHollowFormState.test.ts) | 组件（jsdom） | 未知保存完整字段冷恢复，核对原提交后才进入真实记录详情 |
-| [tests/components/QuantityHollowHistory.test.ts](../../../tests/components/QuantityHollowHistory.test.ts) | 组件（jsdom） | 当前19减4显示15，原检查与整改的日期处数分别可读 |
+| [tests/components/QuantityHollowHistory.test.ts](../../../tests/components/QuantityHollowHistory.test.ts) | 组件（jsdom） | 当前19减4显示15，原检查与整改的日期处数分别可读；户深链挂载中央空鼓页面并由原页读取权限 |
 | [tests/components/QuantityHollowRectification.test.ts](../../../tests/components/QuantityHollowRectification.test.ts) | 组件（jsdom） | 真实公开来源 19 处取消小确认保输入，确认整改 4 处后仍保原检查且余 15 |
-| [tests/components/QuantityHollowRuntime.test.ts](../../../tests/components/QuantityHollowRuntime.test.ts) | 组件（jsdom） | 户深链挂载中央空鼓页面并由原页读取权限 |
 | [tests/components/QuantityScreenCentral.test.ts](../../../tests/components/QuantityScreenCentral.test.ts) | 组件（jsdom） | 正式工程量矩阵来源与入口 |
-| [tests/components/QuantityStageFields.test.ts](../../../tests/components/QuantityStageFields.test.ts) | 组件（jsdom） | 阶段整页字段 |
 | [tests/components/QuantityStageFormPage.test.ts](../../../tests/components/QuantityStageFormPage.test.ts) | 组件（jsdom） | 施工阶段配置整页 |
-| [tests/components/QuantityStageReporting.test.ts](../../../tests/components/QuantityStageReporting.test.ts) | 组件（jsdom） | 显式报量阶段选择 |
+| [tests/components/QuantityStageReporting.test.ts](../../../tests/components/QuantityStageReporting.test.ts) | 组件（jsdom） | 阶段整页字段；显式报量阶段选择 |
 | [tests/components/QuantityTemplateCentral.test.ts](../../../tests/components/QuantityTemplateCentral.test.ts) | 组件（jsdom） | 中央模板整页与缓存 |
 | [tests/components/QuantityTemplateLinesSection.test.ts](../../../tests/components/QuantityTemplateLinesSection.test.ts) | 组件（jsdom） | quantity template lines section |
 | [tests/components/QuantityUnitTotals.test.ts](../../../tests/components/QuantityUnitTotals.test.ts) | 组件（jsdom） | 户详情工程量合计 |

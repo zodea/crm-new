@@ -29,6 +29,5 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
-| [e2e/kit-ui-config-export.spec.ts](../../../e2e/kit-ui-config-export.spec.ts) | Playwright E2E | 配置导出：实时预览、二级写盘、逐步完成并自动关闭页签 |
-| [e2e/kit-ui-export.spec.ts](../../../e2e/kit-ui-export.spec.ts) | Playwright E2E | KitUI 单文件导出：选择目录、写入文件且只显示一次成功反馈 |
+| [e2e/kit-ui-export.spec.ts](../../../e2e/kit-ui-export.spec.ts) | Playwright E2E | 配置导出：实时预览、二级写盘、逐步完成并自动关闭页签；KitUI 单文件导出：选择目录、写入文件且只显示一次成功反馈 |
 | [e2e/kit-ui-import-mapping.spec.ts](../../../e2e/kit-ui-import-mapping.spec.ts) | Playwright E2E | 导入映射：坏文件报错、预匹配三色态、必填门控、删行并成功导入后自动关闭 |

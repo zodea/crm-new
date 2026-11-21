@@ -19,23 +19,18 @@
 | [tests/components/PayrollRecordingReversalEntry.test.ts](../../../tests/components/PayrollRecordingReversalEntry.test.ts) | 组件（jsdom） | 实际台账可以引用错误冲销追加纠错，保持原引用和来源返回 |
 | [tests/components/PayrollReleaseAdjustmentSelection.test.ts](../../../tests/components/PayrollReleaseAdjustmentSelection.test.ts) | 组件（jsdom） | 后续工资核算变化重读候选，保留处理金额直到明确采用新依据 |
 | [tests/payroll/adjustment-navigation-output.test.ts](../../../tests/payroll/adjustment-navigation-output.test.ts) | 单元／服务／状态 | 实际事实按原引用分流，工资筛选与预算/人员返回保留，外站与错来源拒绝 |
-| [tests/payroll/central-actual-history.test.ts](../../../tests/payroll/central-actual-history.test.ts) | 单元／服务／状态 | 历史总额、个人分配与新写依据分别判断：缺个人分配仍保留可证300，不能均分或开放更正 |
-| [tests/payroll/central-actual-month-scope.test.ts](../../../tests/payroll/central-actual-month-scope.test.ts) | 单元／服务／状态 | 按文件中的测试场景定位 |
-| [tests/payroll/central-actual-payments.test.ts](../../../tests/payroll/central-actual-payments.test.ts) | 单元／服务／状态 | 核减100后实际退回40，只减少一次实际现金并保留60待处理和原签名 |
+| [tests/payroll/central-actual-payments.test.ts](../../../tests/payroll/central-actual-payments.test.ts) | 单元／服务／状态 | 按文件中的测试场景定位；历史总额、个人分配与新写依据分别判断：缺个人分配仍保留可证300，不能均分或开放更正；核减100后实际退回40，只减少一次实际现金并保留60待处理和原签名；确认核增100不会提前增加支出，实际补100才净1100，重复补发和反向伪退款均拒绝 |
 | [tests/payroll/central-actual-reversal.test.ts](../../../tests/payroll/central-actual-reversal.test.ts) | 单元／服务／状态 | 有证据的错误退款记录以独立冲销抵销，恢复原待处理余额；不改旧退款也不冒充新现金 |
-| [tests/payroll/central-actual-supplement.test.ts](../../../tests/payroll/central-actual-supplement.test.ts) | 单元／服务／状态 | 确认核增100不会提前增加支出，实际补100才净1100，重复补发和反向伪退款均拒绝 |
 | [tests/payroll/central-adjustment-chain.test.ts](../../../tests/payroll/central-adjustment-chain.test.ts) | 单元／服务／状态 | 先存的草稿后确认时，后续更正与工资处理均采用唯一链末而非建稿顺序 |
 | [tests/payroll/central-adjustment-imported-integrity.test.ts](../../../tests/payroll/central-adjustment-imported-integrity.test.ts) | 单元／服务／状态 | 原实际事件新增矛盾分配后，缓存不得继续给完整净额 |
 | [tests/payroll/central-adjustment-imported-runtime.test.ts](../../../tests/payroll/central-adjustment-imported-runtime.test.ts) | 单元／服务／状态 | 迁入完整原工资、更正及退款后继续处理剩余60，原始JSON和签收1000不变 |
 | [tests/payroll/central-adjustment-migrated-mapping.test.ts](../../../tests/payroll/central-adjustment-migrated-mapping.test.ts) | 单元／服务／状态 | 公开发放的 A 类更正：归属、范围与价格完整映射，正文不改，缺身份拒绝 |
 | [tests/payroll/central-adjustment-migration.test.ts](../../../tests/payroll/central-adjustment-migration.test.ts) | 单元／服务／状态 | 真实更正保存、确认及退款后重复迁入保原事实，无关原图可恢复，相关恢复整批拒绝 |
 | [tests/payroll/central-adjustment-provenance.test.ts](../../../tests/payroll/central-adjustment-provenance.test.ts) | 单元／服务／状态 | 已确认更正正文与确认冻结不一致时阻止新处理，不能按损坏后的数字继续补退 |
-| [tests/payroll/central-adjustment-scope.test.ts](../../../tests/payroll/central-adjustment-scope.test.ts) | 单元／服务／状态 | 原工资及收付稳定身份不属于指定项目时，受控读取拒绝改用另一项目内容 |
 | [tests/payroll/central-adjustment-transactions.test.ts](../../../tests/payroll/central-adjustment-transactions.test.ts) | 单元／服务／状态 | 两个窗口争用同一剩余，只有一笔退款及其分配、余额处理和回执成功 |
 | [tests/payroll/central-adjustment-transport.test.ts](../../../tests/payroll/central-adjustment-transport.test.ts) | 单元／服务／状态 | 真实 P4 SQLite 原图迁入完整中央工资表与回执审计，正文逐字保留且重复接管不覆盖 |
 | [tests/payroll/central-adjustments-http.test.ts](../../../tests/payroll/central-adjustments-http.test.ts) | 单元／服务／状态 | 真实 HTTP 完成独立更正、退40及错记冲销，所有有符号实额以到分十进制传输 |
-| [tests/payroll/central-adjustments.test.ts](../../../tests/payroll/central-adjustments.test.ts) | 单元／服务／状态 | 核减原已发C2的一百元只产生待处理，不改变原签名或实际一千元 |
-| [tests/payroll/central-release-adjustments.test.ts](../../../tests/payroll/central-release-adjustments.test.ts) | 单元／服务／状态 | 核减100先退40再随次月实发940处理60，两月实际1900且不把抵扣另算退款 |
+| [tests/payroll/central-adjustments.test.ts](../../../tests/payroll/central-adjustments.test.ts) | 单元／服务／状态 | 原工资及收付稳定身份不属于指定项目时，受控读取拒绝改用另一项目内容；核减原已发C2的一百元只产生待处理，不改变原签名或实际一千元；核减100先退40再随次月实发940处理60，两月实际1900且不把抵扣另算退款 |
 | [tests/payroll/workbook-actual-snapshot.test.ts](../../../tests/payroll/workbook-actual-snapshot.test.ts) | 单元／服务／状态 | 已保存目录固定当时实际账；后来真实退款只进入新目录版本且旧预览拒绝提交 |
 | [tests/stores/payroll-adjustments-central.test.ts](../../../tests/stores/payroll-adjustments-central.test.ts) | 单元／服务／状态 | 退款已成功但响应丢失时，冷实例只重发原命令，后续合法冲销不妨碍确认原成功 |
 
@@ -44,17 +39,14 @@
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
 | [tests/payroll/release-recheck-message.test.ts](../../../tests/payroll/release-recheck-message.test.ts) | 单元／服务／状态 | A/C1/C2 原发放回执需重核时，按当前记录状态分别说明（已发放、仍需重核、随后已重核、其他更新） |
-| [e2e/payroll-central.spec.ts](../../../e2e/payroll-central.spec.ts) | Playwright E2E | 工资真实八表迁入、完整发放记录、独立来源、缺坏快照与退休历史只读往返 |
-| [e2e/payroll-context-retirement.spec.ts](../../../e2e/payroll-context-retirement.spec.ts) | Playwright E2E | 工资中央来源、筛选与退役写入口 |
+| [e2e/payroll-central.spec.ts](../../../e2e/payroll-central.spec.ts) | Playwright E2E | 工资真实八表迁入、完整发放记录、独立来源、缺坏快照与退休历史只读往返；工资中央来源、筛选与退役写入口 |
 | [e2e/payroll-frozen-location.spec.ts](../../../e2e/payroll-frozen-location.spec.ts) | Playwright E2E | 真实冻结楼层范围在预览、XLSX及分页打印一致，不补断层或改原金额 |
 | [e2e/payroll-statement-detail.spec.ts](../../../e2e/payroll-statement-detail.spec.ts) | Playwright E2E | 工资历史详情的失效边界 |
-| [tests/components/PaymentPayrollSection.test.ts](../../../tests/components/PaymentPayrollSection.test.ts) | 组件（jsdom） | 关联工资：付款页中的工资区块 |
 | [tests/components/PayrollCentralBoundary.test.ts](../../../tests/components/PayrollCentralBoundary.test.ts) | 组件（jsdom） | 工资浏览器入口边界 |
 | [tests/components/PayrollCentralRead.test.ts](../../../tests/components/PayrollCentralRead.test.ts) | 组件（jsdom） | 工资中央只读资料 |
 | [tests/components/PayrollFeeEditors.test.ts](../../../tests/components/PayrollFeeEditors.test.ts) | 组件（jsdom） | 没有工程量读取权限仍可选择工资基数，不能凭格子ID造原户链接 |
 | [tests/components/PayrollHostSection.test.ts](../../../tests/components/PayrollHostSection.test.ts) | 组件（jsdom） | 个人0与整单1000分列，来源链接保原档案查询，表可获得键盘焦点 |
-| [tests/migration/payroll-central-source.test.ts](../../../tests/migration/payroll-central-source.test.ts) | 单元／服务／状态 | 中央工资只剩原审计的损坏旧库仍运输有项目归属的原文，不因当前表为空静默丢失 |
-| [tests/migration/payroll-source.test.ts](../../../tests/migration/payroll-source.test.ts) | 单元／服务／状态 | 公开旧库读取包含八表、独立未领用来源和冻结原文，不因没有工资漏项目 |
+| [tests/migration/payroll-source.test.ts](../../../tests/migration/payroll-source.test.ts) | 单元／服务／状态 | 中央工资只剩原审计的损坏旧库仍运输有项目归属的原文，不因当前表为空静默丢失；公开旧库读取包含八表、独立未领用来源和冻结原文，不因没有工资漏项目 |
 | [tests/payroll/central-history-integrity.test.ts](../../../tests/payroll/central-history-integrity.test.ts) | 单元／服务／状态 | 工资中央历史原值与冻结完整性 |
 | [tests/payroll/central-host-http.test.ts](../../../tests/payroll/central-host-http.test.ts) | 单元／服务／状态 | 真实三个详情HTTP接口受控读取同一退40后960，撤工资权限不返回来源或姓名 |
 | [tests/payroll/central-host-read.test.ts](../../../tests/payroll/central-host-read.test.ts) | 单元／服务／状态 | 项目、原班组及个人冷读同一1000实发与退40，更正不另计现金；零成员与后来转组保留 |
@@ -72,7 +64,7 @@
 | [tests/payroll/coordination-source.test.ts](../../../tests/payroll/coordination-source.test.ts) | 单元／服务／状态 | P7 原协调来源与失败状态保全 |
 | [tests/payroll/source-publication-privacy.test.ts](../../../tests/payroll/source-publication-privacy.test.ts) | 单元／服务／状态 | 工资发布目录与名册照片来源隐私 |
 | [tests/stores/payroll-production-pending.test.ts](../../../tests/stores/payroll-production-pending.test.ts) | 单元／服务／状态 | 工资正式来源原键及后读恢复 |
-| [tests/tabs/payroll-production-startup.test.ts](../../../tests/tabs/payroll-production-startup.test.ts) | 单元／服务／状态 | 工资启动恢复不扩大来源或实体范围 |
+| [tests/tabs/payroll-output-restore.test.ts](../../../tests/tabs/payroll-output-restore.test.ts) | 单元／服务／状态 | 工资启动恢复不扩大来源或实体范围；正式出具冷恢复只保留明确原项目与工资身份并重新读取；工资目录冷恢复仅带公开身份，重新受权读取原目录且不预读私密正文 |
 
 
 ## 空鼓扣款与零额发放
@@ -85,7 +77,6 @@
 | [tests/components/PayrollHollowFrozenOutput.test.ts](../../../tests/components/PayrollHollowFrozenOutput.test.ts) | 组件（jsdom） | 真实发放后打印与xlsx保存1000/450/550及原19减4，后来全整改不回填 |
 | [tests/components/PayrollHollowSourceReturn.test.ts](../../../tests/components/PayrollHollowSourceReturn.test.ts) | 组件（jsdom） | ${format}由已授权空鼓原户返回同一工资，只有原户ID及撤权不得放行 |
 | [tests/components/PayrollHollowStart.test.ts](../../../tests/components/PayrollHollowStart.test.ts) | 组件（jsdom） | 真实工资人工确认后才采用15处扣450，回复丢失原键核对不重复启动 |
-| [tests/components/PayrollHollowZeroRelease.test.ts](../../../tests/components/PayrollHollowZeroRelease.test.ts) | 组件（jsdom） | 明确空鼓450全部抵完请款450时可在原发放确认中提交全员0，撤权和普通零额仍拒 |
 | [tests/payroll/central-a-hollow-incomplete-form.test.ts](../../../tests/payroll/central-a-hollow-incomplete-form.test.ts) | 单元／服务／状态 | 首次新建 A 尚未选择负责人时返回缺项诊断和未知空鼓依据，不能抛出服务错误 |
 | [tests/payroll/central-c-hollow-zero.test.ts](../../../tests/payroll/central-c-hollow-zero.test.ts) | 单元／服务／状态 | 按文件中的测试场景定位 |
 | [tests/payroll/central-c-hollow.test.ts](../../../tests/payroll/central-c-hollow.test.ts) | 单元／服务／状态 | c1真实考勤请款1000，明确启动15处后只发550并保持原检查冻结 |
@@ -139,8 +130,6 @@
 | [tests/payroll/workbook-deep-references.test.ts](../../../tests/payroll/workbook-deep-references.test.ts) | 单元／服务／状态 | 真实管理工资无普通施工行时仍保护管理范围、费用修订和每个原工程量身份 |
 | [tests/payroll/workbook-export.test.ts](../../../tests/payroll/workbook-export.test.ts) | 单元／服务／状态 | 固定工资目录的真实文件组合 |
 | [tests/payroll/workbook-http.test.ts](../../../tests/payroll/workbook-http.test.ts) | 单元／服务／状态 | 真实HTTP预览、归档、列表、冷读取及失响应核对往返，并拒绝多余请求字段 |
-| [tests/tabs/payroll-numbering-restore.test.ts](../../../tests/tabs/payroll-numbering-restore.test.ts) | 单元／服务／状态 | 正式出具冷恢复只保留明确原项目与工资身份并重新读取 |
-| [tests/tabs/payroll-workbook-restore.test.ts](../../../tests/tabs/payroll-workbook-restore.test.ts) | 单元／服务／状态 | 工资目录冷恢复仅带公开身份，重新受权读取原目录且不预读私密正文 |
 
 ## A 表、费用与管理簿
 
@@ -150,23 +139,19 @@
 | [e2e/payroll-item-ratios.spec.ts](../../../e2e/payroll-item-ratios.spec.ts) | Playwright E2E | 合成来源中逐分项比例、费用覆盖、少发、上月继承与尾款锁定 |
 | [e2e/payroll-fees-central.spec.ts](../../../e2e/payroll-fees-central.spec.ts) | Playwright E2E | 多条补贴与独立管理簿：明确配置、未知提交恢复、520负价清单和真实输出 |
 | [tests/components/PayrollAConfigState.test.ts](../../../tests/components/PayrollAConfigState.test.ts) | 组件（jsdom） | 尚无工资的新项目从已验证配置读取得到项目候选 |
-| [tests/components/PayrollACreateFromQuantity.test.ts](../../../tests/components/PayrollACreateFromQuantity.test.ts) | 组件（jsdom） | 没有旧工资的纯量项目按授权新建候选显示入口，固定draftKey并保来源筛选 |
-| [tests/components/PayrollAFeeAdjustmentFields.test.ts](../../../tests/components/PayrollAFeeAdjustmentFields.test.ts) | 组件（jsdom） | 费用更正保原费项/负价修订及范围，只提交本次量价和说明，原冻结不变 |
-| [tests/components/PayrollAFeesReview.test.ts](../../../tests/components/PayrollAFeesReview.test.ts) | 组件（jsdom） | 普通工资明确分开3600工作与130房补，不将缺费用读当无补贴 |
-| [tests/components/PayrollAFloorReview.test.ts](../../../tests/components/PayrollAFloorReview.test.ts) | 组件（jsdom） | 楼层轴只取本簿截至本月真实完成，格内区分往月、本月和未涉及 |
-| [tests/components/PayrollAFloorSourceFocus.test.ts](../../../tests/components/PayrollAFloorSourceFocus.test.ts) | 组件（jsdom） | 同层同分项第二户空鼓入口返回自己的原完成定位 |
+| [tests/components/PayrollAFeesReview.test.ts](../../../tests/components/PayrollAFeesReview.test.ts) | 组件（jsdom） | 费用更正保原费项/负价修订及范围，只提交本次量价和说明，原冻结不变；普通工资明确分开3600工作与130房补，不将缺费用读当无补贴 |
+| [tests/components/PayrollAFloorReview.test.ts](../../../tests/components/PayrollAFloorReview.test.ts) | 组件（jsdom） | 楼层轴只取本簿截至本月真实完成，格内区分往月、本月和未涉及；同层同分项第二户空鼓入口返回自己的原完成定位 |
 | [tests/components/PayrollAFormState.test.ts](../../../tests/components/PayrollAFormState.test.ts) | 组件（jsdom） | 中央 A 独立草稿 |
-| [tests/components/PayrollAFrozenPrint.test.ts](../../../tests/components/PayrollAFrozenPrint.test.ts) | 组件（jsdom） | 打印内容仅用已传冻结值，零成员和四类签名位置完整 |
+| [tests/components/PayrollFrozenPrint.test.ts](../../../tests/components/PayrollFrozenPrint.test.ts) | 组件（jsdom） | 打印内容仅用已传冻结值，零成员和四类签名位置完整；c1 配对打印材料；工资和签工两个输出保原半工、证明、空规则及全成员真实分配，不输出考勤 |
 | [tests/components/PayrollAIncompleteForm.test.ts](../../../tests/components/PayrollAIncompleteForm.test.ts) | 组件（jsdom） | 真实不完整费用与空鼓诊断可补选原稿范围，未证核算始终不能保存 |
 | [tests/components/PayrollANegativeLinesState.test.ts](../../../tests/components/PayrollANegativeLinesState.test.ts) | 组件（jsdom） | 负价命令停用后迟到失败不锁死，原键恢复保负价输入和原基准 |
 | [tests/components/PayrollAPriceDialog.test.ts](../../../tests/components/PayrollAPriceDialog.test.ts) | 组件（jsdom） | 调价弹层切页后撤权，原价格仍保留但保存按钮禁用 |
-| [tests/components/PayrollAReleaseDialog.test.ts](../../../tests/components/PayrollAReleaseDialog.test.ts) | 组件（jsdom） | 中央A工资实发确认 |
+| [tests/components/PayrollAReleaseDialog.test.ts](../../../tests/components/PayrollAReleaseDialog.test.ts) | 组件（jsdom） | 明确空鼓450全部抵完请款450时可在原发放确认中提交全员0，撤权和普通零额仍拒；中央A工资实发确认 |
 | [tests/components/PayrollARoundingSection.test.ts](../../../tests/components/PayrollARoundingSection.test.ts) | 组件（jsdom） | a 工资取整配置 |
 | [tests/components/PayrollASourceReturn.test.ts](../../../tests/components/PayrollASourceReturn.test.ts) | 组件（jsdom） | 工资来源页返回读取核验 |
-| [tests/components/PayrollASourceReview.test.ts](../../../tests/components/PayrollASourceReview.test.ts) | 组件（jsdom） | 没有已证明工资行时仍展示原户位置、损坏说明和原身份，无权入口保持不可用 |
+| [tests/components/PayrollASourceReview.test.ts](../../../tests/components/PayrollASourceReview.test.ts) | 组件（jsdom） | 没有旧工资的纯量项目按授权新建候选显示入口，固定draftKey并保来源筛选；没有已证明工资行时仍展示原户位置、损坏说明和原身份，无权入口保持不可用 |
 | [tests/components/PayrollAStatementState.test.ts](../../../tests/components/PayrollAStatementState.test.ts) | 组件（jsdom） | 此前实付变化后持久需重核，重核成功仍保原实发输入且再确认使用新依据 |
-| [tests/payroll/a-export.test.ts](../../../tests/payroll/a-export.test.ts) | 单元／服务／状态 | 冻结 A 工资实际工作簿 |
-| [tests/payroll/a-fees-output.test.ts](../../../tests/payroll/a-fees-output.test.ts) | 单元／服务／状态 | 冻结费用工作表保存逐条基数和负价，原文档不变且不称完整工作簿 |
+| [tests/payroll/a-export.test.ts](../../../tests/payroll/a-export.test.ts) | 单元／服务／状态 | 冻结 A 工资实际工作簿；冻结费用工作表保存逐条基数和负价，原文档不变且不称完整工作簿 |
 | [tests/payroll/a-location-output.test.ts](../../../tests/payroll/a-location-output.test.ts) | 单元／服务／状态 | 冻结位置按楼栋分项单位分组，断层楼层不补齐，原房间责任与金额不丢失 |
 | [tests/payroll/a-migration-protection.test.ts](../../../tests/payroll/a-migration-protection.test.ts) | 单元／服务／状态 | 按文件中的测试场景定位 |
 | [tests/payroll/a-navigation.test.ts](../../../tests/payroll/a-navigation.test.ts) | 单元／服务／状态 | a工资原来源返回 |
@@ -179,18 +164,15 @@
 | [tests/components/PayrollAItemRatioFields.test.ts](../../../tests/components/PayrollAItemRatioFields.test.ts) | 组件 | 分项和费用比例输入、恢复默认及尾款只读 |
 | [tests/browser/PayrollAItemRatioFields.test.ts](../../../tests/browser/PayrollAItemRatioFields.test.ts) | 浏览器组件 | 键盘填写、费用默认、尾款只读及主要视口不横向溢出 |
 | [tests/payroll/central-a-amount-integrity.test.ts](../../../tests/payroll/central-a-amount-integrity.test.ts) | 单元／服务／状态 | a 工资公开核算的历史实付完整性 |
-| [tests/payroll/central-a-book-history-gaps.test.ts](../../../tests/payroll/central-a-book-history-gaps.test.ts) | 单元／服务／状态 | 管理已领用途关系及两份原件同时缺损时，不借旧A兼容分支变成零已领 |
 | [tests/payroll/central-a-codec.test.ts](../../../tests/payroll/central-a-codec.test.ts) | 单元／服务／状态 | 工资预览拒绝缺数量/状态权限不符/错目标，金额不能传输时取整成另一笔 |
 | [tests/payroll/central-a-commands.test.ts](../../../tests/payroll/central-a-commands.test.ts) | 单元／服务／状态 | 中央 A 配置、核对与冻结发放事务 |
 | [tests/payroll/central-a-diagnostic-location.test.ts](../../../tests/payroll/central-a-diagnostic-location.test.ts) | 单元／服务／状态 | 中央工资损坏来源的原位置读取 |
-| [tests/payroll/central-a-fee-adjustment-calculation.test.ts](../../../tests/payroll/central-a-fee-adjustment-calculation.test.ts) | 单元／服务／状态 | a 费用独立更正计算 |
-| [tests/payroll/central-a-fee-adjustments.test.ts](../../../tests/payroll/central-a-fee-adjustments.test.ts) | 单元／服务／状态 | 后来费用单价变成第三个值时不能以总额近似认作已含原更正 |
+| [tests/payroll/central-a-fee-adjustments.test.ts](../../../tests/payroll/central-a-fee-adjustments.test.ts) | 单元／服务／状态 | a 费用独立更正计算；后来费用单价变成第三个值时不能以总额近似认作已含原更正 |
 | [tests/payroll/central-a-fees-codec.test.ts](../../../tests/payroll/central-a-fees-codec.test.ts) | 单元／服务／状态 | p5 费用 HTTP 读取的封闭嵌套边界 |
 | [tests/payroll/central-a-fees-host-cost.test.ts](../../../tests/payroll/central-a-fees-host-cost.test.ts) | 单元／服务／状态 | 真实普通工资1000和含负价管理工资500经预算、项目、班组、个人、付款入口均只计1500 |
 | [tests/payroll/central-a-fees-integrity.test.ts](../../../tests/payroll/central-a-fees-integrity.test.ts) | 单元／服务／状态 | p5 已发费用完整性与管理主体 |
 | [tests/payroll/central-a-fees-removal.test.ts](../../../tests/payroll/central-a-fees-removal.test.ts) | 单元／服务／状态 | p5 移除追加原文墓碑，不要求失效来源重新取得计价资格 |
-| [tests/payroll/central-a-fees-runtime-options.test.ts](../../../tests/payroll/central-a-fees-runtime-options.test.ts) | 单元／服务／状态 | 真实名册工资事实只投影 A 候选合同，经 HTTP wire 可读取费用配置 |
-| [tests/payroll/central-a-fees.test.ts](../../../tests/payroll/central-a-fees.test.ts) | 单元／服务／状态 | p5 公开配置与现场量费用核算 |
+| [tests/payroll/central-a-fees.test.ts](../../../tests/payroll/central-a-fees.test.ts) | 单元／服务／状态 | 真实名册工资事实只投影 A 候选合同，经 HTTP wire 可读取费用配置；p5 公开配置与现场量费用核算 |
 | [tests/payroll/central-a-http.test.ts](../../../tests/payroll/central-a-http.test.ts) | 单元／服务／状态 | a HTTP/Repository往返保数量精度、明确零与固定目标，拒绝客户端伪造来源和未知动作 |
 | [tests/payroll/central-a-management-ownership.test.ts](../../../tests/payroll/central-a-management-ownership.test.ts) | 单元／服务／状态 | 双窗发起同簿同月只保留一个草稿，重新读取定位原单；双窗发放只有一份实付 |
 | [tests/payroll/central-a-management-ratio.test.ts](../../../tests/payroll/central-a-management-ratio.test.ts) | 单元／服务／状态 | 管理草稿统一沿同簿A比例默认 |
@@ -198,7 +180,7 @@
 | [tests/payroll/central-a-prices.test.ts](../../../tests/payroll/central-a-prices.test.ts) | 单元／服务／状态 | 中央 A 工资单价与比例的有效版本 |
 | [tests/payroll/central-a-provenance.test.ts](../../../tests/payroll/central-a-provenance.test.ts) | 单元／服务／状态 | 旧无正文列的回执升级只增加NULL字段，保原回执全部已知内容 |
 | [tests/payroll/central-a-rounding.test.ts](../../../tests/payroll/central-a-rounding.test.ts) | 单元／服务／状态 | central A payroll rounding revisions |
-| [tests/payroll/central-a-service.test.ts](../../../tests/payroll/central-a-service.test.ts) | 单元／服务／状态 | 中央 A 完成现场量及明确工资配置 |
+| [tests/payroll/central-a-service.test.ts](../../../tests/payroll/central-a-service.test.ts) | 单元／服务／状态 | 管理已领用途关系及两份原件同时缺损时，不借旧A兼容分支变成零已领；中央 A 完成现场量及明确工资配置 |
 | [tests/payroll/central-a-transactions.test.ts](../../../tests/payroll/central-a-transactions.test.ts) | 单元／服务／状态 | 工资核对后的事务复验与不可重复发放 |
 | [tests/payroll/crew-fee-default-facts.test.ts](../../../tests/payroll/crew-fee-default-facts.test.ts) | 单元／服务／状态 | 班组费用默认经真实导出与owner保留0/false/null/缺字段，改名不采用表单默认 |
 | [tests/payroll/fees-migration-batch-boundaries.test.ts](../../../tests/payroll/fees-migration-batch-boundaries.test.ts) | 单元／服务／状态 | 公开第二批及原子边界混合批次均拒绝，两套真实费用原图和当前全状态不变 |
@@ -217,69 +199,54 @@
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
 | [e2e/payroll-attendance.spec.ts](../../../e2e/payroll-attendance.spec.ts) | Playwright E2E | 工资与考勤浏览器接管边界 |
-| [e2e/payroll-c1-central.spec.ts](../../../e2e/payroll-c1-central.spec.ts) | Playwright E2E | 无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出 |
-| [e2e/payroll-c1-readonly.spec.ts](../../../e2e/payroll-c1-readonly.spec.ts) | Playwright E2E | 旧C1缺原快照仍能读原金额，不生成完整工资或考勤输出 |
-| [e2e/payroll-c1-recovery.spec.ts](../../../e2e/payroll-c1-recovery.spec.ts) | Playwright E2E | 原考勤保存失败保稿、冷页原编号恢复与切月份迟到读取 |
+| [e2e/payroll-c1-c2-central.spec.ts](../../../e2e/payroll-c1-c2-central.spec.ts) | Playwright E2E | 无工程量项目考勤、个人标准、C1核对实发、原键恢复与配对冻结输出；独立签工、人工确认、主体规则、C2核算实发与原键配对冻结输出 |
+| [e2e/payroll-c1-c2-readonly.spec.ts](../../../e2e/payroll-c1-c2-readonly.spec.ts) | Playwright E2E | 旧C1缺原快照仍能读原金额，不生成完整工资或考勤输出；旧 C2 缺原快照保留原金额与资料，禁止伪完整工资及签工输出 |
+| [e2e/payroll-c1-c2-recovery.spec.ts](../../../e2e/payroll-c1-c2-recovery.spec.ts) | Playwright E2E | 原考勤保存失败保稿、冷页原编号恢复与切月份迟到读取；新签工失响应后冷页按原编号保存一次，日期和正文不丢失 |
 | [tests/components/AttendanceCentralRace.test.ts](../../../tests/components/AttendanceCentralRace.test.ts) | 组件（jsdom） | 中央考勤原格保存边界 |
-| [tests/components/AttendanceCentralState.test.ts](../../../tests/components/AttendanceCentralState.test.ts) | 组件（jsdom） | 中央考勤矩阵精度 |
-| [tests/components/PayrollAttendanceCell.test.ts](../../../tests/components/PayrollAttendanceCell.test.ts) | 组件（jsdom） | 中央原单元格输入 |
+| [tests/components/PayrollAttendanceCell.test.ts](../../../tests/components/PayrollAttendanceCell.test.ts) | 组件（jsdom） | 中央考勤矩阵精度；中央原单元格输入 |
 | [tests/components/PayrollC1C2Completion.test.ts](../../../tests/components/PayrollC1C2Completion.test.ts) | 组件（jsdom） | C1/C2 回执后的同目标状态读取，需重核时分别说明原结果与当前状态 |
-| [tests/components/PayrollC1Config.test.ts](../../../tests/components/PayrollC1Config.test.ts) | 组件（jsdom） | c1 每人标准输入 |
+| [tests/components/PayrollC1C2Config.test.ts](../../../tests/components/PayrollC1C2Config.test.ts) | 组件（jsdom） | c1 每人标准输入；原缺单价不伪零、规则 null 不伪空；显式选择空规则后按原固定读提交 |
 | [tests/components/PayrollC1ConfigRecovery.test.ts](../../../tests/components/PayrollC1ConfigRecovery.test.ts) | 组件（jsdom） | 冷实例重新打开同一配置，真实 store 保原编号及54/空日薪；读回成功才解除 |
 | [tests/components/PayrollC1C2DetailPrecision.test.ts](../../../tests/components/PayrollC1C2DetailPrecision.test.ts) | 组件（jsdom） | C1/C2 详情保留原单价精度，金额到分，未知价不补零 |
 | [tests/components/PayrollC1C2Form.test.ts](../../../tests/components/PayrollC1C2Form.test.ts) | 组件（jsdom） | C1/C2 页面固定草稿：draftKey 切换与负责人班组采用 |
-| [tests/components/PayrollC1FrozenPrint.test.ts](../../../tests/components/PayrollC1FrozenPrint.test.ts) | 组件（jsdom） | c1 配对打印材料 |
 | [tests/components/PayrollC1C2Release.test.ts](../../../tests/components/PayrollC1C2Release.test.ts) | 组件（jsdom） | C1/C2 实际发放确认：零成员保全与少一分不确认 |
 | [tests/components/PayrollC1C2ReleasedEvidence.test.ts](../../../tests/components/PayrollC1C2ReleasedEvidence.test.ts) | 组件（jsdom） | C1/C2 已发工资只在真实冻结输出可用后显示配对成功 |
 | [tests/components/PayrollC1C2SourceReturn.test.ts](../../../tests/components/PayrollC1C2SourceReturn.test.ts) | 组件（jsdom） | C1/C2 来源（考勤／签工）返回验证 |
 | [tests/payroll/attendance-facts.test.ts](../../../tests/payroll/attendance-facts.test.ts) | 单元／服务／状态 | 逐日事实保原组、7.51小数和真零，坏未来日期不消失且软删原行仍可读 |
 | [tests/payroll/c1-b-independent-review.test.ts](../../../tests/payroll/c1-b-independent-review.test.ts) | 单元／服务／状态 | 按文件中的测试场景定位 |
 | [tests/payroll/c1-export.test.ts](../../../tests/payroll/c1-export.test.ts) | 单元／服务／状态 | c1 真正配对工作簿 |
-| [tests/payroll/c1-migration-protection.test.ts](../../../tests/payroll/c1-migration-protection.test.ts) | 单元／服务／状态 | 迟到的迁入考勤不能越过同库独立待确认签工占用，失败前后整批不变 |
-| [tests/payroll/c1-navigation.test.ts](../../../tests/payroll/c1-navigation.test.ts) | 单元／服务／状态 | c1 格式与原逐日来源 |
+| [tests/payroll/c1-c2-migration-protection.test.ts](../../../tests/payroll/c1-c2-migration-protection.test.ts) | 单元／服务／状态 | 迟到的迁入考勤不能越过同库独立待确认签工占用，失败前后整批不变；另一项目真实 C2 核对来源保留时，可单独准备恢复未被引用的原项目 |
+| [tests/payroll/c1-c2-navigation.test.ts](../../../tests/payroll/c1-c2-navigation.test.ts) | 单元／服务／状态 | c1 格式与原逐日来源；c2 原签工导航 |
 | [tests/payroll/c1-spec-independent.test.ts](../../../tests/payroll/c1-spec-independent.test.ts) | 单元／服务／状态 | c1 成功回执后冷读失败并刷新页面，仍可用原金额原编号恢复结果 |
 | [tests/payroll/c1-worker-facts.test.ts](../../../tests/payroll/c1-worker-facts.test.ts) | 单元／服务／状态 | 真实工人日薪经受控网络保 NULL/0/481，旧缺字段不补价且重复迁入保日常更正 |
 | [tests/payroll/central-attendance-service.test.ts](../../../tests/payroll/central-attendance-service.test.ts) | 单元／服务／状态 | 未选择项目或月份时保原空范围与候选，空矩阵不读取整年事实；非法非空月和空月写入仍拒绝 |
 | [tests/payroll/central-c1-adjustments.test.ts](../../../tests/payroll/central-c1-adjustments.test.ts) | 单元／服务／状态 | 按文件中的测试场景定位 |
-| [tests/payroll/central-c1-codec.test.ts](../../../tests/payroll/central-c1-codec.test.ts) | 单元／服务／状态 | 考勤与 C1 命令封闭动作/字段，正常小数不提前舍入，非数与非法日期不能入请求 |
-| [tests/payroll/central-c1-commands.test.ts](../../../tests/payroll/central-c1-commands.test.ts) | 单元／服务／状态 | 核算与真实实发分离，全成员到分且原键只发一次，已发不可改 |
-| [tests/payroll/central-c1-http.test.ts](../../../tests/payroll/central-c1-http.test.ts) | 单元／服务／状态 | 真实 HTTP/Repository 贯通考勤、独立费率、C1 核对实发与配对冻结，传输不截工时或费率 |
-| [tests/payroll/central-c1-independent.test.ts](../../../tests/payroll/central-c1-independent.test.ts) | 单元／服务／状态 | c1 独立复验：事务末端、历史原组与月份边界 |
+| [tests/payroll/central-c1-c2-codec.test.ts](../../../tests/payroll/central-c1-c2-codec.test.ts) | 单元／服务／状态 | 考勤与 C1 命令封闭动作/字段，正常小数不提前舍入，非数与非法日期不能入请求；签工C2有限数精确展开十进制定点，null与零保真，科学计数传输不能进入读取或命令 |
+| [tests/payroll/central-c1-c2-commands.test.ts](../../../tests/payroll/central-c1-c2-commands.test.ts) | 单元／服务／状态 | 核算与真实实发分离，全成员到分且原键只发一次，已发不可改；同日两段相邻半工可保存，待确认计入一工上限，重叠与第三半工拒绝且不留回执 |
+| [tests/payroll/central-c1-c2-http.test.ts](../../../tests/payroll/central-c1-c2-http.test.ts) | 单元／服务／状态 | 真实 HTTP/Repository 贯通考勤、独立费率、C1 核对实发与配对冻结，传输不截工时或费率；真实HTTP贯通签工与C2空态、半工、主体配置、唯一核对发放及冻结，价保原精度而金额到分 |
+| [tests/payroll/central-c1-c2-independent.test.ts](../../../tests/payroll/central-c1-c2-independent.test.ts) | 单元／服务／状态 | c1 独立复验：事务末端、历史原组与月份边界；c2 独立公开服务反例：原关系、最后窗口与完整冻结 |
 | [tests/payroll/central-c1-provenance.test.ts](../../../tests/payroll/central-c1-provenance.test.ts) | 单元／服务／状态 | 原考勤/个人标准/成功回执须相互证明，改两份来源仍不能复用旧指纹输出 |
-| [tests/payroll/central-c1-service.test.ts](../../../tests/payroll/central-c1-service.test.ts) | 单元／服务／状态 | 纯时工项目无需工程量，逐人工资与未舍入的默认加班价来自真实考勤 |
+| [tests/payroll/central-c1-c2-service.test.ts](../../../tests/payroll/central-c1-c2-service.test.ts) | 单元／服务／状态 | 纯时工项目无需工程量，逐人工资与未舍入的默认加班价来自真实考勤；c2主体按项目与负责人保存正价和明确空规则，不要求月份或工程量，原配置可冷读 |
 | [tests/stores/attendance-central.test.ts](../../../tests/stores/attendance-central.test.ts) | 单元／服务／状态 | 同一个原单元格按项目/人/日保稿恢复，切班组不丢原键，另一日或项目不串写 |
-| [tests/stores/payroll-c1-central.test.ts](../../../tests/stores/payroll-c1-central.test.ts) | 单元／服务／状态 | c1 原金额原键在丢响应、换单和冷恢复期间固定，不与 A 存储桶混用 |
+| [tests/stores/payroll-c1-c2-central.test.ts](../../../tests/stores/payroll-c1-c2-central.test.ts) | 单元／服务／状态 | c1 原金额原键在丢响应、换单和冷恢复期间固定，不与 A 存储桶混用；真实C2发放丢响应冷实例按原键恢复，只有原表单与available冻结的可信后读能解除 |
 
 ## C2 与点工
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
-| [e2e/payroll-c2-central.spec.ts](../../../e2e/payroll-c2-central.spec.ts) | Playwright E2E | 独立签工、人工确认、主体规则、C2核算实发与原键配对冻结输出 |
 | [e2e/payroll-c2-output.spec.ts](../../../e2e/payroll-c2-output.spec.ts) | Playwright E2E | 真实长签工发放后两表分页与下载回读，精确单价及明确空规则不被改写 |
-| [e2e/payroll-c2-readonly.spec.ts](../../../e2e/payroll-c2-readonly.spec.ts) | Playwright E2E | 旧 C2 缺原快照保留原金额与资料，禁止伪完整工资及签工输出 |
-| [e2e/payroll-c2-recovery.spec.ts](../../../e2e/payroll-c2-recovery.spec.ts) | Playwright E2E | 新签工失响应后冷页按原编号保存一次，日期和正文不丢失 |
-| [tests/components/PayrollC2Config.test.ts](../../../tests/components/PayrollC2Config.test.ts) | 组件（jsdom） | 原缺单价不伪零、规则 null 不伪空；显式选择空规则后按原固定读提交 |
-| [tests/components/PayrollC2FrozenPrint.test.ts](../../../tests/components/PayrollC2FrozenPrint.test.ts) | 组件（jsdom） | 工资和签工两个输出保原半工、证明、空规则及全成员真实分配，不输出考勤 |
 | [tests/components/PayrollC2SourceReview.test.ts](../../../tests/components/PayrollC2SourceReview.test.ts) | 组件（jsdom） | 待确认与被占用原记录仍显示具体时段、证明及未采用原因；只以服务采用集合标记 |
 | [tests/components/PayrollC2SpecIndependent.test.ts](../../../tests/components/PayrollC2SpecIndependent.test.ts) | 组件（jsdom） | 独立规格反例：重新读取已撤写权的同一签工，保留本地草稿但停止可编辑与提交 |
 | [tests/components/PayrollDayworkConfirmation.test.ts](../../../tests/components/PayrollDayworkConfirmation.test.ts) | 组件（jsdom） | 修改证明后取消关闭，或 KeepAlive 隐藏再显示，仍保同一原格证明输入 |
 | [tests/components/PayrollDayworkForm.test.ts](../../../tests/components/PayrollDayworkForm.test.ts) | 组件（jsdom） | 保存并确认依据实际状态提示，不将 saved 回执误说为待确认 |
 | [tests/payroll/c2-b-independent.test.ts](../../../tests/payroll/c2-b-independent.test.ts) | 单元／服务／状态 | 独立反例：原签工跨项目及人员移动后仅余可靠回执，仍在恢复删除前保护原行；去掉该回执才可准备 |
-| [tests/payroll/c2-migration-protection.test.ts](../../../tests/payroll/c2-migration-protection.test.ts) | 单元／服务／状态 | 另一项目真实 C2 核对来源保留时，可单独准备恢复未被引用的原项目 |
-| [tests/payroll/c2-navigation.test.ts](../../../tests/payroll/c2-navigation.test.ts) | 单元／服务／状态 | c2 原签工导航 |
 | [tests/payroll/c2-source-locks.test.ts](../../../tests/payroll/c2-source-locks.test.ts) | 单元／服务／状态 | 他单未发逐条领用可见，但不制造同格式整月编辑锁；已发软删头与关联仍占用 |
 | [tests/payroll/c2-spec-independent.test.ts](../../../tests/payroll/c2-spec-independent.test.ts) | 单元／服务／状态 | 独立规格反例：真实发放的全员月锁在签工台账可见，零签工成员与状态筛空均不能丢锁 |
-| [tests/payroll/central-c2-codec.test.ts](../../../tests/payroll/central-c2-codec.test.ts) | 单元／服务／状态 | 签工C2有限数精确展开十进制定点，null与零保真，科学计数传输不能进入读取或命令 |
-| [tests/payroll/central-c2-commands.test.ts](../../../tests/payroll/central-c2-commands.test.ts) | 单元／服务／状态 | 同日两段相邻半工可保存，待确认计入一工上限，重叠与第三半工拒绝且不留回执 |
 | [tests/payroll/central-c2-detail.test.ts](../../../tests/payroll/central-c2-detail.test.ts) | 单元／服务／状态 | 中央 C2 回执被损坏时通用详情也降为来源未证实，保留原金额与原文 |
-| [tests/payroll/central-c2-http.test.ts](../../../tests/payroll/central-c2-http.test.ts) | 单元／服务／状态 | 真实HTTP贯通签工与C2空态、半工、主体配置、唯一核对发放及冻结，价保原精度而金额到分 |
-| [tests/payroll/central-c2-independent.test.ts](../../../tests/payroll/central-c2-independent.test.ts) | 单元／服务／状态 | c2 独立公开服务反例：原关系、最后窗口与完整冻结 |
 | [tests/payroll/central-c2-invalid-migration.test.ts](../../../tests/payroll/central-c2-invalid-migration.test.ts) | 单元／服务／状态 | 按文件中的测试场景定位 |
-| [tests/payroll/central-c2-service.test.ts](../../../tests/payroll/central-c2-service.test.ts) | 单元／服务／状态 | c2主体按项目与负责人保存正价和明确空规则，不要求月份或工程量，原配置可冷读 |
 | [tests/payroll/central-daywork-service.test.ts](../../../tests/payroll/central-daywork-service.test.ts) | 单元／服务／状态 | 没有工程量的直接用工项目可读签工候选，未选择月份保空台账且非法非空月拒绝 |
 | [tests/payroll/daywork-facts.test.ts](../../../tests/payroll/daywork-facts.test.ts) | 单元／服务／状态 | 逐签工事实保留原组、状态、相邻半工与同更新时间的原文变化 |
 | [tests/stores/daywork-central.test.ts](../../../tests/stores/daywork-central.test.ts) | 单元／服务／状态 | 原保存成功后冷读失败仍保原键，随后同ID合法移项目改人改日也能确认原成功并提示后续变化 |
-| [tests/stores/payroll-c2-central.test.ts](../../../tests/stores/payroll-c2-central.test.ts) | 单元／服务／状态 | 真实C2发放丢响应冷实例按原键恢复，只有原表单与available冻结的可信后读能解除 |
 
 ## 辅助文件与配置（非独立测试）
 

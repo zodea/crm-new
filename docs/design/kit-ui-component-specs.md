@@ -675,7 +675,7 @@ const columns: KitTableColumn[] = [{
 
 菜单保留全部调用方动作及禁用语义，触发器为紧凑无边框省略号，浮层消费瑞航面板、描边、阴影与小圆角令牌，并以小箭头关联触发器。空动作显示“无可用操作”，不能造出业务动作。DC 的有状态内部组件不允许由业务屏直接执行；函数式工厂只返回 React 元素。Vue 继续 SFC / Composition API 与现有 reka-ui，不直接调用组件 setup。
 
-本轮仅联动指标、行菜单、标题及其必要网格接缝。Vue 已有 SearchInput、SegTab、StatePanel 和浮层底座继续复用；其他 #496 缺陷及全量界面对标不因此视为完成。原语五档运行验收入口为 `tests/browser/SharedMetricAndMenu.test.ts` 与 `e2e/kit-shared-primitives-dc.spec.ts`，覆盖函数式条件调用、原值/点击、局部溢出、禁用项、键盘、焦点与视口；领域页面及生产冷恢复仍按各工作单元另验，不能由原语验收代替。
+本轮仅联动指标、行菜单、标题及其必要网格接缝。Vue 已有 SearchInput、SegTab、StatePanel 和浮层底座继续复用；其他 #496 缺陷及全量界面对标不因此视为完成。原语五档运行验收入口为 `tests/browser/SharedMetricAndMenu.test.ts` 与 `e2e/kit-table-responsive.spec.ts`，覆盖函数式条件调用、原值/点击、局部溢出、禁用项、键盘、焦点与视口；领域页面及生产冷恢复仍按各工作单元另验，不能由原语验收代替。
 
 <a id="issue-496-decisions"></a>
 

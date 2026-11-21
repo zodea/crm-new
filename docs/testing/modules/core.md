@@ -30,15 +30,13 @@
 | [tests/db/soft-delete.test.ts](../../../tests/db/soft-delete.test.ts) | 单元／服务／状态 | v2 迁移:全业务表 deleted_at + operation_logs |
 | [tests/kit/money.test.ts](../../../tests/kit/money.test.ts) | 单元／服务／状态 | 金额格式化：formatMoney |
 | [tests/server/business-session.test.ts](../../../tests/server/business-session.test.ts) | 单元／服务／状态 | default business session boundary |
-| [tests/server/demo-workspace-test-instance.test.ts](../../../tests/server/demo-workspace-test-instance.test.ts) | 单元／服务／状态 | global demo workspace capability boundary |
 | [tests/stores/data-visibility.test.ts](../../../tests/stores/data-visibility.test.ts) | 单元／服务／状态 | global data visibility preference |
 | [tests/util/chinese-amount.test.ts](../../../tests/util/chinese-amount.test.ts) | 单元／服务／状态 | moneyToChinese |
-| [tests/util/datetime.test.ts](../../../tests/util/datetime.test.ts) | 单元／服务／状态 | datetime formatting |
+| [tests/util/datetime.test.ts](../../../tests/util/datetime.test.ts) | 单元／服务／状态 | datetime formatting；toLocalDateInputValue |
 | [tests/util/external-url.test.ts](../../../tests/util/external-url.test.ts) | 单元／服务／状态 | external URL platform boundary |
 | [tests/util/file-ref-access.test.ts](../../../tests/util/file-ref-access.test.ts) | 单元／服务／状态 | file reference preview safety |
 | [tests/util/file-refs.test.ts](../../../tests/util/file-refs.test.ts) | 单元／服务／状态 | file reference content access |
 | [tests/util/json.test.ts](../../../tests/util/json.test.ts) | 单元／服务／状态 | parseJsonColumn:JSON 列安全解析(类型守卫) |
-| [tests/util/local-date.test.ts](../../../tests/util/local-date.test.ts) | 单元／服务／状态 | toLocalDateInputValue |
 | [tests/util/privacy.test.ts](../../../tests/util/privacy.test.ts) | 单元／服务／状态 | 敏感信息展示脱敏 |
 
 ## 组件（jsdom）

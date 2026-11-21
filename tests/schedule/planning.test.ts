@@ -1,14 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  addCalendarDays,
-  dependencyConflictPreview,
-  dependencyConflicts,
-  dependencyWouldCycle,
-  planTemplateTasks,
-  rescheduledTaskWindow,
-  scheduleDeviationDays,
-  schedulePlannedProgress,
-} from '~/lib/schedule/planning'
+import { addCalendarDays, calendarDays, dependencyConflictPreview, dependencyConflicts, dependencyWouldCycle, planTemplateTasks, rescheduledTaskWindow, scheduleDeviationDays, schedulePlannedProgress } from '~/lib/schedule/planning'
 
 describe('施工进度纯领域规则', () => {
   it('三种搭接方式与手工锚定产出可复现的计划区间', () => {
@@ -139,4 +130,8 @@ describe('施工进度纯领域规则', () => {
   ])('甘特拖动整体平移日期，右缘只调整工期且不允许负工期 / rescheduledTaskWindow：$case', ({ input, expected }) => {
     expect(rescheduledTaskWindow(input)).toEqual(expected)
   })
+})
+
+it('拒绝不存在的月日，不能将日期溢出静默滚到下月', () => {
+  expect(() => calendarDays('2026-02-30', '2026-03-03')).toThrow('无效日期：2026-02-30')
 })

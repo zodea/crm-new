@@ -1,5 +1,6 @@
 import type { APIRequestContext, Page } from '@playwright/test'
 import type { CoreMigrationBatchDTO, CoreMigrationEntityType, CoreMigrationSnapshotDTO } from '../app/lib/migration/core-contract'
+import { Buffer } from 'node:buffer'
 import { mkdir } from 'node:fs/promises'
 import { expect, test } from '@playwright/test'
 import { LATEST_VERSION, migrations, runMigrations } from '../app/lib/db/migrations'
@@ -161,7 +162,7 @@ async function legacyProductionSnapshot(input: MigrationInput, options: { withSo
 }
 
 async function installProductionSnapshot(page: Page, snapshot: Uint8Array) {
-  await page.evaluate(async (bytes) => {
+  await page.evaluate(async (base64) => {
     await new Promise<void>((resolve, reject) => {
       const request = indexedDB.deleteDatabase('crm-new-browser')
       request.addEventListener('success', () => resolve(), { once: true })
@@ -182,7 +183,8 @@ async function installProductionSnapshot(page: Page, snapshot: Uint8Array) {
     try {
       await new Promise<void>((resolve, reject) => {
         const transaction = database.transaction('database_snapshots', 'readwrite')
-        transaction.objectStore('database_snapshots').put(new Uint8Array(bytes).buffer, 'production')
+        const bytes = Uint8Array.from(atob(base64), char => char.charCodeAt(0))
+        transaction.objectStore('database_snapshots').put(bytes.buffer, 'production')
         transaction.addEventListener('complete', () => resolve(), { once: true })
         transaction.addEventListener('error', () => reject(transaction.error), { once: true })
         transaction.addEventListener('abort', () => reject(transaction.error), { once: true })
@@ -191,7 +193,7 @@ async function installProductionSnapshot(page: Page, snapshot: Uint8Array) {
     finally {
       database.close()
     }
-  }, [...snapshot])
+  }, Buffer.from(snapshot).toString('base64'))
 }
 
 async function localMigrationState(page: Page) {
@@ -207,6 +209,15 @@ async function localMigrationState(page: Page) {
         const request = transaction.objectStore(storeName).get(key)
         request.addEventListener('success', () => resolve(request.result), { once: true })
         request.addEventListener('error', () => reject(request.error), { once: true })
+      })
+    }
+    // 无损传回完整快照，避免浏览器为每个 SQLite 字节序列化一个数组元素。
+    function snapshotDataUrl(buffer: ArrayBuffer): Promise<string> {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.addEventListener('load', () => resolve(reader.result as string), { once: true })
+        reader.addEventListener('error', () => reject(reader.error), { once: true })
+        reader.readAsDataURL(new Blob([buffer]))
       })
     }
     try {
@@ -226,10 +237,8 @@ async function localMigrationState(page: Page) {
       return {
         marker,
         readOnly,
-        production: Array.from(new Uint8Array(production)),
-        backup: backup
-          ? Array.from(new Uint8Array(backup.snapshot))
-          : null,
+        production: await snapshotDataUrl(production),
+        backup: backup ? await snapshotDataUrl(backup.snapshot) : null,
         backupId,
       }
     }
@@ -239,7 +248,7 @@ async function localMigrationState(page: Page) {
   })
 }
 
-test.describe('Issue #294：核心身份迁移与可回滚切换', () => {
+test.describe('Issue #294：核心身份迁移与可回滚切换', { tag: '@migration' }, () => {
   test.beforeEach(async ({ request, page }) => {
     await resetMigrationBackend(request)
     await page.addInitScript(() => localStorage.setItem('ruihang:workspace-default:include-demo', 'false'))

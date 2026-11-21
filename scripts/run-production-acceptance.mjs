@@ -14,6 +14,7 @@ const report = resolve(runDirectory, 'report.json')
 const downloads = resolve(runDirectory, 'downloads')
 const entry = resolve(project, output, 'server/index.mjs')
 const env = { ...process.env, NODE_OPTIONS: process.env.NODE_OPTIONS || '--max-old-space-size=4096' }
+const migrationOnly = process.argv.includes('--migration')
 
 function run(args, environment = env) {
   return new Promise((done, reject) => {
@@ -36,13 +37,17 @@ async function main() {
   await mkdir(downloads, { recursive: true })
   console.info(`生产验收报告：${report}`)
   const nuxt = resolve(project, 'node_modules/nuxt/bin/nuxt.mjs')
-  await run([nuxt, 'build'])
+  if (!migrationOnly)
+    await run([nuxt, 'build'])
   await run([nuxt, 'build', '--extends', resolve(project, 'tests/fixtures/invoice-ledger-layer')], {
     ...env,
     NUXT_BUILD_DIR: build,
     CRM_E2E_BUILD_OUTPUT_DIR: output,
   })
-  await run([resolve(project, 'node_modules/@playwright/test/cli.js'), 'test', '--project=production', '--forbid-only', '--reporter=list,json', `--output=${resolve(runDirectory, 'results')}`], {
+  const testArgs = ['test', '--project=production', '--forbid-only', '--reporter=list,json', `--output=${resolve(runDirectory, 'results')}`]
+  if (migrationOnly)
+    testArgs.push('--grep', '@migration')
+  await run([resolve(project, 'node_modules/@playwright/test/cli.js'), ...testArgs], {
     ...env,
     CRM_PRODUCTION_ACCEPTANCE: '1',
     CRM_INVOICE_ACCEPTANCE: '1',
