@@ -21,11 +21,13 @@ it('班组费用默认经真实导出与owner保留0/false/null/缺字段，改�
     const snapshot: CoreMigrationSnapshotDTO = { authority: 'central', activeBatchId: 'crew-fees-batch', entities: source.entities.crews.map(row => ({ ...row, entityType: 'crews', id: row.legacyId, attributes: row.attributes ?? {}, references: {}, quantity: null, amount: null, deletedAt: null, batchId: 'crew-fees-batch' })) }
     snapshot.entities.push({ ...snapshot.entities[0]!, id: 'old-missing', legacyId: 'old-missing', name: '费用未知的旧班组', attributes: {} })
     snapshot.entities.push({ ...snapshot.entities[0]!, id: 'old-null', legacyId: 'old-null', name: '明确空的旧班组', attributes: { rentSubsidyEnabled: null, rentSubsidyPrice: null, mgmtFeeEnabled: null, mgmtFeePrice: null } })
+    snapshot.entities.push({ ...snapshot.entities[0]!, id: 'old-enabled-zero', legacyId: 'old-enabled-zero', name: '启用零价的旧班组', attributes: { rentSubsidyEnabled: 1, rentSubsidyPrice: 0 } })
     const owner = createCrewWorkerCommandTestInstance()
     owner.prepareMigrationSnapshot(snapshot)()
     const facts = () => owner.payrollCrewFeeDefaults().rows
     expect(facts().find(f => f.crewId === 'pa-crew-current')).toMatchObject({ rentEnabled: { state: 'value', value: false }, rentUnitPrice: { state: 'value', value: 0 }, managementEnabled: { state: 'value', value: true }, managementUnitPrice: { state: 'null', value: null } })
     expect(facts().find(f => f.crewId === 'old-null')).toMatchObject({ rentEnabled: { state: 'null', value: null }, managementEnabled: { state: 'null', value: null } })
+    expect(facts().find(f => f.crewId === 'old-enabled-zero')).toMatchObject({ rentEnabled: { state: 'value', value: true }, rentUnitPrice: { state: 'value', value: 0 } })
     const unknown = facts().find(f => f.crewId === 'old-missing')!
     expect(unknown).toMatchObject({ rentEnabled: { state: 'missing' }, rentUnitPrice: { state: 'missing' }, managementEnabled: { state: 'missing' }, managementUnitPrice: { state: 'missing' } })
     const session = { workspaceId: request.workspaceId, actorId: request.actorId, capabilities: [CREW_WRITE_CAPABILITY] }
@@ -33,9 +35,9 @@ it('班组费用默认经真实导出与owner保留0/false/null/缺字段，改�
     await owner.executeCrew({ ...session, requiredCapability: CREW_WRITE_CAPABILITY, commandId: 'rename-only', id: 'old-missing', baseVersion: form.version, action: 'draft', draft: { ...form.draft, name: '仅改名仍未知' }, attachments: {} }, session)
     expect(facts().find(f => f.crewId === 'old-missing')).toEqual(unknown)
     const edited = owner.crewForm('old-missing', session)
-    await owner.executeCrew({ ...session, requiredCapability: CREW_WRITE_CAPABILITY, commandId: 'adopt-zero', id: 'old-missing', baseVersion: edited.version, action: 'draft', draft: { ...edited.draft, rentSubsidyEnabled: true, rentSubsidyPrice: 0 }, attachments: {} }, session)
+    await owner.executeCrew({ ...session, requiredCapability: CREW_WRITE_CAPABILITY, commandId: 'adopt-positive-price', id: 'old-missing', baseVersion: edited.version, action: 'draft', draft: { ...edited.draft, rentSubsidyEnabled: true, rentSubsidyPrice: 0.5 }, attachments: {} }, session)
     const adopted = facts().find(f => f.crewId === 'old-missing')!
-    expect(adopted).toMatchObject({ rentEnabled: { state: 'value', value: true }, rentUnitPrice: { state: 'value', value: 0 }, managementEnabled: { state: 'missing' } })
+    expect(adopted).toMatchObject({ rentEnabled: { state: 'value', value: true }, rentUnitPrice: { state: 'value', value: 0.5 }, managementEnabled: { state: 'missing' } })
     expect(adopted.sourceVersion).not.toBe(unknown.sourceVersion)
     owner.prepareMigrationSnapshot(snapshot)()
     expect(facts().find(f => f.crewId === 'old-missing')).toEqual(adopted)

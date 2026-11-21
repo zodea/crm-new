@@ -65,6 +65,7 @@ const printModels = computed<InvoicePrintViewModel[]>(() => printSource.value.ma
   reviewStatus: record.reviewStatus,
   dupStatus: record.duplicateStatus,
   source: record.sourceKind,
+  original: record.original,
 })))
 function message(cause: unknown) {
   return cause instanceof Error ? cause.message : '操作暂时不可用，请稍后重试。'

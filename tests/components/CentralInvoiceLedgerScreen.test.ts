@@ -168,7 +168,7 @@ it('项目目录版本变化时不导出旧项目名称', async () => {
   expect(mocks.exportFile).toHaveBeenCalledOnce()
 })
 
-it('仅在用户确认已打印后提交原批次，结果未知时核对原任务', async () => {
+it.each(['scan', 'excel'] as const)('%s 有原件且识别核对完成后，确认已打印才提交原批次，结果未知时核对原任务', async (sourceKind) => {
   for (const [name, value] of Object.entries({ computed, shallowRef, useTemplateRef, watch }))
     vi.stubGlobal(name, value)
   vi.stubGlobal('useEventListener', vi.fn())
@@ -176,7 +176,7 @@ it('仅在用户确认已打印后提交原批次，结果未知时核对原任�
   const record: CentralInvoiceRecord = {
     id: 'invoice-one',
     version: '3',
-    sourceKind: 'scan',
+    sourceKind,
     fields: { invoiceNumber: '00123', invoiceDate: '2026-01-01', invoiceType: '', buyer: '', buyerTaxNo: '', seller: '合成销售方', sellerTaxNo: '', amount: null, taxAmount: 0, totalAmount: 100, taxRate: '', remark: '' },
     items: [],
     unrecognizedPageIndexes: [],

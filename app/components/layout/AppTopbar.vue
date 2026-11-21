@@ -12,6 +12,7 @@ import { formatShanghaiDateTime } from '~/lib/util/datetime'
 const route = useRoute()
 const notificationStore = useNotificationStore()
 const dataVisibilityStore = useDataVisibilityStore()
+const productionAccess = useProductionAccessStore()
 const { unreadCount } = storeToRefs(notificationStore)
 const { includeDemo } = storeToRefs(dataVisibilityStore)
 const notificationsRepository = useNuxtApp().$repositories.notifications
@@ -113,6 +114,9 @@ async function switchDataVisibility() {
       </h1>
     </div>
 
+    <span v-if="productionAccess.status?.mode === 'development'" class="shrink-0 rounded-sm bg-warn-soft px-2 py-1 text-12px font-600 text-warn-ink" role="status" title="开发环境 · 仅供测试，请勿录入正式资料">
+      开发环境<span class="hidden sm:inline"> · 仅供测试</span>
+    </span>
     <time class="hidden flex-none text-12px text-[var(--shell-header-muted)] md:block" :datetime="now.toISOString()">
       {{ dateLabel }}
     </time>

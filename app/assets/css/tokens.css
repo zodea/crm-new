@@ -159,12 +159,14 @@
   box-shadow: var(--shadow-pop);
 }
 
-/* ── 全局重置 ── */
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-  margin: 0;
+/* 组件和工具类可覆盖基础重置。 */
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+    margin: 0;
+  }
 }
 
 html {

@@ -22,6 +22,7 @@ import { onActivated, onDeactivated, onScopeDispose } from 'vue'
 import CommandRecoveryPanel from '~/components/shared/CommandRecoveryPanel.vue'
 import SupplierTaxpayerDialog from '~/components/supplier/SupplierTaxpayerDialog.vue'
 import { useTabCloseGuard } from '~/composables/useTabCloseGuard'
+import { crewFeePriceIssues } from '~/lib/crew-worker/payroll-fee-defaults'
 import { validateCrewWorkerReturnTo } from '~/lib/crew-worker/return-context'
 import { customerOriginal } from '~/lib/customer/original'
 import {
@@ -479,12 +480,18 @@ async function initialize(retainInput = false) {
   }
 }
 
-function validateRequired(): boolean {
+function validateForSave(action: MasterDataSaveAction): boolean {
   const errors: Record<string, string> = {}
-  for (const [field, label] of formRequiredFields(props.kind)) {
-    const value = draft.value[field as keyof MasterDataPageDraft]
-    if (typeof value === 'string' ? !value.trim() : value == null)
-      errors[field] = `${label}为必填项`
+  if (action !== 'draft') {
+    for (const [field, label] of formRequiredFields(props.kind)) {
+      const value = draft.value[field as keyof MasterDataPageDraft]
+      if (typeof value === 'string' ? !value.trim() : value == null)
+        errors[field] = `${label}为必填项`
+    }
+  }
+  if (props.kind === 'crew') {
+    for (const { field, message } of crewFeePriceIssues(draft.value))
+      errors[field] = message
   }
   fieldErrors.value = errors
   const labels = Object.values(errors)
@@ -590,7 +597,7 @@ async function handleFooterAction(action: FormFooterAction) {
       : action === 'saveSubmit'
         ? 'submit'
         : 'save'
-  if (saveAction !== 'draft' && !validateRequired())
+  if ((saveAction !== 'draft' || props.kind === 'crew') && !validateForSave(saveAction))
     return
 
   loadingAction.value = action

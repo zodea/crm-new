@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onKeyStroke, useEventListener, useResizeObserver } from '@vueuse/core'
 import { useOverlayStack, useOwnedOverlayLayerStyle } from '~/composables/useOverlayStack'
-import { HOME_KEY, MAX_TABS } from '~/lib/tabs/tab-machine'
+import { MAX_TABS } from '~/lib/tabs/tab-machine'
 import { routeTitle } from '~/lib/tabs/tab-title'
 
 const router = useRouter()
@@ -184,8 +184,10 @@ function onMenuKeydown(event: KeyboardEvent) {
 
 const menuTab = computed(() => tabsStore.tabs.find(tab => tab.key === menu.value.key))
 const menuIndex = computed(() => tabsStore.tabs.findIndex(tab => tab.key === menu.value.key))
-const hasRight = computed(() => tabsStore.tabs.slice(menuIndex.value + 1).some(tab => tab.key !== HOME_KEY))
-const hasOthers = computed(() => tabsStore.tabs.some(tab => tab.key !== HOME_KEY && tab.key !== menu.value.key))
+const hasLeft = computed(() => menuIndex.value > 0 && tabsStore.tabs.slice(0, menuIndex.value).some(tab => tab.closable))
+const hasRight = computed(() => menuIndex.value >= 0 && tabsStore.tabs.slice(menuIndex.value + 1).some(tab => tab.closable))
+const hasOthers = computed(() => tabsStore.tabs.some(tab => tab.closable && tab.key !== menu.value.key))
+const hasClosable = computed(() => tabsStore.tabs.some(tab => tab.closable))
 
 async function act(action: () => Promise<boolean>) {
   const pending = action()
@@ -243,6 +245,7 @@ onKeyStroke('Escape', () => closeMenu(true))
             type="button"
             data-tab-trigger
             class="min-w-0 flex h-full flex-1 items-center border-0 bg-transparent p-0 text-inherit outline-none focus-visible:[box-shadow:inset_0_0_0_2px_var(--brand)]"
+            :title="tab.title"
             :aria-current="tab.key === tabsStore.activeKey ? 'page' : undefined"
             @click="goTab(tab.fullPath, tab.key)"
             @keydown="openKeyboardMenu($event, tab.key)"
@@ -337,6 +340,16 @@ onKeyStroke('Escape', () => closeMenu(true))
         role="menuitem"
         tabindex="-1"
         class="tab-menu-item"
+        :disabled="!hasLeft"
+        @click="act(() => tabsStore.requestCloseToLeft(menu.key))"
+      >
+        关闭左侧
+      </button>
+      <button
+        type="button"
+        role="menuitem"
+        tabindex="-1"
+        class="tab-menu-item"
         :disabled="!hasRight"
         @click="act(() => tabsStore.requestCloseToRight(menu.key))"
       >
@@ -348,7 +361,7 @@ onKeyStroke('Escape', () => closeMenu(true))
         role="menuitem"
         tabindex="-1"
         class="tab-menu-item"
-        :disabled="!hasOthers"
+        :disabled="!hasClosable"
         @click="act(() => tabsStore.requestCloseEvery())"
       >
         关闭全部

@@ -7,6 +7,7 @@ import { Buffer } from 'node:buffer'
 import { createHash, randomUUID } from 'node:crypto'
 import { CentralInvoiceProblem, INVOICE_ORIGINAL_MAX_BYTES, INVOICE_READ_CAPABILITY, INVOICE_WRITE_CAPABILITY } from '../../app/lib/invoice/central-contract'
 import { invoiceCorrectionChanges } from '../../app/lib/invoice/correction-contract'
+import { hasPrintableCentralOriginal } from '../../app/lib/invoice/print-layout'
 import { resolveContractSignatory } from '../../app/lib/our-signatory/storage'
 import { parsePageQuery, resolvePagination } from '../../app/lib/read-model/pagination'
 import { isISODateDTO } from '../../app/types/read-model'
@@ -606,7 +607,7 @@ export async function validateProductionInvoiceJournal(tx: TransactionDb, identi
         const before = parse(entry.printing.line.before_json)
         const after = parse(entry.printing.line.after_json)
         if (!object(before) || !object(after) || canonical(before) !== canonical(prior) || before.deletedAt !== null
-          || before.sourceKind !== 'scan' || before.ocrStatus !== 'done' || before.reviewStatus !== 'reviewed' || before.duplicateStatus !== 'normal'
+          || !hasPrintableCentralOriginal(before.sourceKind, before.original) || before.ocrStatus !== 'done' || before.reviewStatus !== 'reviewed' || before.duplicateStatus !== 'normal'
           || !object(before.fields) || typeof before.fields.totalAmount !== 'number' || before.fields.totalAmount <= 0
           || typeof before.printCount !== 'number' || entry.printing.print.printCount !== before.printCount + 1
           || canonical(after) !== canonical({ ...before, version: entry.result.version, updatedAt: entry.result.updatedAt, printCount: entry.printing.print.printCount, printRotation: entry.printing.print.printRotation })) {
@@ -1406,9 +1407,9 @@ export function createProductionInvoiceService(storage: ProductionStorage, optio
           const invoice = await record(tx, target.invoiceId, false, actor)
           if (invoice.version !== target.baseVersion)
             fail('conflict', '打印列表中发票版本已变化，请重新核对整批。')
-          if (invoice.sourceKind !== 'scan' || invoice.ocrStatus !== 'done' || invoice.reviewStatus !== 'reviewed' || invoice.duplicateStatus !== 'normal'
+          if (!hasPrintableCentralOriginal(invoice.sourceKind, invoice.original) || invoice.ocrStatus !== 'done' || invoice.reviewStatus !== 'reviewed' || invoice.duplicateStatus !== 'normal'
             || invoice.fields.totalAmount === null || invoice.fields.totalAmount <= 0) {
-            fail('validation-failed', '打印列表包含未完成识别、未核对、重复或缺少有效金额的发票。')
+            fail('validation-failed', '打印列表包含缺少可打印原件、未完成识别、未核对、重复或缺少有效金额的发票。')
           }
           if (!Number.isSafeInteger(Number(invoice.version) + 1) || !Number.isSafeInteger(invoice.printCount + 1))
             fail('unavailable', '发票版本或打印次数无法可靠递增。')

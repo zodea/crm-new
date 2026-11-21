@@ -34,6 +34,46 @@ describe('班组—工人中央 command 测试实例', () => {
     expect(instance.crewForm(created.id, session).draft.defaultPayRatio).toBe(ratio)
   })
 
+  it('局部更新沿用已启用的开关，拒绝清空单价并保留原版本', async () => {
+    const instance = createCrewWorkerCommandTestInstance()
+    const request = { ...session, requiredCapability: CREW_WRITE_CAPABILITY, commandId: 'create-fees', baseVersion: null, action: 'draft' as const, attachments: {} }
+    const saved = await instance.executeCrew({
+      ...request,
+      draft: { name: '合成班组', rentSubsidyEnabled: true, rentSubsidyPrice: 0.005, mgmtFeeEnabled: false, mgmtFeePrice: 0 },
+    }, session)
+    await expect(instance.executeCrew({
+      ...request,
+      commandId: 'clear-fee-price',
+      id: saved.id,
+      baseVersion: saved.version,
+      draft: { name: '合成班组', rentSubsidyPrice: null },
+    }, session)).rejects.toMatchObject({
+      problem: { code: 'validation-failed', fieldErrors: { rentSubsidyPrice: ['启用房租补贴时，单价必须大于 0'] } },
+    })
+    expect(instance.crewForm(saved.id, session)).toMatchObject({
+      version: saved.version,
+      draft: { rentSubsidyEnabled: true, rentSubsidyPrice: 0.005, mgmtFeeEnabled: false, mgmtFeePrice: 0 },
+    })
+  })
+
+  it.each([
+    { action: 'draft', fees: { rentSubsidyEnabled: true }, field: 'rentSubsidyPrice', label: '房租补贴' },
+    { action: 'save', fees: { rentSubsidyEnabled: true, rentSubsidyPrice: 0 }, field: 'rentSubsidyPrice', label: '房租补贴' },
+    { action: 'submit', fees: { rentSubsidyEnabled: true, rentSubsidyPrice: -1 }, field: 'rentSubsidyPrice', label: '房租补贴' },
+    { action: 'draft', fees: { mgmtFeeEnabled: true, mgmtFeePrice: 0 }, field: 'mgmtFeePrice', label: '管理提成' },
+    { action: 'save', fees: { mgmtFeeEnabled: true, mgmtFeePrice: null }, field: 'mgmtFeePrice', label: '管理提成' },
+    { action: 'submit', fees: { mgmtFeeEnabled: true, mgmtFeePrice: -1 }, field: 'mgmtFeePrice', label: '管理提成' },
+  ] as const)('启用 $label 的 $action 命令必须提供大于 0 的单价', async ({ action, fees, field, label }) => {
+    const instance = createCrewWorkerCommandTestInstance()
+    const draft = { ...formDefaults('crew'), name: '合成班组', trade: '泥工', contactName: '负责人', contactPhone: '13812345678', ...fees }
+    const request = { ...session, requiredCapability: CREW_WRITE_CAPABILITY, commandId: 'invalid-fee-price', baseVersion: null, action, draft, attachments: {} }
+
+    await expect(instance.executeCrew(request, session)).rejects.toMatchObject({
+      problem: { code: 'validation-failed', fieldErrors: { [field]: [`启用${label}时，单价必须大于 0`] } },
+    })
+    expect(instance.crewRows()).toEqual([])
+  })
+
   it('由服务器分配稳定 ID，幂等创建，并用 baseVersion 保护显式编辑', async () => {
     let sequence = 0
     const instance = createCrewWorkerCommandTestInstance({

@@ -2,6 +2,7 @@
 import type { CentralInvoiceRecord } from '~/lib/invoice/central-contract'
 import { computed, ref, watch } from 'vue'
 import { centralInvoiceSourceLabel } from '~/lib/invoice/central-source-label'
+import { hasPrintableCentralOriginal } from '~/lib/invoice/print-layout'
 
 interface ReferenceOption { id: string, label: string }
 const props = defineProps<{ records: readonly CentralInvoiceRecord[], projects: readonly ReferenceOption[], busy?: boolean }>()
@@ -37,7 +38,7 @@ const total = computed(() => {
   }
   return cents / 100
 })
-const invalidPrint = computed(() => selected.value.filter(record => record.sourceKind !== 'scan' || !record.original || record.ocrStatus !== 'done' || record.reviewStatus !== 'reviewed' || record.duplicateStatus !== 'normal' || record.fields.totalAmount === null || record.fields.totalAmount <= 0))
+const invalidPrint = computed(() => selected.value.filter(record => !hasPrintableCentralOriginal(record.sourceKind, record.original) || record.ocrStatus !== 'done' || record.reviewStatus !== 'reviewed' || record.duplicateStatus !== 'normal' || record.fields.totalAmount === null || record.fields.totalAmount <= 0))
 watch(archived, (rows) => {
   checked.value = checked.value.filter(id => rows.some(record => record.id === id))
 })

@@ -575,6 +575,26 @@ describe('发票中央原件 owner（隔离内存）', () => {
     const [sourceRow] = await f.storage.select<{ source_json: string }>('SELECT source_json FROM invoice_import_sources WHERE invoice_id=? ORDER BY rowid', [imported.invoiceId])
     expect(JSON.parse(sourceRow!.source_json)).toEqual(request.source)
     await expect(f.storage.execute('DELETE FROM invoice_import_sources')).rejects.toThrow('invoice import source is immutable')
+    const attached = await f.service.execute({
+      workspaceId: f.actor.workspaceId,
+      actorId: f.actor.actorId,
+      requiredCapability: INVOICE_WRITE_CAPABILITY,
+      action: 'attach-original',
+      commandId: 'excel-original',
+      invoiceId: imported.invoiceId,
+      baseVersion: imported.version,
+      original: f.upload.original,
+      confirmed: true,
+    }, f.session)
+    await expect(f.service.recordPrinted({
+      workspaceId: f.actor.workspaceId,
+      actorId: f.actor.actorId,
+      requiredCapability: INVOICE_WRITE_CAPABILITY,
+      action: 'record-printed',
+      commandId: 'excel-still-pending',
+      targets: [{ invoiceId: imported.invoiceId, baseVersion: attached.version, rotation: 0 }],
+    }, f.session)).rejects.toMatchObject({ problem: { code: 'validation-failed' } })
+    expect(await f.service.get(imported.invoiceId, f.session)).toMatchObject({ sourceKind: 'excel', version: attached.version, original: { id: attached.originalId }, ocrStatus: 'pending', printCount: 0 })
     await expect(validateProductionInvoiceJournal(f.storage, f.actor)).resolves.toBeUndefined()
   })
 

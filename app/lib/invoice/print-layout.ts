@@ -17,8 +17,9 @@ export interface PrintableInvoice {
   ocrStatus?: string
   reviewStatus?: string
   dupStatus?: string
-  /** Excel 导入的记录没有扫描原件，不能打印；旧排版 fixture 省略时不检查。 */
   source?: string
+  /** 中央读面已核验的原件引用。旧台账路径或文件名不能证明关联成功。 */
+  original?: { id: string } | null
 }
 
 /** 打印只依赖可见票面和打印状态，不要求伪造未识别的其他金额。 */
@@ -56,18 +57,27 @@ export interface PrintQueueCheckResult {
   reason?: string
 }
 
+export function hasPrintableCentralOriginal(source: unknown, original: unknown): boolean {
+  return (source === 'scan' || source === 'excel')
+    && typeof original === 'object' && original !== null && 'id' in original
+    && typeof original.id === 'string' && original.id.trim().length > 0
+}
+
 /** 打印队列只接受已完成识别、人工确认且未被重复排除的当前值。 */
 export function checkPrintableInvoice(invoice: PrintableInvoice): PrintQueueCheckResult {
   if (!invoice.id.trim())
     return { ok: false, reason: '缺少票据 ID，不能进入打印队列' }
-  if (invoice.source === 'excel')
+  const excel = invoice.source === 'excel'
+  if (excel && !hasPrintableCentralOriginal(invoice.source, invoice.original))
     return { ok: false, reason: 'Excel 导入的发票没有原件，不能打印' }
-  if (invoice.ocrStatus != null && invoice.ocrStatus !== 'done')
+  if ((excel || invoice.ocrStatus != null) && invoice.ocrStatus !== 'done')
     return { ok: false, reason: '识别尚未完成，不能进入打印队列' }
-  if (invoice.reviewStatus != null && invoice.reviewStatus !== 'reviewed')
+  if ((excel || invoice.reviewStatus != null) && invoice.reviewStatus !== 'reviewed')
     return { ok: false, reason: '当前字段尚未完成人工确认，不能进入打印队列' }
   if (invoice.dupStatus === 'duplicate')
     return { ok: false, reason: '重复票据已排除，不能进入打印队列' }
+  if (excel && invoice.dupStatus !== 'normal')
+    return { ok: false, reason: '去重状态尚未确认，不能进入打印队列' }
   if (!Number.isFinite(invoice.totalAmount) || invoice.totalAmount <= 0)
     return { ok: false, reason: '价税合计缺失或金额异常，不能进入打印队列' }
   return { ok: true }

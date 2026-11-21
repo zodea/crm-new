@@ -83,10 +83,10 @@ watch(
 
 const currentSlots = computed(() => previewLayout.value.pages[currentPage.value - 1] ?? [])
 /** 列表中不能打印的票及原因；打印时会被跳过，须在面板中明确列出。 */
-const unprintableReasons = computed(() => new Map(previewLayout.value.skipped.map(item => [item.invoice.id, item.reason])))
-const skippedInvoices = computed(() => layout.value.skipped)
+const skippedInvoices = computed(() => previewLayout.value.skipped)
+const unprintableReasons = computed(() => new Map(skippedInvoices.value.map(item => [item.invoice.id, item.reason])))
 const allSelected = computed({
-  get: () => props.invoices.length > 0 && selectedIds.value.size === props.invoices.length,
+  get: () => previewLayout.value.selectedCount > 0 && layout.value.selectedCount === previewLayout.value.selectedCount,
   set: (checked: boolean) => {
     selectedIds.value = checked
       ? new Set(props.invoices.map(invoice => invoice.id))
@@ -177,8 +177,8 @@ useEventListener(() => document, 'click', () => {
           class="w-full flex items-center gap-2 border-b border-line bg-panel px-3 py-2.5 text-left hover:bg-surface-2"
           :class="selectedInvoiceId === invoice.id ? 'bg-brand-soft' : ''"
           @click="selectedInvoiceId = invoice.id"
-          @keydown.enter="selectedInvoiceId = invoice.id"
-          @keydown.space.prevent="selectedInvoiceId = invoice.id"
+          @keydown.enter.self="selectedInvoiceId = invoice.id"
+          @keydown.space.self.prevent="selectedInvoiceId = invoice.id"
         >
           <input
             type="checkbox"
@@ -225,7 +225,7 @@ useEventListener(() => document, 'click', () => {
 
       <div class="flex items-center justify-between gap-2 border-b border-line px-3 py-2 text-11px text-ink-soft">
         <label class="inline-flex items-center gap-1.5">
-          <input v-model="allSelected" type="checkbox" aria-label="全选发票">
+          <input v-model="allSelected" type="checkbox" aria-label="全选发票" :disabled="!previewLayout.selectedCount">
           全选
         </label>
         <div class="inline-flex items-center gap-2">

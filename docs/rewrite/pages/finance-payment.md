@@ -49,7 +49,7 @@
 | 申请人 | 文本/人员选择 |
 | 回票类型 | 先票后款/先款后票/无需发票 |
 | 付款内容 | 多行文本 |
-| 附件 | 最多 15 份 |
+| 附件 | 表单最多保留 15 份，超出时提示本次实际加入的份数。命令端的 15 份上限校验按 [#497 G3](https://github.com/zodea/crm-new/issues/497#issuecomment-6049913811) 暂缓。 |
 
 上述控件的实体字段、附件归属和存储例外直接见 [DATABASE](../DATABASE.md#entity-payment-application)，公共保存与回执见 [COMMANDS](../COMMANDS.md#command-envelope)；本页只维护交互和领域操作。
 

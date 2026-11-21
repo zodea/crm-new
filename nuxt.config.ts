@@ -15,6 +15,10 @@ export default defineNuxtConfig({
   ...(buildDir ? { buildDir: isolatedPaths?.build ?? buildDir } : {}),
   devtools: { enabled: process.env.NUXT_DEVTOOLS !== 'false' },
 
+  $development: {
+    nitro: { sourceMap: process.env.CRM_DEV_NITRO_SOURCEMAP === '1' },
+  },
+
   nitro: {
     ...(isolatedPaths ? { output: { dir: isolatedPaths.output } } : {}),
     // PDF.js 读取中文文字型 PDF 时按需加载内置字符映射；打包与开发环境使用同一来源。
