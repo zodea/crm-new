@@ -6,6 +6,7 @@ import type { ProjectListPageDTO, ProjectListQueryDTO } from '~/lib/project/repo
 import type { MetricDTO } from '~/types/read-model'
 import { useDebounceFn } from '@vueuse/core'
 import * as XLSX from 'xlsx'
+import EntityDeletedList from '~/components/shared/EntityDeletedList.vue'
 import EntityPendingRecovery from '~/components/shared/EntityPendingRecovery.vue'
 import KitStatusTag from '~/components/ui/KitStatusTag.vue'
 import RowActionMenu from '~/components/ui/RowActionMenu.vue'
@@ -18,9 +19,11 @@ import { PROJECT_STATUSES, projectStatusTone } from '~/lib/project/status'
 import { readProblemTitle } from '~/lib/read-model/state'
 import { toErrorMessage } from '~/lib/util/error'
 import { yuan } from '~/lib/util/money'
+import { useProjectProductionStore } from '~/stores/project-production'
 
 const readStore = useProjectListStore()
 const commandStore = useProjectCommandStore()
+const productionStore = useProjectProductionStore()
 const dataVisibilityStore = useDataVisibilityStore()
 const route = useRoute()
 const router = useRouter()
@@ -488,7 +491,12 @@ onDeactivated(() => {
       description="刷新前的保存结果还未确认。先核对原提交，再填写新的项目资料。"
       :load-pending-forms="commandStore.pendingForms"
     />
-    <ProjectDeletedList v-if="readPage?.capabilities.includes('project:lifecycle:write')" />
+    <EntityDeletedList
+      v-if="readPage?.capabilities.includes('project:lifecycle:write')"
+      entity-label="项目"
+      :load-deleted="productionStore.deleted"
+      :get-detail-path="id => `/project/${encodeURIComponent(id)}?origin=real`"
+    />
     <StatePanel
       v-if="readStore.state.kind === 'loading' && !readPage"
       kind="loading"

@@ -21,6 +21,9 @@ import { buildProjectListPage } from '~/lib/project/repository'
 import { withOriginReadMeta } from '../../server/utils/read-meta'
 import { projectSnapshotEvidence } from '../helpers/project-read-meta'
 
+const deletedProjects = vi.hoisted(() => vi.fn())
+vi.mock('~/stores/project-production', () => ({ useProjectProductionStore: () => ({ deleted: deletedProjects }) }))
+
 const projects = [
   {
     id: 'project-1',
@@ -301,6 +304,7 @@ describe('project list screen', () => {
     route.hash = ''
     route.query = {}
     routerReplace.mockReset()
+    deletedProjects.mockReset().mockResolvedValue([])
     vi.stubGlobal('useRoute', () => route)
     vi.stubGlobal('useRouter', () => ({ replace: routerReplace }))
     navigateTo.mockReset()
@@ -350,6 +354,19 @@ describe('project list screen', () => {
       success: vi.fn(),
       undoToast: vi.fn(),
     }))
+  })
+
+  it('已删除项目入口随权限开放，并保留项目详情的正式来源', async () => {
+    deletedProjects.mockResolvedValue([{ id: '项目/id', name: '已删除的原项目', version: 'v2', deletedAt: '2026-09-24' }])
+    render(ProjectListScreen, { global })
+    await nextTick()
+    expect(deletedProjects).not.toHaveBeenCalled()
+    expect(screen.queryByText(/已删除项目/)).toBeNull()
+
+    const data = projectPage()
+    projectReadStore.state = { kind: 'ready', data: { ...data, capabilities: [...data.capabilities, 'project:lifecycle:write'] } }
+    await fireEvent.click(await screen.findByText('已删除项目（1）'))
+    expect((await screen.findByRole('link', { name: '已删除的原项目' })).getAttribute('href')).toBe(`/project/${encodeURIComponent('项目/id')}?origin=real`)
   })
 
   it('采用参考的左侧阶段树结构，但筛选值只使用本地项目状态机', () => {

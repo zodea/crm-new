@@ -3,16 +3,19 @@ import type { CustomerListPageDTO, CustomerListQueryDTO } from '~/lib/customer/r
 import type { MasterDataFilterValue, MasterDataListFilterField, MasterDataListSort } from '~/lib/master-data/list'
 import { useDebounceFn } from '@vueuse/core'
 import { computed, onActivated, onDeactivated, onMounted, onScopeDispose, shallowRef, watch } from 'vue'
+import EntityDeletedList from '~/components/shared/EntityDeletedList.vue'
 import EntityPendingRecovery from '~/components/shared/EntityPendingRecovery.vue'
 import { MASTER_DATA_LIST_PROFILES, masterDataStatusLabel } from '~/lib/master-data/list'
 import { readProblemTitle } from '~/lib/read-model/state'
 import { normalizeEnumSelection } from '~/lib/util/enum-selection'
 import { maskIdentifier, maskPhone } from '~/lib/util/privacy'
 import { useCustomerCommandStore } from '~/stores/customer-command'
+import { useCustomerProductionStore } from '~/stores/customer-production'
 import { useCustomerReadStore } from '~/stores/customer-read'
 
 const readStore = useCustomerReadStore()
 const commandStore = useCustomerCommandStore()
+const productionStore = useCustomerProductionStore()
 const visibility = useDataVisibilityStore()
 const route = useRoute()
 const router = useRouter()
@@ -257,6 +260,11 @@ onScopeDispose(deactivateView)
         </div>
       </template>
     </ListShell>
-    <CustomerDeletedList v-if="readPage?.capabilities.includes('customer:lifecycle:write')" />
+    <EntityDeletedList
+      v-if="readPage?.capabilities.includes('customer:lifecycle:write')"
+      entity-label="客户"
+      :load-deleted="productionStore.deleted"
+      :get-detail-path="id => `/base/customer/${encodeURIComponent(id)}?origin=real`"
+    />
   </div>
 </template>

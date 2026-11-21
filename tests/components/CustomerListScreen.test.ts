@@ -1,6 +1,6 @@
 import type { CustomerListPageDTO, CustomerListQueryDTO } from '~/lib/customer/read-contract'
 import type { ReadState } from '~/types/read-model'
-import { render, screen, waitFor } from '@testing-library/vue'
+import { fireEvent, render, screen, waitFor } from '@testing-library/vue'
 import { flushPromises } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, nextTick, onActivated, reactive } from 'vue'
@@ -11,8 +11,10 @@ import { attachOriginReadMeta } from '~/lib/read-model/meta'
 import { publicReadMeta } from '../helpers/public-read-meta'
 
 const fixtures = vi.hoisted(() => ({ store: null as unknown }))
+const deletedCustomers = vi.hoisted(() => vi.fn())
 vi.mock('~/stores/customer-read', () => ({ useCustomerReadStore: () => fixtures.store }))
 vi.mock('~/stores/customer-command', () => ({ useCustomerCommandStore: () => ({ latestWrite: null }) }))
+vi.mock('~/stores/customer-production', () => ({ useCustomerProductionStore: () => ({ deleted: deletedCustomers }) }))
 const route = reactive({ path: '/base/customer', fullPath: '/base/customer', query: {} as Record<string, string> })
 const replace = vi.fn()
 let store: { listState: ReadState<CustomerListPageDTO>, loadList: ReturnType<typeof vi.fn> }
@@ -28,7 +30,7 @@ function page(query: CustomerListQueryDTO) {
 const global = { components: {
   ListShell: defineComponent({ template: '<main><slot name="toolbar" /><slot name="table" /></main>' }),
   StatePanel: defineComponent({ props: ['title', 'description'], template: '<section role="alert"><h2>{{ title }}</h2><p>{{ description }}</p></section>' }),
-}, stubs: { MasterDataListToolbar: true, KitTable: true, EntityPendingRecovery: true, CustomerDeletedList: true, NuxtLink: true } }
+}, stubs: { MasterDataListToolbar: true, KitTable: true, EntityPendingRecovery: true, NuxtLink: true } }
 
 describe('客户列表实际分页和撤权', () => {
   beforeEach(() => {
@@ -36,6 +38,7 @@ describe('客户列表实际分页和撤权', () => {
     route.fullPath = '/base/customer'
     route.query = {}
     replace.mockReset()
+    deletedCustomers.mockReset().mockResolvedValue([])
     vi.stubGlobal('useCustomerListReturnContext', useCustomerListReturnContext)
     vi.stubGlobal('useRoute', () => route)
     vi.stubGlobal('useRouter', () => ({ replace }))
@@ -87,5 +90,18 @@ describe('客户列表实际分页和撤权', () => {
     expect((await screen.findByRole('alert')).textContent).toContain('登录已失效')
     expect(screen.queryByText('还没有客户档案')).toBeNull()
     expect(document.querySelector('kit-table-stub')).toBeNull()
+  })
+
+  it('已删除客户入口随权限开放，并保留客户详情的正式来源', async () => {
+    deletedCustomers.mockResolvedValue([{ id: '客户/id', name: '已删除的原客户', version: 'v2', deletedAt: '2026-10-04' }])
+    render(CustomerListScreen, { global: { ...global, stubs: { ...global.stubs, NuxtLink: { props: ['to'], template: '<a :href="to"><slot /></a>' } } } })
+    await flushPromises()
+    expect(deletedCustomers).not.toHaveBeenCalled()
+    expect(screen.queryByText(/已删除客户/)).toBeNull()
+
+    const data = page({ search: '', status: [], page: 1, pageSize: 10, sort: 'updated-desc', includeDemo: false })
+    store.listState = { kind: 'empty', data: { ...data, capabilities: [...data.capabilities, 'customer:lifecycle:write'] }, empty: data.empty! }
+    await fireEvent.click(await screen.findByText('已删除客户（1）'))
+    expect((await screen.findByRole('link', { name: '已删除的原客户' })).getAttribute('href')).toBe(`/base/customer/${encodeURIComponent('客户/id')}?origin=real`)
   })
 })
