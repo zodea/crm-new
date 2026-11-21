@@ -43,7 +43,7 @@ function setFilter(field: MasterDataListFilterField, value: string[]) {
 <template>
   <section
     data-ui="master-data-list-toolbar"
-    class="panel min-w-0 max-w-full p-2.5"
+    class="min-w-0 max-w-full flex-1"
   >
     <div
       data-ui="master-data-list-toolbar-row"

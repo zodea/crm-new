@@ -6,6 +6,7 @@ import { computed, onActivated, onDeactivated, onMounted, onScopeDispose, shallo
 import MasterDataListToolbar from '~/components/master-data/MasterDataListToolbar.vue'
 import EntityDeletedList from '~/components/shared/EntityDeletedList.vue'
 import EntityPendingRecovery from '~/components/shared/EntityPendingRecovery.vue'
+import KitStatusTag from '~/components/ui/KitStatusTag.vue'
 import { MASTER_DATA_LIST_PROFILES, masterDataStatusLabel } from '~/lib/master-data/list'
 import { readProblemTitle } from '~/lib/read-model/state'
 import { normalizeEnumSelection } from '~/lib/util/enum-selection'
@@ -189,7 +190,7 @@ onScopeDispose(deactivateView)
       :compact="Boolean(readPage)"
       @action="load"
     />
-    <ListShell v-if="!problem || readPage" :summary="summary">
+    <ListShell v-if="!problem || readPage" continuous :summary="summary">
       <template #toolbar>
         <MasterDataListToolbar
           v-model:search="search"
@@ -245,7 +246,9 @@ onScopeDispose(deactivateView)
               <span class="font-mono">{{ maskPhone(row.contactPhone) || '—' }}</span>
             </template>
             <template #status="{ row }">
-              <span :class="row.status === 'active' ? 'chip chip-ok' : 'chip chip-warn'">{{ masterDataStatusLabel(row.status) }}</span>
+              <KitStatusTag :tone="row.status === 'active' ? 'ok' : 'warn'">
+                {{ masterDataStatusLabel(row.status) }}
+              </KitStatusTag>
             </template>
             <template #action="{ row }">
               <div class="flex justify-end gap-1">
