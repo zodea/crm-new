@@ -602,11 +602,9 @@ onDeactivated(() => {
           </template>
 
           <template #origin="{ row }">
-            <span
-              v-if="row.dataOrigin === 'demo'"
-              class="chip chip-warn"
-            >测试数据</span>
-            <span v-else class="text-11px font-600 text-ink-soft">正式数据</span>
+            <KitStatusTag :tone="row.dataOrigin === 'demo' ? 'warn' : 'neutral'">
+              {{ row.dataOrigin === 'demo' ? '测试数据' : '正式数据' }}
+            </KitStatusTag>
           </template>
 
           <template #status="{ row }">

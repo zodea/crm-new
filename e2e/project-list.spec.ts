@@ -309,6 +309,8 @@ test.describe('项目中央 HTTP', () => {
       await expect(page.getByText('无权限', { exact: true })).toBeVisible()
       await expect(page.getByText('翠湖投资', { exact: true })).toHaveCount(0)
       await expect(page.getByText('¥0.00', { exact: true }).first()).toBeVisible()
+      const sourceTag = page.locator('[data-list-shell-table] [data-ui="kit-table"]').getByText('测试数据', { exact: true }).first()
+      await expect(sourceTag).toHaveAttribute('data-ui', 'status-tag')
 
       const summary = page.getByLabel('项目列表汇总')
       await expect(summary).toContainText(/测试数据.*累计收入\s*未知（已知小计 ¥25,367,027\.00）.*收入缺失 10 个/)
