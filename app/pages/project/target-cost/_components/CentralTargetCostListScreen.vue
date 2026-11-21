@@ -3,6 +3,7 @@ import type { TargetCostFormRead, TargetCostListRead, TargetCostPending } from '
 import type { TargetCostListRow } from '~/lib/target-cost/list'
 import { computed, onActivated, onDeactivated, onScopeDispose, shallowRef, watch } from 'vue'
 import TargetCostCommandState from '~/components/target-cost/TargetCostCommandState.vue'
+import ListShell from '~/components/ui/ListShell.vue'
 import { clampPage, paginate } from '~/lib/kit/table'
 import { filterTargetCostList } from '~/lib/target-cost/list'
 import { TARGET_COST_LIST_PATH, targetCostListPath, targetCostListQuery, targetCostLocation, targetCostOrigin } from '~/lib/target-cost/navigation'
@@ -200,24 +201,36 @@ onScopeDispose(() => {
 </script>
 
 <template>
-  <div class="grid min-w-0 gap-4">
-    <TargetCostListFilters v-model:search="search" v-model:project="project" v-model:baseline="baseline" v-model:status="status" :loading="loading" :project-options="projectOptions" :status-options="statusOptions" :can-create="!!canWrite" @refresh="load" @create="create" />
-    <div class="panel flex min-w-0 flex-wrap items-center gap-4 p-3 text-12px">
-      <label>资料来源<select class="field-input ml-2" :value="origin || ''" aria-label="预算资料来源" @change="router.replace({ path: TARGET_COST_LIST_PATH, query: { origin: ($event.target as HTMLSelectElement).value } })"><option value="real">正式预算</option><option value="demo">演示预算（只读）</option></select></label>
-      <label>排序<select v-model="sort" class="field-input ml-2" aria-label="预算排序"><option value="updated-desc">最近更新</option><option value="name-asc">版本名</option></select></label>
-      <label class="flex items-center gap-2"><input v-model="deleted" type="checkbox" class="accent-brand">查看已删除版本</label>
-    </div>
-    <TargetCostCommandState :error="error" :pending="!!pending" :busy="loading || saving" :applied="pending?.state === 'applied'" @recover="recover()" @recheck="load" />
-    <section v-for="operation in pendingOperations.filter(item => item.descriptor.commandId !== pending?.descriptor.commandId)" :key="operation.descriptor.commandId" class="panel p-3 text-12px" aria-label="预算未决操作">
-      <p>「{{ rows.find(row => row.id === operation.descriptor.targetId)?.name || '未填写版本名' }}」仍有一次提交结果待核对。</p>
-      <KitButton class="mt-2" :disabled="loading || saving" @click="recover(operation)">
-        核对并恢复原提交
-      </KitButton>
-    </section>
-    <TargetCostListTable v-if="!error" :rows="pageRows" :loading="loading && !read" :page="currentPage" :page-size="pageSize" :total="filtered.length" :filtered="hasFilters" :origin="origin || 'real'" :return-to="returnTo" :can-write="!!canWrite" :can-read-project="!!read?.context.capabilities.includes('project:list:read')" @page-change="value => { page = value.page; pageSize = value.pageSize }" @action="handleAction" />
-    <footer v-if="!error" role="status" aria-label="目标成本列表汇总" class="panel flex min-w-0 flex-wrap items-center justify-end gap-x-6 gap-y-2 px-4 py-3 text-12px">
-      <span class="mr-auto text-ink-faint">当前筛选 {{ filtered.length }} 个版本</span>
-      <span v-for="total in totals" :key="total.key">{{ totalLabels[total.key] }} <b class="ml-1 font-mono">{{ total.known == null ? `未知 · 缺 ${total.missing} 个版本` : total.missing ? `已知 ${yuan(total.known)} · 缺 ${total.missing} 个版本` : yuan(total.known) }}</b></span>
-    </footer>
-  </div>
+  <ListShell continuous summary-label="目标成本列表汇总">
+    <template #toolbar>
+      <TargetCostListFilters v-model:search="search" v-model:project="project" v-model:baseline="baseline" v-model:status="status" :loading="loading" :project-options="projectOptions" :status-options="statusOptions" :can-create="!!canWrite" @refresh="load" @create="create" />
+    </template>
+    <template #filters>
+      <div class="grid min-w-0 gap-2">
+        <div class="flex min-w-0 flex-wrap items-center gap-4 text-12px">
+          <label>资料来源<select class="field-input ml-2" :value="origin || ''" aria-label="预算资料来源" @change="router.replace({ path: TARGET_COST_LIST_PATH, query: { origin: ($event.target as HTMLSelectElement).value } })"><option value="real">正式预算</option><option value="demo">演示预算（只读）</option></select></label>
+          <label>排序<select v-model="sort" class="field-input ml-2" aria-label="预算排序"><option value="updated-desc">最近更新</option><option value="name-asc">版本名</option></select></label>
+          <label class="flex items-center gap-2"><input v-model="deleted" type="checkbox" class="accent-brand">查看已删除版本</label>
+        </div>
+        <TargetCostCommandState :error="error" :pending="!!pending" :busy="loading || saving" :applied="pending?.state === 'applied'" @recover="recover()" @recheck="load" />
+        <section v-for="operation in pendingOperations.filter(item => item.descriptor.commandId !== pending?.descriptor.commandId)" :key="operation.descriptor.commandId" class="panel p-3 text-12px" aria-label="预算未决操作">
+          <p>「{{ rows.find(row => row.id === operation.descriptor.targetId)?.name || '未填写版本名' }}」仍有一次提交结果待核对。</p>
+          <KitButton class="mt-2" :disabled="loading || saving" @click="recover(operation)">
+            核对并恢复原提交
+          </KitButton>
+        </section>
+      </div>
+    </template>
+    <template #table>
+      <TargetCostListTable v-if="!error" :rows="pageRows" :loading="loading && !read" :page="currentPage" :page-size="pageSize" :total="filtered.length" :filtered="hasFilters" :origin="origin || 'real'" :return-to="returnTo" :can-write="!!canWrite" :can-read-project="!!read?.context.capabilities.includes('project:list:read')" @page-change="value => { page = value.page; pageSize = value.pageSize }" @action="handleAction" />
+    </template>
+    <template v-if="!error && read?.context.origin === origin" #summary>
+      <div class="flex w-full flex-wrap items-baseline gap-x-5 gap-y-1">
+        <span class="mr-auto text-ink-faint">当前筛选 {{ filtered.length }} 个版本</span>
+        <span v-for="total in totals" :key="total.key">
+          {{ totalLabels[total.key] }} <b class="ml-1 font-mono text-ink">{{ total.known == null ? `未知 · 缺 ${total.missing} 个版本` : total.missing ? `已知 ${yuan(total.known)} · 缺 ${total.missing} 个版本` : yuan(total.known) }}</b>
+        </span>
+      </div>
+    </template>
+  </ListShell>
 </template>

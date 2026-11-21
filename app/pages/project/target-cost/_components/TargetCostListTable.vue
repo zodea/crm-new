@@ -2,6 +2,7 @@
 import type { KitTableColumn } from '~/lib/kit/table'
 import type { TargetCostListRow } from '~/lib/target-cost/list'
 import type { DataOriginDTO } from '~/types/read-model'
+import KitStatusTag from '~/components/ui/KitStatusTag.vue'
 import { targetCostLocation } from '~/lib/target-cost/navigation'
 import { targetCostProjectTarget } from '~/lib/target-cost/project-navigation'
 
@@ -84,8 +85,12 @@ function actions(row: TargetCostListRow) {
       <span v-else class="text-ink-faint">{{ row.projectId ? row.projectName || '已关联项目' : '未关联项目' }}</span>
     </template>
     <template #baseline="{ row }">
-      <span v-if="row.isBaseline" class="chip-brand">{{ row.status === 'submitted' && !row.deletedAt ? '当前基线' : '草稿/已删基线' }}</span>
-      <span v-else class="chip bg-surface-3 text-ink-faint">历史/非基线</span>
+      <KitStatusTag v-if="row.isBaseline" tone="brand">
+        {{ row.status === 'submitted' && !row.deletedAt ? '当前基线' : '草稿/已删基线' }}
+      </KitStatusTag>
+      <KitStatusTag v-else>
+        历史/非基线
+      </KitStatusTag>
     </template>
     <template #profitRate="{ row }">
       <span class="font-mono tabular-nums" :class="row.profitRate != null && row.profitRate < 0 ? 'text-danger' : 'text-ink'">
@@ -93,9 +98,9 @@ function actions(row: TargetCostListRow) {
       </span>
     </template>
     <template #status="{ row }">
-      <span class="chip" :class="row.status === 'submitted' ? 'chip-ok' : 'chip-warn'">
+      <KitStatusTag :tone="row.status === 'submitted' ? 'ok' : 'warn'">
         {{ row.status === 'submitted' ? '已提交' : row.status === 'draft' ? '草稿' : row.status || '—' }}
-      </span>
+      </KitStatusTag>
     </template>
     <template #action="{ row }">
       <RowActionMenu

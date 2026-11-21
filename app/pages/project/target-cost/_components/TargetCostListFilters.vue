@@ -26,7 +26,7 @@ const status = defineModel<string[]>('status', { required: true })
 </script>
 
 <template>
-  <header class="panel flex min-w-0 flex-col gap-3 px-4 py-3">
+  <div class="min-w-0 flex flex-1 flex-col gap-3">
     <div class="flex min-w-0 flex-wrap items-center gap-3">
       <div class="mr-auto min-w-0 flex items-center gap-1">
         <h1 class="text-17px font-800 text-ink">
@@ -63,5 +63,5 @@ const status = defineModel<string[]>('status', { required: true })
       <KitMultiSelectFilter v-model="baseline" label="基线范围" :options="[{ key: 'baseline', label: '当前基线' }, { key: 'history', label: '历史/非基线' }]" full-width />
       <KitMultiSelectFilter v-model="status" label="状态" :options="statusOptions" full-width />
     </div>
-  </header>
+  </div>
 </template>

@@ -30,6 +30,7 @@ describe('中央预算列表同路由状态', () => {
   it('已有列表从预算返回另一筛选及页码时以路由恢复，不被旧本地值覆写', async () => {
     const wrapper = render()
     await flushPromises()
+    expect(wrapper.get('[data-list-shell]').classes()).toContain('list-shell--continuous')
     expect(wrapper.get('[aria-label="目标成本列表汇总"]').text()).toContain('含税合价 未知')
     expect(wrapper.get('[aria-label="目标成本列表汇总"]').text()).toContain('计划利润 ¥0.00')
     await wrapper.get('input').setValue('A')
