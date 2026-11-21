@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/vue'
 import { describe, expect, it } from 'vitest'
-import QuantityTemplateLinesSection from '~/components/quantity/QuantityTemplateLinesSection.vue'
+import QuantityTemplateLinesSection from '~/pages/subcontract/quantity/_components/QuantityTemplateLinesSection.vue'
 
 describe('quantity template lines section', () => {
   const props = {

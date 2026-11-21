@@ -1,8 +1,8 @@
 import { fireEvent, render, screen, within } from '@testing-library/vue'
 import { describe, expect, it } from 'vitest'
-import MigrationPreflightPanel from '~/components/migration/MigrationPreflightPanel.vue'
-import MigrationReconciliationTable from '~/components/migration/MigrationReconciliationTable.vue'
-import MigrationSwitchPanel from '~/components/migration/MigrationSwitchPanel.vue'
+import MigrationPreflightPanel from '~/pages/settings/_components/MigrationPreflightPanel.vue'
+import MigrationReconciliationTable from '~/pages/settings/_components/MigrationReconciliationTable.vue'
+import MigrationSwitchPanel from '~/pages/settings/_components/MigrationSwitchPanel.vue'
 
 describe('核心身份迁移展示面板', () => {
   const evidence = {

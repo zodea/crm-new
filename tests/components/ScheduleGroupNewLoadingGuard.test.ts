@@ -10,7 +10,7 @@ import {
   shallowRef,
   watch,
 } from 'vue'
-import ScheduleGroupNewScreen from '~/components/schedule/ScheduleGroupNewScreen.vue'
+import ScheduleGroupNewScreen from '~/pages/schedule/_components/ScheduleGroupNewScreen.vue'
 
 vi.mock('~/composables/useTabCloseGuard', () => ({ useTabCloseGuard: vi.fn() }))
 

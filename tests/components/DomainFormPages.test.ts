@@ -46,14 +46,14 @@ const fieldStub = defineComponent({
 const attachmentStub = defineComponent({
   setup: () => () => h('section', { id: 'section-attachments' }, '附件内容'),
 })
-const components = {
-  EntityFormShell,
-  FormFooter,
-  KitButton,
-  FinancePaymentTypeStep,
-  FinanceFormFields: fieldStub,
-  MaterialFormFields: fieldStub,
-  FileRefAttachmentSection: attachmentStub,
+const formGlobals = {
+  components: { EntityFormShell, FormFooter, KitButton, FinancePaymentTypeStep },
+  stubs: {
+    FinanceFormFields: fieldStub,
+    MaterialFormFields: fieldStub,
+    MaterialLineGrid: true,
+    FileRefAttachmentSection: attachmentStub,
+  },
 }
 
 function attachmentState() {
@@ -111,7 +111,7 @@ describe('财务和物资整页表单布局接线', () => {
   })
 
   it('选择付款类型前不出现分区或保存动作，进入表单后保留草稿和离开保护', async () => {
-    render(FinanceFormPage, { props: { kind: 'payment_application' }, global: { components } })
+    render(FinanceFormPage, { props: { kind: 'payment_application' }, global: formGlobals })
     await flushPromises()
     expect(screen.getByRole('heading', { name: '选择付款业务类型' })).not.toBeNull()
     expect(screen.queryByRole('navigation', { name: '表单分区' })).toBeNull()
@@ -140,7 +140,7 @@ describe('财务和物资整页表单布局接线', () => {
 
   it('物资表单分区导航保留草稿，底部保存继续调用原领域动作', async () => {
     route.fullPath = '/material/requisition/new'
-    render(MaterialFormPage, { props: { kind: 'mat_requisition' }, global: { components } })
+    render(MaterialFormPage, { props: { kind: 'mat_requisition' }, global: formGlobals })
     await flushPromises()
     expect((screen.getByRole('button', { name: '保存草稿' }) as HTMLButtonElement).disabled).toBe(true)
     await fireEvent.update(screen.getByRole('textbox', { name: '备注草稿' }), '保留的下料备注')
@@ -171,7 +171,7 @@ describe('财务和物资整页表单布局接线', () => {
       arrivedQty: 0,
       remainingQty: 10,
     })
-    render(MaterialFormPage, { props: { kind: 'mat_requisition' }, global: { components } })
+    render(MaterialFormPage, { props: { kind: 'mat_requisition' }, global: formGlobals })
     await flushPromises()
 
     expect(screen.getByText('已生效')).not.toBeNull()

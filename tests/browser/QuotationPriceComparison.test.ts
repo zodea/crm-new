@@ -5,10 +5,10 @@ import { expect, it } from 'vitest'
 import { render } from 'vitest-browser-vue'
 import { page, userEvent } from 'vitest/browser'
 import { defineComponent, h } from 'vue'
-import QuotationPriceTable from '~/components/material/price/QuotationPriceTable.vue'
 import SectionHeader from '~/components/ui/SectionHeader.vue'
 import { newQuotationDraft } from '~/lib/material-quotation/contract'
 import { decodeQuotationRead } from '~/lib/material-quotation/http-repository'
+import QuotationPriceTable from '~/pages/material/_components/QuotationPriceTable.vue'
 
 it('五档真实报价价格页保冻结来源、未知值、真零、条件门禁、局部横滚和键盘焦点', async () => {
   const at = '2026-10-05T00:00:00.000Z'

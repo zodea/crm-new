@@ -1,5 +1,5 @@
 // PayrollPaymentDetailScreen — 工资实际补发 / 实际退款 / 错记冲销只读详情（/subcontract/payroll/payments/:eventId；#412 P4）。
-// 对应 app/components/payroll/PayrollActualPaymentDetailScreen.vue：只读确认事实，保留原工资签名金额；
+// 对应 app/pages/subcontract/payroll/payments/_components/PayrollActualPaymentDetailScreen.vue：只读确认事实，保留原工资签名金额；
 // 标题随事实类型变化；冲销可回看被引用原记录；依据完整的事实可继续“核实错记冲销 / 纠正这次错记冲销”。
 // params：id（独立事实 eventId；原工资发放不走本页，回原工资详情）、previewState。
 (function () {

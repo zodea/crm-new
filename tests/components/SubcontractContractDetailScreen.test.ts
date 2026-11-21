@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, reactive } from 'vue'
-import SubcontractContractDetailScreen from '~/components/contract/SubcontractContractDetailScreen.vue'
+import SubcontractContractDetailScreen from '~/pages/contract/_components/SubcontractContractDetailScreen.vue'
 
 const contractStoreMock = vi.hoisted(() => ({
   detailState: { kind: 'ready', data: { contract: { name: '中央分包合同', no: 'FB-327' } } } as any,

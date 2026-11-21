@@ -21,6 +21,14 @@ export default withNuxt(
     ],
   }),
   {
+    name: 'crm/page-private-components',
+    files: ['app/pages/**/_components/**/*.vue'],
+    rules: {
+      // Nuxt 的路由根节点约束只适用于进入路由表的页面。
+      'vue/no-multiple-template-root': 'off',
+    },
+  },
+  {
     name: 'crm/vitest-assertions',
     files: ['tests/**/*.test.{js,jsx,ts,tsx}'],
     rules: {

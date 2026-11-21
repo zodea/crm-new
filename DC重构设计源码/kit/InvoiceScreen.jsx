@@ -1,4 +1,4 @@
-// InvoiceScreen — 发票识别工作台（按实现端 app/components/invoice/InvoiceWorkspaceScreen.vue 校准）
+// InvoiceScreen — 发票识别工作台（按实现端 app/pages/finance/invoice/_components/InvoiceWorkspaceScreen.vue 校准）
 // 单一校对工作台 + 全页拖拽上传 + 两个子模式：字段校对 / 打印排版
 // （子模式切换内联在工具栏那一条里，不独占一行；实现端同步走 SegTab 的 pill 变体）。
 // 三栏 = 队列 | 原件（排版模式下换成 A4 排版） | 校对，与实现端 AdaptiveWorkbench 同构：

@@ -1,7 +1,7 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 import { defineComponent, h, shallowRef } from 'vue'
-import TargetCostItemEditor from '~/components/target-cost/TargetCostItemEditor.vue'
+import TargetCostItemEditor from '~/pages/project/target-cost/_components/TargetCostItemEditor.vue'
 
 const KitButton = defineComponent({
   emits: ['click'],

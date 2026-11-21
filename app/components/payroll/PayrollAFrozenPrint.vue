@@ -2,6 +2,7 @@
 import type { PayrollAFrozenDocument } from '~/lib/payroll/central-a-contract'
 import type { PayrollOfficialIssue } from '~/lib/payroll/central-numbering-contract'
 import { computed } from 'vue'
+import PayrollOfficialIdentity from '~/components/payroll/PayrollOfficialIdentity.vue'
 import { hasPayrollAFeesDocument } from '~/lib/payroll/central-a-fees-contract'
 import { payrollAmount } from '~/lib/payroll/read-presentation'
 import PayrollAFeesFrozenSection from './PayrollAFeesFrozenSection.vue'

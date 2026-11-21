@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import FactorSolverConfig from '~/pages/finance/invoice/_components/FactorSolverConfig.vue'
+import FactorSolverResults from '~/pages/finance/invoice/_components/FactorSolverResults.vue'
+import FactorTaxCalculator from '~/pages/finance/invoice/_components/FactorTaxCalculator.vue'
+
 const {
   calculating,
   cancelCalculation,

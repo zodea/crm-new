@@ -1,4 +1,4 @@
-// 付款申请独立只读详情：对应 app/components/finance/PaymentApplicationDetailScreen.vue。
+// 付款申请独立只读详情：对应 app/pages/finance/payment/[id]/_components/PaymentApplicationDetailScreen.vue。
 // 只消费设计样本已存在的事实；缺少分摊/批复来源时保留未知，不从申请金额猜支付资格。
 (function () {
   function PayApplyDetailScreen({ params = {}, navigate }) {

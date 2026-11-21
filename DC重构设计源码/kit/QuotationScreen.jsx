@@ -1,5 +1,5 @@
 // QuotationScreen — 材料报价清单（route quotation ↔ 实现 /material/quotations，
-// 对应 app/components/material/quotation/QuotationListScreen.vue；Q-A02-03 独立报价 owner，独立于 price 单价对比屏）。
+// 对应 app/pages/material/quotations/_components/QuotationListScreen.vue；Q-A02-03 独立报价 owner，独立于 price 单价对比屏）。
 // 口径：头部 = 标题 + 说明 + 「新增报价」（material-quotation:write）+「核验本地报价迁入」（core:migration:write）；
 //       清单 = 报价方原文（蓝链进详情，下附是否已明确关联分供方）/ 报价日期 / 适用范围 / 材料行 / 版本 / 操作「编辑」。
 //       实现端无搜索、筛选和删除，设计稿同样不放（表格沿用 KitTable 原语，含其分页条）；读取范围不完整时提示「不能作为全部报价数量」。

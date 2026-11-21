@@ -1,7 +1,7 @@
 # 送货单识别 — 上传·识别·归档·打印
 
 > 路由: `/material/delivery`
-> 页面: `app/pages/material/delivery/index.vue` → `app/components/delivery/DeliveryRecognitionScreen.vue`
+> 页面: `app/pages/material/delivery/index.vue` → `app/pages/material/delivery/_components/DeliveryRecognitionScreen.vue`
 > 来源: 现有 DeliveryView + delivery store 代码分析；2026-07-17 已接入真实 OCR 闭环
 > 真实票据 Excel 结构、合并单元格和导入导出兼容规则见 [`real-ticket-excel-reference.md`](./real-ticket-excel-reference.md)。
 

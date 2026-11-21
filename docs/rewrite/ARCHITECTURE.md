@@ -224,7 +224,7 @@ flowchart TD
 
 ## 6. UI 模块边界
 
-`app/components/ui/` 放稳定通用能力；`shared/` 放应用壳、KitUIHost 和公共组合件；领域组件保留 WBS、工程量、票款分摊等领域逻辑。先核实已有组件的契约与质量再复用，不平行创建重复宿主。
+`app/components/ui/` 放稳定通用能力。`shared/` 放应用壳、KitUIHost 和公共组合件。Nuxt 仅扫描 `ui/`、`shared/` 和 `layout/` 自动导入组件。跨页复用的领域组件留在各自的业务目录，由调用方显式导入。仅供单一路由使用的组件可放在对应页面目录的 `_components/` 中，由页面显式导入。复用前先核实已有组件的契约与质量。
 
 `useKitUI()` 是 toast、confirm、formModal 入口。智能洞察的 metadata/subject、右侧 Sheet、全局 inbox 与消息扇出经 PUBLIC-SURFACES；领域负责事件事实和稳定目标，不单独创建消息系统。复杂状态的界面效果须按用户已确认的 A03-12 展示方法体现：独立显示读取状态、授权范围和金额完整性，其语义和例子只在 [READ-MODELS](./READ-MODELS.md#read-status-and-completeness)维护。
 

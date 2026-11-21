@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import PayrollWorkbookScreen from '~/pages/subcontract/payroll/_components/PayrollWorkbookScreen.vue'
+
 const route = useRoute()
 </script>
 

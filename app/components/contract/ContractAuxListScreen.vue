@@ -3,7 +3,9 @@ import type {
   ContractAuxListKind,
   ContractAuxRow,
 } from '~/lib/contract/aux-list'
+import ContractAuxListToolbar from '~/components/contract/ContractAuxListToolbar.vue'
 import KitStatusTag from '~/components/ui/KitStatusTag.vue'
+import ListShell from '~/components/ui/ListShell.vue'
 import {
   CONTRACT_AUX_LIST_CONFIG,
   contractAuxAmountTotal,
@@ -269,106 +271,109 @@ onActivated(() => {
 </script>
 
 <template>
-  <div class="flex min-w-0 flex-col gap-3">
-    <ContractAuxListToolbar
-      v-model:search="search"
-      v-model:project="projectFilter"
-      v-model:category="categoryFilter"
-      v-model:status="statusFilter"
-      :title="meta.listLabel"
-      :subtitle="meta.subtitle"
-      :create-label="`新建${meta.label}`"
-      :loading="loading"
-      :search-placeholder="config.searchPlaceholder"
-      :show-project="config.showProjectFilter"
-      :show-category="config.showCategoryFilter"
-      :project-options="projectOptions"
-      :category-options="categoryOptions"
-      :status-options="statusOptions"
-      @refresh="load"
-      @create="openCreate"
-    />
-
-    <div
-      v-if="contextFilters.length"
-      data-ui="contract-aux-route-context"
-      class="flex min-w-0 flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-brand/25 bg-brand-soft px-3 py-2"
-      aria-label="来源筛选"
-    >
-      <span class="text-11px font-700 text-brand-deep">来源范围</span>
-      <button
-        v-for="context in contextFilters"
-        :key="context.key"
-        type="button"
-        class="chip chip-brand gap-1 border-0 cursor-pointer"
-        :aria-label="`清除${context.label}筛选`"
-        @click="clearRouteFilter(context.key)"
-      >
-        {{ context.label }}
-        <span class="i-lucide-x h-3 w-3" aria-hidden="true" />
-      </button>
-    </div>
-
-    <StatePanel
-      v-if="loadError && !loading"
-      kind="error"
-      :title="`${meta.listLabel}载入失败`"
-      :description="loadError"
-      action-label="重新载入"
-      @action="load"
-    />
-
-    <div v-else class="min-w-0">
-      <KitTable
-        data-ui="contract-aux-table"
-        :columns="config.columns"
-        :data="pageRows"
+  <ListShell continuous>
+    <template #toolbar>
+      <ContractAuxListToolbar
+        v-model:search="search"
+        v-model:project="projectFilter"
+        v-model:category="categoryFilter"
+        v-model:status="statusFilter"
+        embedded
+        :title="meta.listLabel"
+        :subtitle="meta.subtitle"
+        :create-label="`新建${meta.label}`"
         :loading="loading"
-        :page="{ page: currentPage, pageSize, total: filtered.length }"
-        :empty="emptyState"
-        @page-change="handlePageChange"
-        @empty-action="handleEmptyAction"
+        :search-placeholder="config.searchPlaceholder"
+        :show-project="config.showProjectFilter"
+        :show-category="config.showCategoryFilter"
+        :project-options="projectOptions"
+        :category-options="categoryOptions"
+        :status-options="statusOptions"
+        @refresh="load"
+        @create="openCreate"
+      />
+    </template>
+    <template v-if="contextFilters.length" #filters>
+      <div
+        data-ui="contract-aux-route-context"
+        class="flex min-w-0 flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-brand/25 bg-brand-soft px-3 py-2"
+        aria-label="来源筛选"
       >
-        <template #name="{ row }">
-          <NuxtLink :to="formPath(kind, row.id)" class="cell--link" :title="row.name">
-            {{ row.name }}
-          </NuxtLink>
-        </template>
-        <template #project="{ row }">
-          <NuxtLink v-if="row.projectId" :to="`/project/${row.projectId}`" class="cell--link">
-            {{ row.projectName || '—' }}
-          </NuxtLink>
-          <span v-else>—</span>
-        </template>
-        <template #supplier="{ row }">
-          <NuxtLink v-if="row.supplierId" :to="`/base/supplier/${row.supplierId}`" class="cell--link">
-            {{ row.supplierName || '—' }}
-          </NuxtLink>
-          <span v-else>—</span>
-        </template>
-        <template #contract="{ row }">
-          <NuxtLink v-if="row.contractId" :to="sourceContractPath(row)" class="cell--link">
-            {{ row.contractName || '—' }}
-          </NuxtLink>
-          <span v-else>—</span>
-        </template>
-        <template #status="{ row }">
-          <KitStatusTag :tone="contractAuxStatusTone(row.status)">
-            {{ row.status }}
-          </KitStatusTag>
-        </template>
-        <template #action="{ row }">
-          <RowActionMenu
-            :items="rowActions"
-            :label="`${row.name}${meta.label}操作`"
-            @select="handleRowAction($event, row)"
-          />
-        </template>
-      </KitTable>
-
+        <span class="text-11px font-700 text-brand-deep">来源范围</span>
+        <button
+          v-for="context in contextFilters"
+          :key="context.key"
+          type="button"
+          class="chip chip-brand gap-1 border-0 cursor-pointer"
+          :aria-label="`清除${context.label}筛选`"
+          @click="clearRouteFilter(context.key)"
+        >
+          {{ context.label }}
+          <span class="i-lucide-x h-3 w-3" aria-hidden="true" />
+        </button>
+      </div>
+    </template>
+    <template #table>
+      <StatePanel
+        v-if="loadError && !loading"
+        kind="error"
+        :title="`${meta.listLabel}载入失败`"
+        :description="loadError"
+        action-label="重新载入"
+        @action="load"
+      />
+      <div v-else class="min-w-0" data-ui="contract-aux-table">
+        <KitTable
+          :columns="config.columns"
+          :data="pageRows"
+          :loading="loading"
+          :page="{ page: currentPage, pageSize, total: filtered.length }"
+          :empty="emptyState"
+          @page-change="handlePageChange"
+          @empty-action="handleEmptyAction"
+        >
+          <template #name="{ row }">
+            <NuxtLink :to="formPath(kind, row.id)" class="cell--link" :title="row.name">
+              {{ row.name }}
+            </NuxtLink>
+          </template>
+          <template #project="{ row }">
+            <NuxtLink v-if="row.projectId" :to="`/project/${row.projectId}`" class="cell--link">
+              {{ row.projectName || '—' }}
+            </NuxtLink>
+            <span v-else>—</span>
+          </template>
+          <template #supplier="{ row }">
+            <NuxtLink v-if="row.supplierId" :to="`/base/supplier/${row.supplierId}`" class="cell--link">
+              {{ row.supplierName || '—' }}
+            </NuxtLink>
+            <span v-else>—</span>
+          </template>
+          <template #contract="{ row }">
+            <NuxtLink v-if="row.contractId" :to="sourceContractPath(row)" class="cell--link">
+              {{ row.contractName || '—' }}
+            </NuxtLink>
+            <span v-else>—</span>
+          </template>
+          <template #status="{ row }">
+            <KitStatusTag :tone="contractAuxStatusTone(row.status)">
+              {{ row.status }}
+            </KitStatusTag>
+          </template>
+          <template #action="{ row }">
+            <RowActionMenu
+              :items="rowActions"
+              :label="`${row.name}${meta.label}操作`"
+              @select="handleRowAction($event, row)"
+            />
+          </template>
+        </KitTable>
+      </div>
+    </template>
+    <template v-if="!loadError || loading" #summary>
       <div
         data-ui="contract-aux-summary"
-        class="flex min-w-0 flex-wrap items-center justify-end gap-x-4 gap-y-1 border-x border-b border-line bg-surface-2 px-4 py-2 text-12px text-ink-soft"
+        class="flex min-w-0 w-full flex-wrap items-center justify-end gap-x-4 gap-y-1 text-12px text-ink-soft"
       >
         <span>{{ config.countLabel }}：<strong class="text-ink">{{ filtered.length }}</strong></span>
         <span>
@@ -384,6 +389,6 @@ onActivated(() => {
           清除筛选
         </button>
       </div>
-    </div>
-  </div>
+    </template>
+  </ListShell>
 </template>

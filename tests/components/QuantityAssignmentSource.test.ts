@@ -1,7 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, expect, it, vi } from 'vitest'
 import { computed, reactive, ref, shallowRef, watch } from 'vue'
-import QuantityAssignmentDialog from '~/components/quantity/QuantityAssignmentDialog.vue'
+import QuantityAssignmentDialog from '~/pages/subcontract/quantity/_components/QuantityAssignmentDialog.vue'
 
 vi.mock('vue-router', () => ({ onBeforeRouteLeave: vi.fn() }))
 const load = vi.fn()

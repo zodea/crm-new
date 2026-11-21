@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import QuantityHollowFormPage from '~/components/quantity/QuantityHollowFormPage.vue'
+
 const route = useRoute()
 </script>
 

@@ -2,6 +2,7 @@
 import type { HomeDashboardViewState } from '~/lib/home/dashboard'
 import type { ScheduleProjectView, ScheduleTaskView } from '~/lib/schedule/read-model'
 import type { DataOriginDTO } from '~/types/read-model'
+import HomeScheduleOverview from '~/components/home/HomeScheduleOverview.vue'
 import { Button } from '~/components/ui/button'
 
 withDefaults(defineProps<{

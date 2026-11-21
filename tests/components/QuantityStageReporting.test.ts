@@ -1,7 +1,7 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
-import QuantityStageFields from '../../app/components/quantity/QuantityStageFields.vue'
-import QuantityStageReporting from '../../app/components/quantity/QuantityStageReporting.vue'
+import QuantityStageFields from '../../app/pages/subcontract/quantity/_components/QuantityStageFields.vue'
+import QuantityStageReporting from '../../app/pages/subcontract/quantity/_components/QuantityStageReporting.vue'
 
 const workspace = {
   projectId: 'p',

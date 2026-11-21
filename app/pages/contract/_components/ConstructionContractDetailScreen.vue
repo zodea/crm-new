@@ -1,0 +1,358 @@
+<script setup lang="ts">
+import type { ConstructionContractDetailFocusDTO, ConstructionContractDetailReadDTO } from '~/lib/construction-contract/repository'
+import type { DataOriginDTO, NavigationIntentDTO, ReadState } from '~/types/read-model'
+import { useTimeoutFn } from '@vueuse/core'
+import ConstructionManagementFeeConfiguration from '~/components/contract/ConstructionManagementFeeConfiguration.vue'
+import ConstructionSpendingPanel from '~/components/contract/ConstructionSpendingPanel.vue'
+import ContractOriginalFilesPanel from '~/components/contract/ContractOriginalFilesPanel.vue'
+import KitStatusTag from '~/components/ui/KitStatusTag.vue'
+import { useReceiptSourceReturn } from '~/composables/useReceiptSourceReturn'
+import { validateConstructionContractProjectReturnTo, validateConstructionContractReturnTo } from '~/lib/construction-contract/return-context'
+import { contractStatusTone } from '~/lib/contract/status'
+import { resolveCustomerRelationReturnOrigin } from '~/lib/customer/return-context'
+import { resolveNavigationTarget } from '~/lib/nav/target-registry'
+import { validateOwnerDocumentDetailReturnTo } from '~/lib/owner-document/return-context'
+import { readProblemTitle } from '~/lib/read-model/state'
+import { loadReceiptSourceOrigin } from '~/lib/receipt/return-context'
+import { yuan } from '~/lib/util/money'
+import ConstructionContractFactTable from '~/pages/contract/_components/ConstructionContractFactTable.vue'
+import { useConstructionContractReadStore } from '~/stores/construction-contract-read'
+import { useDataVisibilityStore } from '~/stores/data-visibility'
+
+const props = defineProps<{ contractId: string, origin: DataOriginDTO }>()
+const route = useRoute()
+const restoreReceiptSource = useReceiptSourceReturn()
+const receiptReturnOrigin = computed(() => loadReceiptSourceOrigin(route.fullPath))
+const router = useRouter()
+const store = useConstructionContractReadStore()
+const readOriginal = useNuxtApp().$repositories.constructionContractRead.fileContent
+const visibilityStore = useDataVisibilityStore()
+const state = computed(() => store.detailState as ReadState<ConstructionContractDetailReadDTO>)
+const detail = computed(() => {
+  const current = state.value
+  if (current.kind === 'ready')
+    return current.data
+  if ((current.kind === 'loading' || (current.kind === 'error' || current.kind === 'unavailable')) && current.previous)
+    return current.previous
+  return null
+})
+const loading = computed(() => state.value.kind === 'loading')
+function sectionIssue(key: string, label: string, fallback?: string) {
+  const source = detail.value?.meta.sources.find(row => row.key === key) ?? (fallback ? detail.value?.meta.sources.find(row => row.key === fallback) : undefined)
+  if (!source || source.state === 'readable')
+    return null
+  return { kind: source.state === 'forbidden' ? 'forbidden' as const : 'empty' as const, title: `${label}${source.state === 'forbidden' ? '无查看权限' : '暂不可读取'}`, description: source.state === 'forbidden' ? '请按当前查看权限核对此分区。' : '已保存的历史资料继续保留；当前缺少完整来源，不能据空列表推定没有记录。' }
+}
+function sectionCount(rows: readonly unknown[], key: string, label: string, fallback?: string) {
+  const issue = sectionIssue(key, label, fallback)
+  return issue ? issue.kind === 'forbidden' || !rows.length ? '待核' : `历史 ${rows.length} · 待核` : String(rows.length)
+}
+const tabs = computed(() => [
+  { key: 'info', label: '详细资料' },
+  { key: 'supplements', label: `补充合同 ${detail.value?.sections.supplements.length ?? 0}` },
+  { key: 'changes', label: `甲方变洽签 ${detail.value ? sectionCount(detail.value.sections.changes, 'boq-changes', '甲方变洽签', 'owner-documents') : '待核'}` },
+  { key: 'settlements', label: '验收结算' },
+  { key: 'invoices', label: '票税管理' },
+  { key: 'receipts', label: `收款登记 ${detail.value ? sectionCount(detail.value.sections.receipts, 'construction-finance', '收款登记') : '待核'}` },
+  { key: 'acceptance', label: '竣工验收及保修' },
+])
+const tabKeys = new Set(tabs.value.map(tab => tab.key))
+const activeTab = computed({
+  get: () => typeof route.query.tab === 'string' && tabKeys.has(route.query.tab) ? route.query.tab : 'info',
+  set: value => void router.replace({
+    query: {
+      ...route.query,
+      tab: value === 'info' ? undefined : value,
+      focus: undefined,
+      focusView: undefined,
+    },
+    hash: '',
+  }),
+})
+const focusId = computed(() => ['supplements', 'changes', 'settlements', 'acceptance'].includes(String(route.query.tab ?? ''))
+  && typeof route.query.focus === 'string'
+  ? route.query.focus
+  : null)
+const focusScope = computed(() => {
+  if (focusId.value === null)
+    return null
+  const scopes = {
+    supplements: 'supplement',
+    changes: 'change',
+    settlements: 'settlement',
+    acceptance: 'acceptance',
+  } as const
+  return scopes[route.query.tab as keyof typeof scopes] ?? null
+})
+const focusView = computed(() => route.query.focusView === 'acceptance' || route.query.focusView === 'warranty'
+  ? route.query.focusView
+  : null)
+const focus = computed<ConstructionContractDetailFocusDTO | null>(() => {
+  if (!focusId.value)
+    return null
+  if (focusScope.value === 'acceptance')
+    return { id: focusId.value, scope: 'acceptance', view: focusView.value }
+  return { id: focusId.value, scope: focusScope.value }
+})
+const ownerDocumentReturnTo = computed(() => validateOwnerDocumentDetailReturnTo(route.query.returnTo, props.origin))
+const returnCheckTime = shallowRef(Date.now())
+const customerReturnOrigin = computed(() => resolveCustomerRelationReturnOrigin(route.query.returnTo, {
+  targetEntity: 'contract',
+  targetId: props.contractId,
+  origin: props.origin,
+}, Math.max(returnCheckTime.value, Date.now())))
+const { start: startReturnExpiry, stop: stopReturnExpiry } = useTimeoutFn(
+  () => returnCheckTime.value = Date.now(),
+  () => Math.max(0, (customerReturnOrigin.value?.expiresAt ?? 0) - Date.now() + 1),
+  { immediate: false },
+)
+watch(customerReturnOrigin, origin => origin ? startReturnExpiry() : stopReturnExpiry(), { immediate: true })
+const customerReturnTo = computed(() => customerReturnOrigin.value?.returnTo ?? null)
+const projectReturnTo = computed(() => validateConstructionContractProjectReturnTo(route.query.returnTo, detail.value?.contract.project.state === 'resolved' ? detail.value.contract.project.id : null, props.origin))
+const returnTo = computed(() => customerReturnTo.value ?? projectReturnTo.value ?? ownerDocumentReturnTo.value
+  ?? validateConstructionContractReturnTo(route.query.returnTo, props.origin)
+  ?? '/contract/construction')
+const backLabel = computed(() => customerReturnTo.value ? '返回客户详情' : projectReturnTo.value ? '返回项目详情' : ownerDocumentReturnTo.value ? '返回来源详情' : '返回施工合同列表')
+const canEdit = computed(() => state.value.kind === 'ready' && detail.value?.dataOrigin === 'real' && detail.value.capabilities.includes('construction-contract:write'))
+const boqTo = computed(() => {
+  const current = detail.value
+  if (!current || current.dataOrigin !== 'real' || current.contract.project.state !== 'resolved')
+    return null
+  return target({
+    kind: 'entity-subview',
+    subject: { state: 'resolved', entity: 'contract', id: current.contract.id, label: current.contract.name, no: current.contract.no || null },
+    variant: 'boq',
+    view: null,
+    filters: { dataOrigin: 'real', contractKind: '施工', projectId: current.contract.project.id },
+  })
+})
+const shellState = computed<'ready' | 'loading' | 'error' | 'forbidden' | 'not-found'>(() => {
+  if (detail.value)
+    return 'ready'
+  if (state.value.kind === 'idle' || state.value.kind === 'loading')
+    return 'loading'
+  if (state.value.kind === 'forbidden')
+    return 'forbidden'
+  if (state.value.kind === 'not-found')
+    return 'not-found'
+  return 'error'
+})
+const problem = computed(() => 'problem' in state.value ? state.value.problem : null)
+const stateTitle = computed(() => state.value.kind === 'mismatch'
+  ? '合同来源或类别不匹配'
+  : shellState.value === 'loading' ? '正在读取施工合同' : shellState.value === 'forbidden' ? '无权查看该施工合同' : shellState.value === 'not-found' ? '未找到施工合同' : '施工合同读取失败')
+
+function target(intent: NavigationIntentDTO): string | null {
+  const result = resolveNavigationTarget(intent)
+  return result.state === 'resolved' ? result.to : null
+}
+
+const metrics = computed(() => {
+  const amounts = detail.value?.contract.amounts
+  if (!amounts)
+    return []
+  const rows: Array<[string, string | null]> = [
+    ['合同金额', amounts.contract],
+    ['变更后金额', amounts.changed],
+    ['累计结算', amounts.settled],
+    ['累计开票', amounts.invoiced],
+    ['累计收款', amounts.received],
+    ['按结算应收', amounts.bySettlementReceivable],
+  ]
+  return rows.map(([label, value]) => ({ label, value: yuan(value, '未知') }))
+})
+
+async function load() {
+  await store.loadDetail({
+    id: props.contractId,
+    origin: props.origin,
+    includeDemo: props.origin === 'demo' && visibilityStore.includeDemo,
+    focus: focus.value,
+  })
+  if (store.detailState.kind === 'ready')
+    await restoreReceiptSource(route.fullPath)
+}
+
+function edit() {
+  void navigateTo({
+    path: `/contract/construction/form/${encodeURIComponent(props.contractId)}`,
+    query: { origin: 'real', contractKind: 'construction', returnTo: route.fullPath },
+  })
+}
+
+watch(() => [props.contractId, props.origin, focus.value], () => void load(), { immediate: true })
+onActivated(() => void load())
+useTabTitle(() => detail.value?.contract.name ?? '施工合同详情')
+</script>
+
+<template>
+  <div class="construction-contract-detail min-w-0" data-testid="construction-contract-detail">
+    <EntityDetailShell
+      :title="detail?.contract.name ?? '施工合同详情'"
+      :subtitle="detail?.contract.no || '编号未填写'"
+      :back-to="returnTo"
+      :back-label="backLabel"
+      :state="shellState"
+      :state-title="readProblemTitle(problem, stateTitle)"
+      :state-description="problem?.message ?? ''"
+      :state-action-label="problem?.retryable ? '重新加载' : ''"
+      @state-action="load"
+    >
+      <template #status>
+        <template v-if="detail">
+          <span class="chip" :class="detail.dataOrigin === 'demo' ? 'chip-warn' : 'chip-brand'">{{ detail.dataOrigin === 'demo' ? '演示只读' : '正式数据' }}</span>
+          <KitStatusTag :tone="contractStatusTone(detail.contract.status)">
+            {{ detail.contract.status }}
+          </KitStatusTag>
+        </template>
+      </template>
+      <template #actions>
+        <button v-if="canEdit" type="button" class="btn-secondary" data-testid="construction-contract-edit" @click="edit">
+          编辑合同
+        </button>
+      </template>
+      <template #summary>
+        <MetricGrid v-if="detail" :cols="6">
+          <Metric v-for="metric in metrics" :key="metric.label" :label="metric.label" :value="metric.value" />
+        </MetricGrid>
+      </template>
+
+      <div v-if="detail" class="space-y-3">
+        <StatePanel v-if="detail.meta.sources.some(source => source.key === 'invoice-applications' && source.state !== 'readable')" kind="empty" title="开票金额暂不可核实" description="累计开票和开票未收金额显示未知；其他已核实的合同事实可继续查看。" compact />
+        <StatePanel v-if="(state.kind === 'error' || state.kind === 'unavailable')" kind="error" title="刷新施工合同失败" :description="`${state.problem.message}；当前保留上一次成功读取的详情。`" :action-label="state.problem.retryable ? '重新加载' : ''" compact @action="load" />
+        <StatePanel v-if="loading" kind="loading" title="正在刷新施工合同" description="当前保留上一次成功读取的详情。" compact />
+        <div class="panel min-w-0 overflow-hidden px-3">
+          <SegTab v-model="activeTab" :tabs="tabs" />
+        </div>
+
+        <section v-if="activeTab === 'info'" class="panel p-4">
+          <SectionHeader title="详细资料" />
+          <div class="construction-contract-grid mt-3">
+            <div class="detail-row">
+              <span>乙方我方签约主体</span><strong data-testid="contract-frozen-signatory">{{ detail.contract.ourSignatorySnapshot?.name || '未核实' }}</strong>
+            </div>
+            <div v-if="detail.contract.legacyPartyA" class="detail-row">
+              <span>历史甲方原文</span><strong data-testid="contract-legacy-party">{{ detail.contract.legacyPartyA }}</strong>
+            </div>
+            <div class="detail-row">
+              <span>所属项目</span><NuxtLink v-if="target(detail.projectNavigation)" :to="target(detail.projectNavigation)!" class="text-brand hover:underline">
+                {{ detail.contract.project.state === 'resolved' ? detail.contract.project.label : '不可用' }}
+              </NuxtLink><strong v-else>不可用</strong>
+            </div>
+            <div class="detail-row">
+              <span>甲方客户</span><NuxtLink v-if="target(detail.customerNavigation)" :to="target(detail.customerNavigation)!" class="text-brand hover:underline">
+                {{ detail.contract.customer.state === 'resolved' ? detail.contract.customer.label : '不可用' }}
+              </NuxtLink><strong v-else>不可用</strong>
+            </div>
+            <div class="detail-row">
+              <span>签约日期</span><strong>{{ detail.contract.signDate || '未记录' }}</strong>
+            </div>
+            <div class="detail-row">
+              <span>实际竣工日期</span><strong data-testid="construction-actual-completion">{{ detail.contract.actualCompletionDate || '未记录' }}</strong>
+            </div>
+            <div class="detail-row">
+              <span>发票类型</span><strong>{{ detail.contract.invoiceType || '未记录' }}</strong>
+            </div>
+            <div class="detail-row">
+              <span>履约联系人</span><strong>{{ detail.contract.contactName || '未记录' }}</strong>
+            </div>
+            <div class="detail-row">
+              <span>联系电话</span><strong>{{ detail.contract.contactPhone || '未记录' }}</strong>
+            </div>
+            <div class="detail-row full">
+              <span>合同内容</span><strong>{{ detail.contract.content || '未记录' }}</strong>
+            </div>
+            <div class="detail-row full">
+              <span>主要条款</span><strong>{{ detail.contract.mainTerms || '未记录' }}</strong>
+            </div>
+            <div class="detail-row full">
+              <span>付款条款</span><strong>{{ detail.contract.paymentTerms || '未记录' }}</strong>
+            </div>
+          </div>
+          <div class="mt-4 rounded border border-line bg-surface-2 p-3">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <strong class="text-13px">工程量清单（BOQ）</strong>
+              </div>
+              <NuxtLink v-if="boqTo" :to="boqTo" class="btn-secondary" data-testid="construction-contract-boq">
+                查看 BOQ
+              </NuxtLink>
+              <span v-else class="chip bg-surface-3 text-ink-soft">暂不可用</span>
+            </div>
+          </div>
+          <section class="mt-4 min-w-0 border-t border-line pt-4" aria-label="总合同管理费配置">
+            <SectionHeader title="总合同管理费配置" />
+            <ConstructionManagementFeeConfiguration class="mt-3" :configuration="detail.contract.managementFee" />
+          </section>
+          <ContractOriginalFilesPanel :owner-id="detail.contract.id" :origin="detail.dataOrigin" :source-version="detail.sourceVersion" :can-read="state.kind === 'ready' && detail.dataOrigin === origin && detail.capabilities.includes('construction-contract:read')" :files="detail.sections.files" :read-content="readOriginal" />
+          <ConstructionSpendingPanel v-if="state.kind === 'ready' && detail.dataOrigin === 'real' && detail.capabilities.includes('construction-scope:read') && detail.contract.project.state === 'resolved'" class="mt-4 border-t border-line pt-4" :project-id="detail.contract.project.id" :main-id="detail.contract.id" />
+        </section>
+
+        <section v-else-if="activeTab === 'supplements'" class="panel min-w-0 overflow-hidden p-4">
+          <SectionHeader title="补充合同" /><ConstructionContractFactTable class="mt-3" :rows="detail.sections.supplements" empty-label="暂无补充合同" :focus-id="focusId" :return-to="returnTo" />
+        </section>
+        <section v-else-if="activeTab === 'changes'" class="panel min-w-0 overflow-hidden p-4">
+          <SectionHeader title="甲方变洽签" />
+          <StatePanel v-if="sectionIssue('boq-changes', '甲方变洽签', 'owner-documents')" v-bind="sectionIssue('boq-changes', '甲方变洽签', 'owner-documents')!" class="mt-3" compact />
+          <ConstructionContractFactTable v-if="!sectionIssue('boq-changes', '甲方变洽签', 'owner-documents') || (sectionIssue('boq-changes', '甲方变洽签', 'owner-documents')?.kind !== 'forbidden' && detail.sections.changes.length)" class="mt-3" :rows="detail.sections.changes" empty-label="暂无甲方变洽签" :focus-id="focusId" :return-to="route.fullPath" />
+        </section>
+        <section v-else-if="activeTab === 'settlements'" class="space-y-3">
+          <div class="panel min-w-0 overflow-hidden p-4">
+            <SectionHeader title="月度报量" />
+            <StatePanel v-if="sectionIssue('owner-documents', '月度报量')" v-bind="sectionIssue('owner-documents', '月度报量')!" class="mt-3" compact />
+            <ConstructionContractFactTable v-if="!sectionIssue('owner-documents', '月度报量') || (sectionIssue('owner-documents', '月度报量')?.kind !== 'forbidden' && detail.sections.settlements.monthlyStatements.length)" class="mt-3" :rows="detail.sections.settlements.monthlyStatements" empty-label="暂无月度报量" :focus-id="focusId" :return-to="route.fullPath" />
+          </div>
+          <div class="panel min-w-0 overflow-hidden p-4">
+            <SectionHeader title="最终结算" />
+            <StatePanel v-if="sectionIssue('owner-documents', '最终结算')" v-bind="sectionIssue('owner-documents', '最终结算')!" class="mt-3" compact />
+            <ConstructionContractFactTable v-if="!sectionIssue('owner-documents', '最终结算') || (sectionIssue('owner-documents', '最终结算')?.kind !== 'forbidden' && detail.sections.settlements.finalSettlements.length)" class="mt-3" :rows="detail.sections.settlements.finalSettlements" empty-label="暂无最终结算" :focus-id="focusId" :return-to="route.fullPath" />
+          </div>
+          <div class="panel min-w-0 overflow-hidden p-4">
+            <SectionHeader title="甲方罚扣" />
+            <StatePanel v-if="sectionIssue('owner-documents', '甲方罚扣')" v-bind="sectionIssue('owner-documents', '甲方罚扣')!" class="mt-3" compact />
+            <ConstructionContractFactTable v-if="!sectionIssue('owner-documents', '甲方罚扣') || (sectionIssue('owner-documents', '甲方罚扣')?.kind !== 'forbidden' && detail.sections.settlements.penalties.length)" class="mt-3" :rows="detail.sections.settlements.penalties" empty-label="暂无甲方罚扣" :focus-id="focusId" :return-to="route.fullPath" />
+          </div>
+        </section>
+        <section v-else-if="activeTab === 'invoices'" class="space-y-3">
+          <div class="panel min-w-0 overflow-hidden p-4">
+            <SectionHeader title="开票申请" />
+            <StatePanel v-if="sectionIssue('construction-finance', '开票申请')" v-bind="sectionIssue('construction-finance', '开票申请')!" class="mt-3" compact />
+            <ConstructionContractFactTable v-if="!sectionIssue('construction-finance', '开票申请') || (sectionIssue('construction-finance', '开票申请')?.kind !== 'forbidden' && detail.sections.invoices.applications.length)" class="mt-3" :rows="detail.sections.invoices.applications" empty-label="暂无开票申请" />
+          </div>
+          <div class="panel min-w-0 overflow-hidden p-4">
+            <SectionHeader title="销项开票登记" />
+            <StatePanel v-if="sectionIssue('construction-finance', '销项开票登记')" v-bind="sectionIssue('construction-finance', '销项开票登记')!" class="mt-3" compact />
+            <ConstructionContractFactTable v-if="!sectionIssue('construction-finance', '销项开票登记') || (sectionIssue('construction-finance', '销项开票登记')?.kind !== 'forbidden' && detail.sections.invoices.registrations.length)" class="mt-3" :rows="detail.sections.invoices.registrations" empty-label="暂无销项开票登记" />
+          </div>
+        </section>
+        <section v-else-if="activeTab === 'receipts'" class="panel min-w-0 overflow-hidden p-4">
+          <SectionHeader title="收款登记" />
+          <StatePanel v-if="sectionIssue('construction-finance', '收款登记')" v-bind="sectionIssue('construction-finance', '收款登记')!" class="mt-3" compact />
+          <StatePanel v-if="detail.receiptsProblem" class="mt-3" :kind="detail.receiptsProblem.code === 'forbidden' ? 'forbidden' : 'error'" title="收款金额暂不可用" :description="detail.receiptsProblem.message" :action-label="detail.receiptsProblem.retryable ? '重新读取收款' : ''" compact @action="load" />
+          <ConstructionContractFactTable v-else-if="!sectionIssue('construction-finance', '收款登记') || (sectionIssue('construction-finance', '收款登记')?.kind !== 'forbidden' && detail.sections.receipts.length)" class="mt-3" :rows="detail.sections.receipts" empty-label="暂无收款登记" :return-to="route.fullPath" :restore-scroll-left="receiptReturnOrigin?.scrollLeft" @view-restored="restoreReceiptSource(route.fullPath)" />
+        </section>
+        <section v-else class="space-y-3">
+          <div class="panel min-w-0 overflow-hidden p-4">
+            <SectionHeader title="竣工验收" />
+            <StatePanel v-if="sectionIssue('owner-documents', '竣工验收')" v-bind="sectionIssue('owner-documents', '竣工验收')!" class="mt-3" compact />
+            <ConstructionContractFactTable v-if="!sectionIssue('owner-documents', '竣工验收') || (sectionIssue('owner-documents', '竣工验收')?.kind !== 'forbidden' && detail.sections.acceptance.acceptances.length)" class="mt-3" :rows="detail.sections.acceptance.acceptances" empty-label="暂无竣工验收记录" :focus-id="focusView === null || focusView === 'acceptance' ? focusId : null" :return-to="route.fullPath" anchor-scope="acceptance" return-focus-view="acceptance" />
+          </div>
+          <div class="panel min-w-0 overflow-hidden p-4">
+            <SectionHeader title="保修到期" />
+            <StatePanel v-if="sectionIssue('owner-documents', '保修到期')" v-bind="sectionIssue('owner-documents', '保修到期')!" class="mt-3" compact />
+            <ConstructionContractFactTable v-if="!sectionIssue('owner-documents', '保修到期') || (sectionIssue('owner-documents', '保修到期')?.kind !== 'forbidden' && detail.sections.acceptance.warranties.length)" class="mt-3" :rows="detail.sections.acceptance.warranties" empty-label="暂无保修到期记录" :focus-id="focusView === 'warranty' ? focusId : null" :return-to="route.fullPath" anchor-scope="warranty" return-focus-view="warranty" />
+          </div>
+        </section>
+      </div>
+    </EntityDetailShell>
+  </div>
+</template>
+
+<style scoped>
+.construction-contract-detail { container-type: inline-size; }
+.construction-contract-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); gap: 0 28px; }
+.detail-row { display: flex; min-width: 0; gap: 12px; padding: 10px 0; border-bottom: 1px dashed var(--line); font-size: 13px; }
+.detail-row > span { width: 112px; flex: none; color: var(--ink-soft); }
+.detail-row > strong { min-width: 0; overflow-wrap: anywhere; }
+.detail-row.full { grid-column: 1 / -1; }
+</style>

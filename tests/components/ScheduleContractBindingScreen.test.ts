@@ -3,7 +3,7 @@ import type { ScheduleContractBindingPreview } from '~/lib/schedule/contract-bin
 import { fireEvent, render, screen } from '@testing-library/vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, shallowRef } from 'vue'
-import ScheduleContractBindingScreen from '~/components/schedule/ScheduleContractBindingScreen.vue'
+import ScheduleContractBindingScreen from '~/pages/schedule/[pid]/bind/_components/ScheduleContractBindingScreen.vue'
 
 const LookupSelectStub = defineComponent({
   props: {

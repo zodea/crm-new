@@ -1,9 +1,9 @@
 import { render, screen } from '@testing-library/vue'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { computed, ref, shallowRef, useTemplateRef } from 'vue'
-import BoqImportWizard from '~/components/boq/BoqImportWizard.vue'
 import ProcessStepper from '~/components/ui/ProcessStepper.vue'
 import ProgressBar from '~/components/ui/ProgressBar.vue'
+import BoqImportWizard from '~/pages/contract/boq/_components/BoqImportWizard.vue'
 
 describe('boqImportWizard', () => {
   beforeAll(() => {

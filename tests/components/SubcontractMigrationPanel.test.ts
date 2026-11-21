@@ -1,8 +1,8 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/vue'
 import { createPinia } from 'pinia'
 import { beforeEach, expect, it, vi } from 'vitest'
-import SubcontractMigrationPanel from '~/components/migration/SubcontractMigrationPanel.vue'
 import { commandRecoveryKey, createCommandRecoveryStorage } from '~/lib/forms/command-recovery'
+import SubcontractMigrationPanel from '~/pages/settings/_components/SubcontractMigrationPanel.vue'
 
 vi.mock('~/composables/useKitUI', async (importOriginal) => {
   const original = await importOriginal<typeof import('~/composables/useKitUI')>()

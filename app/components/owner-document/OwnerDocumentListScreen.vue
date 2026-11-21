@@ -1,17 +1,16 @@
 <script setup lang="ts">
-import type { RowActionItem } from '~/components/ui/RowActionMenu.vue'
 import type { OwnerCommercialDocumentKind } from '~/lib/owner-document/central-repository'
 import type { OwnerDocumentKind, OwnerDocumentListRecord } from '~/lib/owner-document/forms'
+import OwnerDocumentListTable from '~/components/owner-document/OwnerDocumentListTable.vue'
+import OwnerDocumentListToolbar from '~/components/owner-document/OwnerDocumentListToolbar.vue'
+import TargetCostSourceReturn from '~/components/target-cost/TargetCostSourceReturn.vue'
+import ListShell from '~/components/ui/ListShell.vue'
 import { clampPage, paginate } from '~/lib/kit/table'
-import { resolveNavigationTarget } from '~/lib/nav/target-registry'
-import { ownerDocumentStatusIsEditable } from '~/lib/owner-document/forms'
 import {
   filterOwnerDocumentRows,
   OWNER_ACCEPTANCE_LIST_COLUMNS,
   OWNER_ACCEPTANCE_LIST_VIEWS,
   OWNER_DOCUMENT_LIST_CONFIG,
-  ownerDocumentStatusClass,
-  ownerDocumentStatusLabelForList,
   ownerDocumentStatusViewKey,
   ownerDocumentTypeLabel,
 } from '~/lib/owner-document/list'
@@ -252,35 +251,6 @@ const summaries = computed(() =>
     }
   }),
 )
-
-function centralContractTarget(row: OwnerDocumentListRecord): string | null {
-  if (!centralReadOnly.value || !row.contractNavigation)
-    return null
-  const result = resolveNavigationTarget(row.contractNavigation)
-  return result.state === 'resolved' ? result.to : null
-}
-const tableMinWidth = computed(() =>
-  config.value.columns.reduce(
-    (total, column) => total + (column.width ?? column.minWidth ?? 120),
-    0,
-  ),
-)
-
-function rowActions(row: OwnerDocumentListRecord): RowActionItem[] {
-  if (centralReadOnly.value)
-    return [{ key: 'edit', label: '查看详情', icon: 'i-lucide-eye' }]
-  const canDelete = ownerDocumentStatusIsEditable(row.status)
-  return [
-    { key: 'edit', label: '查看/编辑', icon: 'i-lucide-square-pen' },
-    {
-      key: 'delete',
-      label: canDelete ? '删除' : '当前状态不可删除',
-      icon: 'i-lucide-trash-2',
-      tone: 'danger',
-      disabled: !canDelete,
-    },
-  ]
-}
 
 let listLoadTicket = 0
 function currentLoadScope() {
@@ -625,168 +595,106 @@ onActivated(async () => {
         <span class="i-lucide-arrow-left mr-1" aria-hidden="true" />返回来源详情
       </NuxtLink>
     </div>
-    <nav v-if="kind === 'acceptance'" class="panel flex flex-wrap gap-2 p-2" aria-label="验收保修列表视图">
-      <NuxtLink
-        v-for="item in [{ key: 'acceptance', label: '竣工验收' }, { key: 'warranty', label: '保修到期确认' }]"
-        :key="item.key"
-        :to="{ path: route.path, query: { ...route.query, variant: item.key, page: undefined } }"
-        class="btn-ghost min-h-9"
-        :class="{ 'bg-brand-soft text-brand-deep': acceptanceVariant === item.key }"
-        :aria-current="acceptanceVariant === item.key ? 'page' : undefined"
-      >
-        {{ item.label }}
-      </NuxtLink>
-    </nav>
-    <OwnerDocumentListToolbar
-      v-model:search="search"
-      v-model:project="projectFilter"
-      v-model:type="typeFilter"
-      v-model:view="statusView"
-      :title="meta.label"
-      :subtitle="meta.subtitle"
-      :create-label="`新建${meta.label}`"
-      :can-create="canCreate"
-      :loading="loading"
-      :search-placeholder="config.searchPlaceholder"
-      :show-type="config.showTypeFilter"
-      :type-label="config.typeLabel"
-      :project-options="projectOptions"
-      :type-options="typeOptions"
-      :views="statusOptions"
-      @refresh="load"
-      @create="openCreate"
-    />
-
-    <div
-      v-if="contextFilters.length"
-      data-ui="owner-document-route-context"
-      class="flex min-w-0 flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-brand/25 bg-brand-soft px-3 py-2"
-      aria-label="来源筛选"
-    >
-      <span class="text-11px font-700 text-brand-deep">来源范围</span>
-      <button
-        v-for="context in contextFilters"
-        :key="context.key"
-        type="button"
-        class="chip chip-brand gap-1 border-0 cursor-pointer"
-        :aria-label="`清除${context.label}筛选`"
-        @click="clearRouteFilter(context.key)"
-      >
-        {{ context.label }}
-        <span class="i-lucide-x h-3 w-3" aria-hidden="true" />
-      </button>
-    </div>
-
-    <StatePanel
-      v-if="loadError && !loading"
-      kind="error"
-      :title="`${meta.label}载入失败`"
-      :description="hasSnapshot ? `${loadError}；当前保留上一次成功读取的列表。` : loadError"
-      :compact="hasSnapshot"
-      action-label="重新载入"
-      @action="load"
-    />
-
-    <div v-if="!loadError || loading || hasSnapshot" class="min-w-0">
-      <div
-        data-ui="owner-document-table"
-        :aria-busy="loading"
-        role="region"
-        :aria-label="`${meta.label}列表，可横向滚动查看完整列`"
-        tabindex="0"
-        class="max-w-full overflow-x-auto overscroll-x-contain rounded-[var(--radius-card)] outline-none focus-visible:ring-2 focus-visible:ring-brand/35"
-      >
-        <KitTable
+    <ListShell continuous :summary-label="`${meta.label}列表汇总`">
+      <template #toolbar>
+        <nav v-if="kind === 'acceptance'" class="mb-2 flex flex-wrap gap-2 border-b border-line pb-2" aria-label="验收保修列表视图">
+          <NuxtLink
+            v-for="item in [{ key: 'acceptance', label: '竣工验收' }, { key: 'warranty', label: '保修到期确认' }]"
+            :key="item.key"
+            :to="{ path: route.path, query: { ...route.query, variant: item.key, page: undefined } }"
+            class="btn-ghost min-h-9"
+            :class="{ 'bg-brand-soft text-brand-deep': acceptanceVariant === item.key }"
+            :aria-current="acceptanceVariant === item.key ? 'page' : undefined"
+          >
+            {{ item.label }}
+          </NuxtLink>
+        </nav>
+        <OwnerDocumentListToolbar
+          v-model:search="search"
+          v-model:project="projectFilter"
+          v-model:type="typeFilter"
+          v-model:view="statusView"
+          :title="meta.label"
+          :subtitle="meta.subtitle"
+          :create-label="`新建${meta.label}`"
+          :can-create="canCreate"
+          :loading="loading"
+          :search-placeholder="config.searchPlaceholder"
+          :show-type="config.showTypeFilter"
+          :type-label="config.typeLabel"
+          :project-options="projectOptions"
+          :type-options="typeOptions"
+          :views="statusOptions"
+          @refresh="load"
+          @create="openCreate"
+        />
+      </template>
+      <template v-if="contextFilters.length" #filters>
+        <div
+          data-ui="owner-document-route-context"
+          class="flex min-w-0 flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-brand/25 bg-brand-soft px-3 py-2"
+          aria-label="来源筛选"
+        >
+          <span class="text-11px font-700 text-brand-deep">来源范围</span>
+          <button
+            v-for="context in contextFilters"
+            :key="context.key"
+            type="button"
+            class="chip chip-brand gap-1 border-0 cursor-pointer"
+            :aria-label="`清除${context.label}筛选`"
+            @click="clearRouteFilter(context.key)"
+          >
+            {{ context.label }}
+            <span class="i-lucide-x h-3 w-3" aria-hidden="true" />
+          </button>
+        </div>
+      </template>
+      <template #table>
+        <StatePanel
+          v-if="loadError && !loading"
+          class="m-3"
+          kind="error"
+          :title="`${meta.label}载入失败`"
+          :description="hasSnapshot ? `${loadError}；当前保留上一次成功读取的列表。` : loadError"
+          :compact="hasSnapshot"
+          action-label="重新载入"
+          @action="load"
+        />
+        <OwnerDocumentListTable
+          v-if="!loadError || loading || hasSnapshot"
+          :kind="kind"
+          :acceptance-variant="acceptanceVariant"
+          :central-read-only="centralReadOnly"
           :columns="config.columns"
-          :data="pageRows"
+          :rows="pageRows"
+          :busy="loading"
           :loading="loading && !hasSnapshot"
           :page="{ page: currentPage, pageSize, total: totalRows }"
           :empty="emptyState"
-          :style="{ minWidth: kind === 'sub_settlement' && !pageRows.length ? '100%' : `${tableMinWidth}px`, maxWidth: 'none' }"
           @page-change="handlePageChange"
           @empty-action="handleEmptyAction"
-        >
-          <template #document="{ row }">
-            <NuxtLink
-              v-if="centralReadOnly"
-              :id="`owner-document-row-real:${kind}:${row.id}`"
-              :to="ownerDocumentDetailPath(kind, row.id, 'real', row.viewVariant ?? acceptanceVariant)"
-              class="cell--link whitespace-nowrap font-mono"
-              :title="row.no || row.name"
-              @click.prevent="openEdit(row)"
-            >
-              {{ row.no || '未编号' }}
-            </NuxtLink>
-            <NuxtLink
-              v-else
-              :to="ownerDocumentFormPath(kind, row.id)"
-              class="cell--link whitespace-nowrap font-mono"
-              :title="row.no || row.name"
-            >
-              {{ row.no || '未编号' }}
-            </NuxtLink>
-          </template>
-          <template #project="{ row }">
-            <EntityLink :id="row.projectId" type="project" :label="row.projectName" :intent="row.projectNavigation" />
-          </template>
-          <template #contract="{ row }">
-            <NuxtLink v-if="centralContractTarget(row)" :to="centralContractTarget(row)!" class="cell--link">
-              {{ row.contractName }}
-            </NuxtLink>
-            <EntityLink v-else :id="row.contractId" type="contract" :label="row.contractName" />
-          </template>
-          <template #supplier="{ row }">
-            <EntityLink
-              :id="row.supplierId"
-              type="supplier"
-              :label="row.supplierName || row.crewName"
-              :intent="row.supplierNavigation"
-            />
-          </template>
-          <template #type="{ row }">
-            {{ ownerDocumentTypeLabel(kind, row.type) || '—' }}
-          </template>
-          <template #negativeAmount="{ row }">
-            <span class="whitespace-nowrap font-mono font-700 text-danger">
-              -{{ yuan(row.amount) }}
-            </span>
-          </template>
-          <template #status="{ row }">
-            <span class="chip" :class="ownerDocumentStatusClass(kind, row.status)">
-              {{ ownerDocumentStatusLabelForList(kind, row.status) }}
-            </span>
-          </template>
-          <template #action="{ row }">
-            <RowActionMenu
-              :items="rowActions(row)"
-              :label="`${row.no || row.name}${meta.label}操作`"
-              @select="handleRowAction($event, row)"
-            />
-          </template>
-        </KitTable>
-      </div>
-
-      <div
-        data-ui="owner-document-summary"
-        class="flex min-w-0 flex-wrap items-center justify-end gap-x-4 gap-y-1 border-x border-b border-line bg-surface-2 px-4 py-2 text-12px text-ink-soft"
-        role="status"
-        :aria-label="`${meta.label}列表汇总`"
-      >
-        <span>{{ config.countLabel }}：<strong class="text-ink">{{ totalRows }}</strong></span>
-        <span v-for="summary in summaries" :key="summary.label">
-          {{ summary.label }}：
-          <strong class="whitespace-nowrap font-mono text-ink">{{ yuan(summary.value) }}</strong>
-          <span v-if="summary.completeness === 'missing'" class="ml-1 text-ink-faint">尚未回填</span>
-        </span>
-        <button
-          v-if="totalRows > 0 && (hasLocalFilters || contextFilters.length)"
-          type="button"
-          class="border-0 bg-transparent p-0 text-12px font-700 text-brand-deep"
-          @click="resetFilters()"
-        >
-          清除筛选
-        </button>
-      </div>
-    </div>
+          @open-detail="openEdit"
+          @row-action="handleRowAction"
+        />
+      </template>
+      <template v-if="hasSnapshot" #summary>
+        <div data-ui="owner-document-summary" class="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-x-4 gap-y-1">
+          <span>{{ config.countLabel }}：<strong class="text-ink">{{ totalRows }}</strong></span>
+          <span v-for="summary in summaries" :key="summary.label">
+            {{ summary.label }}：
+            <strong class="whitespace-nowrap font-mono text-ink">{{ yuan(summary.value) }}</strong>
+            <span v-if="summary.completeness === 'missing'" class="ml-1 text-ink-faint">尚未回填</span>
+          </span>
+          <button
+            v-if="totalRows > 0 && (hasLocalFilters || contextFilters.length)"
+            type="button"
+            class="border-0 bg-transparent p-0 text-12px font-700 text-brand-deep"
+            @click="resetFilters()"
+          >
+            清除筛选
+          </button>
+        </div>
+      </template>
+    </ListShell>
   </div>
 </template>

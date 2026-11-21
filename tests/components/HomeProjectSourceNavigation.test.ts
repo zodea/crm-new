@@ -4,12 +4,12 @@ import { createPinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent } from 'vue'
 import { createMemoryHistory, createRouter, RouterLink, useRoute, useRouter } from 'vue-router'
-import HomeDashboard from '~/components/home/HomeDashboard.vue'
 import HomeDashboardSurface from '~/components/home/HomeDashboardSurface.vue'
-import HomeScheduleSourceScreen from '~/components/schedule/HomeScheduleSourceScreen.vue'
 import StatePanel from '~/components/ui/StatePanel.vue'
 import { createHttpProjectListRepository } from '~/lib/project/http-repository'
 import { projectProblem, ProjectRepositoryProblem } from '~/lib/project/repository'
+import HomeDashboard from '~/pages/_components/HomeDashboard.vue'
+import HomeScheduleSourceScreen from '~/pages/schedule/_components/HomeScheduleSourceScreen.vue'
 import { createProjectReadTestInstance, PROJECT_READ_FIXTURE } from '../../server/utils/project-read-test-instance'
 import { fixtureProjectCustomerReferences } from '../helpers/project-read-meta'
 
@@ -55,8 +55,8 @@ async function open(location = '/') {
   const shell = defineComponent({ template: '<RouterView v-slot="{ Component }"><KeepAlive><component :is="Component" /></KeepAlive></RouterView>' })
   const wrapper = mount(shell, { global: {
     plugins: [createPinia(), router],
-    components: { NuxtLink: RouterLink, ProjectSwitcher, HomeDashboardSurface, StatePanel },
-    stubs: { HomeScheduleOverview: true },
+    components: { NuxtLink: RouterLink, HomeDashboardSurface, StatePanel },
+    stubs: { HomeScheduleOverview: true, ProjectSwitcher },
   } })
   await flushPromises()
   return { router, wrapper }

@@ -3,8 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/vue
 import { createPinia, defineStore, setActivePinia } from 'pinia'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, reactive, shallowRef } from 'vue'
-import ScheduleProcessLibraryFormPage from '~/components/schedule/ScheduleProcessLibraryFormPage.vue'
-import ScheduleProcessLibraryTaskEditor from '~/components/schedule/ScheduleProcessLibraryTaskEditor.vue'
+import ScheduleProcessLibraryFormPage from '~/pages/schedule/process-library/_components/ScheduleProcessLibraryFormPage.vue'
 
 vi.mock('~/composables/useTabCloseGuard', () => ({ useTabCloseGuard: vi.fn() }))
 vi.mock('vue-router', async importOriginal => ({ ...await importOriginal<typeof import('vue-router')>(), onBeforeRouteUpdate: vi.fn(), onBeforeRouteLeave: vi.fn() }))
@@ -36,7 +35,7 @@ async function harness() {
   vi.stubGlobal('useRouter', () => ({ push: vi.fn() }))
   vi.stubGlobal('useScheduleProcessLibraryStore', () => useStore())
   vi.stubGlobal('useKitUI', () => ({ confirm: vi.fn(async () => false), success: vi.fn(), error: vi.fn() }))
-  render(ScheduleProcessLibraryFormPage, { global: { components: { ScheduleProcessLibraryTaskEditor, ScheduleTemplateGanttEditor: Empty } } })
+  render(ScheduleProcessLibraryFormPage, { global: { stubs: { ScheduleTemplateGanttEditor: Empty } } })
   await screen.findByLabelText('工序库名称 *')
   return { route }
 }

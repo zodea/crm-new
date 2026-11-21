@@ -2,9 +2,9 @@ import type { ProjectDetailReadDTO } from '~/lib/project/repository'
 import { fireEvent, render, screen, within } from '@testing-library/vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h } from 'vue'
-import ProjectDetailScreen from '~/components/project/ProjectDetailScreen.vue'
 import { managementFeeSource, projectManagementFees } from '~/lib/project/management-fee'
 import { projectProblem, ProjectRepositoryProblem } from '~/lib/project/repository'
+import ProjectDetailScreen from '~/pages/project/_components/ProjectDetailScreen.vue'
 
 const detail: ProjectDetailReadDTO = {
   constructionManagementFees: { projectId: 'project-1', dataOrigin: 'demo', state: 'unavailable', sourceVersion: null, asOf: null, reason: '总合同来源未接入', contracts: [] },
@@ -149,6 +149,10 @@ function renderDetail(props: Record<string, unknown>) {
     global: {
       components: {
         NuxtLink: NuxtLinkStub,
+        StatePanel: StatePanelStub,
+      },
+      stubs: {
+        AuxiliaryContractJourney: true,
         ProjectDetailTab: defineComponent({
           props: ['project'],
           template: '<section aria-label="中央详情字段">{{ project.name }}</section>',
@@ -157,7 +161,6 @@ function renderDetail(props: Record<string, unknown>) {
           props: ['relationships'],
           template: '<aside aria-label="中央项目分供方">{{ relationships.length }} 家</aside>',
         }),
-        StatePanel: StatePanelStub,
       },
     },
   })

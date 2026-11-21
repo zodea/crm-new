@@ -1,5 +1,5 @@
 // PayrollReversalFormScreen — 工资错记冲销 / 纠正工资错记冲销整页（/subcontract/payroll/payments/reversal/new；#412 P4）。
-// 对应 app/components/payroll/PayrollRecordingReversalFormPage.vue + usePayrollRecordingReversalForm。
+// 对应 app/pages/subcontract/payroll/payments/reversal/_components/PayrollRecordingReversalFormPage.vue + usePayrollRecordingReversalForm。
 // 流程：从具体收付事实进入 → 核对原事实与原工资 → 填核实日期与依据 → 勾选“原登记的收付实际没有发生”
 //       → 核对错记事实与处理关系 → 确认错记冲销（原事实若本身是冲销，则为“确认冲销纠错”）。
 // 口径：只有确认钱未发生才登记错记冲销；钱已付出后收回属于实际退款，不能用冲销消除已发生的支付。

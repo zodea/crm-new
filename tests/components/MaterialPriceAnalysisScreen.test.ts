@@ -2,7 +2,7 @@ import type { DeliveryPriceRecordInput } from '~/lib/material/price-analysis'
 import { fireEvent, render, screen, within } from '@testing-library/vue'
 import { describe, expect, it } from 'vitest'
 import { defineComponent, h } from 'vue'
-import MaterialPriceAnalysisScreen from '~/components/material/price/MaterialPriceAnalysisScreen.vue'
+import MaterialPriceAnalysisScreen from '~/pages/material/_components/MaterialPriceAnalysisScreen.vue'
 
 const NuxtLinkStub = defineComponent({
   props: {

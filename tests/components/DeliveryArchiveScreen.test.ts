@@ -1,11 +1,10 @@
-import type { Component } from 'vue'
 import type { DeliveryRecord } from '~/stores/delivery-record'
 import { fireEvent, render, screen, waitFor } from '@testing-library/vue'
 import { flushPromises } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, defineComponent, h, onMounted, reactive, shallowRef, watch } from 'vue'
-import DeliveryArchiveScreen from '~/components/delivery/DeliveryArchiveScreen.vue'
 import KitButton from '~/components/ui/KitButton.vue'
+import DeliveryArchiveScreen from '~/pages/material/delivery/archive/_components/DeliveryArchiveScreen.vue'
 
 const createZip = vi.hoisted(() => vi.fn())
 
@@ -95,13 +94,15 @@ const ScopeStub = defineComponent({
   },
 })
 
-const globalComponents: Record<string, Component> = {
-  KitButton,
-  ArchiveScopePicker: Passthrough,
-  KitTable: TableStub,
-  NuxtLink: NuxtLinkStub,
-  SearchInput: Passthrough,
-  TreeNav: Passthrough,
+const global = {
+  components: {
+    KitButton,
+    KitTable: TableStub,
+    NuxtLink: NuxtLinkStub,
+    SearchInput: Passthrough,
+    TreeNav: Passthrough,
+  },
+  stubs: { ArchiveScopePicker: Passthrough },
 }
 
 describe('送货单归档库导出', () => {
@@ -134,7 +135,7 @@ describe('送货单归档库导出', () => {
 
   it('用户取消统一写盘时保持静默，不触发额外成功或缺原件提示', async () => {
     render(DeliveryArchiveScreen, {
-      global: { components: globalComponents },
+      global,
     })
 
     await flushPromises()
@@ -160,7 +161,7 @@ describe('送货单归档库导出', () => {
       return { status: 'exported', displayPath: '下载' }
     })
     render(DeliveryArchiveScreen, {
-      global: { components: globalComponents },
+      global,
     })
 
     await flushPromises()
@@ -176,18 +177,21 @@ describe('送货单归档库导出', () => {
   it('中央归档只使用当前关系，带冒号的稳定 ID 可筛选，读取失败撤下旧事实和动作', async () => {
     const central = reactive({ origin: 'real', canWrite: true, loading: false, list: [{ ...record, id: 'd:1', projectId: 'p:1', supplierId: 's:1', dataOrigin: 'real', projectName: '中央项目', supplierName: '中央分供方' }], context: { projects: [{ id: 'p:1', name: '中央项目' }], suppliers: [{ id: 's:1', name: '中央分供方' }], materialContracts: [] }, load: vi.fn().mockResolvedValue(undefined), loadSourceFile: vi.fn(), remove: vi.fn(), undo: vi.fn() })
     vi.stubGlobal('useDeliveryRecordStore', () => central)
-    render(DeliveryArchiveScreen, { global: { components: { ...globalComponents, ArchiveScopePicker: ScopeStub } } })
+    render(DeliveryArchiveScreen, { global: { ...global, stubs: { ArchiveScopePicker: ScopeStub } } })
     await screen.findByText('中央项目')
     await fireEvent.click(screen.getByRole('button', { name: '筛选中央分供方' }))
     expect(screen.getByRole('link', { name: 'SH-001' }).getAttribute('href')).toBe('/material/delivery/archive/d%3A1?origin=real')
+    expect(screen.getByRole('status', { name: '列表汇总' }).textContent).toContain('金额合计')
     central.load.mockRejectedValueOnce(new Error('关联权限已撤销'))
     await fireEvent.click(screen.getByRole('button', { name: '刷新' }))
     await screen.findByRole('alert')
+    expect(screen.queryByRole('status', { name: '列表汇总' })).toBeNull()
     expect(screen.queryByText('SH-001')).toBeNull()
     expect(screen.queryByRole('link', { name: /新增送货单/ })).toBeNull()
     expect(screen.getByRole('button', { name: '导出原件包' }).hasAttribute('disabled')).toBe(true)
     await fireEvent.click(screen.getByRole('button', { name: '重新读取' }))
     await screen.findByText('SH-001')
+    expect(screen.getByRole('status', { name: '列表汇总' }).textContent).toContain('金额合计')
   })
 
   it('等待目录选择时切换来源，取消当前导出且不再读取迟到原件', async () => {
@@ -199,7 +203,7 @@ describe('送货单归档库导出', () => {
       await options.data()
       return { status: 'exported' }
     })
-    render(DeliveryArchiveScreen, { global: { components: globalComponents } })
+    render(DeliveryArchiveScreen, { global })
     await waitFor(() => expect(screen.getByRole('button', { name: '导出原件包' }).hasAttribute('disabled')).toBe(false))
     await fireEvent.click(screen.getByRole('button', { name: '导出原件包' }))
     central.origin = 'demo'

@@ -19,8 +19,9 @@ for (const item of LIST_ROUTES) {
     await expect(page.locator('[data-ui="owner-document-list-toolbar"]')).toBeVisible({
       timeout: 60_000,
     })
-    const table = page.locator('[data-ui="owner-document-table"]')
+    const table = page.locator('[data-list-shell].list-shell--continuous [data-ui="owner-document-table"]')
     await expect(table).toBeVisible()
+    await expect(table.locator('[data-ui="kit-table"]')).toBeVisible()
     await expect(table).toHaveAttribute('aria-busy', 'false')
 
     const tableOverflow = await table.evaluate(element => element.scrollWidth - element.clientWidth)

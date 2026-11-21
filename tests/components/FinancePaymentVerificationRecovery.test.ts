@@ -44,7 +44,13 @@ const shell = Vue.defineComponent({ template: '<main><slot/></main>' })
 const fields = Vue.defineComponent({ props: ['draft'], emits: ['patch'], template: '<label>备注<input aria-label="后来付款说明" :value="draft.note" @input="$emit(\'patch\', { note: $event.target.value })"></label>' })
 const fileSection = Vue.defineComponent({ emits: ['files'], template: '<section>原件区<input aria-label="上传真实替代文件" type="file" @change="$emit(\'files\', Array.from($event.target.files ?? []))"></section>' })
 function open(kind: 'payment_application' | 'reimbursement' = 'payment_application') {
-  return render(FinanceFormPage, { props: { kind }, global: { components: { EntityFormShell: shell, FinanceFormFields: fields, FileRefAttachmentSection: fileSection, FormFooter, KitButton } } })
+  return render(FinanceFormPage, {
+    props: { kind },
+    global: {
+      components: { EntityFormShell: shell, FileRefAttachmentSection: fileSection, FormFooter, KitButton },
+      stubs: { FinanceFormFields: fields },
+    },
+  })
 }
 async function fill() {
   await fireEvent.update(screen.getByRole('textbox', { name: '核实累计应付金额' }), '70')

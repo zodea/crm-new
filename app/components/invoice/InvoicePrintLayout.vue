@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { InvoicePrintRequest, InvoicePrintViewModel, PrintPerPage, PrintRotation } from '~/lib/invoice/print-layout'
+import InvoicePreviewSvg from '~/components/invoice/InvoicePreviewSvg.vue'
 import { buildPrintLayout, normalizePrintRotation, rotatePrintItems } from '~/lib/invoice/print-layout'
 import { yuan } from '~/lib/util/money'
 

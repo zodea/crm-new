@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/vue'
+import { fireEvent, render, screen } from '@testing-library/vue'
 import { describe, expect, it } from 'vitest'
 import OwnerDocumentListToolbar from '~/components/owner-document/OwnerDocumentListToolbar.vue'
 
@@ -28,6 +28,22 @@ describe('甲方商务单据列表工具栏权限', () => {
   it('具有写入能力时呈现新建入口', () => {
     render(OwnerDocumentListToolbar, { props: { ...props, canCreate: true } })
     expect(screen.getByRole('button', { name: '新建甲方变洽签' })).not.toBeNull()
+  })
+
+  it('用单据名称标记刷新操作，读取期间禁用并显示旋转图标', async () => {
+    const view = render(OwnerDocumentListToolbar, { props: { ...props, loading: true } })
+    const refresh = screen.getByRole('button', { name: '刷新甲方变洽签' })
+
+    expect(refresh.hasAttribute('disabled')).toBe(true)
+    expect(refresh.querySelector('.animate-spin')).not.toBeNull()
+    refresh.click()
+    expect(view.emitted().refresh).toBeUndefined()
+
+    await view.rerender({ ...props, loading: false })
+    expect(refresh.hasAttribute('disabled')).toBe(false)
+    expect(refresh.querySelector('.animate-spin')).toBeNull()
+    await fireEvent.click(refresh)
+    expect(view.emitted().refresh).toHaveLength(1)
   })
 
   it('解释文字默认收进标题旁的帮助入口', () => {

@@ -5,6 +5,7 @@
 // 页签隔离：page-key 按路径身份与缓存版本区分实例，同路径 query 应用新预筛，
 // 配合 keepalive 缓存；滚动位置按页签 key 手动存取（滚动容器是共享的，keep-alive 不覆盖）。
 import { useScrollLock } from '@vueuse/core'
+import ProductionBackupBar from '~/components/production/ProductionBackupBar.vue'
 import { pruneTabPageWrappers, tabPageCacheName } from '~/lib/tabs/page-cache'
 import { deriveKey, MAX_TABS } from '~/lib/tabs/tab-machine'
 

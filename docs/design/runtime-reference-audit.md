@@ -47,7 +47,7 @@
 | `/import/mapping/:entity` | invoice、project、supplier、demo-supplier、quantity-template、quantity-assignment、quantity-completion、quantity-legacy-precheck；分别有上传、映射、预览及失败恢复，demo-supplier 是演示桩 | `app/lib/kit/import-entities.ts`；#406 联同 #407/#408/#412/#413 |
 | 客户 / 分供方 / 项目合作详情 | 客户 3 个事实页签；分供方 6 个页签；项目合作 6 个页签及常驻文件面板 | `CustomerDetailScreen.vue`、`SupplierDetailScreen.vue`、`ProjectSupplierWorkbench.vue`；#407/#408 |
 | 三类中央合同 / 辅助合同 / 其他结算详情 | 三类核心合同各 7 个页签；公司支出 3 个、其他支出 5 个、其他结算 4 个，页签内子表另行登记 | `app/components/contract/`、`app/components/other-settlement/`；#409 |
-| 工程量、BOQ、排程、OCR 工作台 | 工种/班组矩阵，BOQ 五格式导入及三页签，甘特与依赖编辑，发票复核/打印及窄屏面板、送货重复复核分别登记 | `app/components/boq/`、`quantity/`、`schedule/`、`invoice/`、`delivery/`；#406/#409/#411/#412/#413 |
+| 工程量、BOQ、排程、OCR 工作台 | 工种/班组矩阵，BOQ 五格式导入及三页签，甘特与依赖编辑，发票复核/打印及窄屏面板、送货重复复核分别登记 | `app/pages/contract/boq/_components/`、`app/components/` 下的 `quantity/`、`schedule/`、`invoice/`、`delivery/`；#406/#409/#411/#412/#413 |
 
 尚未完成：全量调用位置级子表/浮层清单、每个环境分支的运行验证、红圈全部安全可达目标的双向映射、旧任务逐条验收义务迁移及生产持久化验收。当前重算的路由数量只证明登记集合一致；`design-coverage` 的 covered 只表示有设计落点。
 

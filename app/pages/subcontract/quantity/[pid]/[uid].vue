@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import CrewWorkerRelationFactDetailScreen from '~/components/crew-worker/CrewWorkerRelationFactDetailScreen.vue'
 import { validateCrewWorkerReturnTo } from '~/lib/crew-worker/return-context'
 import { quantityUnitReturnPath, readQuantityOrigin } from '~/lib/quantity/navigation'
+import QuantityUnitDetailScreen from '~/pages/subcontract/quantity/[pid]/_components/QuantityUnitDetailScreen.vue'
 import { isDataOriginDTO } from '~/types/read-model'
 
 // 薄路由（#103 切片 6A）：参数身份已冻结为 pid=项目 id、uid=户 id（见 ADR 0010 / handoff 决策门）。

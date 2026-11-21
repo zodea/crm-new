@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import WorkerRosterArchiveScreen from '~/pages/subcontract/payroll/_components/WorkerRosterArchiveScreen.vue'
+
 const route = useRoute()
 </script>
 

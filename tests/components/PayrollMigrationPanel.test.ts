@@ -2,9 +2,9 @@ import { webcrypto } from 'node:crypto'
 import { fireEvent, render, screen, waitFor } from '@testing-library/vue'
 import { createPinia } from 'pinia'
 import { beforeEach, expect, it, vi } from 'vitest'
-import PayrollMigrationPanel from '~/components/migration/PayrollMigrationPanel.vue'
 import { useKitUIHostState } from '~/composables/useKitUI'
 import { commandRecoveryKey, createCommandRecoveryStorage } from '~/lib/forms/command-recovery'
+import PayrollMigrationPanel from '~/pages/settings/_components/PayrollMigrationPanel.vue'
 import { useProductionAccessStore } from '~/stores/production-access'
 
 vi.mock('~/composables/useKitUI', async (importOriginal) => {

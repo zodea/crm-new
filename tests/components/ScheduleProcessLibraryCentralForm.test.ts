@@ -3,9 +3,9 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/vue'
 import { createPinia, defineStore, setActivePinia } from 'pinia'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, KeepAlive, nextTick, reactive, ref } from 'vue'
-import ScheduleProcessLibraryFormPage from '~/components/schedule/ScheduleProcessLibraryFormPage.vue'
 import { processLibraryProblem } from '~/lib/schedule/process-library-contract'
 import { createProcessLibraryState } from '~/lib/schedule/process-library-state'
+import ScheduleProcessLibraryFormPage from '~/pages/schedule/process-library/_components/ScheduleProcessLibraryFormPage.vue'
 
 vi.mock('~/composables/useTabCloseGuard', () => ({ useTabCloseGuard: vi.fn() }))
 vi.mock('vue-router', async importOriginal => ({ ...await importOriginal<typeof import('vue-router')>(), onBeforeRouteLeave: vi.fn(), onBeforeRouteUpdate: vi.fn() }))

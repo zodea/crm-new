@@ -1,5 +1,5 @@
 // QuotationDetailScreen — 材料报价详情（route quotationDetail ↔ 实现 /material/quotations/:id?version=…，
-// 对应 app/components/material/quotation/QuotationDetailScreen.vue + QuotationOriginalFiles.vue）。
+// 对应 app/pages/material/quotations/_components/QuotationDetailScreen.vue + QuotationOriginalFiles.vue）。
 // 口径：头部「材料报价」+ 返回清单 / 编辑报价（material-quotation:write）；
 //       主体 = 冻结版本下拉（版本 N · 时间）→ 该版本的报价方原文、原报价日期、适用范围、分供方关联，
 //       迁入记录另示「已确认当前关联」（原始编号和冻结资料保持原文）、报价身份与原命令；

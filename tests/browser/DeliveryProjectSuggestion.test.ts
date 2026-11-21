@@ -2,8 +2,8 @@ import { useObjectUrl } from '@vueuse/core'
 import { afterEach, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-vue'
 import * as Vue from 'vue'
-import DeliveryDocumentFields from '~/components/delivery/DeliveryDocumentFields.vue'
 import { useDeliveryRecognitionWorkspace } from '~/composables/useDeliveryRecognitionWorkspace'
+import DeliveryDocumentFields from '~/pages/material/delivery/_components/DeliveryDocumentFields.vue'
 
 afterEach(() => vi.unstubAllGlobals())
 

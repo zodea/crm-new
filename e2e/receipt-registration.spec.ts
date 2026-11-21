@@ -122,7 +122,11 @@ test.describe('Issue #436 普通收款中央全链', () => {
   test('无客户草稿保持空金额，真实零与原提交未应用封存后的新命令保存', async ({ page }) => {
     test.setTimeout(90_000)
     const saved = await seedReceipt(page, 'SK-BLANK-436', true)
-    await page.goto('/finance/receipt?search=SK-BLANK&page=1&pageSize=10')
+    const listPath = '/finance/receipt?search=SK-BLANK&page=1&pageSize=10'
+    const list = page.locator('[data-list-shell].list-shell--continuous [data-ui="kit-table"]')
+    await page.goto(listPath)
+    await expect(list.locator('[data-ui="receipt-list-amount"]')).toHaveText('—')
+    await expect(list.getByText('正式', { exact: true })).toHaveAttribute('data-ui', 'status-tag')
     await openFromList(page, 'SK-BLANK-436')
     await expect(page).not.toHaveURL(/customerId=/)
     await expect(page.getByRole('group', { name: '登记金额', exact: true })).toContainText('未填写')
@@ -157,6 +161,9 @@ test.describe('Issue #436 普通收款中央全链', () => {
     await expect(page.getByRole('group', { name: '登记金额', exact: true })).toContainText('0.00')
     await page.reload()
     await expect(page.getByRole('heading', { name: 'SK-BLANK-436', exact: true })).toBeVisible()
+    await page.goto(listPath)
+    await expect(list.locator('[data-ui="receipt-list-amount"]')).toHaveText('¥0.00')
+    await openFromList(page, 'SK-BLANK-436')
     await scenario(page, 'forbidden')
     await page.getByRole('button', { name: '重新读取', exact: true }).click()
     await expect(page.getByRole('link', { name: '编辑收款' })).toHaveCount(0)

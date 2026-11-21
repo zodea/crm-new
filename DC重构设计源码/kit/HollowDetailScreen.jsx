@@ -1,6 +1,6 @@
 // HollowDetailScreen — 户级空鼓检查与整改详情（#412 P6，补齐 design-pending）。
 // 路由：hollowDetail，params = { building, floor, unit, id, revisionId? }（与 quantityUnit 的 { building, floor, unit } 衔接，id = 空鼓记录）。
-// 对应：/subcontract/quantity/:pid/:uid/hollow/:id → app/components/quantity/QuantityHollowDetailScreen.vue、
+// 对应：/subcontract/quantity/:pid/:uid/hollow/:id → app/pages/subcontract/quantity/[pid]/[uid]/hollow/_components/QuantityHollowDetailScreen.vue、
 //       QuantityHollowRecordSummary / QuantityHollowHistory / QuantityHollowRectification.vue；
 //       规格 docs/rewrite/pages/subcontract-quantity.md「户级空鼓来源」、docs/guides/payroll-hollow.md。
 // 口径：检查归原户、房间分项和原施工责任；修订另开整页并保留原检查历史；整改在原记录中追加本次已修复处数，

@@ -2,7 +2,7 @@ import type { ProjectSupplierFileDTO } from '~/lib/project-supplier/repository'
 import { render, screen } from '@testing-library/vue'
 import { describe, expect, it } from 'vitest'
 import { defineComponent, h } from 'vue'
-import ProjectSupplierFilePanel from '~/components/project-supplier/ProjectSupplierFilePanel.vue'
+import ProjectSupplierFilePanel from '~/pages/project/[pid]/supplier/_components/ProjectSupplierFilePanel.vue'
 
 const EntityLinkStub = defineComponent({
   props: { label: String, intent: Object, returnTo: String },
@@ -55,7 +55,7 @@ describe('项目分供方合作文件', () => {
         returnTo: '/project/project-1/supplier/supplier-1?tab=contract',
       },
       global: {
-        components: {
+        stubs: {
           ProjectSupplierSourceLink: EntityLinkStub,
         },
       },

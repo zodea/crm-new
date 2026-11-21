@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { CrewFormDraft } from '~/lib/master-data/forms'
 import { useId } from 'vue'
+import MasterDataCapabilityFields from '~/components/master-data/MasterDataCapabilityFields.vue'
 
 const props = defineProps<{
   fieldErrors: Record<string, string>

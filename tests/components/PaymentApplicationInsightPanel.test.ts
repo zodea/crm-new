@@ -3,8 +3,8 @@ import { fireEvent, render, screen } from '@testing-library/vue'
 import { flushPromises } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import { reactive } from 'vue'
-import PaymentPayrollSection from '~/components/finance/payment-management/PaymentPayrollSection.vue'
-import PaymentApplicationInsightPanel from '~/components/finance/PaymentApplicationInsightPanel.vue'
+import PaymentPayrollSection from '~/pages/finance/payment-management/_components/PaymentPayrollSection.vue'
+import PaymentApplicationInsightPanel from '~/pages/finance/payment/[id]/_components/PaymentApplicationInsightPanel.vue'
 import { payrollAdjustmentFormRead } from '../helpers/payroll-adjustment-ui-fixture'
 
 describe('付款申请洞察说明', () => {

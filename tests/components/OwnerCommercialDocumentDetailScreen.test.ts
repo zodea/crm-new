@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, reactive } from 'vue'
-import OwnerCommercialDocumentDetailScreen from '~/components/owner-document/OwnerCommercialDocumentDetailScreen.vue'
+import OwnerCommercialDocumentDetailScreen from '~/pages/owner/[kind]/_components/OwnerCommercialDocumentDetailScreen.vue'
 
 const mocks = vi.hoisted(() => ({
   store: {

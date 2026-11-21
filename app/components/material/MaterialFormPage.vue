@@ -9,6 +9,8 @@ import type {
   MaterialGridLine,
   MaterialPageDraft,
 } from '~/lib/material/page'
+import MaterialFormFields from '~/components/material/MaterialFormFields.vue'
+import MaterialLineGrid from '~/components/material/MaterialLineGrid.vue'
 import { useTabCloseGuard } from '~/composables/useTabCloseGuard'
 import {
   listMaterialFormAttachments,

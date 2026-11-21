@@ -2,8 +2,8 @@ import type { ProjectSupplierWorkbenchReadDTO } from '~/lib/project-supplier/rep
 import { fireEvent, render, screen } from '@testing-library/vue'
 import { describe, expect, it } from 'vitest'
 import { defineComponent } from 'vue'
-import ProjectSupplierFactTable from '~/components/project-supplier/ProjectSupplierFactTable.vue'
-import ProjectSupplierOverview from '~/components/project-supplier/ProjectSupplierOverview.vue'
+import ProjectSupplierFactTable from '~/pages/project/[pid]/supplier/_components/ProjectSupplierFactTable.vue'
+import ProjectSupplierOverview from '~/pages/project/[pid]/supplier/_components/ProjectSupplierOverview.vue'
 
 const entityLink = defineComponent({
   props: ['label', 'returnTo'],

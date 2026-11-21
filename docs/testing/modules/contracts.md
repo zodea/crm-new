@@ -69,6 +69,7 @@
 | [tests/contract/forms.test.ts](../../../tests/contract/forms.test.ts) | 单元／服务／状态 | f2 合同与支出结算领域 action |
 | [tests/contract/native-contract-identities.test.ts](../../../tests/contract/native-contract-identities.test.ts) | 单元／服务／状态 | Native v52→53 真实磁盘重建保全部列/外键/索引/触发器与旧原件、冻结/审计；版本记账前中断冷开重试保零/未知及历史重复占号 |
 | [tests/contract/our-signatory-repository.test.ts](../../../tests/contract/our-signatory-repository.test.ts) | 单元／服务／状态 | 独立主体目录真实 owner/HTTP严格解码、完整核实历史、401/403与原命令回执/墓碑；精确编辑恢复定位不开放写页签正文 |
+| [tests/browser/OurSignatorySettings.test.ts](../../../tests/browser/OurSignatorySettings.test.ts) | 浏览器组件 | 五档视口、主体状态、键盘编辑、只读权限、空态与读取重试 |
 | [tests/db/f2-contract-migrations.test.ts](../../../tests/db/f2-contract-migrations.test.ts) | 单元／服务／状态 | v21 F2 canonical 合同与支出结算迁移 |
 | [tests/stores/contract-list-refresh.test.ts](../../../tests/stores/contract-list-refresh.test.ts) | 单元／服务／状态 | 合同列表刷新快照边界 |
 | [tests/stores/contract.test.ts](../../../tests/stores/contract.test.ts) | 单元／服务／状态 | contract store:唯一写路径 action 闭环 |

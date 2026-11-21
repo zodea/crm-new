@@ -1,8 +1,8 @@
 import type { CredentialOcrReviewDraft, CredentialOcrReviewField } from '~/lib/supplier/credential-ocr'
 import { fireEvent, render, screen, within } from '@testing-library/vue'
 import { describe, expect, it } from 'vitest'
-import SupplierCredentialOcrReview from '~/components/supplier/SupplierCredentialOcrReview.vue'
 import { buildCredentialOcrReview } from '~/lib/supplier/credential-ocr'
+import SupplierCredentialOcrReview from '~/pages/base/supplier/credential/_components/SupplierCredentialOcrReview.vue'
 
 function fields(): CredentialOcrReviewField[] {
   return [

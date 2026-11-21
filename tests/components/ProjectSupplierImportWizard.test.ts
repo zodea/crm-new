@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/vue'
 import { describe, expect, it } from 'vitest'
 import { defineComponent } from 'vue'
-import ProjectSupplierImportWizard from '~/components/project-supplier/ProjectSupplierImportWizard.vue'
+import ProjectSupplierImportWizard from '~/pages/project/[pid]/supplier/_components/ProjectSupplierImportWizard.vue'
 
 const global = {
   components: {

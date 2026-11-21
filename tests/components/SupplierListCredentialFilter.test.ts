@@ -2,8 +2,8 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/vue
 import { flushPromises } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, KeepAlive, nextTick, reactive, shallowRef } from 'vue'
-import SupplierListScreen from '~/components/supplier/SupplierListScreen.vue'
 import KitColumnHeader from '~/components/ui/KitColumnHeader.vue'
+import SupplierListScreen from '~/pages/base/supplier/_components/SupplierListScreen.vue'
 
 const readStore = vi.hoisted(() => ({ listState: { kind: 'ready', data: { items: [], summary: { categories: [], credentialStatuses: [], taxpayerTypes: [] }, pagination: { requestedPage: 1, page: 1, pageSize: 20, total: 0 }, capabilities: [] } } as any, listQuery: null as any, loadList: vi.fn().mockResolvedValue(undefined) }))
 const pendingForms = vi.hoisted(() => vi.fn<() => Promise<string[]>>())

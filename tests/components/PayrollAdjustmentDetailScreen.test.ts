@@ -2,7 +2,7 @@ import type { PayrollAdjustmentDetailRead } from '~/lib/payroll/central-adjustme
 import { fireEvent, render, screen, within } from '@testing-library/vue'
 import { expect, it, vi } from 'vitest'
 import PayrollAdjustmentBasisFields from '~/components/payroll/PayrollAdjustmentBasisFields.vue'
-import PayrollAdjustmentDetailScreen from '~/components/payroll/PayrollAdjustmentDetailScreen.vue'
+import PayrollAdjustmentDetailScreen from '~/pages/subcontract/payroll/adjustments/_components/PayrollAdjustmentDetailScreen.vue'
 import { knownPayrollSigned, payrollAdjustmentFormRead } from '../helpers/payroll-adjustment-ui-fixture'
 
 it('续更正本次加40与原链累计减60独立展示，并可回读前序和新旧依据', async () => {

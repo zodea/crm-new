@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { DataOriginDTO } from '~/types/read-model'
 import { validateSupplierReturnTo } from '~/lib/supplier/return-context'
+import SupplierCredentialScreen from '~/pages/base/supplier/credential/_components/SupplierCredentialScreen.vue'
 import { isDataOriginDTO } from '~/types/read-model'
 
 const route = useRoute()

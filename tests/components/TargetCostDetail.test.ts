@@ -3,8 +3,8 @@ import { webcrypto } from 'node:crypto'
 import { mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h } from 'vue'
-import TargetCostItemTable from '~/components/target-cost/TargetCostItemTable.vue'
 import { useTargetCostFiles } from '~/composables/useTargetCostFiles'
+import TargetCostItemTable from '~/pages/project/target-cost/_components/TargetCostItemTable.vue'
 
 describe('目标成本详情', () => {
   const KitTable = defineComponent({

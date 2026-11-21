@@ -2,8 +2,8 @@ import { fireEvent, render, screen, within } from '@testing-library/vue'
 import { flushPromises } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import { computed, defineComponent, h, KeepAlive, onMounted, reactive, ref, shallowRef } from 'vue'
-import DeliveryRecordDetailScreen from '~/components/delivery/DeliveryRecordDetailScreen.vue'
-import DeliveryRecordSummary from '~/components/delivery/DeliveryRecordSummary.vue'
+import DeliveryRecordDetailScreen from '~/pages/material/delivery/archive/_components/DeliveryRecordDetailScreen.vue'
+import DeliveryRecordSummary from '~/pages/material/delivery/archive/_components/DeliveryRecordSummary.vue'
 
 const record = {
   id: 'delivery-1',

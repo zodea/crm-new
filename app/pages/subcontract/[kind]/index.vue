@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import OwnerDocumentListScreen from '~/components/owner-document/OwnerDocumentListScreen.vue'
 import { ownerDocumentKindFromRoute } from '~/lib/owner-document/page'
 
 const route = useRoute()

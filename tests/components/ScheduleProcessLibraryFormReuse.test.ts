@@ -10,7 +10,7 @@ import {
   ref,
   shallowRef,
 } from 'vue'
-import ScheduleProcessLibraryFormPage from '~/components/schedule/ScheduleProcessLibraryFormPage.vue'
+import ScheduleProcessLibraryFormPage from '~/pages/schedule/process-library/_components/ScheduleProcessLibraryFormPage.vue'
 
 vi.mock('~/composables/useTabCloseGuard', () => ({ useTabCloseGuard: vi.fn() }))
 vi.mock('vue-router', async importOriginal => ({ ...await importOriginal<typeof import('vue-router')>(), onBeforeRouteLeave: vi.fn(), onBeforeRouteUpdate: vi.fn() }))

@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import TargetCostFormFields from '~/components/master-data/TargetCostFormFields.vue'
+import TargetCostAttachments from '~/components/target-cost/TargetCostAttachments.vue'
+import TargetCostCommandState from '~/components/target-cost/TargetCostCommandState.vue'
 import { useTargetCostForm } from '~/composables/useTargetCostForm'
 
 const ui = useTargetCostForm()

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import BoqBuildingEvidenceScreen from '~/components/boq/BoqBuildingEvidenceScreen.vue'
+import BoqBuildingEvidenceScreen from './_components/BoqBuildingEvidenceScreen.vue'
 </script>
 
 <template>

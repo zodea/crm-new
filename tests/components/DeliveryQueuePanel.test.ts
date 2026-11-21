@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/vue'
 import { describe, expect, it } from 'vitest'
-import DeliveryQueuePanel from '~/components/delivery/DeliveryQueuePanel.vue'
+import DeliveryQueuePanel from '~/pages/material/delivery/_components/DeliveryQueuePanel.vue'
 
 describe('delivery queue panel', () => {
   it('归档后显示待打印操作，且不再暴露普通移出队列动作', async () => {

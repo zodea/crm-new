@@ -3,7 +3,7 @@ import type { ReadState } from '~/types/read-model'
 import { render, screen, within } from '@testing-library/vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, defineComponent, h, nextTick, onActivated, onMounted, reactive, shallowRef, watch } from 'vue'
-import MaterialContractListScreen from '~/components/contract/MaterialContractListScreen.vue'
+import MaterialContractListScreen from '~/pages/contract/material/_components/MaterialContractListScreen.vue'
 import { materialOriginMeta } from '../helpers/material-read-meta'
 
 const mocks = vi.hoisted(() => ({ store: {} as any }))
@@ -64,7 +64,7 @@ const TableStub = defineComponent({
 function mountList() {
   return render(MaterialContractListScreen, {
     global: {
-      stubs: { KitMultiSelectFilter: true, KitColumnHeader: true, TreeNav: true, SelectFilter: true },
+      stubs: { KitMultiSelectFilter: true, KitColumnHeader: true, TreeNav: true, SelectFilter: true, TargetCostSourceReturn: true },
       components: {
         KitTable: TableStub,
         NuxtLink: defineComponent({ props: ['to'], template: '<a :href="to"><slot/></a>' }),

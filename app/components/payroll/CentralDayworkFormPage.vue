@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { PayrollDayworkRecordDraft } from '~/lib/payroll/central-daywork-contract'
 import { computed } from 'vue'
+import PayrollACommandState from '~/components/payroll/PayrollACommandState.vue'
+import PayrollDayworkFormFields from '~/components/payroll/PayrollDayworkFormFields.vue'
 import { usePayrollDayworkForm } from '~/composables/usePayrollDayworkForm'
 
 const ui = usePayrollDayworkForm()

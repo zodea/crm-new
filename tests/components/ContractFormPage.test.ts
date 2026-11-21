@@ -102,7 +102,7 @@ const EmptyStub = defineComponent({
   setup: () => () => h('div'),
 })
 
-const globalComponents: Record<string, Component> = {
+const stubs: Record<string, Component> = {
   EntityFormShell: EntityFormShellStub,
   ContractFormFields: ContractFormFieldsStub,
   ContractLineItemsEditor: EmptyStub,
@@ -184,7 +184,7 @@ describe('辅助合同整页表单状态', () => {
     route.fullPath = `/contract/${kind}/form/${id}`
     route.params = { id }
     loadForm.mockResolvedValue({ ...f2FormDefaults(kind), id, name: '合成状态合同', status })
-    render(ContractFormPage, { props: { kind }, global: { components: globalComponents } })
+    render(ContractFormPage, { props: { kind }, global: { stubs } })
     await flushPromises()
     const tag = screen.getByText(status)
     expect(tag.getAttribute('data-ui')).toBe('status-tag')
@@ -197,7 +197,7 @@ describe('辅助合同整页表单状态', () => {
 
     render(ContractFormPage, {
       props: { kind: 'company_expense' },
-      global: { components: globalComponents },
+      global: { stubs },
     })
     await flushPromises()
 
@@ -214,7 +214,7 @@ describe('辅助合同整页表单状态', () => {
   it('普通必填校验设置 aria-invalid 并聚焦第一个错误', async () => {
     render(ContractFormPage, {
       props: { kind: 'company_expense' },
-      global: { components: globalComponents },
+      global: { stubs },
     })
     await flushPromises()
 

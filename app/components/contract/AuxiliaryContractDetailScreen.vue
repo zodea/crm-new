@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { AuxiliaryContractKind } from '~/lib/auxiliary-contract/contract'
 import type { EntityRefDTO } from '~/types/read-model'
+import AuxiliaryContractInfo from '~/components/contract/AuxiliaryContractInfo.vue'
+import ConstructionScopeSelector from '~/components/contract/ConstructionScopeSelector.vue'
 import ContractOriginalFilesPanel from '~/components/contract/ContractOriginalFilesPanel.vue'
 import KitStatusTag from '~/components/ui/KitStatusTag.vue'
 import { AUXILIARY_LABELS, auxiliaryListPath } from '~/lib/auxiliary-contract/contract'

@@ -328,6 +328,18 @@ const base = {
 }
 
 describe('甲方商务单据中央读取契约', () => {
+  it.each([null, 0])('甲方报量列表保留审定金额和差额的 %s', (auditedAmount) => {
+    const page = buildOwnerCommercialDocumentListPage({
+      ...base,
+      documents: [{ ...report, amount: 0, auditedAmount }],
+      query: parseOwnerCommercialDocumentListQuery('owner_report', {}),
+    })
+
+    expect(page.items.map(ownerDocumentListRecordFromCentral)).toEqual([
+      expect.objectContaining({ secondaryAmount: auditedAmount, tertiaryAmount: auditedAmount }),
+    ])
+  })
+
   it('中央多选在分页前取并集，组合类型不缩减候选集', () => {
     const documents = [change, { ...change, id: 'second', documentType: 'site_visa', status: 'submitted' }, { ...change, id: 'third', status: 'draft' }]
     const query = parseOwnerCommercialDocumentListQuery('owner_change', { status: '["approved","submitted"]', documentType: '["change_negotiation","site_visa"]' })

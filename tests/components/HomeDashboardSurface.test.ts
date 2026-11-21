@@ -31,10 +31,10 @@ const HomeScheduleOverviewStub = defineComponent({
 
 const global = {
   components: {
-    HomeScheduleOverview: HomeScheduleOverviewStub,
     NuxtLink: NuxtLinkStub,
     StatePanel,
   },
+  stubs: { HomeScheduleOverview: HomeScheduleOverviewStub },
 }
 
 describe('homeDashboardSurface', () => {

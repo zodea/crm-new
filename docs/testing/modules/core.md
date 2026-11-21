@@ -43,7 +43,8 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
-| [tests/components/FileRefAttachmentSection.test.ts](../../../tests/components/FileRefAttachmentSection.test.ts) | 组件（jsdom） | fileRefAttachmentSection restore flow |
+| [tests/components/FileRefAttachmentSection.test.ts](../../../tests/components/FileRefAttachmentSection.test.ts) | 组件（jsdom） | 浏览器附件选择、只读附件及恢复操作 |
+| [tests/components/AttachmentRows.test.ts](../../../tests/components/AttachmentRows.test.ts) | 组件（jsdom） | 财务、合同和主档附件行的下载、分类、删除与撤销 |
 | [tests/components/OriginalFilePreviewDialog.test.ts](../../../tests/components/OriginalFilePreviewDialog.test.ts) | 组件（jsdom） | 原件加载、预览、Esc 与焦点恢复 |
 | [tests/components/DomainImportRecovery.test.ts](../../../tests/components/DomainImportRecovery.test.ts) | 组件（jsdom） | 报价与其他结算迁入：原命令已应用后读取失败仅重读；权限切换撤下公开结果并保原键，跨代迟到回执隔离 |
 | [tests/components/DomainFormCanonicalRecovery.test.ts](../../../tests/components/DomainFormCanonicalRecovery.test.ts) | 实际 Vue 表单、路由与页签缓存 | 首次保存及原命令恢复保后来字段和原件；留原实例后继续更新已保存的同一 ID，正常离页确认保持 |

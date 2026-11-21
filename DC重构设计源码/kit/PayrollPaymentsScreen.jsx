@@ -1,5 +1,5 @@
 // PayrollPaymentsScreen — 工资实际收付台账（/subcontract/payroll/payments；#412 P4）。
-// 对应 app/components/payroll/PayrollActualLedgerScreen.vue + PayrollActualLedgerSection.vue + PayrollActualFactsTable.vue。
+// 对应 app/pages/subcontract/payroll/payments/_components/PayrollActualLedgerScreen.vue + PayrollActualLedgerSection.vue + PayrollActualFactsTable.vue。
 // 口径：按稳定项目只读；原工资发放、真实补退及有效错记冲销同源读取，核算更正与后续处理关联不另计现金；
 //       不灌入付款申请、银行流水或往来余额。可选 params.statementId 只看某张原工资范围。
 // params：project（项目 id，兼容项目名）、statementId（原工资，可选）、previewState。

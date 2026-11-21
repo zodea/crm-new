@@ -2,7 +2,7 @@ import type { PayrollHollowCommand, PayrollHollowConfigRead } from '~/lib/payrol
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import PayrollHollowConfigSection from '~/components/payroll/PayrollHollowConfigSection.vue'
+import PayrollHollowConfigSection from '~/pages/subcontract/payroll/_components/PayrollHollowConfigSection.vue'
 
 vi.mock('vue-router', () => ({ onBeforeRouteLeave: vi.fn() }))
 const config = { scope: { formatFamily: 'A' as const, projectId: 'project', crewId: null, leaderWorkerId: 'worker', book: { bookPurpose: 'ordinary' as const, managementBookId: null } }, month: '2026-09' }
