@@ -1,8 +1,9 @@
-import type { Page } from '@playwright/test'
+import type { Page, Route } from '@playwright/test'
 import type { Database } from 'sql.js'
 import { Buffer } from 'node:buffer'
 import path from 'node:path'
 import initSqlJs from 'sql.js'
+import { createMigratedMemoryDb } from '../../tests/helpers/memory-db'
 
 const DATABASE_NAME = 'crm-new-browser'
 const DATABASE_VERSION = 2
@@ -81,7 +82,7 @@ export async function readProductionSnapshot(page: Page, timeoutMs = 60_000): Pr
 }
 
 /** Replaces only the isolated browser test's production SQLite snapshot. */
-export async function writeProductionSnapshot(page: Page, bytes: number[]): Promise<void> {
+export async function writeProductionSnapshot(page: Page, bytes: number[] | Uint8Array): Promise<void> {
   await openBrowserDatabase(page)
   await page.evaluate(async ({ databaseName, databaseVersion, snapshotStore, snapshot }) => {
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
@@ -128,5 +129,26 @@ export async function updateProductionSnapshot(
   }
   finally {
     database.close()
+  }
+}
+
+/** Seeds an isolated browser context before the app opens its legacy SQLite connection. */
+export async function seedProductionSnapshot(page: Page, baseURL: string, mutate: (database: Database) => void): Promise<void> {
+  const db = await createMigratedMemoryDb()
+  const url = new URL('/__playwright-sqlite-fixture', baseURL).href
+  const serve = (route: Route) => route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>SQLite fixture</title>' })
+  try {
+    mutate(db.raw)
+    await page.route(url, serve)
+    try {
+      await page.goto(url)
+      await writeProductionSnapshot(page, db.raw.export())
+    }
+    finally {
+      await page.unroute(url, serve)
+    }
+  }
+  finally {
+    db.close()
   }
 }
