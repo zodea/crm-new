@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import type { KitStatusTone } from '~/components/ui/KitStatusTag.vue'
 import type { KitTableColumn } from '~/lib/kit/table'
 import type { PaymentManagementRow } from '~/stores/payment-management'
+import KitStatusTag from '~/components/ui/KitStatusTag.vue'
 import { approvalAmountLabel } from '~/lib/finance/approval-amount'
 import { yuan } from '~/lib/util/money'
 
@@ -45,22 +47,22 @@ const rowActions = [
   { key: 'payment', label: '登记支付记录', icon: 'i-lucide-landmark' },
 ] as const
 
-function paymentStatusClass(status: PaymentManagementRow['paymentStatus']): string {
+function paymentStatusTone(status: PaymentManagementRow['paymentStatus']): KitStatusTone {
   if (status === '已付清')
-    return 'chip-ok'
+    return 'ok'
   if (status === '部分支付')
-    return 'chip-brand'
+    return 'brand'
   if (status === '超额支付')
-    return 'chip-danger'
-  return 'chip-warn'
+    return 'danger'
+  return 'warn'
 }
 
-function invoiceStatusClass(status: PaymentManagementRow['invoiceStatus']): string {
+function invoiceStatusTone(status: PaymentManagementRow['invoiceStatus']): KitStatusTone {
   if (status === '已回票' || status === '无需发票' || status === '已关联')
-    return 'chip-ok'
+    return 'ok'
   if (status === '部分回票' || status === '部分关联')
-    return 'chip-brand'
-  return 'chip-warn'
+    return 'brand'
+  return 'warn'
 }
 
 function handleAction(action: string, row: PaymentManagementRow) {
@@ -114,25 +116,25 @@ function handleAction(action: string, row: PaymentManagementRow) {
           class="font-mono font-700 tabular-nums"
           :class="(row.dueAmount ?? 0) > 0 ? 'text-danger-ink' : 'text-ink'"
         >
-          {{ row.dueAmount === null ? '—' : yuan(row.dueAmount) }}
+          {{ yuan(row.dueAmount) }}
         </span>
       </template>
 
       <template #approved="{ row }">
-        <span class="block font-mono tabular-nums">{{ row.approvedAmount === null ? '—' : yuan(row.approvedAmount) }}</span>
+        <span class="block font-mono tabular-nums">{{ yuan(row.approvedAmount) }}</span>
         <span v-if="row.approvedAmount === null" class="text-10px text-ink-faint">{{ approvalAmountLabel(row.approvedAmountState) }}</span>
       </template>
 
       <template #invoiceStatus="{ row }">
-        <span class="chip" :class="invoiceStatusClass(row.invoiceStatus)">
+        <KitStatusTag :tone="invoiceStatusTone(row.invoiceStatus)">
           {{ row.invoiceStatus }}
-        </span>
+        </KitStatusTag>
       </template>
 
       <template #paymentStatus="{ row }">
-        <span class="chip" :class="paymentStatusClass(row.paymentStatus)">
+        <KitStatusTag :tone="paymentStatusTone(row.paymentStatus)">
           {{ row.paymentStatus }}
-        </span>
+        </KitStatusTag>
       </template>
 
       <template #action="{ row }">

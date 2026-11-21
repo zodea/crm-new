@@ -1,4 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/vue'
+import type { PaymentManagementRow } from '~/stores/payment-management'
+import { fireEvent, render, screen, within } from '@testing-library/vue'
 import { storeToRefs } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, defineComponent, h, nextTick, onActivated, onMounted, onScopeDispose, ref, shallowReactive, shallowRef, toRef, useTemplateRef, watch } from 'vue'
@@ -6,6 +7,7 @@ import NotificationDrawer from '~/components/shared/NotificationDrawer.vue'
 import InvoiceQueuePanel from '~/pages/finance/invoice/_components/InvoiceQueuePanel.vue'
 import InvoiceWorkspaceScreen from '~/pages/finance/invoice/_components/InvoiceWorkspaceScreen.vue'
 import PaymentManagementScreen from '~/pages/finance/payment-management/_components/PaymentManagementScreen.vue'
+import PaymentManagementTable from '~/pages/finance/payment-management/_components/PaymentManagementTable.vue'
 
 vi.mock('~/lib/read-model/authority', () => ({ bindReadAuthority: () => undefined }))
 
@@ -83,6 +85,7 @@ describe('补充列表的同字段多选', () => {
     render(PaymentManagementScreen, { global: { stubs: { PaymentManagementTable: Table, PaymentManagementToolbar: Toolbar, PaymentManagementSummary: true, PaymentPayrollSection: true, SegTab: true } } })
     expect(screen.getAllByRole('article')).toHaveLength(1)
     expect(screen.getByText('甲待付')).toBeTruthy()
+    expect(screen.getByText('甲待付').closest('[data-list-shell]')?.classList.contains('list-shell--continuous')).toBe(true)
     await fireEvent.click(screen.getByRole('button', { name: '付款状态，已选 1 项' }))
     await fireEvent.click(screen.getByRole('checkbox', { name: '已付清' }))
     await fireEvent.click(screen.getByRole('button', { name: '应用' }))
@@ -97,6 +100,24 @@ describe('补充列表的同字段多选', () => {
     await fireEvent.click(screen.getByRole('button', { name: '清除' }))
     await fireEvent.update(screen.getByRole('searchbox'), '')
     expect(screen.getAllByRole('article')).toHaveLength(3)
+  })
+
+  it('付款标签保留超额与部分回票的语义，批复历史未知与明确零分开显示', () => {
+    const unknown: PaymentManagementRow = { id: 'unknown', no: 'A', name: '历史批复', projectId: null, projectName: '', supplierId: null, workerId: null, supplierName: '', bizType: '', approvedAmount: null, approvedAmountState: 'legacy-unknown', paidAmount: 0, dueAmount: null, paymentStatus: '历史批复待核验', invoiceState: '', invoiceStatus: '部分回票', pendingInvoiceAmount: null, applyDate: '2026-10-01', canRegisterPayment: false }
+    const zero: PaymentManagementRow = { ...unknown, id: 'zero', no: 'B', name: '已录入零', approvedAmount: 0, approvedAmountState: 'known', dueAmount: 0, paymentStatus: '已付清', invoiceStatus: '已回票' }
+    const overflow: PaymentManagementRow = { ...zero, id: 'overflow', no: 'C', name: '支付超过批复', approvedAmount: 5, paidAmount: 10, paymentStatus: '超额支付' }
+    const Table = defineComponent({ props: ['data'], template: '<article v-for="row in data" :key="row.id" :aria-label="row.name"><slot name="approved" :row="row"/><slot name="due" :row="row"/><slot name="invoiceStatus" :row="row"/><slot name="paymentStatus" :row="row"/></article>' })
+    render(PaymentManagementTable, { props: { rows: [unknown, zero, overflow], loading: false, page: 1, pageSize: 10, total: 3 }, global: { stubs: { KitTable: Table } } })
+    const historical = within(screen.getByRole('article', { name: unknown.name }))
+    expect(screen.getByText('超额支付').getAttribute('data-tone')).toBe('danger')
+    expect(historical.getByText('部分回票').getAttribute('data-tone')).toBe('brand')
+    const historicalApproval = historical.getAllByText('历史批复待核验')
+    expect(historicalApproval).toHaveLength(2)
+    expect(historicalApproval.some(item => item.getAttribute('data-tone') === 'warn')).toBe(true)
+    expect(historical.getAllByText('—')).toHaveLength(2)
+    const explicit = within(screen.getByRole('article', { name: zero.name }))
+    expect(explicit.getByText('已付清').getAttribute('data-tone')).toBe('ok')
+    expect(explicit.getAllByText('¥0.00')).toHaveLength(2)
   })
 
   it('识别队列按既有状态判定多选，不改变归档边界，搜索和选择仍联动', async () => {

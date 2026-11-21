@@ -4,6 +4,7 @@ import type {
   PaymentManagementSummary as PaymentManagementSummaryType,
 } from '~/stores/payment-management'
 import KitMultiSelectFilter from '~/components/ui/KitMultiSelectFilter.vue'
+import ListShell from '~/components/ui/ListShell.vue'
 import StatePanel from '~/components/ui/StatePanel.vue'
 import { financeDetailPath } from '~/lib/finance/page'
 import { clampPage, paginate } from '~/lib/kit/table'
@@ -130,44 +131,51 @@ onActivated(() => {
 
 <template>
   <main class="flex min-w-0 max-w-full flex-col gap-4" :aria-busy="loading">
-    <PaymentManagementToolbar
-      :search="search"
-      :project="project"
-      :loading="loading"
-      :project-options="projectOptions"
-      @update:search="setSearch"
-      @update:project="setProject"
-      @refresh="refresh"
-      @open-records="openRecords"
-    />
-
-    <PaymentManagementSummary v-if="hasSnapshot" :summary="summary" />
-    <p v-else role="status" class="text-12px text-ink-soft" data-testid="payment-management-summary-unknown">
-      付款管理金额尚未核实，请等待或重新读取。
-    </p>
-    <StatePanel v-if="loadError" kind="error" title="付款管理读取失败" :description="loadError" :compact="hasSnapshot" action-label="重试" @action="refresh" />
-    <p v-if="hasSnapshot && !currentRead" role="status" class="text-12px text-ink-soft">
-      以下为上次成功读取的数据，暂不能据此登记支付；请重新读取核实。
-    </p>
-    <p v-if="snapshotOrigin === 'demo'" role="status" class="text-12px text-ink-soft">
-      当前为测试数据，只读查看；正式付款请切回实际来源。
-    </p>
-
-    <section aria-label="付款状态视图" class="panel px-3 py-2">
-      <KitMultiSelectFilter v-model="view" label="付款状态" :options="viewOptions" />
-    </section>
-
-    <PaymentManagementTable
-      :rows="pageRows"
-      :loading="loading && !hasSnapshot"
-      :page="currentPage"
-      :page-size="pageSize"
-      :total="filteredRows.length"
-      :can-register="currentRead && snapshotOrigin !== 'demo'"
-      @page-change="onPageChange"
-      @open-application="openApplication"
-      @create-payment="createPayment"
-    />
+    <ListShell continuous>
+      <template #toolbar>
+        <PaymentManagementToolbar
+          :search="search"
+          :project="project"
+          :loading="loading"
+          :project-options="projectOptions"
+          @update:search="setSearch"
+          @update:project="setProject"
+          @refresh="refresh"
+          @open-records="openRecords"
+        />
+      </template>
+      <template #filters>
+        <div class="grid min-w-0 gap-3">
+          <PaymentManagementSummary v-if="hasSnapshot" :summary="summary" />
+          <p v-else role="status" class="text-12px text-ink-soft" data-testid="payment-management-summary-unknown">
+            付款管理金额尚未核实，请等待或重新读取。
+          </p>
+          <StatePanel v-if="loadError" kind="error" title="付款管理读取失败" :description="loadError" :compact="hasSnapshot" action-label="重试" @action="refresh" />
+          <p v-if="hasSnapshot && !currentRead" role="status" class="text-12px text-ink-soft">
+            以下为上次成功读取的数据，暂不能据此登记支付；请重新读取核实。
+          </p>
+          <p v-if="snapshotOrigin === 'demo'" role="status" class="text-12px text-ink-soft">
+            当前为测试数据，只读查看；正式付款请切回实际来源。
+          </p>
+          <section aria-label="付款状态视图">
+            <KitMultiSelectFilter v-model="view" label="付款状态" :options="viewOptions" />
+          </section>
+        </div>
+      </template>
+      <template #table>
+        <PaymentManagementTable
+          :rows="pageRows"
+          :loading="loading && !hasSnapshot"
+          :page="currentPage"
+          :page-size="pageSize"
+          :total="filteredRows.length"
+          :can-register="currentRead && snapshotOrigin !== 'demo'"
+          @page-change="onPageChange"
+          @open-application="openApplication"
+          @create-payment="createPayment"
+        />
+      </template>
+    </ListShell>
     <PaymentPayrollSection />
   </main>
 </template>

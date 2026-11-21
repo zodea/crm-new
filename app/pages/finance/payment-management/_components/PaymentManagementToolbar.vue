@@ -26,7 +26,7 @@ const emit = defineEmits<{
   <section
     aria-label="付款管理工具栏"
     data-ui="payment-management-toolbar"
-    class="payment-management-toolbar panel min-w-0 p-3.5"
+    class="payment-management-toolbar min-w-0 flex-1"
   >
     <div class="payment-management-toolbar__layout grid min-w-0 items-center gap-3">
       <div class="min-w-0">
