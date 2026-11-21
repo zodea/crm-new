@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ListRefreshButton from '~/components/shared/ListRefreshButton.vue'
 import { Button } from '~/components/ui/button'
 
 defineProps<{
@@ -56,20 +57,12 @@ function toggleDensity() {
 
       <div class="ml-auto flex min-w-max items-center gap-2">
         <SearchInput v-model="search" placeholder="搜索项目、客户、经理…" :width="220" :maxlength="120" />
-        <Button
-          variant="outline"
-          size="icon"
+        <ListRefreshButton
           title="刷新项目列表"
           aria-label="刷新项目列表"
-          :disabled="loading"
-          @click="emit('refresh')"
-        >
-          <span
-            class="i-lucide-refresh-cw h-3.5 w-3.5"
-            :class="loading ? 'animate-spin' : ''"
-            aria-hidden="true"
-          />
-        </Button>
+          :loading="loading"
+          @refresh="emit('refresh')"
+        />
         <Button
           variant="outline"
           size="icon"

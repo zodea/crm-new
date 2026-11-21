@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ListRefreshButton from '~/components/shared/ListRefreshButton.vue'
 import { Button } from '~/components/ui/button'
 import ContextHelp from '~/components/ui/ContextHelp.vue'
 import KitMultiSelectFilter from '~/components/ui/KitMultiSelectFilter.vue'
@@ -73,20 +74,7 @@ const status = defineModel<string[]>('status', { required: true })
           :min-width="112"
         />
         <SearchInput v-model="search" :placeholder="searchPlaceholder" :width="236" />
-        <Button
-          variant="outline"
-          size="icon"
-          title="刷新"
-          :aria-label="`刷新${title}`"
-          :disabled="loading"
-          @click="emit('refresh')"
-        >
-          <span
-            class="i-lucide-refresh-cw h-3.5 w-3.5"
-            :class="loading ? 'animate-spin' : ''"
-            aria-hidden="true"
-          />
-        </Button>
+        <ListRefreshButton :aria-label="`刷新${title}`" :loading="loading" @refresh="emit('refresh')" />
         <Button variant="accent" @click="emit('create')">
           <span class="i-lucide-plus h-3.5 w-3.5" aria-hidden="true" />
           {{ createLabel }}

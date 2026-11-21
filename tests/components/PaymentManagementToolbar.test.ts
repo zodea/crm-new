@@ -55,6 +55,12 @@ describe('payment management toolbar', () => {
     )
     await fireEvent.update(screen.getByRole('combobox', { name: '项目' }), 'project-1')
 
+    const refresh = screen.getByRole('button', { name: '刷新付款管理' })
+    expect(refresh.getAttribute('title')).toBe('刷新')
+    expect(refresh.querySelector('.sr-only')?.textContent).toBe('刷新付款管理')
+    await fireEvent.click(refresh)
+
+    expect(view.emitted().refresh).toHaveLength(1)
     expect(view.emitted()['update:search']).toEqual([['五金机电']])
     expect(view.emitted()['update:project']).toEqual([['project-1']])
   })

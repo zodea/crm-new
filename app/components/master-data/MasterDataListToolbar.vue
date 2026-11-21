@@ -6,6 +6,7 @@ import type {
   MasterDataListFilterField,
   MasterDataListSort,
 } from '~/lib/master-data/list'
+import ListRefreshButton from '~/components/shared/ListRefreshButton.vue'
 import { Button } from '~/components/ui/button'
 import KitMultiSelectFilter from '~/components/ui/KitMultiSelectFilter.vue'
 import { masterDataSelectedValues } from '~/lib/master-data/list'
@@ -68,20 +69,7 @@ function setFilter(field: MasterDataListFilterField, value: string[]) {
             :placeholder="searchPlaceholder"
             :width="250"
           />
-          <Button
-            variant="outline"
-            size="icon"
-            title="刷新"
-            :disabled="loading"
-            @click="emit('refresh')"
-          >
-            <span
-              class="i-lucide-refresh-cw h-3.5 w-3.5"
-              :class="loading ? 'animate-spin' : ''"
-              aria-hidden="true"
-            />
-            <span class="sr-only">刷新</span>
-          </Button>
+          <ListRefreshButton :loading="loading" @refresh="emit('refresh')" />
           <SelectFilter
             v-model="sort"
             label="排序"

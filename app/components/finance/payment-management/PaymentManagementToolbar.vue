@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ListRefreshButton from '~/components/shared/ListRefreshButton.vue'
 import { Button } from '~/components/ui/button'
 
 interface ProjectOption {
@@ -55,20 +56,7 @@ const emit = defineEmits<{
           :width="240"
           @update:model-value="emit('update:search', $event ?? '')"
         />
-        <Button
-          variant="outline"
-          size="icon"
-          title="刷新"
-          :disabled="loading"
-          @click="emit('refresh')"
-        >
-          <span
-            class="i-lucide-refresh-cw h-3.5 w-3.5"
-            :class="loading ? 'animate-spin' : ''"
-            aria-hidden="true"
-          />
-          <span class="sr-only">刷新付款管理</span>
-        </Button>
+        <ListRefreshButton :loading="loading" sr-label="刷新付款管理" @refresh="emit('refresh')" />
         <Button variant="accent" @click="emit('openRecords')">
           <span class="i-lucide-list-checks h-3.5 w-3.5" aria-hidden="true" />
           支付记录

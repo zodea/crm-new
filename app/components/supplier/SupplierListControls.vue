@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { KitTableColumn } from '~/lib/kit/table'
 import type { SupplierListNumericField, SupplierListSort } from '~/lib/supplier/repository'
+import ListRefreshButton from '~/components/shared/ListRefreshButton.vue'
 
 defineProps<{
   loading: boolean
@@ -46,9 +47,7 @@ function toggleColumn(field: string) {
     <div data-ui="supplier-list-toolbar-row" class="supplier-list-controls__actions">
       <SearchInput v-model="search" placeholder="搜索关键词…" :width="200" :maxlength="120" />
       <div class="flex shrink-0 gap-1">
-        <button type="button" class="list-tool-button" title="刷新" aria-label="刷新" :disabled="loading" @click="emit('refresh')">
-          <span class="i-lucide-refresh-cw h-3.5 w-3.5" :class="loading ? 'animate-spin' : ''" aria-hidden="true" />
-        </button>
+        <ListRefreshButton :loading="loading" aria-label="刷新" compact @refresh="emit('refresh')" />
         <KitToolbarPopover label="排序" icon="i-lucide-list-ordered" :active="sort !== 'updated-desc'">
           <label class="grid gap-2">排序
             <select v-model="sort" class="h-8 border border-line rounded-sm bg-panel px-2" aria-label="排序方式">
