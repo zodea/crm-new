@@ -24,9 +24,9 @@ const push = vi.fn()
 const values: FormUi[] = []
 
 describe.each([
-  { format: 'C1', useForm: usePayrollC1Form as () => FormUi, Fields: PayrollC1FormFields, baseRead: c1Form as () => FormRead, store: ['usePayrollC1Store', { loadC1Form: load, saveC1Draft: save, getC1Pending: () => null }] },
-  { format: 'C2', useForm: usePayrollC2Form as () => FormUi, Fields: PayrollC2FormFields, baseRead: c2Form as () => FormRead, store: ['usePayrollC2Store', { loadC2Form: load, saveC2Draft: save, getC2Pending: () => null }] },
-] as const)('$format 页面固定草稿', ({ format, useForm, Fields, baseRead, store: [storeName, store] }) => {
+  { format: 'C1', source: '考勤', formula: '按本月考勤与每人正常、加班标准核算', useForm: usePayrollC1Form as () => FormUi, Fields: PayrollC1FormFields, baseRead: c1Form as () => FormRead, store: ['usePayrollC1Store', { loadC1Form: load, saveC1Draft: save, getC1Pending: () => null }] },
+  { format: 'C2', source: '签工', formula: '按本月已确认签工与本请款主体单价核算', useForm: usePayrollC2Form as () => FormUi, Fields: PayrollC2FormFields, baseRead: c2Form as () => FormRead, store: ['usePayrollC2Store', { loadC2Form: load, saveC2Draft: save, getC2Pending: () => null }] },
+] as const)('$format 页面固定草稿', ({ format, source, formula, useForm, Fields, baseRead, store: [storeName, store] }) => {
   function at(draftKey: string) {
     route.query = { origin: 'real', format, draftKey }
     route.fullPath = `${route.path}?origin=real&format=${format}&draftKey=${draftKey}`
@@ -76,6 +76,10 @@ describe.each([
     const read = baseRead()
     const other = { ...read.members[0]!, id: 'other', crewId: 'crew-other', name: '另一组负责人' }
     const view = mount(Fields, { props: { draft: { projectId: 'p', crewId: null, leaderWorkerId: '', memberWorkerIds: ['w'], month: '2026-08', note: '' }, options: { ...read.options, workers: [...read.members, other] }, disabled: false, fieldErrors: {} }, global: { stubs: { SectionHeader: true } } })
+    expect(view.get('#section-basic').attributes('aria-label')).toBe(`${format}工资基本资料`)
+    expect(view.text()).toContain(`${format} ${formula}`)
+    expect(view.get('legend').text()).toBe(`全部请款成员（包含无${source}与零收款成员）`)
+    expect(view.get('fieldset > div').classes().includes('lg:grid-cols-3')).toBe(format === 'C1')
     await view.get('[aria-label="请款负责人"]').trigger('focus')
     await view.get('[aria-label="请款负责人"]').setValue('另一组')
     await vi.advanceTimersByTimeAsync(310)
