@@ -216,7 +216,7 @@ flowchart TD
 
 ## 5. 导航、页面与表单
 
-侧栏代码权威为 `app/lib/nav/nav-tree.ts`，缺 `to` 表示没有可用入口。路由由 `app/pages/` 生成，active nav 和页签身份由 `app/lib/nav/`、`app/lib/tabs/` 统一管理，页签上限及恢复 descriptor 沿 PUBLIC-SURFACES。
+侧栏代码权威为 `app/lib/nav/nav-tree.ts`，缺 `to` 表示没有可用入口。路由由 `app/pages/` 生成。页面私有组件可以放在页面旁的 `_components/` 并显式导入，Nuxt 的路由扫描跳过这些目录。active nav 和页签身份由 `app/lib/nav/`、`app/lib/tabs/` 统一管理，页签上限及恢复 descriptor 沿 PUBLIC-SURFACES。
 
 后台提供语义目标和稳定 ID，前端唯一 target registry 解析路径；蓝色名称、编号、金额、消息目标及返回来源沿 NAVIGATION。没有可验证关系时展示事实文本，不用编辑页冒充详情、不按公司名或合同编号猜 variant。
 
