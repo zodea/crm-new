@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { defineComponent } from 'vue'
 import FileRefAttachmentSection from '~/components/shared/FileRefAttachmentSection.vue'
 
@@ -42,7 +42,7 @@ describe('fileRefAttachmentSection restore flow', () => {
     expect(wrapper.emitted('toggleExisting')).toEqual([['file-real-id']])
   })
 
-  it('emits browser-selected file metadata and resets the input', async () => {
+  it('emits multiple browser-selected files and resets the input', async () => {
     const wrapper = mount(FileRefAttachmentSection, {
       props: {
         attachments: [attachment(null)],
@@ -50,18 +50,22 @@ describe('fileRefAttachmentSection restore flow', () => {
         pendingRemoveIds: [],
         pendingRestoreIds: [],
         note: '',
+        pickerDescription: '文件随资料一同保存',
       },
       global: { components: { SectionHeader } },
     })
     const input = wrapper.get<HTMLInputElement>('[data-testid="finance-attachment-input"]')
-    const file = new File(['receipt'], '回单.pdf', { type: 'application/pdf' })
-    Object.defineProperty(input.element, 'files', {
-      configurable: true,
-      value: [file],
-    })
+    expect(input.element.multiple).toBe(true)
+    expect(input.element.closest('label')?.textContent).toContain('文件随资料一同保存')
+    const files = [
+      new File(['receipt'], '回单.pdf', { type: 'application/pdf' }),
+      new File(['supplement'], '补充说明.pdf', { type: 'application/pdf' }),
+    ]
+    Object.defineProperty(input.element, 'files', { configurable: true, value: files })
+    const setValue = vi.spyOn(input.element, 'value', 'set')
     await input.trigger('change')
-    expect(wrapper.emitted('files')?.[0]?.[0]).toEqual([file])
-    expect(input.element.value).toBe('')
+    expect(wrapper.emitted('files')).toEqual([[files]])
+    expect(setValue).toHaveBeenCalledWith('')
   })
 
   it('只读模式保留附件内容但隐藏全部变更入口', () => {

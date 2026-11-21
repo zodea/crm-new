@@ -3,6 +3,7 @@ import type {
   ContractFormAttachment,
   ContractFormAttachmentDraft,
 } from '~/lib/contract/forms'
+import AttachmentPicker from '~/components/shared/AttachmentPicker.vue'
 
 interface PendingContractAttachment extends ContractFormAttachmentDraft {
   localId: string
@@ -25,12 +26,6 @@ const emit = defineEmits<{
   updateNote: [value: string]
 }>()
 
-function handleFiles(event: Event) {
-  const input = event.target as HTMLInputElement
-  emit('files', [...(input.files ?? [])])
-  input.value = ''
-}
-
 function inputValue(event: Event): string {
   return (event.target as HTMLInputElement).value
 }
@@ -40,15 +35,12 @@ function inputValue(event: Event): string {
   <section id="section-attachments" class="panel scroll-mt-4 p-4">
     <SectionHeader title="附件与备注" />
 
-    <label
-
-      class="mt-3 flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-[var(--radius-card)] border border-dashed border-line-strong bg-surface-2 px-4 text-center transition-colors hover:border-brand hover:bg-brand-soft"
-    >
-      <span class="i-lucide-upload-cloud mb-1 text-22px text-brand" aria-hidden="true" />
-      <span class="text-12px font-600 text-ink">点击选择附件</span>
-      <span class="mt-0.5 text-11px text-ink-faint">附件正文读取完成后随本次保存提交；历史缺正文附件须重新上传</span>
-      <input type="file" multiple class="sr-only" :disabled="filesDisabled" @change="handleFiles">
-    </label>
+    <AttachmentPicker
+      class="mt-3"
+      description="附件正文读取完成后随本次保存提交；历史缺正文附件须重新上传"
+      :disabled="filesDisabled"
+      @files="emit('files', $event)"
+    />
 
     <div v-if="attachments.length || pendingAttachments.length" class="mt-3 grid gap-2">
       <div

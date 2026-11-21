@@ -3,12 +3,14 @@ import type {
   FormAttachment,
   FormAttachmentDraft,
 } from '~/lib/master-data/forms'
+import { computed } from 'vue'
+import AttachmentPicker from '~/components/shared/AttachmentPicker.vue'
 
 export interface PendingMasterDataAttachment extends FormAttachmentDraft {
   localId: string
 }
 
-defineProps<{
+const props = defineProps<{
   title: string
   storesOriginals?: boolean
   originalDescription?: string
@@ -27,11 +29,9 @@ const emit = defineEmits<{
   updatePendingCategory: [localId: string, category: string]
 }>()
 
-function handleFiles(event: Event) {
-  const input = event.target as HTMLInputElement
-  emit('files', [...(input.files ?? [])])
-  input.value = ''
-}
+const pickerDescription = computed(() => props.storesOriginals
+  ? props.originalDescription || '原件随客户一同保存，重启后可下载；最多 9 份，单份不超过 10 MiB'
+  : '浏览器预览仅保存元数据；桌面应用会保存可重新打开的本机路径')
 
 function inputValue(event: Event) {
   return (event.target as HTMLInputElement).value
@@ -42,15 +42,11 @@ function inputValue(event: Event) {
   <section id="section-attachments" class="panel scroll-mt-4 p-4">
     <SectionHeader :title="title" />
 
-    <label
-
-      class="flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-[var(--radius-card)] border border-dashed border-line-strong bg-surface-2 px-4 text-center transition-colors hover:border-brand hover:bg-brand-soft"
-    >
-      <span class="i-lucide-upload-cloud mb-1 text-22px text-brand" aria-hidden="true" />
-      <span class="text-12px font-600 text-ink">点击选择附件</span>
-      <span class="mt-0.5 text-11px text-ink-faint">{{ storesOriginals ? originalDescription || '原件随客户一同保存，重启后可下载；最多 9 份，单份不超过 10 MiB' : '浏览器预览仅保存元数据；桌面应用会保存可重新打开的本机路径' }}</span>
-      <input type="file" multiple class="sr-only" :disabled="filesDisabled" @change="handleFiles">
-    </label>
+    <AttachmentPicker
+      :description="pickerDescription"
+      :disabled="filesDisabled"
+      @files="emit('files', $event)"
+    />
 
     <div v-if="attachments.length || pendingAttachments.length" class="mt-3 grid gap-2">
       <div

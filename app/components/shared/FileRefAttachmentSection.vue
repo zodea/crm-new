@@ -3,6 +3,7 @@ import type {
   FileRefDraft,
   FileRefRecord,
 } from '~/lib/forms/file-refs'
+import AttachmentPicker from '~/components/shared/AttachmentPicker.vue'
 import KitButton from '~/components/ui/KitButton.vue'
 
 export interface PendingFileRef extends FileRefDraft {
@@ -32,12 +33,6 @@ const emit = defineEmits<{
   download: [id: string, trigger: HTMLElement]
 }>()
 
-function handleFiles(event: Event) {
-  const input = event.target as HTMLInputElement
-  emit('files', [...(input.files ?? [])])
-  input.value = ''
-}
-
 function inputValue(event: Event): string {
   return (event.target as HTMLInputElement).value
 }
@@ -47,21 +42,13 @@ function inputValue(event: Event): string {
   <section id="section-attachments" class="panel scroll-mt-4 p-4">
     <SectionHeader :title="title ?? '附件与备注'" />
 
-    <label
+    <AttachmentPicker
       v-if="!readonly"
-      class="mt-3 flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-[var(--radius-card)] border border-dashed border-line-strong bg-surface-2 px-4 text-center transition-colors hover:border-brand hover:bg-brand-soft"
-    >
-      <span class="i-lucide-upload-cloud mb-1 text-22px text-brand" aria-hidden="true" />
-      <span class="text-12px font-600 text-ink">点击选择附件</span>
-      <span class="mt-0.5 text-11px text-ink-faint">{{ pickerDescription ?? '浏览器保存文件元数据' }}</span>
-      <input
-        type="file"
-        multiple
-        class="sr-only"
-        data-testid="finance-attachment-input"
-        @change="handleFiles"
-      >
-    </label>
+      class="mt-3"
+      :description="pickerDescription ?? '浏览器保存文件元数据'"
+      input-test-id="finance-attachment-input"
+      @files="emit('files', $event)"
+    />
 
     <div v-if="attachments.length || pendingAttachments.length" class="mt-3 grid gap-2">
       <div
