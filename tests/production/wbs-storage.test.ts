@@ -7,7 +7,6 @@ import { resolve } from 'node:path'
 import process from 'node:process'
 import { promisify } from 'node:util'
 import { afterEach, expect, it } from 'vitest'
-import { runMigrations } from '../../app/lib/db/migrations'
 import { createProductionProcessLibraryService } from '../../server/utils/production-process-library-service'
 import { createProductionProjectService } from '../../server/utils/production-project-service'
 import { createProductionStorage } from '../../server/utils/production-storage'
@@ -15,7 +14,7 @@ import { wbsBytesDigest } from '../../server/utils/production-wbs-files'
 import { productionWbsLibraryUsage } from '../../server/utils/production-wbs-library-usage'
 import { createProductionWbsMigration } from '../../server/utils/production-wbs-migration'
 import { createProductionWbsService } from '../../server/utils/production-wbs-service'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 import { createWbsActualBoqFixture } from '../helpers/production-wbs-upstream-fixture'
 
 const close: Array<() => Promise<void>> = []
@@ -57,8 +56,7 @@ async function fixture() {
   } }
 }
 async function migrationFixture(f: Awaited<ReturnType<typeof fixture>>, external = false, legacyJournal = false) {
-  const native = await createMemoryDb()
-  await runMigrations(native)
+  const native = await createMigratedMemoryDb()
   await native.execute('INSERT INTO projects(id,name) VALUES (?,?)', [f.project.id, '原排程项目'])
   for (const table of ['items', 'buildings', 'house_type_templates', 'construction_stages', 'floors', 'rooms', 'units', 'construction_stage_items', 'house_type_template_items']) {
     const columns = new Set((await native.select<{ name: string }>(`PRAGMA table_info(${table})`)).map(row => row.name))

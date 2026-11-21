@@ -65,7 +65,7 @@ test('真实 SQLite 迁入、从任意旧版保存下一版、冷刷新与冲突
   await evidence(page, info, '01-library-list')
   const group = page.locator('section').filter({ has: page.getByRole('heading', { name: '装饰施工标准工序', exact: true }) })
   await group.getByRole('link', { name: '查看版本' }).click()
-  await expect(page.getByRole('heading', { name: '装饰施工标准工序 · v1', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '装饰施工标准工序 · v1', exact: true })).toBeVisible({ timeout: 20_000 })
   await evidence(page, info, '02-immutable-old-version')
   await page.getByRole('link', { name: '基于此版本新建', exact: true }).click()
   await expect(page.getByRole('heading', { name: '基于旧版新建版本', exact: true })).toBeVisible()

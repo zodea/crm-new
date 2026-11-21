@@ -180,7 +180,9 @@ test('预算真实迁入、版本头与科目整份保存、原件、固定版�
   await test.step('真实已应用丢回执，原键恢复只提交一次', async () => {
     let intercepted: unknown = null
     let originalKey = ''
+    let submissions = 0
     await page.route('**/api/commands/target-costs', async (route) => {
+      submissions++
       if (intercepted)
         return route.continue()
       intercepted = route.request().postDataJSON()
@@ -193,12 +195,13 @@ test('预算真实迁入、版本头与科目整份保存、原件、固定版�
     await page.getByRole('button', { name: '保存', exact: true }).click()
     await expect(page.getByRole('button', { name: '核对原提交', exact: true })).toBeEnabled()
     await capture(page, info, 'unknown-header-retained')
-    await page.unroute('**/api/commands/target-costs')
-    const response = page.waitForResponse(response => response.url().endsWith('/api/commands/target-costs') && response.request().postDataJSON().commandId === originalKey)
+    const response = page.waitForResponse(response => response.url().endsWith('/api/commands/target-costs/resolve') && response.request().method() === 'POST' && response.request().postDataJSON().commandId === originalKey)
     await page.getByRole('button', { name: '核对原提交', exact: true }).click()
     expect((await response).ok()).toBe(true)
     await expect(page.getByRole('heading', { name: `新预算 ${f.runId}`, exact: true })).toBeVisible()
     expect((await readDetail(page, f.b)).view.header.note).toBe('原键恢复验证')
+    expect(submissions).toBe(1)
+    await page.unroute('**/api/commands/target-costs')
   })
 
   await test.step('真实合同来源与项目往返保同一预算版本及列表筛选', async () => {

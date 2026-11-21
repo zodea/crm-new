@@ -209,7 +209,7 @@ flowchart TD
 
 正式与演示的相同 ID 也属于不同身份。来源开关须先处理未保存输入，再通过授权切换；旧读投影、最近候选与连接一并失效，迟到响应不能污染新来源。
 
-迁移仅经显式 `preflight → immutable backup → dry-run → import → reconciliation → confirm`。沿稳定旧 ID 和真实拓扑映射，补充协议、甲方/分包单据、原件和审计按所属关系接管。既有 IndexedDB 核心迁移由本地 adapter 验证备份字节，中央核验提交证明与写后事实。Native 维护出口与用户明确选择完整文件的领域迁入按 [DATABASE](./DATABASE.md#native-domain-snapshot) 核验实际来源；不借维护出口建立 Native 的正式工作区身份，也不恢复旧本地库日常写入权威。确认后进入同一日常命令事实源，旧库保留受保护恢复入口。
+迁移仅经显式 `preflight → immutable backup → dry-run → import → reconciliation → confirm`。沿稳定旧 ID 和真实拓扑映射，补充协议、甲方/分包单据、原件和审计按所属关系接管。既有 IndexedDB 核心迁移由本地 adapter 验证备份字节，中央核验提交证明与写后事实。切换准备冻结旧库后，确认和恢复确认从浏览器快照复核来源哈希、备份字节哈希及独立报价的迁入状态。Native 维护出口与用户明确选择完整文件的领域迁入按 [DATABASE](./DATABASE.md#native-domain-snapshot) 核验实际来源；不借维护出口建立 Native 的正式工作区身份，也不恢复旧本地库日常写入权威。确认后进入同一日常命令事实源，旧库保留受保护恢复入口。
 
 迁移回滚、灾难恢复与发布回退分别处理。后续改动、原命令/回执、删除历史、独立业务依赖以及整批拒绝规则统一见 [COMMANDS](./COMMANDS.md#migration-and-rollback)，不能沿旧实现撤去本批后续真实业务。
 

@@ -1,14 +1,12 @@
 import type { SubcontractImportCommand } from '../../app/lib/subcontract-contract/import-contract'
 import type { createSubcontractFixture } from './production-subcontract-fixture'
 import { Buffer } from 'node:buffer'
-import { runMigrations } from '../../app/lib/db/migrations'
 import { contractOriginalDigest } from '../../server/utils/contract-original'
 import { createProductionSubcontractMigration } from '../../server/utils/production-subcontract-contract-migration'
-import { createMemoryDb } from './memory-db'
+import { createMigratedMemoryDb } from './memory-db'
 
 export async function createSubcontractNative(f: Pick<Awaited<ReturnType<typeof createSubcontractFixture>>, 'storage' | 'session' | 'project' | 'supplier'>, legacyCommand = false, amounts: { head?: number | null, supplement?: number | null, status?: string, uploadedAt?: string | null } = {}) {
-  const native = await createMemoryDb()
-  await runMigrations(native)
+  const native = await createMigratedMemoryDb()
   await native.execute('INSERT INTO projects(id,name) VALUES(\'legacy-sub-project\',\'原分包工程\')')
   await native.execute('INSERT INTO suppliers(id,name) VALUES(\'legacy-sub-supplier\',\'原分包商\')')
   await native.execute('ALTER TABLE contracts ADD COLUMN extension_json TEXT')

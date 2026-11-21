@@ -111,6 +111,7 @@ async function initialize(targetId = routeId.value, retainInput = false) {
   const request = ++initializeRequest
   invalidatePreparation()
   loading.value = true
+  loadingAction.value = null
   context.value = null
   loadError.value = ''
   fieldErrors.value = {}

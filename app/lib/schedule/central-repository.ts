@@ -102,7 +102,7 @@ export function createScheduleRepository(fetcher: ScheduleFetcher) {
         if (!object(value) || value.commandId !== frozen.commandId || value.projectId !== frozen.projectId || typeof value.sourceVersion !== 'string' || !value.sourceVersion || !('value' in value))
           invalid()
         return structuredClone(value) as unknown as ScheduleCommandResult
-      })
+      }, frozen.commandId)
     },
     resolve(descriptor: CommandRecoveryDescriptor): Promise<CommandResolution<ScheduleCommandResult>> {
       const frozen = structuredClone(descriptor)

@@ -4,6 +4,7 @@ import { Buffer } from 'node:buffer'
 import { randomUUID } from 'node:crypto'
 import { expect } from '@playwright/test'
 import { updateProductionSnapshot } from './browser-production-snapshot'
+import { createVerifiedSignatory, verifiedSignatoryAdoption } from './contract-signatory'
 
 export const MATERIAL_PRODUCTION_FIXTURE = {
   projectName: 'E2E正式物资项目',
@@ -29,7 +30,9 @@ export async function installMaterialProductionFixture(page: Page, options: { le
   }
   const project = await create('projects', 'project:write', { name: MATERIAL_PRODUCTION_FIXTURE.projectName, manager: '合成经办人', status: '筹备中' })
   const supplier = await create('suppliers', 'supplier:write', { name: MATERIAL_PRODUCTION_FIXTURE.supplierName, supplierCategory: '材料供应商', aliases: [] })
-  const contract = await create('material-contracts', 'material-contract:write', { name: MATERIAL_PRODUCTION_FIXTURE.contractName, content: '正式瓷砖采购验收', projectId: project.id, supplierId: supplier.id, amount: 100000, taxRate: null, signDate: '2026-08-01', lineItems: [{ materialName: 'E2E正式瓷砖', unit: '㎡', qty: 10000, taxInclusiveUnitPrice: 10 }] }, 'submit')
+  const signatoryId = await createVerifiedSignatory(page, 'E2E物资已核实我方主体')
+  const adoption = await verifiedSignatoryAdoption(page, signatoryId)
+  const contract = await create('material-contracts', 'material-contract:write', { ...adoption, name: MATERIAL_PRODUCTION_FIXTURE.contractName, content: '正式瓷砖采购验收', projectId: project.id, supplierId: supplier.id, amount: 100000, taxRate: null, signDate: '2026-08-01', lineItems: [{ materialName: 'E2E正式瓷砖', unit: '㎡', qty: 10000, taxInclusiveUnitPrice: 10 }] }, 'submit')
   const archived = await page.request.post('/api/commands/deliveries', { data: {
     ...identity,
     requiredCapability: 'delivery:write',

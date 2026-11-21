@@ -1,8 +1,20 @@
 import type { Locator, Page } from '@playwright/test'
-import { expect } from '@playwright/test'
+import process from 'node:process'
+import { expect, test } from '@playwright/test'
 
-export const RESPONSIVE_WIDTHS = [390, 768, 1024, 1440] as const
+export const RESPONSIVE_WIDTHS = process.env.CRM_E2E_TIER === 'pr'
+  ? [390, 1024, 1440] as const
+  : [390, 768, 1024, 1440] as const
 export const EQUIVALENT_200_PERCENT_VIEWPORT = { width: 720, height: 500 } as const
+
+export async function checkResponsiveWidths(page: Page, widths: readonly number[], check: (width: number) => Promise<void>) {
+  for (const width of widths) {
+    await test.step(`${width}px`, async () => {
+      await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
+      await check(width)
+    })
+  }
+}
 
 export async function expectNoPageOverflow(page: Page, context: string) {
   const widths = await page.evaluate(() => ({

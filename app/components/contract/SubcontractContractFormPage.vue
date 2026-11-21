@@ -122,6 +122,7 @@ async function initialize(targetId = routeId.value, retainInput = false) {
   const request = ++initializeRequest
   invalidatePreparation()
   loading.value = true
+  loadingAction.value = null
   context.value = null
   loadError.value = ''
   fieldErrors.value = {}
@@ -185,7 +186,7 @@ async function save(action: FormFooterAction) {
   if (commandSession.busy || commandSession.pending || readingFiles.value || !context.value)
     return
   const saveAction: F2SaveAction = action === 'draft' ? 'draft' : action === 'saveSubmit' ? 'submit' : 'save'
-  if (!commandSession.targetId && !constructionMain.value) {
+  if (!commandSession.targetId && context.value?.constructionMains && !constructionMain.value) {
     warning('工程名称必须明确选择对应的真实施工主合同')
     return
   }

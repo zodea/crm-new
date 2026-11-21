@@ -5,6 +5,7 @@ import { decodePayrollAFeeConfigRead, decodePayrollAFeesResult } from '../../app
 import { createPayrollAFeesFixture } from '../helpers/payroll-a-fees-fixture'
 
 describe('p5 费用 HTTP 读取的封闭嵌套边界', () => {
+  const invalidData = expect.objectContaining({ problem: expect.objectContaining({ code: 'validation-failed' }) })
   let fixture: Awaited<ReturnType<typeof createPayrollAFeesFixture>>
   let config: PayrollAFeeConfigRead
   let form: PayrollAFeesFormRead
@@ -35,14 +36,15 @@ describe('p5 费用 HTTP 读取的封闭嵌套边界', () => {
   afterAll(async () => fixture?.close())
 
   it('公开服务的配置、费用表单和冻结输出仍可读取', () => {
-    expect(() => decodePayrollAFeeConfigRead(encodePayrollAWire(config), { origin: 'real' }, config.scope)).not.toThrow()
+    expect(decodePayrollAFeeConfigRead(encodePayrollAWire(config), { origin: 'real' }, config.scope)).toEqual(config)
   })
 
   it.each([
-    { case: '费用表单', input: () => encodePayrollAWire(form), view: 'form' as const, target: () => ({ statementId: form.statementId! }) },
-    { case: '冻结输出', input: () => encodePayrollAWire({ context: { ...form.context, readonly: true }, statementId: document.id, state: 'available', document, reasons: [] }), view: 'output' as const, target: () => document.id },
+    { case: '费用表单', input: () => form, view: 'form' as const, target: () => ({ statementId: form.statementId! }) },
+    { case: '冻结输出', input: () => ({ context: { ...form.context, readonly: true }, statementId: document.id, state: 'available', document, reasons: [] }), view: 'output' as const, target: () => document.id },
   ])('公开服务的配置、费用表单和冻结输出仍可读取 / decodePayrollARead：$case', ({ input, view, target }) => {
-    expect(() => decodePayrollARead(input(), view, { origin: 'real' }, target())).not.toThrow()
+    const expected = input()
+    expect(decodePayrollARead(encodePayrollAWire(expected), view, { origin: 'real' }, target())).toEqual(expected)
   })
   const configCorruptions: Array<[string, (value: PayrollAFeeConfigRead) => void]> = [
     ['上下文缺工作区', v => Reflect.deleteProperty(v.context, 'workspaceId')],
@@ -63,7 +65,7 @@ describe('p5 费用 HTTP 读取的封闭嵌套边界', () => {
   it.each(configCorruptions)('%s 必须拒绝为坏响应', (_label, corrupt) => {
     const value = structuredClone(config)
     corrupt(value)
-    expect(() => decodePayrollAFeeConfigRead(encodePayrollAWire(value), { origin: 'real' }, config.scope)).toThrow()
+    expect(() => decodePayrollAFeeConfigRead(encodePayrollAWire(value), { origin: 'real' }, config.scope)).toThrow(invalidData)
   })
   const feeCorruptions: Array<[string, (value: PayrollAFeesFrozenDocument['fees']) => void]> = [
     ['费用原量事实缺字段', v => Object.assign(v.lines[0]!.components[0]!, { fact: {} })],
@@ -76,14 +78,14 @@ describe('p5 费用 HTTP 读取的封闭嵌套边界', () => {
   it.each(feeCorruptions)('表单和冻结输出拒绝：%s', (_label, corrupt) => {
     const read = structuredClone(form)
     corrupt(read.fees!)
-    expect(() => decodePayrollARead(encodePayrollAWire(read), 'form', { origin: 'real' }, { statementId: read.statementId! })).toThrow()
+    expect(() => decodePayrollARead(encodePayrollAWire(read), 'form', { origin: 'real' }, { statementId: read.statementId! })).toThrow(invalidData)
     const output = { context: { ...form.context, readonly: true }, statementId: document.id, state: 'available', document: structuredClone(document), reasons: [] }
     corrupt(output.document.fees)
-    expect(() => decodePayrollARead(encodePayrollAWire(output), 'output', { origin: 'real' }, document.id)).toThrow()
+    expect(() => decodePayrollARead(encodePayrollAWire(output), 'output', { origin: 'real' }, document.id)).toThrow(invalidData)
   })
   it('用途未证分支也验证此前已领、负价稿和费用阻断', () => {
     const read = { ...structuredClone(form), book: null, fees: null, bookProof: { state: 'unproven', book: null, reasons: ['原用途不可证'] }, bookEligibility: { canSave: false, canCheck: false, canRelease: false, reasons: ['原用途不可证'] }, previousBookPayments: [null] }
-    expect(() => decodePayrollARead(encodePayrollAWire(read), 'form', { origin: 'real' }, { statementId: form.statementId! })).toThrow()
+    expect(() => decodePayrollARead(encodePayrollAWire(read), 'form', { origin: 'real' }, { statementId: form.statementId! })).toThrow(invalidData)
   })
   it.each(Array.from(([
     r => Object.assign(r.fees!.management!.book, { managerWorkerId: 42 }),
@@ -96,16 +98,16 @@ describe('p5 费用 HTTP 读取的封闭嵌套边界', () => {
     r => Object.assign(r, { negativeLineRevisions: [null] }),
   ]) as Array<(read: PayrollAFeesFormRead) => void>).map(input => ({ input })))('管理原量、永久归属、此前已领和负价引用逐层验证：输入案例 %#', ({ input: corrupt }) => {
     const decode = (read: unknown) => decodePayrollARead(encodePayrollAWire(read), 'form', { origin: 'real' }, { statementId: managementForm.statementId! })
-    expect(() => decode(managementForm)).not.toThrow()
+    expect(decode(managementForm)).toEqual(managementForm)
 
     const value = structuredClone(managementForm)
     corrupt(value)
-    expect(() => decode(value)).toThrow()
+    expect(() => decode(value)).toThrow(invalidData)
   })
   function createFeeCommandReceipt() {
     const command = fixture.feeCommand(config, { kind: 'save-a-fees', baseVersion: config.baseVersion, fees: [], remove: [] })
     const result = { commandId: command.commandId, projectId: command.projectId, statementId: null, subjectConfigId: null, priceRevisionIds: [], sourceVersion: 'version', outcome: 'saved', logIds: [], book: command.book, managementBookId: null, managementRevisionId: null, feeRevisionIds: [], negativeLineRevisionIds: [], locatedExistingDraft: false }
-    expect(() => decodePayrollAFeesResult(result, command)).not.toThrow()
+    expect(decodePayrollAFeesResult(result, command)).toEqual(result)
     const value = structuredClone(result)
     Reflect.deleteProperty(value, 'subjectConfigId')
     return { command, result, value }
@@ -127,7 +129,7 @@ describe('p5 费用 HTTP 读取的封闭嵌套边界', () => {
   ])('费用回执也不能缺失继承字段或错配原单 / decodePayrollAFeesResult：$case', ({ prepare }) => {
     const fixture = createFeeCommandReceipt()
     const { input, argument2 } = prepare(fixture)
-    expect(() => decodePayrollAFeesResult(input, argument2)).toThrow()
+    expect(() => decodePayrollAFeesResult(input, argument2)).toThrow(invalidData)
   })
   it('原负价证据失效仍能读取真实不可用诊断，不能用于冻结输出', async () => {
     const old = managementForm.fees!.negativeLines[0]!
@@ -136,8 +138,8 @@ describe('p5 费用 HTTP 读取的封闭嵌套边界', () => {
     const read = await fixture.service.aForm({ origin: 'real' }, target) as PayrollAFeesFormRead
     expect(read.fees!.totals.negativeAmount.state).toBe('unknown')
     expect(read.bookEligibility.canCheck).toBe(false)
-    expect(() => decodePayrollARead(encodePayrollAWire(read), 'form', { origin: 'real' }, target)).not.toThrow()
+    expect(decodePayrollARead(encodePayrollAWire(read), 'form', { origin: 'real' }, target)).toEqual(read)
     const invalidOutput = { context: { ...read.context, readonly: true }, statementId: document.id, state: 'available', document: { ...document, book: read.book, fees: read.fees }, reasons: [] }
-    expect(() => decodePayrollARead(encodePayrollAWire(invalidOutput), 'output', { origin: 'real' }, document.id)).toThrow()
+    expect(() => decodePayrollARead(encodePayrollAWire(invalidOutput), 'output', { origin: 'real' }, document.id)).toThrow(invalidData)
   })
 })

@@ -1,19 +1,17 @@
 import type { TestDb } from '../helpers/memory-db'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { runMigrations } from '~/lib/db/migrations'
 import { softDelete } from '~/lib/db/soft-delete'
 import {
   loadQuantityConstructionRecords,
   loadQuantityMonthlyOutput,
   loadQuantityStageProgress,
 } from '~/lib/quantity/derived'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 let mem: TestDb
 
 beforeEach(async () => {
-  mem = await createMemoryDb()
-  await runMigrations(mem)
+  mem = await createMigratedMemoryDb()
   await mem.execute(`INSERT INTO projects (id, name, code) VALUES ('p1', '项目一', 'P1')`)
   await mem.execute(`INSERT INTO buildings (id, project_id, code, name, sort_order) VALUES
     ('b1', 'p1', '1', '1栋', 10)`)

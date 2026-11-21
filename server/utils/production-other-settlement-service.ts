@@ -1,12 +1,13 @@
 import type { TransactionDb } from '../../app/lib/db/coordinator'
 import type { FinanceExpenseReference } from '../../app/lib/finance/expense-reference'
-import type { OtherSettlementContext, OtherSettlementFact, OtherSettlementResult, OtherSettlementSourceDocument, OtherSettlementStored } from '../../app/lib/other-settlement/contract'
+import type { OtherSettlementContext, OtherSettlementExpenseInput, OtherSettlementFact, OtherSettlementResult, OtherSettlementSourceDocument, OtherSettlementStored } from '../../app/lib/other-settlement/contract'
 import type { BusinessSession } from './business-session'
 import type { ProductionStorage } from './production-storage'
 import { Buffer } from 'node:buffer'
 import { auxiliaryProblem } from '../../app/lib/auxiliary-contract/contract'
-import { CONFIRMED_SETTLEMENT_SQL_VALUES, isEffectiveExpenditureContract } from '../../app/lib/contract/effective-status'
+import { CONFIRMED_SETTLEMENT_SQL_VALUES, isConfirmedExpenditureSettlement, isEffectiveExpenditureContract } from '../../app/lib/contract/effective-status'
 import { FinanceRepositoryProblem } from '../../app/lib/finance/central-contract'
+import { isExpenseClearanceSourceDTO } from '../../app/lib/finance/clearance-verification'
 import { contractOriginalPayloadDigest } from '../../app/lib/forms/original-content'
 import { decodeOtherSettlementResult, otherSettlementFingerprint, otherSettlementKey, readOtherSettlementStored, validateOtherSettlementJournal } from '../../app/lib/other-settlement/storage'
 import { decodeOtherSettlementCommand } from '../../app/lib/other-settlement/validation'
@@ -171,6 +172,34 @@ async function loaded(tx: TransactionDb, actor: BusinessSession) {
   }
   return { ...data, originalRecords: data.records, source, records, sources, qualificationReasons, deletedAtById, unavailableFactKindsById }
 }
+async function readAdoptionSources(tx: TransactionDb, actor: BusinessSession, input: OtherSettlementExpenseInput[], previous?: OtherSettlementStored) {
+  const sources = await listOriginalExpenseReferences(tx, actor)
+  if (!previous || isConfirmedExpenditureSettlement(previous.draft.status ?? ''))
+    return sources
+
+  return Promise.all(sources.map(async (source) => {
+    const expected = input.find(line => line.originalExpenseLineId === source.id)?.consumptionVersion
+    const prior = previous.draft.originalExpenses?.find(line => line.originalExpenseLineId === source.id)
+    if (!expected || source.consumptionVersion === expected || prior?.consumptionVersion !== expected)
+      return source
+
+    const [allocation] = await tx.select<{ id: string, frozen_json: string }>('SELECT id,frozen_json FROM expenditure_settlement_expense_allocations WHERE settlement_id=? AND original_expense_line_id=? AND deleted_at IS NULL', [previous.id, source.id])
+    if (!allocation)
+      return source
+    const frozen: unknown = JSON.parse(allocation.frozen_json)
+    if (!isExpenseClearanceSourceDTO(frozen) || frozen.consumptionVersion !== expected)
+      return source
+
+    // 同一待确认结算新增的旧份额保留从未计入它冻结的来源版本。
+    const frozenLinkIds = new Set(frozen.clearanceLinks.map(link => link.id))
+    const ownReservations = new Set(source.clearanceLinks.filter(link => link.expenseAllocationId === allocation.id && !frozenLinkIds.has(link.id)).map(link => link.id))
+    if (!ownReservations.size)
+      return source
+    const withoutOwnReservations = await readOriginalExpenseReference(tx, actor, source.id, ownReservations)
+    return withoutOwnReservations?.consumptionVersion === expected ? withoutOwnReservations : source
+  }))
+}
+
 function instance(data: Awaited<ReturnType<typeof loaded>>, expenses: Awaited<ReturnType<typeof listOriginalExpenseReferences>> = []) {
   return createOtherSettlementInstance({ identities: () => data.source, records: data.records, originalExpenses: () => expenses, expenseAdoptionCap: (base, input) => {
     const source = expenses.find(row => row.id === base.id)!
@@ -299,7 +328,8 @@ export function createProductionOtherSettlementService(storage: ProductionStorag
         }
         if (request.id && data.records.find(row => row.id === request.id)?.version === 0)
           return fail('unavailable', '旧结算需先完成完整来源核验；保留旧原文、原件和当前输入')
-        const expenses = request.draft.originalExpenses?.length ? await listOriginalExpenseReferences(tx, actor) : []
+        const expenseInput = request.draft.originalExpenses
+        const expenses = expenseInput?.length ? await readAdoptionSources(tx, actor, expenseInput, data.records.find(row => row.id === request.id)) : []
         const domain = instance(data, expenses)
         const result: OtherSettlementResult = await domain.execute(request, actor)
         const record = domain.snapshot().find(row => row.id === result.id)!

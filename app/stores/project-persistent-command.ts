@@ -27,19 +27,24 @@ export const useProjectPersistentCommandStore = defineStore('project-persistent-
     capability: PROJECT_WRITE_CAPABILITY,
     problemFromUnknown: projectProblemFromUnknown,
     conflict: latest => new ProjectPersistentConflictError(latest),
-    repository: () => ({ ...repository(), context: async () => {
-      const context = await repository().context()
-      if (!context.capabilities.includes('project:original:write'))
-        throw new Error('当前正式项目权限或来源已变化，请保留原编号。')
-      return context
-    }, resolve: async (commandId) => {
-      const resolved = await useNuxtApp().$repositories.projectProduction.resolve(commandId)
-      if (resolved.outcome === 'applied' && resolved.result)
-        return { outcome: 'applied' as const, result: resolved.result }
-      if (resolved.outcome === 'not-applied' && resolved.commandId === commandId && resolved.result === null)
-        return { outcome: 'not-applied' as const, commandId }
-      throw new Error('原项目提交核对结果无效，请保留原编号。')
-    } }),
+    repository: () => ({
+      loadForm: id => repository().loadForm(id),
+      execute: request => repository().execute(request),
+      context: async () => {
+        const context = await repository().context()
+        if (!context.capabilities.includes('project:original:write'))
+          throw new Error('当前正式项目权限或来源已变化，请保留原编号。')
+        return context
+      },
+      resolve: async (commandId) => {
+        const resolved = await useNuxtApp().$repositories.projectProduction.resolve(commandId)
+        if (resolved.outcome === 'applied' && resolved.result)
+          return { outcome: 'applied' as const, result: resolved.result }
+        if (resolved.outcome === 'not-applied' && resolved.commandId === commandId && resolved.result === null)
+          return { outcome: 'not-applied' as const, commandId }
+        throw new Error('原项目提交核对结果无效，请保留原编号。')
+      },
+    }),
     recoveryAdapter: {
       key: scope => projectPendingKey({ ...scope, capabilities: [] }, `form:${scope.targetId ?? 'new'}`),
       read: (key, scope) => {

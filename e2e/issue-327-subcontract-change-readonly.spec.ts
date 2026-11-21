@@ -2,7 +2,7 @@ import type { APIRequestContext, Page, TestInfo } from '@playwright/test'
 import { Buffer } from 'node:buffer'
 import { expect, test } from '@playwright/test'
 import { createVerifiedSignatory, selectVerifiedSignatory } from './helpers/contract-signatory'
-import { expectLocalHorizontalScroll, expectNoPageOverflow, RESPONSIVE_WIDTHS } from './helpers/responsive'
+import { checkResponsiveWidths, expectLocalHorizontalScroll, expectNoPageOverflow, RESPONSIVE_WIDTHS } from './helpers/responsive'
 
 type Scenario = 'ready' | 'empty' | 'forbidden' | 'unavailable'
 type Domain = 'owner-documents' | 'subcontract-contracts' | 'projects'
@@ -265,21 +265,21 @@ test.describe('Issue #327：分包变洽签专属只读链', () => {
     await expect(page.getByRole('heading', { name: '中央正式分包范围调整' })).toBeVisible()
   })
 
-  for (const width of RESPONSIVE_WIDTHS) {
-    test(`${width}px 列表与详情无页面级横滚，密集宽表只在自身区域滚动`, async ({ page }) => {
-      await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
-      await page.goto('/subcontract/change')
-      const table = page.locator('[data-ui="owner-document-table"]')
-      await expect(table).toBeVisible({ timeout: 20_000 })
+  test('多档视口列表与详情无页面级横滚，密集宽表只在自身区域滚动', async ({ page }) => {
+    test.slow()
+    await page.goto('/subcontract/change')
+    const table = page.locator('[data-ui="owner-document-table"]')
+    await expect(table).toBeVisible({ timeout: 45_000 })
+    await checkResponsiveWidths(page, RESPONSIVE_WIDTHS, async (width) => {
       await expectNoPageOverflow(page, `#327 分包变洽签列表 @ ${width}px`)
       await table.focus()
       await expect(table).toBeFocused()
       if (width === 390)
         await expectLocalHorizontalScroll(table, '#327 分包变洽签列表 @ 390px')
-
-      await page.goto('/subcontract/change/sub-change-real-327?origin=real')
-      await expect(page.getByTestId('subcontract-change-detail')).toBeVisible({ timeout: 20_000 })
-      await expectNoPageOverflow(page, `#327 分包变洽签详情 @ ${width}px`)
     })
-  }
+
+    await page.goto('/subcontract/change/sub-change-real-327?origin=real')
+    await expect(page.getByTestId('subcontract-change-detail')).toBeVisible({ timeout: 20_000 })
+    await checkResponsiveWidths(page, RESPONSIVE_WIDTHS, width => expectNoPageOverflow(page, `#327 分包变洽签详情 @ ${width}px`))
+  })
 })

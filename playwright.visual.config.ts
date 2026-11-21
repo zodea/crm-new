@@ -1,5 +1,6 @@
 import process from 'node:process'
 import { defineConfig, devices } from '@playwright/test'
+import { isolatedDevServer } from './e2e/helpers/playwright-server'
 import { VISUAL_BASE_URL, VISUAL_DATA_PROFILE } from './e2e/helpers/visual-environment'
 
 if (process.platform !== 'win32')
@@ -11,10 +12,10 @@ if (process.env.PLAYWRIGHT_BASE_URL)
 export default defineConfig({
   testDir: './e2e',
   testMatch: /runtime-visual-matrix\.spec\.ts/,
-  fullyParallel: false,
+  fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
-  workers: 1,
+  workers: 2,
   reporter: process.env.CI ? 'github' : 'list',
   outputDir: 'test-results/visual',
   use: {
@@ -30,15 +31,5 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  webServer: {
-    command: 'node ./node_modules/nuxt/bin/nuxt.mjs dev --host 127.0.0.1 --port 3101',
-    env: {
-      NUXT_DEVTOOLS: 'false',
-      NUXT_IGNORE_LOCK: '1',
-      NUXT_PUBLIC_VISUAL_BASELINE_MODE: VISUAL_DATA_PROFILE,
-    },
-    url: VISUAL_BASE_URL,
-    reuseExistingServer: false,
-    timeout: 120_000,
-  },
+  webServer: isolatedDevServer(Number(new URL(VISUAL_BASE_URL).port), VISUAL_DATA_PROFILE),
 })

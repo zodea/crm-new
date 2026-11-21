@@ -1,19 +1,17 @@
 import type { TestDb } from '../helpers/memory-db'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { runMigrations } from '~/lib/db/migrations'
 import { seedIfEmpty } from '~/lib/db/seed'
 import {
   buildQuantityVarianceRows,
   filterQuantityVarianceRows,
   loadQuantityVarianceFacts,
 } from '~/lib/quantity/variance'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 let db: TestDb
 
 beforeEach(async () => {
-  db = await createMemoryDb()
-  await runMigrations(db)
+  db = await createMigratedMemoryDb()
   await seedIfEmpty(db)
 })
 

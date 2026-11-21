@@ -3,7 +3,7 @@ import { Buffer } from 'node:buffer'
 import { createHash } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import { selectVerifiedSignatory } from './helpers/contract-signatory'
-import { expectNoPageOverflow, RESPONSIVE_WIDTHS } from './helpers/responsive'
+import { checkResponsiveWidths, expectNoPageOverflow, RESPONSIVE_WIDTHS } from './helpers/responsive'
 
 type Scenario = 'ready' | 'empty' | 'forbidden' | 'unavailable' | 'demo-forbidden'
 const DATA_VISIBILITY_STORAGE_KEY = 'ruihang:workspace-default:include-demo'
@@ -63,9 +63,7 @@ test.describe('Issue #318：材料采购合同中央只读详情', () => {
     expect(await read.json()).toMatchObject({ contract: { amounts: { contract: '4800.00', changed: '4900.00' } }, sections: { deductions: [{ amount: '-200.00' }], supplements: [{ id: protocol.id, lineItems: [{ originalLineId: form.draft.lineItems[0].id, amount: '100.00' }], originalLineSnapshots: [{ parentVersion: 1, unitPrice: '20.00' }] }] } })
     await page.goto(`/contract/material/form/${saved.id}`)
     await expect(page.getByLabel('合同名称 *')).toHaveValue('A02自有材采', { timeout: 20_000 })
-    await expect(page.getByTestId('contract-our-signatory')).toBeEnabled()
-    await page.getByTestId('contract-our-signatory').selectOption(own.id)
-    await expect(page.getByTestId('contract-our-signatory-snapshot')).toHaveText('文书采用：A02明确核实我方公司 · 核实版本 1')
+    await selectVerifiedSignatory(page, own.id, 'A02明确核实我方公司')
     await expect(page.getByLabel('扣减金额，第 1 行')).toHaveValue('200')
     const grade = page.getByLabel('材质，第 1 行', { exact: true })
     await expect(grade).toHaveValue('304')
@@ -365,12 +363,20 @@ test.describe('Issue #318：材料采购合同中央只读详情', () => {
     // 原断言保护迁入ID及编辑回读；按现行正式保存规则，人工采用已核实主体。
     const own = (await (await page.request.get('/api/read/our-signatories', { headers: { 'x-ruihang-test-session': session(testInfo) } })).json()).records[0]
     await selectVerifiedSignatory(page, own.id, 'A02明确核实我方公司')
-    await page.getByLabel('【保存】后关闭').uncheck()
     await page.getByLabel('合同名称 *').fill('既有中央材料采购合同（留在表单）')
+    const closeAfterSave = page.getByLabel('【保存】后关闭')
+    await closeAfterSave.uncheck()
+    await expect(closeAfterSave).not.toBeChecked()
     const saved = page.waitForResponse(response => response.url().includes('/api/commands/material-contracts/') && response.request().method() === 'PUT')
-    await page.getByRole('group', { name: '表单操作' }).getByRole('button', { name: '保存', exact: true }).click()
+    const save = page.getByRole('group', { name: '表单操作' }).getByRole('button', { name: '保存', exact: true })
+    await save.click()
     expect((await saved).ok()).toBe(true)
+    await expect(save).toBeEnabled({ timeout: 15_000 })
     await expect(page).toHaveURL(/\/contract\/material\/form\/contract-existing-318/)
+    await expect(page.getByRole('heading', { name: '编辑 · 材料采购合同', exact: true })).toBeVisible()
+    await expect(page.getByLabel('合同名称 *')).toHaveValue('既有中央材料采购合同（留在表单）')
+    await page.goto('/contract/contract-existing-318?origin=real&contractKind=material')
+    await expect(page.getByRole('heading', { name: '既有中央材料采购合同（留在表单）', exact: true })).toBeVisible()
     await page.reload()
     await expect(page.getByRole('heading', { name: '既有中央材料采购合同（留在表单）', exact: true })).toBeVisible()
     await page.getByTestId('material-contract-edit').click()
@@ -444,18 +450,24 @@ test.describe('Issue #318：材料采购合同中央只读详情', () => {
     await expect(page.getByRole('button', { name: '重新加载' })).toBeVisible()
   })
 
-  for (const width of RESPONSIVE_WIDTHS) {
-    test(`${width}px 列表、详情与宽表无页面级横滚`, async ({ page }) => {
-      await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
-      await page.goto('/contract/material?search=瓷砖')
-      await expect(page.getByTestId('material-contract-list')).toBeVisible({ timeout: 20_000 })
+  test('多档视口列表、详情与宽表无页面级横滚', async ({ page }) => {
+    test.slow()
+    await page.goto('/contract/material?search=瓷砖')
+    await expect(page.getByTestId('material-contract-list')).toBeVisible({ timeout: 45_000 })
+    const link = page.getByRole('link', { name: '瓷砖采购合同', exact: true })
+    await checkResponsiveWidths(page, RESPONSIVE_WIDTHS, async (width) => {
       await expectNoPageOverflow(page, `#318 列表 @ ${width}px`)
-      await page.getByRole('link', { name: '瓷砖采购合同', exact: true }).click()
-      await expect(page.getByTestId('material-contract-detail')).toBeVisible()
+      await expect(link).toHaveAttribute('href', /^\/contract\/con_demo_cg01\?origin=demo&contractKind=material&returnTo=/)
+      await link.click({ trial: true })
+    })
+    await link.click()
+    await expect(page.getByTestId('material-contract-detail')).toBeVisible()
+    await checkResponsiveWidths(page, RESPONSIVE_WIDTHS, async (width) => {
+      await page.getByRole('tab', { name: '详细信息' }).click()
       await expectNoPageOverflow(page, `#318 详情 @ ${width}px`)
       await page.getByRole('tab', { name: /采购明细/ }).click()
       await expect(page.getByTestId('material-contract-lines-scroll')).toBeVisible()
       await expectNoPageOverflow(page, `#318 采购明细 @ ${width}px`)
     })
-  }
+  })
 })

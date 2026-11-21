@@ -2,7 +2,7 @@ import { Buffer } from 'node:buffer'
 import { randomUUID } from 'node:crypto'
 import { test as base, expect } from '@playwright/test'
 import * as XLSX from 'xlsx'
-import { updateProductionSnapshot } from './helpers/browser-production-snapshot'
+import { seedProductionSnapshot } from './helpers/browser-production-snapshot'
 
 const INPUT = {
   projectName: '受控清单工程',
@@ -20,16 +20,19 @@ const INPUT = {
   sheetName: '户内安装',
 }
 
-interface BoqFixture { projectId: string, contractId: string, changeId: string, wallId: string }
+interface BoqFixture { projectId: string, contractId: string, changeId: string, wallId: string, pageErrors: string[] }
 
 // 每个浏览器上下文显式准备独立的迁移前正式来源，不依赖演示开关或前一条用例的写入。
 const test = base.extend<{ boq: BoqFixture }>({
-  boq: [async ({ page }, use) => {
+  boq: [async ({ page, baseURL }, use) => {
     const prefix = `boq-${randomUUID()}`
     const id = (kind: string) => `${prefix}-${kind}`
+    const pageErrors: string[] = []
+    page.on('pageerror', error => pageErrors.push(error.message))
     await page.clock.setFixedTime(new Date('2026-07-02T00:00:00Z'))
-    await page.goto('/contract/boq')
-    await updateProductionSnapshot(page, (db) => {
+    if (!baseURL)
+      throw new Error('BOQ 夹具需要 Playwright baseURL')
+    await seedProductionSnapshot(page, baseURL, (db) => {
       const insert = (table: string, row: Record<string, string | number | null>) => {
         const columns = Object.keys(row)
         db.run(`INSERT INTO ${table} (${columns.join(',')}) VALUES (${columns.map(() => '?').join(',')})`, Object.values(row))
@@ -64,10 +67,12 @@ const test = base.extend<{ boq: BoqFixture }>({
       insert('unit_assignments', { id: id('assignment'), unit_id: id('unit'), trade: '水暖工', crew_id: id('crew') })
       insert('unit_stage_completions', { id: id('completion'), unit_id: id('unit'), stage_id: id('stage'), assignment_id: id('assignment'), status: 'completed', completed_at: `${INPUT.generationMonth}-15` })
     })
-    await page.reload()
-    await expect(page.getByTestId('boq-contract-number')).toHaveText(INPUT.contractNumber)
-    await use({ projectId: id('project'), contractId: id('contract'), changeId: id('change'), wallId: id('wall') })
-  }, { auto: true }],
+    const response = await page.goto('/contract/boq')
+    expect(response?.ok()).toBe(true)
+    await expect(page.getByTestId('boq-workspace-header'), '清单应用壳须先完成启动').toBeVisible({ timeout: 30_000 })
+    await expect(page.getByTestId('boq-contract-number')).toHaveText(INPUT.contractNumber, { timeout: 25_000 })
+    await use({ projectId: id('project'), contractId: id('contract'), changeId: id('change'), wallId: id('wall'), pageErrors })
+  }, { auto: true, timeout: 60_000 }],
 })
 
 function boqWorkbook(includeUnitPrice = true, input = { quantity: INPUT.pipe.quantity, price: INPUT.pipe.price }): Buffer {
@@ -99,10 +104,6 @@ async function expectDocumentDoesNotOverflow(page: import('@playwright/test').Pa
 
 test.describe('Issue #115：BOQ 清单、变更与月度报量', () => {
   test('独立正式来源展示有效合同值、签证台账与月报量', async ({ page, boq }) => {
-    const pageErrors: string[] = []
-    page.on('pageerror', error => pageErrors.push(error.message))
-
-    await page.goto('/contract/boq')
     await expect(page.getByRole('heading', { name: '合同工程量清单' })).toBeVisible({ timeout: 20_000 })
     await expect(page.getByTestId('project-switcher-trigger')).toContainText(INPUT.projectName)
     await expect(page.getByTestId('boq-contract-number')).toHaveText(INPUT.contractNumber)
@@ -126,13 +127,10 @@ test.describe('Issue #115：BOQ 清单、变更与月度报量', () => {
     await expect(page.getByRole('row').filter({ hasText: '地砖铺贴' })).toBeVisible()
     await expect(page.getByText(String(INPUT.floor.quantity), { exact: true }).first()).toBeVisible()
     await expectDocumentDoesNotOverflow(page)
-    expect(pageErrors).toEqual([])
+    expect(boq.pageErrors).toEqual([])
   })
 
   test('键盘可在三个工作台标签间移动，并保持直接业务入口可聚焦', async ({ page }) => {
-    await page.goto('/contract/boq')
-    await page.waitForLoadState('networkidle')
-
     const linesTab = page.getByRole('tab', { name: /合同清单/ })
     await linesTab.focus()
     await page.keyboard.press('ArrowRight')
@@ -149,7 +147,6 @@ test.describe('Issue #115：BOQ 清单、变更与月度报量', () => {
   ]) {
     test(`三步拆表 ${input.quantity}→${input.confirmed} × ${input.price} 回接户型工程量`, async ({ page, boq }) => {
       await page.goto(`/contract/boq/import?project=${boq.projectId}&contract=${boq.contractId}`)
-      await page.waitForLoadState('networkidle')
       await expect(page.getByRole('heading', { name: '合同清单拆表' })).toBeVisible()
 
       const chooserPromise = page.waitForEvent('filechooser')
@@ -181,7 +178,6 @@ test.describe('Issue #115：BOQ 清单、变更与月度报量', () => {
 
   test('导入映射缺少必填列时保留错误状态并指出需修复字段', async ({ page, boq }) => {
     await page.goto(`/contract/boq/import?project=${boq.projectId}&contract=${boq.contractId}`)
-    await page.waitForLoadState('networkidle')
 
     const chooserPromise = page.waitForEvent('filechooser')
     await page.getByRole('button', { name: '选择文件', exact: true }).click()
@@ -211,7 +207,7 @@ test.describe('Issue #115：BOQ 清单、变更与月度报量', () => {
     page.on('pageerror', error => pageErrors.push(error.message))
 
     await page.goto('/contract/boq?tab=monthly')
-    await page.waitForLoadState('networkidle')
+    await expect(page.getByTestId('boq-contract-number')).toHaveText(INPUT.contractNumber)
 
     await page.getByRole('button', { name: '生成月度报量' }).click()
     const dialog = page.getByRole('dialog')
@@ -248,9 +244,6 @@ test.describe('Issue #115：BOQ 清单、变更与月度报量', () => {
   test('未确认迁入的清单目标跨域保留稳定引用，并显示来源不可用', async ({ page, boq }) => {
     // 正式模板写入与BOQ关联见 quantity-central-ui.spec.ts；中央BOQ楼层定位见 schedule-central.spec.ts。
     // 本例保留迁移前来源边界，不能把它默认为另一份中央项目或重启已退役的本地表单。
-    await page.goto('/contract/boq')
-    await page.waitForLoadState('networkidle')
-
     await page.getByRole('button', { name: /现场算式：墙砖铺贴/ }).first().click()
     await expect(page).toHaveURL(/\/subcontract\/quantity\?.*boqLine=/)
     let destination = new URL(page.url())
@@ -261,7 +254,7 @@ test.describe('Issue #115：BOQ 清单、变更与月度报量', () => {
     await expect(page.getByRole('button', { name: '保存模板', exact: true })).toHaveCount(0)
 
     await page.goto('/contract/boq')
-    await page.waitForLoadState('networkidle')
+    await expect(page.getByTestId('boq-contract-number')).toHaveText(INPUT.contractNumber)
     await page.getByRole('button', { name: /楼层计划：墙砖铺贴/ }).first().click()
     await expect(page).toHaveURL(/\/schedule\?.*boqLine=/)
     destination = new URL(page.url())
@@ -273,8 +266,6 @@ test.describe('Issue #115：BOQ 清单、变更与月度报量', () => {
 
   test('清单页头部保持紧凑，固定操作列不挤占页面且横滚留在表格内', async ({ page }) => {
     await page.setViewportSize({ width: 1024, height: 900 })
-    await page.goto('/contract/boq')
-    await page.waitForLoadState('networkidle')
 
     const header = page.getByTestId('boq-workspace-header')
     await expect(header).toBeVisible()
@@ -287,17 +278,16 @@ test.describe('Issue #115：BOQ 清单、变更与月度报量', () => {
     const tablePanel = page.locator('.boq-lines-layout .vxe-table').first()
     const horizontalScroller = page.locator('.boq-lines-layout .vxe-table--scroll-x-wrapper').first()
     await expect(horizontalScroller).toBeVisible()
-    const tableBox = await tablePanel.boundingBox()
-    const scrollerBox = await horizontalScroller.boundingBox()
-    expect(scrollerBox!.x).toBeGreaterThanOrEqual(tableBox!.x)
-    expect(scrollerBox!.x + scrollerBox!.width).toBeLessThanOrEqual(tableBox!.x + tableBox!.width + 1)
+    await expect(async () => {
+      const [tableBox, scrollerBox] = await Promise.all([tablePanel.boundingBox(), horizontalScroller.boundingBox()])
+      expect(scrollerBox!.x).toBeGreaterThanOrEqual(tableBox!.x)
+      expect(scrollerBox!.x + scrollerBox!.width).toBeLessThanOrEqual(tableBox!.x + tableBox!.width + 1)
+    }).toPass({ timeout: 5_000 })
     await expectDocumentDoesNotOverflow(page)
   })
 
   test('清单列只从右缘拖拽，双击手柄恢复自适应且固定操作列不位移', async ({ page }) => {
     await page.setViewportSize({ width: 1024, height: 900 })
-    await page.goto('/contract/boq')
-    await page.waitForLoadState('networkidle')
 
     const unitTypeHeader = page.locator('.boq-lines-table .vxe-header--column')
       .filter({ hasText: '户型' })
@@ -339,8 +329,6 @@ test.describe('Issue #115：BOQ 清单、变更与月度报量', () => {
   ] as const) {
     test(`${viewport.width}px 清单/变更/报量全部可达且页面不横滚`, async ({ page, boq }) => {
       await page.setViewportSize(viewport)
-      await page.goto('/contract/boq')
-      await page.waitForLoadState('networkidle')
 
       await expect(page.getByRole('tab', { name: /合同清单/ })).toBeVisible()
       await page.getByRole('tab', { name: /变更单/ }).click()
@@ -356,7 +344,6 @@ test.describe('Issue #115：BOQ 清单、变更与月度报量', () => {
       await expectDocumentDoesNotOverflow(page)
 
       await page.goto(`/contract/boq/import?project=${boq.projectId}&contract=${boq.contractId}`)
-      await page.waitForLoadState('networkidle')
       await expect(page.getByRole('heading', { name: '合同清单拆表' })).toBeVisible()
       await expectDocumentDoesNotOverflow(page)
     })

@@ -496,15 +496,12 @@ describe('唯一 Target Registry', () => {
     })
   })
 
-  it.each([
-    ['contract', 'detail', '/contract/source-1'],
-    ['payment-application', 'detail', '/finance/payment/source-1/detail'],
-  ] as const)('项目分供方来源记录 %s/%s 消费双父 ID 与受限返回页签', (entity, variant, path) => {
+  it('项目分供方合同来源记录消费双父 ID 与受限返回页签', () => {
     const returnTo = '/project/project-1/supplier/supplier-1?origin=demo&tab=settlement'
     const intent: NavigationIntentDTO = {
       kind: 'source-record',
-      subject: { state: 'resolved', entity, id: 'source-1', label: '来源单', no: 'NO-1' },
-      variant,
+      subject: { state: 'resolved', entity: 'contract', id: 'source-1', label: '来源单', no: 'NO-1' },
+      variant: 'detail',
       view: null,
       filters: { dataOrigin: 'demo' },
     }
@@ -512,11 +509,12 @@ describe('唯一 Target Registry', () => {
     expect(resolveNavigationTarget(intent, { returnTo })).toEqual({
       state: 'resolved',
       label: '来源单',
-      to: `${path}?projectId=project-1&supplierId=supplier-1&origin=demo&returnTo=${encodeURIComponent(returnTo)}`,
+      to: `/contract/source-1?projectId=project-1&supplierId=supplier-1&origin=demo&returnTo=${encodeURIComponent(returnTo)}`,
     })
   })
 
   it.each([
+    ['payment-application', 'detail'],
     ['invoice', 'detail'],
     ['payment-record', 'detail'],
     ['settlement', 'subcontract-settlement'],

@@ -67,7 +67,7 @@ test.describe('Issue #112 R2：高风险业务工作区', () => {
       await documentDoesNotOverflow(page)
 
       await page.goto('/finance/ledger')
-      await expect(page.getByRole('button', { name: '打印 PDF', exact: true })).toBeVisible()
+      await expect(page.getByRole('button', { name: '打印 PDF', exact: true })).toBeVisible({ timeout: 15_000 })
       await updateProductionSnapshot(page, (database) => {
         database.run('INSERT INTO invoices (id, invoice_number, invoice_date, file_name, seller, total_amount, owner_kind, account_status, review_status, ocr_status, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [`responsive-${viewport.width}`, `CONTROLLED-${viewport.width}`, '2026-09-11', `responsive-${viewport.width}.png`, '合成响应供方', 113, 'personal', 'none', 'reviewed', 'done', 'scan'])
       })

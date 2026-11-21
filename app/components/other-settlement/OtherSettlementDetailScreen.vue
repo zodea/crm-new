@@ -4,7 +4,7 @@ import { TabsContent, TabsList, TabsRoot, TabsTrigger } from 'reka-ui'
 import { validateAuxiliaryReturnTo } from '~/lib/auxiliary-contract/navigation'
 import { auxiliaryMoney } from '~/lib/auxiliary-contract/presentation'
 import { isConfirmedExpenditureSettlement } from '~/lib/contract/effective-status'
-import { OTHER_SETTLEMENT_PATH, OTHER_SETTLEMENT_STATUS_LABELS } from '~/lib/other-settlement/contract'
+import { canonicalOtherSettlementStatus, OTHER_SETTLEMENT_PATH, OTHER_SETTLEMENT_STATUS_LABELS } from '~/lib/other-settlement/contract'
 
 const props = defineProps<{
   settlementId: string
@@ -17,7 +17,7 @@ const { data: detail, problem, shellState, load } = useAuxiliaryContractRead(() 
 const settlement = computed(() => detail.value?.settlement)
 const tabs = [{ key: 'info', label: '详细资料' }, { key: 'penalty', label: '奖罚抵扣' }, { key: 'application', label: '付款申请' }, { key: 'payment', label: '支付事实' }] as const
 const activeTab = computed(() => tabs.find(tab => tab.key === route.query.tab)?.key ?? 'info')
-const status = computed(() => OTHER_SETTLEMENT_STATUS_LABELS[settlement.value?.draft.status ?? ''] || '未记录')
+const status = computed(() => OTHER_SETTLEMENT_STATUS_LABELS[canonicalOtherSettlementStatus(settlement.value?.draft.status ?? '')] || '未记录')
 function factUnavailableReason(kind: OtherSettlementFact['kind']) {
   const keys = { penalty: 'deductions', application: 'applied', payment: 'paid' } as const
   return settlement.value?.amounts[keys[kind]] === null ? settlement.value.qualificationUnavailableReason || '当前真实来源或归属不可核验，完整金额未知；已核验明细继续保留，不能把缺口当作零。' : null

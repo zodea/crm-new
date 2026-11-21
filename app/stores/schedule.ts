@@ -83,6 +83,15 @@ export const useScheduleStore = defineStore('schedule', () => {
     if (context.value)
       editingBaselines.set(taskId, structuredClone({ workspaceId: context.value.workspaceId, actorId: context.value.actorId, origin: context.value.origin, capabilities: [...context.value.capabilities], sourceVersion: context.value.sourceVersion }))
   }
+  function dependencySuccessor(action: ScheduleAction) {
+    if (action.kind === 'update-dependency')
+      return action.successorId
+    if (action.kind === 'remove-dependency')
+      return local.snapshot.value?.dependencies.find(row => row.id === action.dependencyId)?.succId ?? null
+    if (action.kind === 'restore-dependency')
+      return local.snapshot.value?.disabledDependencies.find(row => row.id === action.dependencyId)?.succId ?? null
+    return null
+  }
   const canWrite = computed(() => isTauri() || (origin.value === 'real' && capabilities.value.includes('schedule:write')))
   let today = toLocalDateInputValue()
   let generation = 0
@@ -307,7 +316,7 @@ export const useScheduleStore = defineStore('schedule', () => {
       throw scheduleProblem('forbidden', '当前来源或身份不能修改排程')
     if (pendingCommand.value)
       throw scheduleProblem('conflict', '上次提交结果尚未确认，请先恢复原提交')
-    const editingId = 'taskId' in action ? action.taskId : action.kind === 'update-dependency' ? action.successorId : null
+    const editingId = 'taskId' in action && action.kind !== 'reschedule-task' ? action.taskId : dependencySuccessor(action)
     if (editingId && editingBaselines.has(editingId))
       baseline = editingBaselines.get(editingId)!
     if (!baseline || baseline.workspaceId !== workspaceId.value || baseline.actorId !== actorId.value || baseline.origin !== origin.value)
@@ -333,8 +342,15 @@ export const useScheduleStore = defineStore('schedule', () => {
     const current = scheduleVersionBasis(loaded.sourceVersion)
     if ((result.sourceVersion.startsWith('wbs-v1:') && (!original || !current || current.projectId !== result.projectId || current.revision < original.revision)) || (!result.sourceVersion.startsWith('wbs-v1:') && !loaded.sourceVersion))
       throw scheduleProblem('unavailable', '已保存的WBS版本尚未可靠读取，请只重试读取')
-    if (scopeProjectId.value === descriptor.targetId && workspaceId.value === descriptor.workspaceId && actorId.value === descriptor.actorId && origin.value === 'real')
+    if (scopeProjectId.value === descriptor.targetId && workspaceId.value === descriptor.workspaceId && actorId.value === descriptor.actorId && origin.value === 'real') {
+      const command = pending.value[key]?.command
+      const editedTask = command ? dependencySuccessor(command.action) : null
       apply(loaded)
+      // The same task draft can continue after its separately saved dependency.
+      // A read with additional changes still requires the original edit basis.
+      if (editedTask && command && editingBaselines.get(editedTask)?.sourceVersion === command.sourceVersion && loaded.sourceVersion === result.sourceVersion)
+        beginPlanEdit(editedTask)
+    }
     recovery.clear(key, descriptor.commandId)
     const next = { ...pending.value }
     delete next[key]

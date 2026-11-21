@@ -8,7 +8,6 @@ import process from 'node:process'
 import { promisify } from 'node:util'
 import { afterEach, expect, it } from 'vitest'
 import { createHttpConstructionContractCommandRepository } from '../../app/lib/construction-contract/command-http-repository'
-import { runMigrations } from '../../app/lib/db/migrations'
 import { decodeProjectDetailRead } from '../../app/lib/project/read-decoder'
 import { contractOriginalDigest } from '../../server/utils/contract-original'
 import { createProductionConstructionMigration } from '../../server/utils/production-construction-contract-migration'
@@ -19,7 +18,7 @@ import { createProductionCustomerService } from '../../server/utils/production-c
 import { createProductionOurSignatoryService } from '../../server/utils/production-our-signatory-service'
 import { createProductionProjectService } from '../../server/utils/production-project-service'
 import { createProductionStorage } from '../../server/utils/production-storage'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 import { constructionScopeCommand, createConstructionScopeFixture } from '../helpers/production-construction-scope-fixture'
 
 const closers: Array<() => Promise<void>> = []
@@ -46,8 +45,7 @@ async function fixture() {
   } }
 }
 async function nativeSource(f: Pick<Awaited<ReturnType<typeof fixture>>, 'storage' | 'session' | 'project' | 'customer'>, duplicateNumber = false, legacyCommand = false, times: { uploadedAt?: string | null, headAmount?: number } = {}) {
-  const native = await createMemoryDb()
-  await runMigrations(native)
+  const native = await createMigratedMemoryDb()
   await native.execute('INSERT INTO customers(id,name) VALUES(\'legacy-construction-customer\',\'原甲方\')')
   await native.execute('INSERT INTO projects(id,name,customer_id) VALUES(\'legacy-construction-project\',\'原项目\',\'legacy-construction-customer\')')
   await native.execute('ALTER TABLE contracts ADD COLUMN future_json TEXT')
@@ -134,14 +132,15 @@ it('施工主补原件未知上传时间NULL保全且历史表单仍可编辑，
   })).rejects.toMatchObject({ problem: { code: 'unavailable' } })
   expect((await commands.loadForm('legacy-construction-head')).attachments[0]!.uploadedAt).toBeNull()
   const descriptor = { commandId: saved.commandId, workspaceId: f.session().workspaceId, actorId: f.session().actorId, family: 'construction-contract-import', targetId: null, action: 'adopt', scopeId: source.command.source.sha256 }
-  const output = resolve(f.options.directory, 'cold-upload-unknown.json')
   await f.storage.close()
-  await promisify(execFile)(process.execPath, [resolve('node_modules/vite-node/dist/cli.mjs'), '--config', resolve('vitest.config.ts'), resolve('tests/helpers/production-construction-cold.ts'), f.options.directory, saved.ids[0]!, JSON.stringify(descriptor), output], { windowsHide: true })
-  const cold = JSON.parse(await readFile(output, 'utf8'))
-  expect(cold.resolution).toEqual({ outcome: 'applied', result: saved })
-  expect(cold.form.attachments[0].uploadedAt).toBeNull()
-  expect(cold.files[0]).toMatchObject({ id: 'legacy-head-file', payloadBase64: 'YWJj' })
-  expect(cold.detail.sections.files.map((file: { uploadedAt: string | null }) => file.uploadedAt)).toEqual([null, null])
+  const reopened = createProductionStorage(f.options)
+  closers.push(() => reopened.close())
+  const owner = createProductionConstructionContractService(reopened)
+  const id = saved.ids[0]!
+  expect(await createProductionConstructionMigration(reopened).resolve(descriptor, f.session)).toEqual({ outcome: 'applied', result: saved })
+  expect((await owner.form(id, f.session)).attachments[0]).toMatchObject({ id: 'legacy-head-file', uploadedAt: null })
+  expect((await owner.file(id, 'legacy-head-file', 'real', f.session)).bytes).toEqual(Buffer.from('abc'))
+  expect((await owner.detail(id, { origin: 'real' }, f.session)).sections.files.map(file => file.uploadedAt)).toEqual([null, null])
 })
 it('施工主合同直接读取现formal主档，保null/0管理费和原件；原号重放不重复新建', async () => {
   const f = await fixture()
@@ -221,7 +220,7 @@ it('原保存编号由独立Node冷恢复后读到同一正式合同/原件，�
 
 it('迁入原号独立冷恢复保主补零未知与原件；错scope/封存/陌生字段不覆盖原意图', async () => {
   const f = await fixture()
-  const source = await nativeSource(f)
+  const source = await nativeSource(f, false, false, { uploadedAt: null })
   const saved = await source.service.adopt(source.command, f.session)
   const descriptor = { family: 'construction-contract-import', targetId: null, action: 'adopt', scopeId: source.command.source.sha256, commandId: source.command.commandId, workspaceId: f.session().workspaceId, actorId: f.session().actorId }
   await expect(source.service.resolve({ ...descriptor, scopeId: '0'.repeat(64) }, f.session)).rejects.toMatchObject({ problem: { code: 'conflict' } })
@@ -237,6 +236,8 @@ it('迁入原号独立冷恢复保主补零未知与原件；错scope/封存/陌
   expect(cold.resolution).toEqual({ outcome: 'applied', result: saved })
   expect(cold.detail.sections.supplements[0]).toMatchObject({ id: 'legacy-construction-supp', amount: '0.00' })
   expect(cold.form.draft.amount).toBeNull()
+  expect(cold.form.attachments[0]).toMatchObject({ id: 'legacy-head-file', uploadedAt: null })
+  expect(cold.detail.sections.files.map((file: { uploadedAt: string | null }) => file.uploadedAt)).toEqual([null, null])
   expect(cold.files).toEqual([{ id: 'legacy-head-file', sha256: contractOriginalDigest(Buffer.from('abc')), payloadBase64: 'YWJj' }])
 }, 20_000)
 

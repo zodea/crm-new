@@ -7,15 +7,13 @@ import {
   loadMonthlyStatement,
   regenerateMonthlyStatement,
 } from '~/lib/boq/monthly'
-import { runMigrations } from '~/lib/db/migrations'
 import { seedIfEmpty } from '~/lib/db/seed'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 let db: TestDb
 
 beforeEach(async () => {
-  db = await createMemoryDb()
-  await runMigrations(db)
+  db = await createMigratedMemoryDb()
   await seedIfEmpty(db)
 })
 

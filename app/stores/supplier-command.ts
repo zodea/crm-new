@@ -24,19 +24,24 @@ export const useSupplierCommandStore = defineStore('supplier-command', () => {
     capability: SUPPLIER_WRITE_CAPABILITY,
     problemFromUnknown: supplierProblemFromUnknown,
     conflict: latest => new SupplierCommandConflictError(latest),
-    repository: () => ({ ...repository(), context: async () => {
-      const context = await repository().context()
-      if (!context.capabilities.includes(SUPPLIER_PERSISTENT_CAPABILITY))
-        throw credentialProblem('forbidden', '当前正式分供方权限或来源已变化，请保留原编号。')
-      return context
-    }, resolve: async (commandId) => {
-      const resolved = await useNuxtApp().$repositories.supplierProduction.resolve(commandId)
-      if (resolved.outcome === 'applied' && resolved.result && 'id' in resolved.result)
-        return { outcome: 'applied' as const, result: resolved.result }
-      if (resolved.outcome === 'not-applied' && resolved.commandId === commandId && resolved.result === null)
-        return { outcome: 'not-applied' as const, commandId }
-      throw credentialProblem('unavailable', '原分供方主档核对结果无效，请保留原编号。')
-    } }),
+    repository: () => ({
+      loadForm: id => repository().loadForm(id),
+      execute: request => repository().execute(request),
+      context: async () => {
+        const context = await repository().context()
+        if (!context.capabilities.includes(SUPPLIER_PERSISTENT_CAPABILITY))
+          throw credentialProblem('forbidden', '当前正式分供方权限或来源已变化，请保留原编号。')
+        return context
+      },
+      resolve: async (commandId) => {
+        const resolved = await useNuxtApp().$repositories.supplierProduction.resolve(commandId)
+        if (resolved.outcome === 'applied' && resolved.result && 'id' in resolved.result)
+          return { outcome: 'applied' as const, result: resolved.result }
+        if (resolved.outcome === 'not-applied' && resolved.commandId === commandId && resolved.result === null)
+          return { outcome: 'not-applied' as const, commandId }
+        throw credentialProblem('unavailable', '原分供方主档核对结果无效，请保留原编号。')
+      },
+    }),
     recoveryAdapter: {
       key: scope => supplierPendingKey(scope, `form:${scope.targetId ?? 'new'}`),
       read: (key, scope) => {

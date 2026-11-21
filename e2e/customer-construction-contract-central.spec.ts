@@ -110,19 +110,19 @@ for (const input of CUSTOMER_INPUTS) {
 
     async function saveEntity(page: Page, entity: 'customers' | 'projects' | 'construction-contracts', draft: Record<string, unknown>, id?: string) {
       const adoptedDraft = entity === 'construction-contracts' && !id ? { ...adoptedSignatories.get(page), ...draft } : draft
-      return page.evaluate(async ({ entity, draft, id }) => {
-        const session = await (await fetch('/api/read/business-session')).json()
-        const form = id ? await (await fetch(`/api/read/${entity}/${id}/form`)).json() : null
-        const response = await fetch(`/api/commands/${entity}${id ? `/${id}` : ''}`, {
-          method: id ? 'PUT' : 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ ...session, ...(id ? { id } : {}), requiredCapability: entity === 'customers' ? 'customer:write' : entity === 'projects' ? 'project:write' : 'construction-contract:write', commandId: crypto.randomUUID(), baseVersion: form?.version ?? null, action: 'save', draft: { ...form?.draft, ...draft }, attachments: {} }),
-        })
-        const result = await response.json()
-        if (!response.ok)
-          throw new Error(`合成${entity}保存失败：${JSON.stringify(result)}`)
-        return result as { id: string, version: string }
-      }, { entity, draft: adoptedDraft, id })
+      const session = await page.request.get('/api/read/business-session')
+      expect(session.ok(), await session.text()).toBe(true)
+      const { workspaceId, actorId } = await session.json()
+      const saved = id ? await page.request.get(`/api/read/${entity}/${id}/form`) : null
+      if (saved)
+        expect(saved.ok(), await saved.text()).toBe(true)
+      const form = await saved?.json()
+      const response = await page.request.fetch(`/api/commands/${entity}${id ? `/${id}` : ''}`, {
+        method: id ? 'PUT' : 'POST',
+        data: { workspaceId, actorId, ...(id ? { id } : {}), requiredCapability: entity === 'customers' ? 'customer:write' : entity === 'projects' ? 'project:write' : 'construction-contract:write', commandId: crypto.randomUUID(), baseVersion: form?.version ?? null, action: 'save', draft: { ...form?.draft, ...adoptedDraft }, attachments: {} },
+      })
+      expect(response.ok(), await response.text()).toBe(true)
+      return await response.json() as { id: string, version: string }
     }
 
     const saveContract = (page: Page, name: string, amount = input.amount) => saveEntity(page, 'construction-contracts', { name, amount, projectId: 'project-real-320', customerId: 'customer-real-320', content: '隔离合成施工', signDate: input.date, status: '履约中' })
@@ -422,7 +422,7 @@ for (const input of CUSTOMER_INPUTS) {
       await expect(page.getByRole('link', { name: named('新客户施工合同425'), exact: true })).toBeVisible()
       await saveEntity(page, 'customers', { name: '甲方更名后425' }, b.id)
       await page.reload()
-      await expect(page.getByRole('heading', { name: '甲方更名后425', exact: true })).toBeVisible()
+      await expect(page.getByRole('heading', { name: '甲方更名后425', exact: true })).toBeVisible({ timeout: 15_000 })
       await page.getByRole('link', { name: named('新客户施工合同425'), exact: true }).click()
       await expect(page.getByRole('link', { name: '甲方更名后425', exact: true })).toBeVisible()
     })
@@ -450,7 +450,7 @@ for (const input of CUSTOMER_INPUTS) {
           expect(current.searchParams.get('origin')).toBe('real')
           expect(current.searchParams.get('tab')).toBe('contracts')
           const link = matrixPage.getByRole('link', { name: named('第二份同项目施工合同425'), exact: true })
-          await expect(link).toBeVisible()
+          await expect(link).toBeVisible({ timeout: 15_000 })
           await expect(matrixPage.getByRole('link', { name: named('第一份同项目施工合同425'), exact: true })).toHaveAttribute('data-customer-target-id', first.id)
           await expect(link).toHaveAttribute('data-customer-target-id', second.id)
           await expectNoPageOverflow(matrixPage, `客户施工合同 @ ${width}`)

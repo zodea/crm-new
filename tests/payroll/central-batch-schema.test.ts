@@ -1,17 +1,15 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { runMigrations } from '../../app/lib/db/migrations'
 import { initializePayrollARoundingSchema } from '../../app/lib/payroll/central-a-rounding-schema'
 import { initializePayrollBatchSchema } from '../../app/lib/payroll/central-batch-schema'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 const closers: Array<() => Promise<void>> = []
 afterEach(async () => Promise.all(closers.splice(0).map(close => close())))
 
 describe('central payroll batch schema', () => {
   it('creates durable immutable plans, one prepared attempt and idempotent coordination receipts', async () => {
-    const db = await createMemoryDb()
+    const db = await createMigratedMemoryDb()
     closers.push(() => db.close())
-    await runMigrations(db)
     await initializePayrollBatchSchema(db)
 
     const tables = (await db.select<{ name: string }>('SELECT name FROM sqlite_master WHERE type=\'table\' AND name LIKE \'payroll_batch_%\' ORDER BY name')).map(row => row.name)
@@ -61,9 +59,8 @@ describe('central payroll batch schema', () => {
   })
 
   it('stores explicit A rounding revisions without giving C formats a default', async () => {
-    const db = await createMemoryDb()
+    const db = await createMigratedMemoryDb()
     closers.push(() => db.close())
-    await runMigrations(db)
     await initializePayrollARoundingSchema(db)
     expect((await db.select<{ name: string }>('PRAGMA table_info(payroll_a_rounding_revisions)')).map(row => row.name)).toEqual([
       'id',

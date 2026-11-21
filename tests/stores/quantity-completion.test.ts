@@ -1,7 +1,6 @@
 import type { TestDb } from '../helpers/memory-db'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { runMigrations } from '~/lib/db/migrations'
 import { softDelete } from '~/lib/db/soft-delete'
 import {
   loadQuantityCompletionWorkspace,
@@ -9,7 +8,7 @@ import {
   persistQuantityStageCompletion,
 } from '~/lib/quantity/completion'
 import { useNativeQuantityStore as useQuantityStore } from '~/stores/quantity-native'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 let mem: TestDb
 
@@ -31,8 +30,7 @@ vi.mock('~/lib/db/connection', () => ({
 }))
 
 beforeEach(async () => {
-  mem = await createMemoryDb()
-  await runMigrations(mem)
+  mem = await createMigratedMemoryDb()
   await mem.execute(`INSERT INTO projects (id, name, code) VALUES
     ('p1', '项目一', 'P1'),
     ('p2', '项目二', 'P2')`)

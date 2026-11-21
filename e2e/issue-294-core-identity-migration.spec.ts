@@ -5,6 +5,7 @@ import path from 'node:path'
 import { expect, test } from '@playwright/test'
 import { LATEST_VERSION, migrations, runMigrations } from '../app/lib/db/migrations'
 import { createMemoryDb } from '../tests/helpers/memory-db'
+import { writeProductionSnapshot } from './helpers/browser-production-snapshot'
 import { expectLocalHorizontalScroll, expectNoPageOverflow } from './helpers/responsive'
 
 const VIEWPORTS = [
@@ -44,10 +45,9 @@ async function expectSoftDeletedGraphs(page: Page) {
 }
 
 async function reloadMigrationPage(page: Page) {
-  await page.reload()
-  // 冷启动的安全恢复只重新打开已登记业务目标；设置入口需显式再次进入。
+  // 完整文档导航重新创建 SQLite 连接和页面状态。
   await page.goto('/settings/data-migration')
-  await expect(page.getByTestId('core-migration-page')).toBeVisible()
+  await expect(page.getByTestId('core-migration-page')).toBeVisible({ timeout: 30_000 })
 }
 
 async function resetMigrationBackend(request: APIRequestContext) {
@@ -83,13 +83,14 @@ function expectCompleteGraph(snapshot: CoreMigrationSnapshotDTO, input: Migratio
   const credentials = entity('supplier_credentials')
   expect(credentials.references).toEqual({ supplierId: supplier.id })
   expect(JSON.parse(String(credentials.attributes.graphJson))).toMatchObject({
-    schemaVersion: 1,
+    schemaVersion: 2,
     supplier: { id: 'supplier-local-294', name: input.supplierName },
     credentials: [],
     files: [],
     payloads: [],
     credentialAudits: [],
     supplierAudits: [],
+    reviewHistory: [],
   })
   expect(JSON.parse(String(entity('process_libraries').attributes.graphJson))).toMatchObject({
     schemaVersion: 1,
@@ -161,37 +162,15 @@ async function legacyProductionSnapshot(input: MigrationInput, options: { withSo
 }
 
 async function installProductionSnapshot(page: Page, snapshot: Uint8Array) {
-  await page.evaluate(async (bytes) => {
+  await page.evaluate(async () => {
     await new Promise<void>((resolve, reject) => {
       const request = indexedDB.deleteDatabase('crm-new-browser')
       request.addEventListener('success', () => resolve(), { once: true })
       request.addEventListener('error', () => reject(request.error), { once: true })
       request.addEventListener('blocked', () => reject(new Error('browser database deletion blocked')), { once: true })
     })
-    const database = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open('crm-new-browser', 2)
-      request.addEventListener('upgradeneeded', () => {
-        for (const store of ['database_snapshots', 'database_backups', 'database_settings']) {
-          if (!request.result.objectStoreNames.contains(store))
-            request.result.createObjectStore(store)
-        }
-      })
-      request.addEventListener('success', () => resolve(request.result), { once: true })
-      request.addEventListener('error', () => reject(request.error), { once: true })
-    })
-    try {
-      await new Promise<void>((resolve, reject) => {
-        const transaction = database.transaction('database_snapshots', 'readwrite')
-        transaction.objectStore('database_snapshots').put(new Uint8Array(bytes).buffer, 'production')
-        transaction.addEventListener('complete', () => resolve(), { once: true })
-        transaction.addEventListener('error', () => reject(transaction.error), { once: true })
-        transaction.addEventListener('abort', () => reject(transaction.error), { once: true })
-      })
-    }
-    finally {
-      database.close()
-    }
-  }, [...snapshot])
+  })
+  await writeProductionSnapshot(page, snapshot)
 }
 
 async function localMigrationState(page: Page) {
@@ -208,6 +187,10 @@ async function localMigrationState(page: Page) {
         request.addEventListener('success', () => resolve(request.result), { once: true })
         request.addEventListener('error', () => reject(request.error), { once: true })
       })
+    }
+    async function digest(bytes: ArrayBuffer) {
+      const hash = await crypto.subtle.digest('SHA-256', bytes)
+      return Array.from(new Uint8Array(hash), byte => byte.toString(16).padStart(2, '0')).join('')
     }
     try {
       const marker = await read('database_settings', 'active-core-migration')
@@ -226,10 +209,8 @@ async function localMigrationState(page: Page) {
       return {
         marker,
         readOnly,
-        production: Array.from(new Uint8Array(production)),
-        backup: backup
-          ? Array.from(new Uint8Array(backup.snapshot))
-          : null,
+        production: await digest(production),
+        backup: backup ? await digest(backup.snapshot) : null,
         backupId,
       }
     }
@@ -414,7 +395,7 @@ test.describe('Issue #294：核心身份迁移与可回滚切换', () => {
     const rollback = page.getByRole('button', { name: '回滚到本地快照' })
     const rollbackReceipt = await migrationCommand(page, '回滚到本地快照', `/api/migrations/core/${batch.batchId}/rollback`)
     expect(await rollbackReceipt.json()).toMatchObject({ batchId: batch.batchId, status: 'rolled-back' })
-    await expect(page.getByRole('alert')).toHaveText('测试：本地快照暂时无法恢复')
+    await expect(page.getByRole('alert').filter({ hasText: '测试：本地快照暂时无法恢复' })).toHaveText('测试：本地快照暂时无法恢复')
     await expect(page.getByText('中央已回滚，等待恢复本地快照', { exact: true })).toBeVisible()
     await expect(page.getByText('对账通过，未发现迁移差异')).toHaveCount(0)
     await expect(page.getByRole('button', { name: '运行预检' })).toBeDisabled()

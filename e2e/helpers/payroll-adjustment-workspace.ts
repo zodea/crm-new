@@ -57,7 +57,8 @@ export async function payrollAdjustmentWorkspace(page: Page, info: TestInfo) {
     const response = await page.request.get('/api/read/target-costs/form', { params: { origin: 'real', draftKey } })
     expect(response.ok(), await response.text()).toBe(true)
     const form = decodeTargetCostRead<TargetCostFormRead>(await response.json(), 'form', query, null)
-    const saved = await page.request.post('/api/commands/target-costs', { data: encodeTargetCostWire({ ...form.context, requiredCapability: 'target-cost:write', commandId: randomUUID(), targetCostId: null, draftKey, action: { kind: 'save-header', saveAction: 'save', draft: { projectId, name: 'P4 工资同源预算', isBaseline: true } } }) })
+    const { workspaceId, actorId, origin, sourceVersion } = form.context
+    const saved = await page.request.post('/api/commands/target-costs', { data: encodeTargetCostWire({ workspaceId, actorId, origin, sourceVersion, requiredCapability: 'target-cost:write', commandId: randomUUID(), targetCostId: null, draftKey, action: { kind: 'save-header', saveAction: 'save', draft: { projectId, name: 'P4 工资同源预算', isBaseline: true } } }) })
     expect(saved.ok(), await saved.text()).toBe(true)
     return (await saved.json()).id as string
   }

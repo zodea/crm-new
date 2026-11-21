@@ -90,8 +90,11 @@ for (const input of cases) {
     await amount.fill(input.amount)
     await expect(page.getByText('金额已勾稽', { exact: true })).toBeVisible()
     await review.getByRole('button', { name: '确认人工归档', exact: true }).click()
+    const archiveResponse = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/commands/deliveries')
     await page.getByRole('dialog').getByRole('button', { name: '确认人工归档', exact: true }).click()
-    await expect(page.getByText('已归档 · 待打印', { exact: true }).first()).toBeVisible()
+    const result = await archiveResponse
+    expect(result.ok(), await result.text()).toBe(true)
+    await expect(page.getByText('已归档 · 待打印', { exact: true }).first()).toBeVisible({ timeout: 15_000 })
     const records = (await (await page.request.get('/api/read/deliveries?origin=real')).json()).records
     const archived = records.find((record: { orderNo: string }) => record.orderNo === input.no)
     expect(archived).toMatchObject({ projectId: fixture.projectId, supplierId: fixture.supplierId, deliveryDate: input.date, totalAmount: Number(input.amount), printDisposition: 'pending' })

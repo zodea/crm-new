@@ -1,6 +1,6 @@
 import type { APIRequestContext, Page, TestInfo } from '@playwright/test'
 import type { CoreMigrationBatchDTO } from '../app/lib/migration/core-contract'
-import type { ScheduleRead } from '../app/lib/schedule/central-contract'
+import type { ScheduleCommand, ScheduleCommandResult, ScheduleRead } from '../app/lib/schedule/central-contract'
 import { execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
@@ -124,13 +124,19 @@ test('中央合同三步建组、冻结历史、任务调整与基线在五档�
   await choose(page, '前置工序', '原冻结任务')
   await dependency.getByLabel('Lag 天数').fill('0')
   await dependency.getByRole('button', { name: '保存依赖' }).click()
+  await expect(dependency).toBeHidden()
   await expect(manual).toBeVisible()
   // 轻量依赖往返不能覆盖还没提交的任务日期。
   await expect(manual.getByLabel('计划完成', { exact: true })).toHaveValue('2026-09-06')
   const keptDependencyId = (await fixture.read()).snapshot.dependencies[0]!.id
+  const planSaved = page.waitForResponse(response => new URL(response.url()).pathname === '/api/commands/schedule' && response.request().postDataJSON()?.action.kind === 'save-task-plan')
   await manual.getByRole('button', { name: '保存调整' }).click()
-  await expect(manual).not.toBeVisible()
-  expect((await fixture.read()).snapshot.dependencies[0]!.id).toBe(keptDependencyId)
+  const planResponse = await planSaved
+  expect(planResponse.ok(), await planResponse.text()).toBe(true)
+  await expect(manual).not.toBeVisible({ timeout: 20_000 })
+  const updated = (await fixture.read()).snapshot
+  expect(updated.dependencies[0]!.id).toBe(keptDependencyId)
+  expect(updated.groups.flatMap(group => group.tasks).find(task => task.name === '手工任务')?.plannedFinish).toBe('2026-09-06')
   await page.getByRole('button', { name: '手工任务', exact: true }).click()
   await manual.getByRole('button', { name: '取消', exact: true }).click()
   await page.getByRole('button', { name: '原冻结任务', exact: true }).click()
@@ -228,11 +234,14 @@ test('暂估冻结、未知提交恢复、自动进度及矩阵户详情同身�
   await choose(page, '标准工序库', /中央暂估工序库/)
   await page.getByLabel('计划开始', { exact: true }).fill('2026-08-01')
   await page.getByRole('button', { name: '下一步：预览排程' }).click()
-  const submissions: string[] = []
+  const submissions: ScheduleCommand[] = []
+  let applied: ScheduleCommandResult | null = null
   await page.route('**/api/commands/schedule', async (route) => {
-    submissions.push(route.request().postData()!)
+    submissions.push(route.request().postDataJSON())
     if (submissions.length === 1) {
-      expect((await route.fetch()).ok()).toBe(true)
+      const result = await route.fetch()
+      expect(result.ok(), await result.text()).toBe(true)
+      applied = await result.json()
       await route.abort('failed')
     }
     else { await route.continue() }
@@ -241,10 +250,15 @@ test('暂估冻结、未知提交恢复、自动进度及矩阵户详情同身�
   await page.getByRole('dialog').getByRole('button', { name: '生成排程', exact: true }).click()
   await expect(page.getByRole('button', { name: '核对原提交', exact: true })).toBeVisible()
   await capture(page, info, 'pending-command')
+  const resolution = page.waitForResponse(response => new URL(response.url()).pathname === '/api/commands/schedule/resolve')
   await page.getByRole('button', { name: '核对原提交', exact: true }).click()
-  await expect(page).toHaveURL(/\/schedule\?.*group=/)
-  expect(submissions).toHaveLength(2)
-  expect(submissions[1]).toBe(submissions[0])
+  const proof = await resolution
+  const { commandId, workspaceId, actorId, projectId } = submissions[0]!
+  expect(proof.request().postDataJSON()).toEqual({ commandId, workspaceId, actorId, family: 'schedule', targetId: projectId, action: 'create-group' })
+  expect(proof.ok(), await proof.text()).toBe(true)
+  expect(await proof.json()).toEqual({ outcome: 'applied', result: applied })
+  await expect(page).toHaveURL(/\/schedule\?.*group=/, { timeout: 20_000 })
+  expect(submissions).toHaveLength(1)
   await page.unroute('**/api/commands/schedule')
   const read = async (): Promise<ScheduleRead> => (await page.request.get('/api/read/schedule/workspace', { params: { projectId: fixture.projectId, origin: 'real', includeDemo: false } })).json()
   const saved = await read()

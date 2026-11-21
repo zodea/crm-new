@@ -3,13 +3,11 @@ import type { PayrollIdentitySource, PayrollServiceOptions } from '../../server/
 import type { PayrollAttendanceCommand, PayrollAttendanceMatrixRead, PayrollAttendanceRecordDraft } from '~/lib/payroll/central-attendance-contract'
 import type { PayrollC1Action, PayrollC1Command, PayrollC1CommandRead, PayrollC1Draft } from '~/lib/payroll/central-c1-contract'
 import { createDbCoordinator } from '~/lib/db/coordinator'
-import { runMigrations } from '~/lib/db/migrations'
 import { createPayrollService } from '../../server/utils/payroll-service'
-import { createMemoryDb } from './memory-db'
+import { createMigratedMemoryDb } from './memory-db'
 
 export async function createPayrollC1ServiceFixture(readOptions: Pick<PayrollServiceOptions, 'attendanceFacts'> = {}) {
-  const db = await createMemoryDb()
-  await runMigrations(db)
+  const db = await createMigratedMemoryDb()
   const coordinator = createDbCoordinator(async () => db)
   let session: BusinessSession = { workspaceId: 'work', actorId: 'actor', capabilities: ['payroll:read', 'payroll:write'] }
   const source: PayrollIdentitySource = { version: 'identity-1', projects: [{ id: 'p', name: '纯时工项目', code: 'P' }, { id: 'other-project', name: '其他项目', code: 'Q' }], crews: [{ id: 'crew', name: '时工班组' }, { id: 'next-crew', name: '新班组' }], workers: [

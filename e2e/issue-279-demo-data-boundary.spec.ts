@@ -64,12 +64,12 @@ test.describe('Issue #279：正式与演示数据边界', () => {
     await openProductionOnlyList(page)
     await expect(page.getByRole('button', { name: '包含测试数据' })).toHaveAttribute('aria-pressed', 'false')
     await expect(page.getByRole('link', { name: '合和新城', exact: true })).toHaveCount(0)
-    await expect(page.getByLabel('项目列表汇总')).toContainText(/正式数据\s*0 个/)
+    await expect(page.getByLabel('项目列表汇总')).toContainText(/正式数据\s*当前筛选范围\s*0 个/)
 
     await includeDemo(page)
     await expect(page.getByRole('button', { name: '关闭测试数据' })).toHaveAttribute('aria-pressed', 'true')
-    await expect(page.getByLabel('项目列表汇总')).toContainText(/正式数据\s*0 个/)
-    await expect(page.getByLabel('项目列表汇总')).toContainText(/测试数据\s*12 个/)
+    await expect(page.getByLabel('项目列表汇总')).toContainText(/正式数据\s*当前筛选范围\s*0 个/)
+    await expect(page.getByLabel('项目列表汇总')).toContainText(/测试数据\s*当前筛选范围\s*12 个/)
     await expect(page.getByText('测试数据', { exact: true }).first()).toBeVisible()
     expect(await page.evaluate(storageKey => localStorage.getItem(storageKey), DATA_VISIBILITY_STORAGE_KEY)).toBe('true')
 

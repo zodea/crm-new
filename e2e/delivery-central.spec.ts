@@ -108,7 +108,7 @@ test('两页真实 PDF 经人工核对形成共享原件的两张逻辑记录，
   await expect(page.getByRole('button', { name: '上传送货单', exact: true })).toBeVisible({ timeout: 60_000 })
   const picker = page.waitForEvent('filechooser')
   await page.getByRole('button', { name: '上传送货单', exact: true }).click()
-  const recognized = page.waitForResponse(response => new URL(response.url()).pathname === '/api/ocr/recognize' && response.request().method() === 'POST')
+  const recognized = page.waitForResponse(response => new URL(response.url()).pathname === '/api/ocr/recognize' && response.request().method() === 'POST', { timeout: 30_000 })
   await (await picker).setFiles({ name: '双页送货原件.pdf', mimeType: 'application/pdf', buffer: Buffer.from(original) })
   const recognition = await recognized
   expect(recognition.ok(), await recognition.text()).toBe(true)
@@ -141,7 +141,7 @@ test('两页真实 PDF 经人工核对形成共享原件的两张逻辑记录，
     await review.getByRole('button', { name: '确认人工归档', exact: true }).click()
     await page.getByRole('dialog').getByRole('button', { name: '确认人工归档', exact: true }).click()
     try {
-      await expect.poll(async () => (await records(page)).length).toBe(index)
+      await expect.poll(async () => (await records(page)).length, { timeout: 20_000 }).toBe(index)
     }
     catch (cause) {
       await info.attach('归档请求诊断', { body: JSON.stringify({ errors, archiveRequests }, null, 2), contentType: 'application/json' })

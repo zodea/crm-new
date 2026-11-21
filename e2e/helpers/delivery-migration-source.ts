@@ -34,7 +34,7 @@ async function prepare() {
       isNative: () => false,
       isDemoActive: () => false,
       currentSchemaVersion: async () => LATEST_VERSION,
-      select: sql => db.select(sql),
+      select: (sql, params) => db.select(sql, params),
       closeDatabase: unused,
       loadProductionSnapshot: unused,
       readSnapshotSource: unused,

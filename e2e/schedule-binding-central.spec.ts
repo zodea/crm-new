@@ -5,7 +5,7 @@ import type { QuantityCommand } from '../app/lib/quantity/central-contract'
 import type { QuantityCompletionStageView } from '../app/lib/quantity/completion'
 import type { QuantityTemplateWorkspace } from '../app/lib/quantity/template'
 import type { ScheduleBindingRead } from '../app/lib/schedule/central-binding-contract'
-import type { ScheduleAction, ScheduleRead } from '../app/lib/schedule/central-contract'
+import type { ScheduleAction, ScheduleCommand, ScheduleCommandResult, ScheduleRead } from '../app/lib/schedule/central-contract'
 import { execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { readFile, writeFile } from 'node:fs/promises'
@@ -230,17 +230,17 @@ async function exerciseExceptions(page: Page, info: TestInfo, data: Awaited<Retu
   expect((await data.read()).snapshot.groups.find(row => row.id === groupId)!.scopeBasis).toBe('provisional')
   await page.getByRole('button', { name: '重新核对资料', exact: true }).click()
   await expect(confirmButton).toBeEnabled()
-  const submitted: unknown[] = []
-  let lost = false
+  const submitted: ScheduleCommand[] = []
+  let applied: ScheduleCommandResult | null = null
   await page.route('**/api/commands/schedule', async (route) => {
     const command = route.request().postDataJSON()
     if (command.action.kind !== 'bind-contract')
       return route.continue()
     submitted.push(command)
-    if (!lost) {
-      lost = true
+    if (submitted.length === 1) {
       const result = await route.fetch()
       expect(result.ok(), await result.text()).toBe(true)
+      applied = await result.json()
       await route.abort('failed')
     }
     else { await route.continue() }
@@ -252,12 +252,17 @@ async function exerciseExceptions(page: Page, info: TestInfo, data: Awaited<Retu
   await expect(page.getByLabel('已选施工合同', { exact: true })).toHaveText('迁入合同')
   await recover.scrollIntoViewIfNeeded()
   await capture(page, info, 'unknown-command-retained')
+  const resolution = page.waitForResponse(response => new URL(response.url()).pathname === '/api/commands/schedule/resolve')
   await recover.focus()
   await page.keyboard.press('Enter')
-  await expect(page).toHaveURL(url => url.pathname === '/schedule' && url.searchParams.get('group') === groupId)
+  const proof = await resolution
+  const original = submitted[0]!
+  expect(proof.request().postDataJSON()).toEqual({ commandId: original.commandId, workspaceId: original.workspaceId, actorId: original.actorId, family: 'schedule', targetId: original.projectId, action: 'bind-contract' })
+  expect(proof.ok(), await proof.text()).toBe(true)
+  expect(await proof.json()).toEqual({ outcome: 'applied', result: applied })
+  await expect(page).toHaveURL(url => url.pathname === '/schedule' && url.searchParams.get('group') === groupId, { timeout: 20_000 })
   await page.unroute('**/api/commands/schedule')
-  expect(submitted).toHaveLength(2)
-  expect(submitted[1]).toEqual(submitted[0])
+  expect(submitted).toHaveLength(1)
   expect((await data.read()).snapshot.groups.find(row => row.id === groupId)!.tasks).toEqual(before.tasks)
   expect(await completionFacts()).toEqual(completionBefore)
   await page.goto(bindingUrl)
@@ -294,7 +299,10 @@ test('暂估冻结差异、缺覆盖更正往返、取消与确认、绑定冷�
     await expect(page.getByLabel('分组名称')).toBeEnabled()
     await page.getByLabel('分组名称').fill('冻结数量待绑定组')
     await page.getByRole('radio', { name: /内部暂估/ }).check()
-    await page.getByRole('checkbox', { name: /合同待建二栋/ }).check()
+    const building = page.getByRole('checkbox', { name: /合同待建二栋/ })
+    await expect(building).toBeEnabled()
+    await building.check()
+    await expect(building).toBeChecked()
     await page.getByRole('button', { name: '下一步：选择工序' }).click()
     await choose(page, '标准工序库', new RegExp(data.libraryName))
     await page.getByRole('button', { name: '下一步：预览排程' }).click()

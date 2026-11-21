@@ -6,13 +6,12 @@ import { resolve } from 'node:path'
 import process from 'node:process'
 import { promisify } from 'node:util'
 import { afterEach, expect, it } from 'vitest'
-import { runMigrations } from '../../app/lib/db/migrations'
 import { createProductionProjectService } from '../../server/utils/production-project-service'
 import { createProductionStorage } from '../../server/utils/production-storage'
 import { budgetBytesDigest } from '../../server/utils/production-target-cost-files'
 import { createProductionBudgetMigration } from '../../server/utils/production-target-cost-migration'
 import { createProductionTargetCostService } from '../../server/utils/production-target-cost-service'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 const closers: Array<() => Promise<void>> = []
 afterEach(async () => {
@@ -37,8 +36,7 @@ async function fixture() {
   } }
 }
 async function nativeSource(external = false) {
-  const db = await createMemoryDb()
-  await runMigrations(db)
+  const db = await createMigratedMemoryDb()
   await db.execute('INSERT INTO projects(id,name) VALUES (\'legacy-budget-project\',\'原预算项目\')')
   await db.execute('ALTER TABLE target_costs ADD COLUMN unknown_extension TEXT')
   await db.execute('ALTER TABLE target_costs ADD COLUMN integer_extension INTEGER')

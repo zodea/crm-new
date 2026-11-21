@@ -33,6 +33,7 @@ export function useAuxiliaryContractForm(kind: () => AuxiliaryContractKind) {
   const defaults = (): AuxiliaryContractDraft => ({ kind: kind(), name: '', category: kind() === 'company_expense' ? '房租' : '其他', paymentCycle: '一次性', status: '草稿', amount: null, taxRate: null })
   const draft = ref(defaults())
   const context = shallowRef<AuxiliaryContractContext | null>(null)
+  const usesConstructionMain = computed(() => context.value?.constructionMains !== undefined)
   const version = shallowRef<string | null>(null)
   const constructionMain = shallowRef<ConstructionMainSelection | null>(null)
   const errors = shallowRef<Record<string, string>>({})
@@ -233,5 +234,5 @@ export function useAuxiliaryContractForm(kind: () => AuxiliaryContractKind) {
   watch(() => `${kind()}:${targetId.value}:${route.query.origin}`, () => void initialize(), { immediate: true })
   onBeforeUnmount(() => generation++)
   useTabTitle(title)
-  return { draft, title, files, errors, loading, loadError, saveError, loadingAction, closeAfterSave, dirty, initialize, save, leave, patch, pending, pendingCommandId, recover, constructionMain, selectMain, fetchMains, fetchSignatories, selectSignatory, fetchProjects: lookup('projects'), fetchSuppliers: lookup('suppliers') }
+  return { draft, title, files, errors, loading, loadError, saveError, loadingAction, closeAfterSave, dirty, initialize, save, leave, patch, pending, pendingCommandId, recover, constructionMain, usesConstructionMain, selectMain, fetchMains, fetchSignatories, selectSignatory, fetchProjects: lookup('projects'), fetchSuppliers: lookup('suppliers') }
 }

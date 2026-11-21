@@ -1,6 +1,7 @@
 import type { MaterialContractListPageDTO } from '../app/lib/material-contract/read-contract'
 import { Buffer } from 'node:buffer'
 import { expect, test } from '@playwright/test'
+import { createVerifiedSignatory, selectVerifiedSignatory } from './helpers/contract-signatory'
 import { expectLocalHorizontalScroll, expectNoPageOverflow } from './helpers/responsive'
 
 const money = (value: number | string) => `¥${Number(value).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -8,7 +9,7 @@ const money = (value: number | string) => `¥${Number(value).toLocaleString('zh-
 test.describe('Issue #422 材料采购合同列表', () => {
   test.beforeEach(async ({ page }, testInfo) => {
     const session = Buffer.from(testInfo.testId).toString('base64url')
-    await page.setExtraHTTPHeaders({ 'x-ruihang-test-session': session })
+    await page.context().setExtraHTTPHeaders({ 'x-ruihang-test-session': session })
     await page.addInitScript(() => localStorage.setItem('ruihang:workspace-default:include-demo', 'true'))
     const reset = await page.context().request.post('/api/testing/material-contracts/reset', {
       headers: { 'x-ruihang-test-reset': '1', 'x-ruihang-test-session': session },
@@ -119,7 +120,10 @@ test.describe('Issue #422 材料采购合同列表', () => {
     test.setTimeout(90_000)
     const longName = '合成材料采购合同－长名称与零金额验收－外墙铝板及机电安装辅材联合采购标段'
     const largeAmount = '123456789012.34'
+    const signatoryName = 'E2E材采长名称已核实我方主体'
+    const signatoryId = await createVerifiedSignatory(page, signatoryName)
     await page.goto('/contract/material/form/contract-existing-318')
+    await selectVerifiedSignatory(page, signatoryId, signatoryName)
     await page.getByLabel('合同名称 *').fill(longName)
     await page.getByLabel('含税合同金额 *', { exact: true }).fill(largeAmount)
     const saved = page.waitForResponse(response => response.url().includes('/api/commands/material-contracts/') && response.request().method() === 'PUT')

@@ -207,7 +207,7 @@ describe('core migration store', () => {
       backup: null,
     }))
     expect(localSource.createBackup).toHaveBeenCalledWith(SOURCE.sourceHash)
-    expect(localSource.confirmSwitch).toHaveBeenCalledWith(marker())
+    expect(localSource.confirmSwitch).toHaveBeenCalledWith(marker(), backup().snapshotSha256)
   })
 
   it('does not create a backup or switch authority when preflight fails', async () => {
@@ -360,7 +360,7 @@ describe('core migration store', () => {
       commandId: pending.commandId,
       batchId: pending.batchId,
     }))
-    expect(localSource.confirmSwitch).toHaveBeenCalledWith(marker())
+    expect(localSource.confirmSwitch).toHaveBeenCalledWith(marker(), pending.snapshotSha256)
     expect(store.phase).toBe('confirmed')
   })
 

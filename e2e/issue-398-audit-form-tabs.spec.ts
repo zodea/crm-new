@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { createVerifiedSignatory, selectVerifiedSignatory } from './helpers/contract-signatory'
 import { expectNoPageOverflow, RESPONSIVE_WIDTHS } from './helpers/responsive'
 
 test('取消关闭和刷新保留草稿，后台页签也先确认再卸载', async ({ page }, testInfo) => {
@@ -59,7 +60,9 @@ for (const kind of ['construction', 'material', 'subcontract'] as const) {
       headers: { 'x-ruihang-test-reset': '1', 'x-ruihang-test-session': id },
       data: { scenario: 'ready' },
     })
-    expect(reset.ok()).toBe(true)
+    expect(reset.ok(), await reset.text()).toBe(true)
+    const signatoryName = `连续新增 ${kind} 验收主体`
+    const signatoryId = await createVerifiedSignatory(page, signatoryName, id)
     await page.goto(`/contract/${kind}/form`)
     const savedIds: string[] = []
     for (let index = 0; index < 2; index++) {
@@ -70,12 +73,13 @@ for (const kind of ['construction', 'material', 'subcontract'] as const) {
       await page.getByText(kind === 'material' ? '中央正式材料项目' : '中央正式施工项目', { exact: true }).click()
       await page.getByRole('combobox', { name: kind === 'construction' ? '检索客户' : '检索分供方' }).click()
       await page.getByText(kind === 'construction' ? '中央正式甲方客户' : kind === 'material' ? '中央正式材料供应商' : '中央正式劳务分供方', { exact: true }).click()
+      await selectVerifiedSignatory(page, signatoryId, signatoryName)
       await page.getByLabel('合同内容简述 *').fill('保存并新建回归')
       await page.getByLabel('签约日期 *').fill('2026-09-05')
       const response = page.waitForResponse(response => response.url().endsWith(`/api/commands/${kind}-contracts`) && response.request().method() === 'POST')
       await page.getByRole('button', { name: '保存并新建', exact: true }).click()
       const saved = await response
-      expect(saved.ok()).toBe(true)
+      expect(saved.ok(), await saved.text()).toBe(true)
       savedIds.push((await saved.json()).id)
       await expect(name).toHaveValue('')
       await expect(page).toHaveURL(new RegExp(`/contract/${kind}/form$`))

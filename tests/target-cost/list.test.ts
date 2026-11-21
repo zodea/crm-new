@@ -1,15 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { runMigrations } from '~/lib/db/migrations'
 import {
   filterTargetCostList,
   loadTargetCostList,
 } from '~/lib/target-cost/list'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 describe('target cost list read model', () => {
   it('loads active versions with project and financial fields', async () => {
-    const db = await createMemoryDb()
-    await runMigrations(db)
+    const db = await createMigratedMemoryDb()
     await db.execute(`INSERT INTO projects (id, name) VALUES ('project-a', '项目甲')`)
     await db.execute(`
       INSERT INTO target_costs (

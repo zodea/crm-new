@@ -261,7 +261,7 @@ A01/A02 已确认的材采优惠/扣减单列负金额并参与合计，保留�
 
 2026-10-05 已确认的[历史清偿承接](./DATABASE.md#historical-expense-clearance)复用 `POST /api/commands/finance` 的 `kind=reimbursement / action=save`，目标及 `baseVersion` 固定已保存原费用头。追加替代原件使用 `draft={id,clearanceAttachmentsOnly:true}`，只追加实际新增字节；核定使用 `draft={id,clearanceVerificationEdit}` 且 `attachments={}`，edit 携实际原费用行、当前 `sourceVersion / sourceHash`、依据、已保存 file IDs、逐项旧处理份额及明确既有采用关系。服务端同事务生成冻结核定，原回执携 `clearanceVerificationId / clearanceVerificationSha256`，绑定完整核定。正常编辑、追加原件和核定三个意图分别复验，不能混正文或删除原件；执行能力仍为已有 `finance-reimbursement:read/write`，不新增负责人审批身份。
 
-普通 Other `save / submit / confirm` 的 `originalExpenses` 可携 `clearanceAllocations=[{verificationId,itemId,amount}]`；同次写入先建立真实采用行，再核实际已核 item 的未占用份额并原子保存关联，不能先把含旧份额的总额当纯新采用额拒绝或把后补关联留在第二次事务。已确认结算追加关联使用原 `save` 的 `draft={id,clearanceLinkEdit:{verificationId,bindings:[{expenseAllocationId,itemId,amount}]}}`、原版本和 `attachments={}`；实际采用行须来自该已确认结算，旧头及现金保持不变。原回执 `clearanceLinkIds` 必须在同目标可靠后读中完整核对，缺关联时只读重试并保原编号；其他恢复、晚输入及撤权边界沿公共契约。
+普通 Other `save / submit / confirm` 的 `originalExpenses` 可携 `clearanceAllocations=[{verificationId,itemId,amount}]`；同次写入先建立真实采用行，再核实际已核 item 的未占用份额并原子保存关联，不能先把含旧份额的总额当纯新采用额拒绝或把后补关联留在第二次事务。确认前复验原采用版本时，仅从该结算本次来源版本复核中扣除自身在冻结后已保留的旧份额。其他结算仍受这笔保留约束，其他来源变化仍须重新核对。已确认结算追加关联使用原 `save` 的 `draft={id,clearanceLinkEdit:{verificationId,bindings:[{expenseAllocationId,itemId,amount}]}}`、原版本和 `attachments={}`；实际采用行须来自该已确认结算，旧头及现金保持不变。原回执 `clearanceLinkIds` 必须在同目标可靠后读中完整核对，缺关联时只读重试并保原编号；其他恢复、晚输入及撤权边界沿公共契约。
 
 Native 财务迁入可携 `declaredMissingOriginals=[{fileId,reason}]`，仅用于服务端当前预检判定为真实旧清偿头外部原单的明确缺件。请求指纹同时绑定真实原库 SHA-256、完整来源图摘要及逐件声明；不接受任意 owner、已嵌入正文、银行回单或原费用附件的缺件豁免，不制造零字节替代正文。最小恢复描述仍是原 `finance-import` 六字段，不保存来源正文、映射、原件或声明理由。迁入、原费用核定、后继合并采用和原号恢复已完成限定正式流程验证；精确外部缺件声明的真实 Native 图及组件验证与纸单整页场景分别说明，范围见 [DATABASE](./DATABASE.md#historical-expense-clearance)。
 
@@ -299,6 +299,8 @@ F3 五类事实使用现有 `POST /api/commands/finance`，按 `kind` 对应原�
 版本只核实际消费的原计划、区域/量源、合同清单和不可变库依据，按[本单与依赖](#version-and-dependency-checks)区分可自动派生与需重认变化；不以整项目任意变化制造冲突。首页只读，受限 undo 不越域，不借普通撤销解绑/换绑。事实见 [DATABASE](./DATABASE.md#中央-wbs-事实与整图接管444)，运行证据见 [#444](../design/evidence/issue-444/README.md)。
 
 本机正式 WBS 普通动作沿原入口分派到同库 `wbs` 参与者，`POST /api/commands/schedule/resolve` 仅以同身份、项目、动作和原编号核对不可变原意图/回执或封存，不从客户端恢复正文。已知回执后只读同目标；读取失败保编号及当前内存稿。建组消费选定楼栋和正式不可变库；任务、计划、依赖、基线及撤销各核实际采用的正文、父子、边、冻结量或原日志，未采用的兄弟记录不抬高基准。当前只开放内部暂估；新合同范围与绑定遵循 [上游范围](./ARCHITECTURE.md#opt-02-scope-decision)。完整原库采用与整批受保护恢复见 [排程指南](../guides/project-start-and-schedule.md)。
+
+开发验收实例以同一入口核对事务中已记录工作区、操作者、项目及动作的原回执。缺少回执或旧回执缺少定位证据时保留原编号和未知状态。
 
 <a id="中央暂估绑定与楼栋证据更正445"></a>
 ### 中央暂估绑定与合同楼栋证据更正（#445）

@@ -1,19 +1,17 @@
 import type { BusinessSession } from '../../server/utils/business-session'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createDbCoordinator } from '~/lib/db/coordinator'
-import { runMigrations } from '~/lib/db/migrations'
 import { decodePayrollRead, encodePayrollWire, parsePayrollQuery } from '~/lib/payroll/central-codec'
 import { loadPayrollGraph, payrollSourceLocks } from '~/lib/payroll/central-read'
 import { createPayrollService } from '../../server/utils/payroll-service'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 const closers: (() => Promise<void>)[] = []
 afterEach(async () => {
   await Promise.all(closers.splice(0).map(close => close()))
 })
 async function fixture() {
-  const db = await createMemoryDb()
-  await runMigrations(db)
+  const db = await createMigratedMemoryDb()
   const coordinator = createDbCoordinator(async () => db)
   closers.push(() => coordinator.close())
   let session: BusinessSession = { workspaceId: 'work', actorId: 'actor', capabilities: ['payroll:read'] }

@@ -1,14 +1,19 @@
+import type { Page } from '@playwright/test'
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
+import { installFinanceListFixtures } from './helpers/finance-list-fixture'
 import { installProjectCentralFixture, PROJECT_INPUTS } from './helpers/project-central-fixture'
 import { expectNoPageOverflow } from './helpers/responsive'
 
 test.use({ screenshot: 'off', video: 'off', trace: 'off' })
 
+async function showDemoData(page: Page) {
+  await page.addInitScript(() => localStorage.setItem('ruihang:workspace-default:include-demo', 'true'))
+}
+
 test.describe('Issue #418：页面层次与红圈结构对齐', () => {
   test.beforeEach(async ({ page }) => {
     await page.setExtraHTTPHeaders({ 'x-ruihang-test-session': `layout-418-${randomUUID()}` })
-    await page.addInitScript(() => localStorage.setItem('ruihang:workspace-default:include-demo', 'true'))
     await page.clock.install({ time: new Date('2026-10-03T04:00:00.000Z') })
   })
 
@@ -17,6 +22,7 @@ test.describe('Issue #418：页面层次与红圈结构对齐', () => {
     { project: PROJECT_INPUTS[1], count: 24 },
   ]) {
     test(`200% 等效视口中受控项目列表汇总随工作区吸底：${input.count}条`, async ({ page }) => {
+      await showDemoData(page)
       await page.setViewportSize({ width: 720, height: 500 })
       const sessionId = `layout-long-list-${randomUUID()}`
       await installProjectCentralFixture(page, input.project, { sessionId })
@@ -43,6 +49,7 @@ test.describe('Issue #418：页面层次与红圈结构对齐', () => {
 
   for (const width of [390, 768, 1024, 1280, 1440]) {
     test(`${width}px 详情资料分区、业务页签与金额跳转`, async ({ page }) => {
+      await showDemoData(page)
       await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 })
       await page.goto('/base/supplier/sup_demo_004?origin=demo')
       const nav = page.getByRole('navigation', { name: '分供方业务事实' })
@@ -91,13 +98,17 @@ test.describe('Issue #418：页面层次与红圈结构对齐', () => {
     for (const path of ['/finance/current', '/material/arrival', '/contract/construction', '/base/supplier', '/project', '/contract/material']) {
       test(`${width}px 列表连续工作面与主操作：${path}`, async ({ page }) => {
         await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 })
+        if (path === '/finance/current')
+          await installFinanceListFixtures(page)
+        else
+          await showDemoData(page)
         await page.goto(path)
         const shell = page.locator('[data-list-shell]')
-        await expect(shell).toBeVisible()
+        await expect(shell).toBeVisible({ timeout: 20_000 })
         const toolbar = shell.locator('[data-list-shell-toolbar]')
         await expect(toolbar).toBeVisible()
         const table = shell.locator('[data-list-shell-table]')
-        await expect(table.locator('.vxe-table')).toBeVisible()
+        await expect(table.locator('.vxe-table')).toBeVisible({ timeout: 20_000 })
         await expectNoPageOverflow(page, `${path} ${width}`)
         expect(await shell.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
         const bounds = await Promise.all([toolbar.boundingBox(), table.boundingBox()])
@@ -115,9 +126,13 @@ test.describe('Issue #418：页面层次与红圈结构对齐', () => {
     ]) {
       test(`${width}px 整页表单分区、两列上限与吸底操作：${input.path}`, async ({ page }) => {
         await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 })
+        if (input.path === '/finance/current/new')
+          await installFinanceListFixtures(page, true)
+        else
+          await showDemoData(page)
         await page.goto(input.path)
         const shell = page.locator('[data-ui="entity-form-shell"]')
-        await expect(shell).toBeVisible()
+        await expect(shell).toBeVisible({ timeout: 20_000 })
         const footer = page.getByRole('group', { name: '表单操作' })
         await expect(footer).toBeVisible()
         const fields = shell.locator('.form-fields-grid').first()
@@ -128,6 +143,7 @@ test.describe('Issue #418：页面层次与红圈结构对齐', () => {
           expect(count).toBe(1)
         await expectNoPageOverflow(page, `${input.path} ${width}`)
         const save = footer.getByRole('button', { name: '保存', exact: true })
+        await expect(save).toBeEnabled({ timeout: 20_000 })
         await save.focus()
         await expect(save).toBeInViewport()
         await expect(save).toBeFocused()

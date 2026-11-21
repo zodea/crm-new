@@ -14,11 +14,10 @@ import EntityDetailShell from '~/components/ui/EntityDetailShell.vue'
 import Metric from '~/components/ui/Metric.vue'
 import MetricGrid from '~/components/ui/MetricGrid.vue'
 import SectionHeader from '~/components/ui/SectionHeader.vue'
-import { runMigrations } from '~/lib/db/migrations'
 import { createWageStatementDraft } from '~/lib/payroll/statements'
 import { usePayrollStatementDetailStore } from '~/stores/payroll-statement-detail'
 import { useSignedDayworkStore } from '~/stores/signed-daywork'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 let db: TestDb
 vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => true }))
@@ -29,8 +28,7 @@ const query = { project: 'project-b', month: '2025-11', crew: 'crew-b', status: 
 beforeEach(async () => {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date('2026-09-24T08:00:00Z'))
-  db = await createMemoryDb()
-  await runMigrations(db)
+  db = await createMigratedMemoryDb()
   await db.execute('INSERT INTO projects (id, name, code) VALUES (\'project-a\', \'A 项目\', \'PA\'), (\'project-b\', \'B 项目\', \'PB\')')
   await db.execute('INSERT INTO crews (id, name, trade) VALUES (\'crew-b\', \'测试班组\', \'泥水工\')')
   await db.execute('INSERT INTO workers (id, crew_id, name, trade, current_project_id) VALUES (\'worker-b\', \'crew-b\', \'测试工人\', \'泥水工\', \'project-b\')')

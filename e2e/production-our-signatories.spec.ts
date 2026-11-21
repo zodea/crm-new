@@ -8,6 +8,7 @@ import { createServer } from 'node:net'
 import { resolve } from 'node:path'
 import process from 'node:process'
 import { expect, test } from '@playwright/test'
+import { selectVerifiedSignatory } from './helpers/contract-signatory'
 import { expectNoPageOverflow } from './helpers/responsive'
 
 test.skip(process.env.CRM_PRODUCTION_ACCEPTANCE !== '1', '先构建，再运行独立本机合成库；不连接开发或用户数据')
@@ -84,14 +85,20 @@ test('主体整页维护、实际选择与冻结、原命令恢复、占号和�
     const customer = await (await command('/api/commands/customers', { ...envelope, requiredCapability: 'customer:write', commandId: 'own-customer', draft: { name: '合成签约客户', contact: '合成人' } })).json()
     const project = await (await command('/api/commands/projects', { ...envelope, requiredCapability: 'project:write', commandId: 'own-project', draft: { name: '合成签约项目', customerId: customer.id, manager: '合成经理' } })).json()
     const supplier = await (await command('/api/commands/suppliers', { ...envelope, requiredCapability: 'supplier:write', commandId: 'own-supplier', draft: { name: '合成签约分供方', supplierCategory: '其他', contact: '合成人' } })).json()
+    const mainResponse = await command('/api/commands/construction-contracts', { ...envelope, requiredCapability: 'construction-contract:write', commandId: 'own-construction-main', draft: { name: '合成施工主合同', no: 'OWN-CONSTRUCTION-MAIN', projectId: project.id, customerId: customer.id, content: '合成实际施工范围', signDate: '2026-10-03', amount: 100, taxRate: 0, ourSignatoryId: own.id, ourSignatoryVersion: own.version } })
+    expect(mainResponse.ok(), await mainResponse.text()).toBe(true)
+    const main = await mainResponse.json()
+    const materialContext = await page.request.get(`${origin}/api/read/material-contracts/form-context`)
+    expect(materialContext.ok(), await materialContext.text()).toBe(true)
+    const selectedMain = (await materialContext.json()).constructionMains.find((row: { id: string }) => row.id === main.id)
+    expect(selectedMain).toMatchObject({ id: main.id, projectId: project.id, basis: expect.any(String) })
+    const materialEnvelope = { ...envelope, requiredCapability: 'material-contract:write', constructionMain: { id: selectedMain.id, projectId: selectedMain.projectId, basis: selectedMain.basis } }
     const materialDraft = { name: '主体冻结材采合同', no: 'OWN-GLOBAL-01', projectId: project.id, supplierId: supplier.id, content: '合成真实合同事实', signDate: '2026-10-04', amount: 20, taxRate: null, lineItems: [{ materialName: '原材料', qty: 1, unit: '米', taxInclusiveUnitPrice: 20 }], deductions: [] }
-    const created = await command('/api/commands/material-contracts', { ...envelope, requiredCapability: 'material-contract:write', commandId: 'own-material-draft', action: 'draft', draft: materialDraft })
-    expect(created.ok()).toBe(true)
+    const created = await command('/api/commands/material-contracts', { ...materialEnvelope, commandId: 'own-material-draft', action: 'draft', draft: materialDraft })
+    expect(created.ok(), await created.text()).toBe(true)
     const material = await created.json()
     await page.goto(`${origin}/contract/material/form/${material.id}`)
-    await expect(page.getByTestId('contract-our-signatory')).toBeEnabled()
-    await page.getByTestId('contract-our-signatory').selectOption(own.id)
-    await expect(page.getByTestId('contract-our-signatory-snapshot')).toContainText('合成真实签约公司原名 · 核实版本 1')
+    await selectVerifiedSignatory(page, own.id, '合成真实签约公司原名', 'SYNTHETIC-OWN-TAX')
     await page.getByRole('group', { name: '表单操作' }).getByRole('button', { name: '保存并提交', exact: true }).click()
     await expect(page.getByRole('heading', { name: '主体冻结材采合同', exact: true })).toBeVisible()
     const pricesResponse = await page.request.get(`${origin}/api/read/material-contracts/prices?origin=real`)
@@ -124,7 +131,7 @@ test('主体整页维护、实际选择与冻结、原命令恢复、占号和�
     expect(priceOriginal.draft.lineItems[0]).toMatchObject({ unit: '米', qty: 1, taxInclusiveUnitPrice: 20, applicableTaxRate: null })
     await page.goto(`${origin}/contract/${material.id}?contractKind=material&origin=real`)
 
-    const protocolResponse = await command('/api/commands/material-contracts', { ...envelope, requiredCapability: 'material-contract:write', commandId: 'own-protocol', action: 'submit', draft: { ...materialDraft, name: '原主体协议', isSupplement: true, originalContractId: material.id, amount: 2, lineItems: [{ materialName: '新增材料', qty: 1, unit: '米', taxInclusiveUnitPrice: 2 }] } })
+    const protocolResponse = await command('/api/commands/material-contracts', { ...materialEnvelope, commandId: 'own-protocol', action: 'submit', draft: { ...materialDraft, name: '原主体协议', isSupplement: true, originalContractId: material.id, amount: 2, lineItems: [{ materialName: '新增材料', qty: 1, unit: '米', taxInclusiveUnitPrice: 2 }] } })
     expect(protocolResponse.ok()).toBe(true)
     const protocol = await protocolResponse.json()
     await page.goto(`${origin}/settings/our-signatories/form/${own.id}`)
@@ -159,12 +166,12 @@ test('主体整页维护、实际选择与冻结、原命令恢复、占号和�
     const detail = await (await page.request.get(`${origin}/api/read/material-contracts/${material.id}?origin=real`)).json()
     expect(detail.contract.ourSignatorySnapshot).toMatchObject({ id: own.id, version: '1', name: '合成真实签约公司原名', taxNo: 'SYNTHETIC-OWN-TAX' })
     expect(detail.contract.amounts.contract).toBe('20.00')
-    const duplicate = await command('/api/commands/material-contracts', { ...envelope, requiredCapability: 'material-contract:write', commandId: 'own-current-duplicate', action: 'submit', draft: { ...materialDraft, ourSignatoryId: own.id, ourSignatoryVersion: '2' } })
+    const duplicate = await command('/api/commands/material-contracts', { ...materialEnvelope, commandId: 'own-current-duplicate', action: 'submit', draft: { ...materialDraft, ourSignatoryId: own.id, ourSignatoryVersion: '2' } })
     expect(duplicate.status()).toBe(422) // 停用目录也不能被当作新选择；已有合同仍保原快照。
     const otherOwnResponse = await command('/api/commands/our-signatories', { workspaceId: envelope.workspaceId, actorId: envelope.actorId, requiredCapability: 'our-signatory:write', commandId: 'own-second-active', baseVersion: null, draft: { name: '另一真实签约公司', taxNo: null, registeredAddress: null, legalRepresentative: null, verificationNote: '另一文书核实', status: 'active' } })
     expect(otherOwnResponse.ok()).toBe(true)
     const otherOwn = await otherOwnResponse.json()
-    const duplicateCurrent = await command('/api/commands/material-contracts', { ...envelope, requiredCapability: 'material-contract:write', commandId: 'own-real-number-duplicate', action: 'submit', draft: { ...materialDraft, ourSignatoryId: otherOwn.id, ourSignatoryVersion: otherOwn.version } })
+    const duplicateCurrent = await command('/api/commands/material-contracts', { ...materialEnvelope, commandId: 'own-real-number-duplicate', action: 'submit', draft: { ...materialDraft, ourSignatoryId: otherOwn.id, ourSignatoryVersion: otherOwn.version } })
     expect(duplicateCurrent.status()).toBe(422)
     expect(await duplicateCurrent.json()).toMatchObject({ data: { code: 'validation-failed', message: expect.stringContaining('其他正式主合同重复') } })
     await stop()

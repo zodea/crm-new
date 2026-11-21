@@ -90,7 +90,7 @@ export function scheduleApi(event: H3Event) {
     scope: (query: ScheduleReadQuery, buildings: string[]) => scheduleService.scope(query, buildings, sessionId),
     binding: (query: ScheduleReadQuery, groupId: string, contractId = '') => scheduleService.binding(query, groupId, contractId, sessionId),
     execute: (command: ScheduleCommand) => scheduleService.execute(command, sessionId),
-    resolve: (_input: unknown): never => { throw scheduleProblem('unavailable', '开发排程没有正式原意图恢复证明，请保留原提交') },
+    resolve: (input: unknown) => scheduleService.resolve(input, sessionId),
     importState: (): never => { throw scheduleProblem('unavailable', '正式WBS接管需要真实磁盘来源') },
     importPreflight: (_input: unknown): never => { throw scheduleProblem('unavailable', '正式WBS接管需要真实磁盘来源') },
     importAdopt: (_input: unknown): never => { throw scheduleProblem('unavailable', '正式WBS接管需要真实磁盘来源') },

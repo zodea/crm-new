@@ -1,20 +1,19 @@
+import type { TestDb } from '../helpers/memory-db'
 import type { QuantityReadResult } from '~/lib/quantity/central-contract'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { runMigrations } from '~/lib/db/migrations'
 import { createQuantityBrowserState } from '~/lib/quantity/browser-state'
 import { quantityProblem } from '~/lib/quantity/central-contract'
 import { createQuantityRepository } from '~/lib/quantity/central-repository'
 import { loadQuantityCentralWorkspace } from '~/lib/quantity/central-workspace'
 import { createQuantityReadAdapter } from '~/lib/quantity/read-adapter'
 import { loadQuantityTemplateWorkspace } from '~/lib/quantity/template'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
-let db: Awaited<ReturnType<typeof createMemoryDb>>
+let db: TestDb
 const context = async () => ({ workspaceId: 'w', actorId: 'a', capabilities: ['quantity:read', 'quantity:write'] })
 const envelope = <T>(data: T, sourceVersion: string): QuantityReadResult<T> => ({ data, sourceVersion, dataOrigin: 'real', asOf: '2026-09-11T00:00:00Z', capabilities: ['quantity:read', 'quantity:write'] })
 beforeEach(async () => {
-  db = await createMemoryDb()
-  await runMigrations(db)
+  db = await createMigratedMemoryDb()
   await db.execute('INSERT INTO projects(id,code,name) VALUES (\'p\',\'P\',\'正式项目\')')
 })
 afterEach(() => db.close())

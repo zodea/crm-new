@@ -20,4 +20,37 @@ export default withNuxt(
       'src-tauri/target/**',
     ],
   }),
+  {
+    name: 'crm/vitest-assertions',
+    files: ['tests/**/*.ts'],
+    rules: {
+      'test/require-to-throw-message': 'error',
+      'test/no-restricted-matchers': ['error', {
+        'rejects.toBeDefined': '请断言具体的拒绝原因。',
+      }],
+    },
+  },
+  {
+    name: 'crm/e2e-assertions',
+    files: ['e2e/**/*.spec.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        'TSEnumDeclaration[const=true]',
+        'TSExportAssignment',
+        {
+          selector: 'CallExpression[callee.property.name="toThrow"][arguments.length=0]',
+          message: '请断言具体的错误原因。',
+        },
+        {
+          selector: 'CallExpression[callee.property.name="toBeDefined"][callee.object.property.name="rejects"]',
+          message: '请断言具体的拒绝原因。',
+        },
+        {
+          selector: 'CallExpression[callee.name="test"] > :matches(ArrowFunctionExpression, FunctionExpression)[body.body.length=0]',
+          message: '测试必须验证可观察的行为。',
+        },
+      ],
+    },
+  },
 )

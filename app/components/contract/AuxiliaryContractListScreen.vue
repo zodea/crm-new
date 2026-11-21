@@ -310,7 +310,7 @@ useTabTitle(() => AUXILIARY_LABELS[props.kind])
             核对原采用结果
           </KitButton>
         </div>
-        <fieldset :disabled="migrationBusy || Boolean(migrationPending)" class="m-0 grid min-w-0 gap-3 border-0 p-0">
+        <fieldset :disabled="!migration || migrationBusy || Boolean(migrationPending)" class="m-0 grid min-w-0 gap-3 border-0 p-0">
           <label class="field-block"><span class="field-label">完整 SQLite 来源文件</span><input type="file" accept=".sqlite,.db,.sqlite3" aria-label="完整辅助合同来源文件" @change="selectNative"></label>
           <template v-if="preview">
             <p class="m-0 break-all text-12px">

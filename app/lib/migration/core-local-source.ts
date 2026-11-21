@@ -1490,9 +1490,9 @@ export function createCoreMigrationLocalSource(
     await dependencies.clearMigration()
   }
 
-  async function confirmSwitch(marker: BrowserCoreMigrationMarker): Promise<void> {
-    await assertQuotationCoreMigrationGate(await dependencies.currentSchemaVersion(), dependencies.select)
-    await dependencies.closeDatabase()
+  async function confirmSwitch(marker: BrowserCoreMigrationMarker, snapshotSha256: string): Promise<void> {
+    // 切换准备已经冻结旧连接；从受保护快照校验来源和独立报价接管结果。
+    await assertCurrentSource(marker.sourceHash, snapshotSha256)
     await dependencies.activateMigration(marker)
   }
 

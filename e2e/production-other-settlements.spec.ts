@@ -29,7 +29,18 @@ test('真实原费用→结算→申请→实付，整页原键恢复、版本�
     }
     const service = await command('suppliers', { name: '实际服务交易方', supplierCategory: '其他', contact: '合成人' }, 'other-browser-service', 'supplier:write')
     const payee = await command('suppliers', { name: '实际垫付收款人', supplierCategory: '其他', contact: '合成人' }, 'other-browser-payee', 'supplier:write')
-    await command('finance/reimbursement', { applicantSupplierId: payee.id, reimbursementDate: '2026-10-05', status: 'confirmed', lines: [{ expenseItem: '实际无合同运输费用', counterpartySupplierId: service.id, amount: 100 }] }, 'other-browser-expense', 'finance-reimbursement:write', { kind: 'reimbursement' })
+    // 公司归属且无施工合同的原费用来自可追溯的旧库迁入。
+    const nativeExpense = await createHistoricalClearanceMigrationSource(join(f.directory, 'native-company-expense'), { expenseItem: '实际无合同运输费用' })
+    const previewResponse = await f.request('/api/commands/finance/import/preflight', { method: 'POST', data: { ...identity, source: nativeExpense.source } })
+    expect(previewResponse.ok(), await previewResponse.text()).toBe(true)
+    const preview = await previewResponse.json()
+    const mappings = [[nativeExpense.ids.service, service.id], [nativeExpense.ids.payee, payee.id]].map(([legacyId, targetId]) => {
+      const candidate = preview.candidates.find((row: { entityType: string, serverId: string }) => row.entityType === 'suppliers' && row.serverId === targetId)
+      expect(candidate).toBeTruthy()
+      return { entityType: 'suppliers', legacyId, targetId, version: candidate.version, sourceVersion: candidate.sourceVersion, reason: '逐项核验公司归属原费用、原件和交易双方身份' }
+    })
+    const expenseImport = await f.request('/api/commands/finance/import', { method: 'POST', data: { ...identity, commandId: 'other-browser-company-expense-import', source: nativeExpense.source, mappings } })
+    expect(expenseImport.ok(), await expenseImport.text()).toBe(true)
     await page.goto(`${f.origin}/contract/other-settlement/form`)
     await page.getByLabel('采用原费用 实际无合同运输费用', { exact: true }).check()
     await page.getByLabel('原费用 实际无合同运输费用 采用金额', { exact: true }).fill('70')
@@ -399,7 +410,12 @@ test('Native原纸缺失E100/C30经整页替代核定，合并新70及旧30义�
     const payeeId = suppliers.find(row => row.legacyId === native.ids.payee)!.id
     await page.goto(`${f.origin}/settings/data-migration`)
     const migration = page.getByRole('region', { name: '财务原库迁入', exact: true })
-    await migration.getByLabel('选择桌面导出的 SQLite 一致快照').setInputFiles(native.path)
+    const file = migration.getByLabel('选择桌面导出的 SQLite 一致快照')
+    await expect(file).toBeEnabled({ timeout: 15_000 })
+    const previewResponse = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/commands/finance/import/preflight')
+    await file.setInputFiles(native.path)
+    const preview = await previewResponse
+    expect(preview.ok(), await preview.text()).toBe(true)
     await expect(migration.getByText('费用与报销：2 条（含已移除历史 0 条）', { exact: true })).toBeVisible()
     for (const supplier of suppliers)
       await migration.getByRole('combobox', { name: new RegExp(supplier.legacyId) }).selectOption(supplier.id)

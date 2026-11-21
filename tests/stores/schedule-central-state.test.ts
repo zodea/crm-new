@@ -61,6 +61,53 @@ describe('中央绑定固定预览与原提交恢复', () => {
 })
 
 describe('浏览器中央 WBS 项目会话与失响应恢复', () => {
+  it.each([['v2', 'v2'], ['v3-from-another-write', 'v1']])('依赖写后读回 %s 时继续从 %s 保存原工序草稿', async (readVersion, expectedBasis) => {
+    const store = useScheduleStore()
+    await store.loadProject('p')
+    store.beginPlanEdit('task')
+    const apply = async (command: ScheduleCommand) => ({ commandId: command.commandId, projectId: 'p', sourceVersion: 'v2', value: {} })
+    mocks.save.mockImplementationOnce(apply).mockImplementationOnce(apply)
+    mocks.read.mockResolvedValueOnce(read('p', readVersion))
+    await store.updateDependency('task', 'previous', 0)
+    const draft = { task: { plannedStart: '2026-09-02', plannedFinish: '2026-09-06' }, floorPlans: [], dependency: null }
+    await store.saveTaskPlan('task', draft)
+    expect(mocks.save.mock.calls[0]?.[0]).toMatchObject({ sourceVersion: 'v1', action: { kind: 'update-dependency' } })
+    expect(mocks.save.mock.calls[1]?.[0]).toMatchObject({ sourceVersion: expectedBasis, action: { kind: 'save-task-plan', draft } })
+  })
+  it('在同一工序草稿内连续恢复及移除依赖，各动作沿已核对的原任务新基准提交', async () => {
+    const dependency = { id: 'dependency', predId: 'previous', succId: 'task', dependencyType: 'FS' as const, lagDays: 0 }
+    const initial = read()
+    initial.snapshot.disabledDependencies = [{ ...dependency, disabledAt: '2026-09-06', disabledReason: 'schedule-conflict', auditLogId: 'log' }]
+    mocks.read.mockResolvedValueOnce(initial)
+    const store = useScheduleStore()
+    await store.loadProject('p')
+    store.beginPlanEdit('task')
+    const restored = read('p', 'v2')
+    restored.snapshot.dependencies = [dependency]
+    mocks.read.mockResolvedValueOnce(restored).mockResolvedValueOnce(read('p', 'v3')).mockResolvedValueOnce(read('p', 'v4'))
+    for (const sourceVersion of ['v2', 'v3', 'v4'])
+      mocks.save.mockImplementationOnce(async (command: ScheduleCommand) => ({ commandId: command.commandId, projectId: 'p', sourceVersion, value: {} }))
+    await store.restoreDependency(dependency.id)
+    await store.removeDependency(dependency.id)
+    const draft = { task: { plannedStart: '2026-09-02', plannedFinish: '2026-09-06' }, floorPlans: [], dependency: null }
+    await store.saveTaskPlan('task', draft)
+    expect(mocks.save.mock.calls.map(([command]) => [command.action.kind, command.sourceVersion])).toEqual([
+      ['restore-dependency', 'v1'],
+      ['remove-dependency', 'v2'],
+      ['save-task-plan', 'v3'],
+    ])
+  })
+  it('甘特图拖动按当前排程提交，不沿用之前工序详情的编辑版本', async () => {
+    const store = useScheduleStore()
+    await store.loadProject('p')
+    store.beginPlanEdit('task')
+    mocks.read.mockResolvedValueOnce(read('p', 'v2'))
+    await store.loadProject('p')
+    mocks.save.mockImplementationOnce(async (command: ScheduleCommand) => ({ commandId: command.commandId, projectId: 'p', sourceVersion: 'v3', value: {} }))
+    mocks.read.mockResolvedValueOnce(read('p', 'v3'))
+    await store.rescheduleTask('task', { plannedFinish: '2026-09-07' }, [])
+    expect(mocks.save).toHaveBeenCalledWith(expect.objectContaining({ sourceVersion: 'v2', action: { kind: 'reschedule-task', taskId: 'task', patch: { plannedFinish: '2026-09-07' }, dependencyIdsToDisable: [] } }))
+  })
   it('正式读取从不访问本地 SQL；项目切换的迟到读取不覆盖新项目', async () => {
     let resolve!: (value: ScheduleRead) => void
     mocks.read.mockImplementationOnce(() => new Promise<ScheduleRead>((done) => {

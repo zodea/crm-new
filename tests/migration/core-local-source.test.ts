@@ -1,8 +1,9 @@
 import type { CoreMigrationLocalSourceDependencies } from '~/lib/migration/core-local-source'
+import { createHash } from 'node:crypto'
 import { describe, expect, it, vi } from 'vitest'
 import { adoptConstructionManagementFee, emptyConstructionManagementFee } from '~/lib/construction-contract/management-fee'
 import { persistNativeConstructionManagementFee } from '~/lib/construction-contract/management-fee-storage'
-import { LATEST_VERSION, runMigrations } from '~/lib/db/migrations'
+import { LATEST_VERSION } from '~/lib/db/migrations'
 import { seedIfEmpty } from '~/lib/db/seed'
 import { materialQuotationSchemaDefinitions } from '~/lib/material-quotation/schema-upgrade'
 import {
@@ -16,7 +17,7 @@ import { createCoreMigrationLocalSource } from '~/lib/migration/core-local-sourc
 import { PAYROLL_CENTRAL_MIGRATION_TABLES } from '~/lib/migration/payroll-central-source'
 import { createCoreMigrationTestInstance } from '../../server/utils/core-migration-test-instance'
 import { createOwnerCommercialDocumentCommandTestInstance } from '../../server/utils/owner-commercial-document-command-test-instance'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 function sourceRows(sql: string): Record<string, unknown>[] {
   // 最新版本的替身包含已安装但尚无业务事实的独立报价 owner；未知查询仍拒绝。
@@ -347,9 +348,8 @@ function dependencies(
 
 describe('core migration local source', () => {
   it('native总合同导出配置和全部采用历史，供应商合同不产生总合同配置属性', async () => {
-    const db = await createMemoryDb()
+    const db = await createMigratedMemoryDb()
     try {
-      await runMigrations(db)
       await seedIfEmpty(db)
       const first = adoptConstructionManagementFee(emptyConstructionManagementFee(), { managementFeeAmount: 0, managementFeeBasis: '原主合同条款' }, { version: 'config-1', adoptedAt: '2026-10-05T00:00:00.000Z', contractVersion: 'native-version-1', actorId: null, commandId: null })
       const second = adoptConstructionManagementFee(first, { managementFeeAmount: 1200, managementFeeBasis: '补充核实主合同原文' }, { version: 'config-2', adoptedAt: '2026-10-05T00:01:00.000Z', contractVersion: 'native-version-2', actorId: null, commandId: null })
@@ -569,9 +569,8 @@ describe('core migration local source', () => {
   })
 
   it('完整 BOQ 与月度事实查询可在最新 SQLite schema 上执行', async () => {
-    const db = await createMemoryDb()
+    const db = await createMigratedMemoryDb()
     try {
-      await runMigrations(db)
       await seedIfEmpty(db)
 
       const result = await createCoreMigrationLocalSource(dependencies({
@@ -596,9 +595,8 @@ describe('core migration local source', () => {
   })
 
   it('旧 SQLite 未建中央工资表时省略扩展，仍完整导出原工资金额与原文', async () => {
-    const db = await createMemoryDb()
+    const db = await createMigratedMemoryDb()
     try {
-      await runMigrations(db)
       const tables = await db.select<{ name: string }>('SELECT name FROM sqlite_master WHERE type=\'table\'')
       const centralTables = new Set<string>(PAYROLL_CENTRAL_MIGRATION_TABLES)
       expect(tables.filter(table => centralTables.has(table.name))).toEqual([])
@@ -617,9 +615,8 @@ describe('core migration local source', () => {
   })
 
   it('sqlite 本地写入时间经 ISO 规范化后可完成甲方单据受控迁移', async () => {
-    const db = await createMemoryDb()
+    const db = await createMigratedMemoryDb()
     try {
-      await runMigrations(db)
       await db.execute(`INSERT INTO customers (id, name) VALUES ('customer-local-323', '迁移甲方')`)
       await db.execute(`
         INSERT INTO projects (id, name, customer_id)
@@ -996,10 +993,17 @@ describe('core migration local source', () => {
     expect(deps.closeDatabase).toHaveBeenCalledOnce()
   })
 
-  it('locks the old source only after confirmation and restores the protected backup on rollback', async () => {
+  it('核验冻结后的快照再启用中央，并从受保护备份回滚', async () => {
     const events: string[] = []
+    const snapshot = new Uint8Array([1, 2, 3])
+    const snapshotSha256 = createHash('sha256').update(snapshot).digest('hex')
     const deps = dependencies({
       closeDatabase: vi.fn(async () => events.push('close')),
+      select: vi.fn().mockRejectedValue(new Error('旧库已经冻结')),
+      loadProductionSnapshot: vi.fn(async () => {
+        events.push('snapshot')
+        return snapshot
+      }),
       loadBackup: vi.fn().mockResolvedValue({
         metadata: {
           backupId: 'core-source-hash',
@@ -1007,12 +1011,12 @@ describe('core migration local source', () => {
           sourceSchemaVersion: LATEST_VERSION,
           sourceVersion: CORE_MIGRATION_SOURCE_VERSION,
           sourceHash: 'a'.repeat(64),
-          snapshotSha256: 'b'.repeat(64),
+          snapshotSha256,
           immutable: true,
           snapshotKey: 'production',
           byteLength: 3,
         },
-        snapshot: new Uint8Array([1, 2, 3]),
+        snapshot,
       }),
       readSnapshotSource: vi.fn().mockResolvedValue({
         contractVersion: CORE_MIGRATION_CONTRACT_VERSION,
@@ -1028,17 +1032,26 @@ describe('core migration local source', () => {
     })
     const source = createCoreMigrationLocalSource(deps)
 
-    await source.confirmSwitch({
+    const marker = {
       batchId: 'batch-1',
       backupId: 'core-source-hash',
       sourceHash: 'a'.repeat(64),
       confirmedAt: '2026-08-15T01:00:00.000Z',
       rollbackExpiresAt: '2026-08-22T01:00:00.000Z',
+    }
+    await expect(source.confirmSwitch(marker, 'b'.repeat(64))).rejects.toMatchObject({
+      code: 'source-changed-after-preflight',
     })
+    expect(deps.activateMigration).not.toHaveBeenCalled()
+    await source.confirmSwitch(marker, snapshotSha256)
     await source.rollback('core-source-hash', 'a'.repeat(64))
 
+    expect(deps.select).not.toHaveBeenCalled()
     expect(events).toEqual([
       'close',
+      'snapshot',
+      'close',
+      'snapshot',
       'activate:batch-1',
       'close',
       'restore:core-source-hash',

@@ -4,6 +4,8 @@ import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import { buildCrewListPage, buildWorkerListPage, parseCrewListQuery, parseWorkerListQuery } from '../app/lib/crew-worker/read-page'
 import { buildCustomerListPage, parseCustomerListQuery } from '../app/lib/customer/read-page'
+import { attachOriginReadMeta } from '../app/lib/read-model/meta'
+import { publicReadMeta } from '../tests/helpers/public-read-meta'
 import { expectNoPageOverflow } from './helpers/responsive'
 
 test.use({ screenshot: 'off', video: 'off', trace: 'off' })
@@ -68,11 +70,18 @@ test.beforeEach(async ({ page }) => {
   await page.route(/\/api\/read\/(customers|crews|workers)\?/, async (route) => {
     const url = new URL(route.request().url())
     const input = Object.fromEntries(url.searchParams)
-    const common = { asOf, sourceVersion: 'multi-fixture', capabilities: [], crews, workers, projects: [], assignments: [], wages: [] }
-    const result = url.pathname.endsWith('/customers')
+    const customer = url.pathname.endsWith('/customers')
+    const crew = url.pathname.endsWith('/crews')
+    const capabilities = customer ? ['customer:list:read'] : ['crew:list:read', 'worker:list:read']
+    const common = { asOf, sourceVersion: 'multi-fixture', capabilities, crews, workers, projects: [], assignments: [], wages: [] }
+    const result = customer
       ? buildCustomerListPage({ ...common, rows: customers, query: parseCustomerListQuery(input) })
-      : url.pathname.endsWith('/crews') ? buildCrewListPage({ ...common, query: parseCrewListQuery(input) }) : buildWorkerListPage({ ...common, query: parseWorkerListQuery(input) })
-    await route.fulfill({ json: result })
+      : crew ? buildCrewListPage({ ...common, query: parseCrewListQuery(input) }) : buildWorkerListPage({ ...common, query: parseWorkerListQuery(input) })
+    const evidence = { asOf, sourceVersion: common.sourceVersion, capabilities, schemaVersion: customer ? 'customer-read-v2' : 'crew-worker-read-v2', scope: input }
+    await route.fulfill({ json: attachOriginReadMeta(result, {
+      real: publicReadMeta({ ...evidence, dataOrigin: 'real', requested: true }),
+      demo: publicReadMeta({ ...evidence, dataOrigin: 'demo', requested: false }),
+    }) })
   })
 })
 

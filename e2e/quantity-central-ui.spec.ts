@@ -9,14 +9,14 @@ test('新项目经真实整页建立模板清单关联和区域，刷新与五�
   await page.context().setExtraHTTPHeaders(headers)
   const session = await (await page.request.get('/api/read/business-session', { headers })).json()
   const create = async (entity: string, capability: string, draft: Record<string, unknown>) => {
-    const response = await page.request.post(`/api/commands/${entity}`, { headers, data: { ...session, requiredCapability: capability, commandId: randomUUID(), baseVersion: null, action: 'draft', draft, attachments: {} } })
+    const response = await page.request.post(`/api/commands/${entity}`, { headers, data: { workspaceId: session.workspaceId, actorId: session.actorId, requiredCapability: capability, commandId: randomUUID(), baseVersion: null, action: 'draft', draft, attachments: {} } })
     expect(response.ok(), await response.text()).toBe(true)
     return response.json()
   }
   const project = await create('projects', 'project:write', { name: '中央工程量整页验收项目', manager: '合成经办人', status: '筹备中' })
   const projectId = project.id as string
   const contract = await create('construction-contracts', 'construction-contract:write', { name: '整页验收施工合同', projectId, content: '合成验收', signDate: '2026-09-11', amount: 5200 })
-  const ownerEnvelope = { ...session, requiredCapability: 'owner-document:write', kind: 'owner_change', attachments: { add: [], removeIds: [], restoreIds: [] } }
+  const ownerEnvelope = { workspaceId: session.workspaceId, actorId: session.actorId, requiredCapability: 'owner-document:write', kind: 'owner_change', attachments: { add: [], removeIds: [], restoreIds: [] } }
   const changeResponse = await page.request.post('/api/commands/owner-documents', { headers, data: { ...ownerEnvelope, commandId: randomUUID(), action: 'submit', id: null, baseVersion: null, draft: { name: '新增整页验收清单', reason: '合成验收', projectId, contractId: contract.id, applicationDate: '2026-09-11', lines: [{ operation: 'add', itemName: '墙面抹灰', unit: '㎡', deltaQty: 100, newUnitPrice: 52 }] } } })
   expect(changeResponse.ok(), await changeResponse.text()).toBe(true)
   const change = await changeResponse.json()

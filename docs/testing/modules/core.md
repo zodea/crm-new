@@ -18,6 +18,7 @@
 | [tests/util/read-model-state.test.ts](../../../tests/util/read-model-state.test.ts) | 单元／服务／状态 | 公开读取状态、来源失效与合法旧投影 |
 | [tests/composables/session-file-cache.test.ts](../../../tests/composables/session-file-cache.test.ts) | 单元／服务／状态 | 会话原文件生命周期 |
 | [tests/db/browser-storage.test.ts](../../../tests/db/browser-storage.test.ts) | 单元／服务／状态 | browser database migration backup |
+| [tests/db/memory-db.test.ts](../../../tests/db/memory-db.test.ts) | 测试基础设施 | 并发只迁移一次，克隆连接的写入、关闭及外键隔离 |
 | [tests/db/coordinator.test.ts](../../../tests/db/coordinator.test.ts) | 单元／服务／状态 | 桌面数据库连接协调器 |
 | [tests/db/connection.test.ts](../../../tests/db/connection.test.ts) | 单元／服务／状态 | 实际数据库入口按需初始化、并发共用连接、条件种子、只读锁、失败关闭重试及初始化前一致备份 |
 | [tests/db/native-snapshot.test.ts](../../../tests/db/native-snapshot.test.ts) | 单元／服务／状态 | 完整 SQLite 字节、版本、外键与只读迁移快照核验 |

@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { runMigrations } from '~/lib/db/migrations'
 import { DELIVERY_RECORD_SOURCE_SQL, deliveryRecordSourceEntities } from '~/lib/migration/delivery-record-source'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 const payload = btoa('%PDF-1.7\noriginal multi-page source\n%%EOF')
 describe('送货旧库完整迁移来源', () => {
@@ -11,9 +10,8 @@ describe('送货旧库完整迁移来源', () => {
     await expect(deliveryRecordSourceEntities([{ ...row, deleted_at: '2026-02-31 01:02:03' }])).rejects.toThrow('软删除时间')
   })
   it('真实 SQLite 读取头、所有材料版本、共享原件与原始审计，缺失保持缺失', async () => {
-    const db = await createMemoryDb()
+    const db = await createMigratedMemoryDb()
     try {
-      await runMigrations(db)
       await db.execute('INSERT INTO projects(id,name) VALUES(\'p-old\',\'项目\')')
       await db.execute('INSERT INTO suppliers(id,name) VALUES(\'s-old\',\'分供方\')')
       for (const id of ['one', 'two', 'missing']) {
