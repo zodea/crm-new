@@ -163,6 +163,9 @@ export function usePayrollTierStatement<Read extends PayrollTierReleaseRead, Out
         working.value = false
     }
   }
+  function setReleaseDraft(value: PayrollTierReleaseDraft) {
+    releaseDraft.value = value
+  }
   function setReleaseApplications(applications: PayrollReleaseAdjustmentApplication[]) {
     if (!matching.value || !writable.value || releaseOpen.value)
       return
@@ -226,5 +229,5 @@ export function usePayrollTierStatement<Read extends PayrollTierReleaseRead, Out
     active.value = false
     sequence += 1
   })
-  return { read, matching, latest, output, active, loading, working, busy, error, writable, pending, releaseOpen, releaseRead, releaseDraft, load, execute, openRelease, setReleaseApplications, recover }
+  return { read, matching, latest, output, active, loading, working, busy, error, writable, pending, releaseOpen, releaseRead, releaseDraft: computed(() => releaseDraft.value), load, execute, openRelease, setReleaseDraft, setReleaseApplications, recover }
 }
