@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { QuotationFile } from '~/lib/material-quotation/contract'
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from '~/components/ui/dialog'
+import OriginalFilePreviewDialog from '~/components/shared/OriginalFilePreviewDialog.vue'
 import { useOriginalFiles } from '~/composables/useOriginalFiles'
 
 const props = defineProps<{
@@ -33,14 +33,18 @@ const { previewOpen, previewUrl, previewTitle, previewMime, busy, problem, canPr
     <KitButton v-if="busy" @click="cancel">
       取消读取
     </KitButton>
-    <Dialog v-model:open="previewOpen">
-      <DialogContent class="flex h-[85vh] w-[calc(100vw-2rem)] max-w-1100px flex-col overflow-hidden p-4" @close-auto-focus="restoreFocus">
-        <DialogTitle>{{ previewTitle }}</DialogTitle><DialogDescription>报价版本原件只读预览</DialogDescription>
-        <StatePanel v-if="problem" kind="error" title="原件不可预览" :description="problem" compact />
-        <StatePanel v-else-if="busy" kind="loading" title="正在读取原件" />
-        <img v-else-if="previewUrl && previewMime.startsWith('image/')" :src="previewUrl" :alt="previewTitle" class="min-h-0 max-w-full flex-1 object-contain">
-        <iframe v-else-if="previewUrl" :src="previewUrl" :title="previewTitle" class="min-h-0 w-full flex-1 border-0" />
-      </DialogContent>
-    </Dialog>
+    <OriginalFilePreviewDialog
+      v-model:open="previewOpen"
+      :title="previewTitle"
+      :url="previewUrl"
+      :mime="previewMime"
+      :busy="Boolean(busy)"
+      :problem="problem"
+      description="报价版本原件只读预览"
+      error-title="原件不可预览"
+      loading-title="正在读取原件"
+      compact
+      @close-auto-focus="restoreFocus"
+    />
   </section>
 </template>
