@@ -4,6 +4,7 @@ import type { KitTableColumn } from '~/lib/kit/table'
 import type { SupplierListColumnFilters, SupplierListNumericField, SupplierListPageDTO, SupplierListQueryDTO, SupplierListSort, SupplierListTextField } from '~/lib/supplier/repository'
 import { useDebounceFn, useMediaQuery, useStorage } from '@vueuse/core'
 import { computed, nextTick, onActivated, onDeactivated, onMounted, onScopeDispose, shallowRef, watch } from 'vue'
+import EntityPendingRecovery from '~/components/shared/EntityPendingRecovery.vue'
 import { readProblemTitle, readStateData, readStateProblem } from '~/lib/read-model/state'
 import { SUPPLIER_LIST_NUMERIC_FIELDS, SUPPLIER_NUMERIC_SOURCE } from '~/lib/supplier/read-contract'
 import { normalizeSupplierEnumSelection } from '~/lib/supplier/read-query'
@@ -345,7 +346,13 @@ onActivated(() => {
 
 <template>
   <div class="grid min-w-0 gap-3">
-    <SupplierPendingRecovery v-if="readPage?.capabilities.includes('supplier:persistent:write')" />
+    <EntityPendingRecovery
+      v-if="readPage?.capabilities.includes('supplier:persistent:write')"
+      class="min-w-0"
+      entity-label="分供方"
+      description="保存结果尚未确认。先核对主档、证照或税务核验的原提交，再登记新资料。"
+      :load-pending-forms="commandStore.pendingForms"
+    />
     <p v-if="readPage?.unavailableSources?.length" class="m-0 border border-line bg-panel p-3 text-12px text-ink-muted" role="status">
       关联{{ unavailableSourceLabel }}尚未接入，相关数量和金额显示为未知；分供方主档与证照可正常维护。
     </p>

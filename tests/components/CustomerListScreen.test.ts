@@ -28,7 +28,7 @@ function page(query: CustomerListQueryDTO) {
 const global = { components: {
   ListShell: defineComponent({ template: '<main><slot name="toolbar" /><slot name="table" /></main>' }),
   StatePanel: defineComponent({ props: ['title', 'description'], template: '<section role="alert"><h2>{{ title }}</h2><p>{{ description }}</p></section>' }),
-}, stubs: { MasterDataListToolbar: true, KitTable: true, CustomerPendingRecovery: true, CustomerDeletedList: true, NuxtLink: true } }
+}, stubs: { MasterDataListToolbar: true, KitTable: true, EntityPendingRecovery: true, CustomerDeletedList: true, NuxtLink: true } }
 
 describe('客户列表实际分页和撤权', () => {
   beforeEach(() => {

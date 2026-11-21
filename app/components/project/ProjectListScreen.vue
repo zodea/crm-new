@@ -6,6 +6,7 @@ import type { ProjectListPageDTO, ProjectListQueryDTO } from '~/lib/project/repo
 import type { MetricDTO } from '~/types/read-model'
 import { useDebounceFn } from '@vueuse/core'
 import * as XLSX from 'xlsx'
+import EntityPendingRecovery from '~/components/shared/EntityPendingRecovery.vue'
 import KitStatusTag from '~/components/ui/KitStatusTag.vue'
 import RowActionMenu from '~/components/ui/RowActionMenu.vue'
 import { useProjectListReturnContext } from '~/composables/useProjectListReturnContext'
@@ -481,7 +482,12 @@ onDeactivated(() => {
 
 <template>
   <div class="flex min-w-0 flex-col gap-4">
-    <ProjectPendingRecovery v-if="readPage?.capabilities.includes('project:original:write')" />
+    <EntityPendingRecovery
+      v-if="readPage?.capabilities.includes('project:original:write')"
+      entity-label="项目"
+      description="刷新前的保存结果还未确认。先核对原提交，再填写新的项目资料。"
+      :load-pending-forms="commandStore.pendingForms"
+    />
     <ProjectDeletedList v-if="readPage?.capabilities.includes('project:lifecycle:write')" />
     <StatePanel
       v-if="readStore.state.kind === 'loading' && !readPage"

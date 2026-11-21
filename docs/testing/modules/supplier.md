@@ -53,7 +53,7 @@
 | [tests/components/SupplierDetailScreen.test.ts](../../../tests/components/SupplierDetailScreen.test.ts) | 组件（jsdom） | 分供方中央详情；材采可读而其他合同域不可用／无权／缺证时只显示已核事实与完整未知，禁止挂载缺源子区；统一可信合同及 demo 原边界 |
 | [tests/components/SupplierFactTable.test.ts](../../../tests/components/SupplierFactTable.test.ts) | 组件（jsdom） | 分供方合同事实类别 |
 | [tests/components/SupplierFormFields.test.ts](../../../tests/components/SupplierFormFields.test.ts) | 组件（jsdom） | 分供方表单资料辅助动作 |
-| [tests/components/SupplierListCredentialFilter.test.ts](../../../tests/components/SupplierListCredentialFilter.test.ts) | 组件（jsdom） | 分供方营业执照真实状态筛选 |
+| [tests/components/SupplierListCredentialFilter.test.ts](../../../tests/components/SupplierListCredentialFilter.test.ts) | 组件（jsdom） | 分供方营业执照真实状态筛选、页签恢复时以上次提交的最新读取为准 |
 | [tests/components/SupplierTaxpayerDialog.test.ts](../../../tests/components/SupplierTaxpayerDialog.test.ts) | 组件（jsdom） | 人工税务核验对话框 |
 
 ## Playwright E2E
