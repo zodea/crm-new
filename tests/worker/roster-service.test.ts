@@ -4,19 +4,17 @@ import { Buffer } from 'node:buffer'
 import { afterEach, describe, expect, it } from 'vitest'
 import * as XLSX from 'xlsx'
 import { createDbCoordinator } from '~/lib/db/coordinator'
-import { runMigrations } from '~/lib/db/migrations'
 import { EMPTY_WORKER_PRIVATE } from '~/lib/worker-roster/contract'
 import { createWorkerRosterArchiveFiles, createWorkerRosterArchiveZip, createWorkerRosterWorkbook } from '~/lib/worker-roster/export'
 import { createWorkerRosterService } from '../../server/utils/worker-roster-service'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 const closers: Array<() => Promise<void>> = []
 afterEach(async () => {
   await Promise.all(closers.splice(0).map(close => close()))
 })
 async function setup() {
-  const db = await createMemoryDb()
-  await runMigrations(db)
+  const db = await createMigratedMemoryDb()
   const coordinator = createDbCoordinator(async () => db)
   closers.push(coordinator.close)
   const session = { workspaceId: 'work', actorId: 'actor', capabilities: ['payroll:read', 'payroll:write', 'worker:write', 'worker:sensitive:read'] }

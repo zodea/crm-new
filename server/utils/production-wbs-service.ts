@@ -17,21 +17,13 @@ import { readProductionProcessLibraryState } from './production-process-library-
 import { productionWbsBindingAdapters, productionWbsBoqLines, productionWbsBoqReadable, productionWbsContract, productionWbsLinesByItem } from './production-wbs-boq-sources'
 import { advanceProductionWbsRevision, productionWbsEngineAdapters, productionWbsLegacyCommandExists, productionWbsProject, productionWbsVisibility, verifyProductionWbsState, wbsDigest } from './production-wbs-record'
 import { checkProductionWbsVersion, productionWbsVersion } from './production-wbs-version'
-import { parseScheduleCommand, parseScheduleRead } from './schedule-request'
+import { parseScheduleCommand, parseScheduleRead, parseScheduleRecoveryDescriptor } from './schedule-request'
 import { assertScheduleUndoScope, executeScheduleEngineAction } from './schedule-service'
 
 type Session = () => BusinessSession
 function authorize(actor: BusinessSession, storage: ProductionStorage, write = false) {
   if (actor.workspaceId !== storage.identity.workspaceId || actor.actorId !== storage.identity.actorId || !actor.capabilities.includes('schedule:read') || (write && !actor.capabilities.includes('schedule:write')))
     throw scheduleProblem('forbidden', '当前可信身份不能读取或维护这份正式WBS')
-}
-function descriptor(input: unknown): CommandRecoveryDescriptor {
-  if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input).sort().join(',') !== 'action,actorId,commandId,family,targetId,workspaceId')
-    throw scheduleProblem('validation-failed', 'WBS恢复只接受原编号与最小定位证据')
-  const value = input as CommandRecoveryDescriptor
-  if (value.family !== 'schedule' || !value.targetId || !['workspaceId', 'actorId', 'targetId', 'action'].every(key => typeof value[key as keyof CommandRecoveryDescriptor] === 'string' && String(value[key as keyof CommandRecoveryDescriptor]).trim()) || !/^[a-z0-9][\w-]{2,79}$/i.test(value.commandId) || !['create-group', 'update-task', 'update-floors', 'update-dependency', 'save-task-plan', 'reschedule-task', 'remove-dependency', 'restore-dependency', 'set-baseline', 'add-task', 'remove-task', 'undo', 'bind-contract'].includes(value.action))
-    throw scheduleProblem('validation-failed', '原WBS恢复编号或动作无效')
-  return value
 }
 export function createProductionWbsService(storage: ProductionStorage) {
   async function run<T>(session: Session, write: boolean, work: (tx: TransactionDb, actor: BusinessSession) => Promise<T>) {
@@ -253,7 +245,7 @@ export function createProductionWbsService(storage: ProductionStorage) {
       }
     },
     resolve(input: unknown, session: Session) {
-      const value = descriptor(input)
+      const value = parseScheduleRecoveryDescriptor(input)
       return run(session, true, (tx, actor) => resolveOriginal(tx, actor, value))
     },
   }

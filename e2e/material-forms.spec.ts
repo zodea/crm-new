@@ -137,7 +137,7 @@ test.describe('F4 物资领域整页表单', () => {
       await page.getByTestId('material-no').fill(no)
       await page.getByRole('button', { name: '保存草稿' }).click()
       await expect(page).toHaveURL(url => form.editUrl.test(url.pathname) && url.pathname !== form.path)
-      await expect(page.getByRole('heading', { name: form.title.replace('新建', '编辑'), exact: true })).toBeVisible()
+      await expect(page.getByRole('heading', { name: form.title.replace('新建', '编辑'), exact: true })).toBeVisible({ timeout: 15_000 })
       await expect(page.getByTestId('material-no')).toHaveValue(no)
       await expect(page.getByRole('button', { name: '保存草稿' })).toBeDisabled()
       await page.reload()

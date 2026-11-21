@@ -7,7 +7,6 @@ import { resolve } from 'node:path'
 import process from 'node:process'
 import { promisify } from 'node:util'
 import { afterEach, describe, expect, it } from 'vitest'
-import { runMigrations } from '../../app/lib/db/migrations'
 import { signatorySnapshot } from '../../app/lib/our-signatory/contract'
 import { readOurSignatories } from '../../app/lib/our-signatory/storage'
 import { createAuxiliaryContractTestInstance } from '../../server/utils/auxiliary-contract-test-instance'
@@ -16,7 +15,7 @@ import { readAuxiliaryContractScopeFacts, validateProductionAuxiliaryState } fro
 import { createProductionAuxiliaryContractService } from '../../server/utils/production-auxiliary-contract-service'
 import { createProductionConstructionScopeService } from '../../server/utils/production-construction-scope-service'
 import { financeRecordSnapshot } from '../../server/utils/production-finance-journal'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 import { constructionScopeCommand } from '../helpers/production-construction-scope-fixture'
 import { createSubcontractFixture } from '../helpers/production-subcontract-fixture'
 
@@ -35,8 +34,7 @@ async function productionFixture() {
   return { ...f, auxiliary: service, request }
 }
 async function nativeAuxiliary(f: Awaited<ReturnType<typeof productionFixture>>, legacy = false, specialIdentity = false, duplicateNumber = false, adoptedSignatory = false) {
-  const source = await createMemoryDb()
-  await runMigrations(source)
+  const source = await createMigratedMemoryDb()
   await source.execute('INSERT INTO projects(id,name) VALUES(\'legacy-aux-project\',\'原检测项目\')')
   await source.execute('INSERT INTO suppliers(id,name) VALUES(\'legacy-aux-supplier\',\'原检测商\')')
   await source.execute('ALTER TABLE contracts ADD COLUMN extension_integer INTEGER')

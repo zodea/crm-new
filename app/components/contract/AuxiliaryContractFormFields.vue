@@ -4,7 +4,7 @@ import type { ConstructionMainSelection } from '~/lib/construction-scope/contrac
 import type { LookupOption } from '~/lib/kit/lookup'
 import { AUXILIARY_CATEGORIES } from '~/lib/auxiliary-contract/contract'
 
-const props = defineProps<{ draft: AuxiliaryContractDraft, errors: Record<string, string>, fetchProjects: (keyword: string) => Promise<LookupOption[]>, fetchSuppliers: (keyword: string) => Promise<LookupOption[]>, fetchMains: (keyword: string) => Promise<LookupOption[]>, fetchSignatories: (keyword: string) => Promise<LookupOption[]>, constructionMain: ConstructionMainSelection | null }>()
+const props = defineProps<{ draft: AuxiliaryContractDraft, errors: Record<string, string>, fetchProjects: (keyword: string) => Promise<LookupOption[]>, fetchSuppliers: (keyword: string) => Promise<LookupOption[]>, fetchMains: (keyword: string) => Promise<LookupOption[]>, fetchSignatories: (keyword: string) => Promise<LookupOption[]>, constructionMain: ConstructionMainSelection | null, usesConstructionMain: boolean }>()
 const emit = defineEmits<{ patch: [patch: Partial<AuxiliaryContractDraft>], selectMain: [id: string | null], selectSignatory: [id: string | null] }>()
 const categories = computed(() => AUXILIARY_CATEGORIES[props.draft.kind].map(value => ({ key: value, label: value })))
 const fields = computed(() => [
@@ -44,13 +44,13 @@ function number(key: 'amount' | 'taxRate', event: Event) {
         <span class="field-label">类别 *</span><SelectFilter :model-value="draft.category" :options="categories" aria-label="合同类别" full-width @update:model-value="emit('patch', { category: $event })" /><span v-if="errors.category" class="field-error">{{ errors.category }}</span>
       </div>
       <template v-if="draft.kind === 'other_expense'">
-        <div v-if="draft.id && !constructionMain" class="field-block">
-          <span class="field-label">历史项目 *</span><LookupSelect :model-value="draft.projectId" :fetch="fetchProjects" :invalid="Boolean(errors.projectId)" placeholder="检索项目" @update:model-value="emit('patch', { projectId: $event })" /><span v-if="errors.projectId" class="field-error">{{ errors.projectId }}</span>
-          <p class="m-0 text-12px text-ink-soft">
+        <div v-if="!usesConstructionMain || (draft.id && !constructionMain)" class="field-block">
+          <span class="field-label">{{ usesConstructionMain ? '历史项目' : '项目' }} *</span><LookupSelect :model-value="draft.projectId" :fetch="fetchProjects" :invalid="Boolean(errors.projectId)" placeholder="检索项目" @update:model-value="emit('patch', { projectId: $event })" /><span v-if="errors.projectId" class="field-error">{{ errors.projectId }}</span>
+          <p v-if="usesConstructionMain" class="m-0 text-12px text-ink-soft">
             原工程关系保留；施工主合同在已有来源详情明确核实，不自动补关联。
           </p>
         </div>
-        <div class="field-block">
+        <div v-if="usesConstructionMain" class="field-block">
           <label class="field-label" for="aux-construction-main">工程名称 *</label><LookupSelect field="aux-construction-main" :model-value="constructionMain?.id ?? null" :fetch="fetchMains" :invalid="Boolean(errors.projectId || errors.constructionMain)" placeholder="搜索工程及施工主合同名称 / 编号" @update:model-value="emit('selectMain', $event)" /><span v-if="errors.projectId || errors.constructionMain" class="field-error">{{ errors.projectId || errors.constructionMain }}</span>
           <p v-if="draft.id && !constructionMain && draft.projectId" class="m-0 text-12px text-ink-soft">
             历史项目关系保留；未采用施工主合同，不自动补关联。

@@ -70,6 +70,19 @@ describe('中央 WBS 原子命令与真实数量来源', () => {
     expect(JSON.parse(evidence[0]!.snapshot_json)).toMatchObject({ knownValue: 8, value: null, missingCount: 1, unit: '㎡' })
     await expect(service.execute({ ...request, action: { ...group(), draft: { ...group().draft, name: '换内容' } } })).rejects.toMatchObject({ problem: { code: 'conflict' } })
   })
+  it('开发恢复只返回匹配工作区、本人、项目和动作的原回执，缺证明不解除未知状态', async () => {
+    const request = await command(group())
+    const descriptor = { commandId: request.commandId, workspaceId: request.workspaceId, actorId: request.actorId, family: 'schedule', targetId: request.projectId, action: request.action.kind }
+    const saved = await service.execute(request)
+    await expect(service.resolve(descriptor)).resolves.toEqual({ outcome: 'applied', result: saved })
+    await expect(service.resolve({ ...descriptor, action: 'set-baseline' })).rejects.toMatchObject({ problem: { code: 'conflict' } })
+    await expect(service.resolve({ ...descriptor, targetId: 'other' })).rejects.toMatchObject({ problem: { code: 'conflict' } })
+    await expect(service.resolve({ ...descriptor, workspaceId: 'foreign' })).rejects.toMatchObject({ problem: { code: 'forbidden' } })
+    await expect(service.resolve({ ...descriptor, commandId: 'missing-command' })).rejects.toMatchObject({ problem: { code: 'unavailable' } })
+    await quantities.withSchedule(query, db => db.execute('UPDATE schedule_command_receipts SET workspace_id = NULL, action = NULL WHERE command_id = ?', [request.commandId]))
+    await expect(service.resolve(descriptor)).rejects.toMatchObject({ problem: { code: 'unavailable' } })
+    await expect(service.execute(request)).resolves.toEqual(saved)
+  })
   it('陈旧量版本、外部来源变化、错项目和无写权均不留下半组', async () => {
     const request = await command(group())
     sources.version = 'sources-2'

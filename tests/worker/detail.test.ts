@@ -1,14 +1,12 @@
 import type { TestDb } from '../helpers/memory-db'
 import { afterEach, describe, expect, it } from 'vitest'
-import { runMigrations } from '~/lib/db/migrations'
 import { loadWorkerDetail } from '~/lib/worker/detail'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 let db: TestDb | null = null
 
 async function createDb() {
-  db = await createMemoryDb()
-  await runMigrations(db)
+  db = await createMigratedMemoryDb()
   return db
 }
 

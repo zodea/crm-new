@@ -1,15 +1,13 @@
 import type { TestDb } from '../helpers/memory-db'
 import { afterEach, beforeEach, expect, it } from 'vitest'
-import { runMigrations } from '~/lib/db/migrations'
 import { parseQuantityMigrationGraph, quantityMigrationTimestamp } from '~/lib/quantity/migration-graph'
 import { mapQuantityMigrationGraph } from '~/lib/quantity/migration-mapping'
 import { readQuantityMigrationGraphs } from '~/lib/quantity/migration-source'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 let memory: TestDb
 beforeEach(async () => {
-  memory = await createMemoryDb()
-  await runMigrations(memory)
+  memory = await createMigratedMemoryDb()
   await memory.execute('INSERT INTO projects (id, name) VALUES (?, ?)', ['p', '工程量项目'])
   await memory.execute('INSERT INTO buildings (id, project_id, code, name) VALUES (?, ?, ?, ?)', ['b', 'p', 'B', '一栋'])
   await memory.execute('INSERT INTO floors (id, building_id, code, name) VALUES (?, ?, ?, ?)', ['f', 'b', 'F', '一层'])

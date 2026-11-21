@@ -1,0 +1,765 @@
+{
+  "tests/auxiliary-contract/http.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/auxiliary-contract/migration.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/boq/central-building-invariants.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/boq/production-recovery.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/components/PayrollWorkbookState.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/construction-contract/http-repository.test.ts": {
+    "test/no-restricted-matchers": {
+      "count": 1
+    }
+  },
+  "tests/construction-contract/management-fee.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 6
+    }
+  },
+  "tests/contract/central-list-filters.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/contract/command-sessions.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 4
+    }
+  },
+  "tests/contract/construction-subcontract-signatory.test.ts": {
+    "test/no-restricted-matchers": {
+      "count": 2
+    },
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/contract/native-contract-prices.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/contract/our-signatory-repository.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/crew-worker/multi-enum-query.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/db/doc02-acceptance-warranty-migration.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 2
+    }
+  },
+  "tests/db/f3-finance-migrations.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 2
+    }
+  },
+  "tests/db/f4-material-migrations.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 4
+    }
+  },
+  "tests/db/f5-owner-subcontract-migrations.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 4
+    }
+  },
+  "tests/db/migrations.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 2
+    }
+  },
+  "tests/db/payment-approval-migration.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 2
+    }
+  },
+  "tests/db/soft-delete.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 2
+    }
+  },
+  "tests/delivery/central-service.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/delivery/controlled-migration.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/delivery/material-contracts.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/finance/expense-references.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/finance/forms.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/material-contract/http-repository.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 2
+    }
+  },
+  "tests/material-contract/repository-contract.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/migration/supplier-credential-source.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 2
+    }
+  },
+  "tests/migration/target-cost-source.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/migration/verified-snapshot.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/other-settlement/central.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/other-settlement/migration.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 3
+    }
+  },
+  "tests/other-settlement/native-owner-upgrade.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/owner-document/forms.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/owner-document/project-penalty-central.test.ts": {
+    "test/no-restricted-matchers": {
+      "count": 2
+    }
+  },
+  "tests/owner-document/subcontract-settlement-central.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/payroll/c1-spec-independent.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 3
+    }
+  },
+  "tests/payroll/c1-worker-facts.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/payroll/central-a-book-history-gaps.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/payroll/central-a-codec.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 4
+    }
+  },
+  "tests/payroll/central-a-fees-integrity.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 3
+    }
+  },
+  "tests/payroll/central-a-fees-removal.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 2
+    }
+  },
+  "tests/payroll/central-a-fees-runtime-options.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 2
+    }
+  },
+  "tests/payroll/central-a-fees.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 2
+    }
+  },
+  "tests/payroll/central-a-hollow-incomplete-form.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/payroll/central-a-management-ownership.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/payroll/central-a-prices-migration.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 4
+    }
+  },
+  "tests/payroll/central-adjustment-imported-integrity.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/payroll/central-adjustment-migrated-mapping.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 3
+    }
+  },
+  "tests/payroll/central-adjustments-http.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/payroll/central-attendance-service.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 3
+    }
+  },
+  "tests/payroll/central-c1-codec.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 2
+    }
+  },
+  "tests/payroll/central-c1-commands.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/payroll/central-c1-http.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 4
+    }
+  },
+  "tests/payroll/central-c1-independent.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 3
+    }
+  },
+  "tests/payroll/central-c1-service.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/payroll/central-c2-codec.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 8
+    }
+  },
+  "tests/payroll/central-c2-commands.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 3
+    }
+  },
+  "tests/payroll/central-c2-detail.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/payroll/central-c2-independent.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 4
+    }
+  },
+  "tests/payroll/central-c2-invalid-migration.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/payroll/central-daywork-service.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/payroll/central-hollow-deduction.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/payroll/central-host-read.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 2
+    }
+  },
+  "tests/payroll/central-numbering-integrity.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 2
+    }
+  },
+  "tests/payroll/central-service.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 2
+    }
+  },
+  "tests/payroll/central-workbook.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 2
+    }
+  },
+  "tests/payroll/crew-fee-default-facts.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/payroll/fees-migration-graph.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 4
+    }
+  },
+  "tests/payroll/fees-migration-runtime.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 3
+    }
+  },
+  "tests/payroll/hollow-deduction-command.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 6
+    }
+  },
+  "tests/payroll/hollow-migration-adjustments.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/payroll/hollow-migration-graph.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 3
+    }
+  },
+  "tests/payroll/hollow-migration-integrity.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 3
+    }
+  },
+  "tests/payroll/hollow-migration-proof-package.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 5
+    }
+  },
+  "tests/payroll/hollow-migration-runtime.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/payroll/numbering-controlled-migration.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/payroll/numbering-export.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/payroll/numbering-http.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/payroll/numbering-migration-chain.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 2
+    }
+  },
+  "tests/payroll/signed-daywork.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/payroll/subject-facts.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/payroll/workbook-controlled-migration.test.ts": {
+    "test/no-restricted-matchers": {
+      "count": 4
+    }
+  },
+  "tests/payroll/workbook-export.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 2
+    }
+  },
+  "tests/payroll/workbook-http.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/production/backup-package.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 2
+    }
+  },
+  "tests/production/backup-quotation.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/production/backup-retention.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/production/backup-ui-state.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/production/customer-pending.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 2
+    }
+  },
+  "tests/production/finance-storage.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 3
+    }
+  },
+  "tests/production/finance-verification.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/production/material-contract-storage.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/production/owner-documents-storage.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/production/payroll-storage.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/production/project-pending.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 2
+    }
+  },
+  "tests/production/quantity-migration.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/production/quantity-storage.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/production/storage-boundaries.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/production/supplier-business-facts.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/production/supplier-pending.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 3
+    }
+  },
+  "tests/quantity/central-completion.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 3
+    }
+  },
+  "tests/quantity/central-photo.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/quantity/command-recovery.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/quantity/controlled-migration.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/quantity/hollow-migration.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 4
+    }
+  },
+  "tests/quantity/migration-graph.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 3
+    }
+  },
+  "tests/quantity/request.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 3
+    }
+  },
+  "tests/read-model/pagination.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 2
+    }
+  },
+  "tests/receipt/command-session.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 3
+    }
+  },
+  "tests/receipt/commands.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/receipt/read.test.ts": {
+    "test/no-restricted-matchers": {
+      "count": 1
+    }
+  },
+  "tests/receipt/request.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/schedule/central-binding.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 3
+    }
+  },
+  "tests/schedule/central-date.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/schedule/central-request.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 3
+    }
+  },
+  "tests/schedule/process-library-migration.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/server/contract-read-meta.test.ts": {
+    "test/no-restricted-matchers": {
+      "count": 3
+    }
+  },
+  "tests/server/crew-worker-read-meta.test.ts": {
+    "test/no-restricted-matchers": {
+      "count": 3
+    }
+  },
+  "tests/server/customer-construction-contract-central.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 2
+    }
+  },
+  "tests/server/customer-receipt-source.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 2
+    }
+  },
+  "tests/server/quantity-database.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 2
+    }
+  },
+  "tests/server/quantity-hollow-migration.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 4
+    }
+  },
+  "tests/server/quantity-migration.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 2
+    }
+  },
+  "tests/server/wbs-migration.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/stores/attendance-central.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 5
+    }
+  },
+  "tests/stores/boq-building.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/stores/boq-production-pending.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/stores/crew-worker-membership.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/stores/daywork-central.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 3
+    }
+  },
+  "tests/stores/payroll-a-central.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 3
+    }
+  },
+  "tests/stores/payroll-a-fees-pending.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 5
+    }
+  },
+  "tests/stores/payroll-a-pending-read.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 3
+    }
+  },
+  "tests/stores/payroll-a-release-read.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 3
+    }
+  },
+  "tests/stores/payroll-adjustments-central.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 4
+    }
+  },
+  "tests/stores/payroll-c2-central.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 6
+    }
+  },
+  "tests/stores/payroll-hollow-pending.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 7
+    }
+  },
+  "tests/stores/process-library-central-state.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 3
+    }
+  },
+  "tests/stores/schedule-central-state.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 5
+    }
+  },
+  "tests/stores/supplier-credential-state.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/stores/supplier-persistent-command.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 3
+    }
+  },
+  "tests/stores/supplier-taxpayer.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/stores/target-cost-central.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 6
+    }
+  },
+  "tests/stores/target-cost-pending-storage.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 2
+    }
+  },
+  "tests/subcontract-contract/http-repository.test.ts": {
+    "test/no-restricted-matchers": {
+      "count": 1
+    }
+  },
+  "tests/supplier/credential-central.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 2
+    }
+  },
+  "tests/supplier/credential-migration.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 2
+    }
+  },
+  "tests/supplier/credential-request.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 5
+    }
+  },
+  "tests/supplier/import-command.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/supplier/repository-contract.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 8
+    }
+  },
+  "tests/supplier/taxpayer-repository.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  },
+  "tests/target-cost/files.test.ts": {
+    "test/require-to-throw-message": {
+      "count": 1
+    }
+  }
+}

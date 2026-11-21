@@ -232,7 +232,7 @@ async function save(action: FormFooterAction) {
     return
   }
   const saveAction: F2SaveAction = action === 'draft' ? 'draft' : action === 'saveSubmit' ? 'submit' : 'save'
-  if (!draft.value.id && !constructionMain.value) {
+  if (!draft.value.id && context.value.constructionMains && !constructionMain.value) {
     warning('新建时必须搜索并选择实际工程对应的施工主合同')
     return
   }
@@ -393,7 +393,7 @@ useTabTitle(title)
         </button>
       </section>
       <ContractFormFields kind="material" :editing="isEditing" :draft="draft" :field-errors="fieldErrors" :fetch-projects="fetchProjects" :fetch-customers="emptyLookup" :fetch-suppliers="fetchSuppliers" :fetch-original-contracts="fetchOriginalContracts" :fetch-other-expense-contracts="emptyLookup" @patch="patchDraft" @clear-error="clearFieldError">
-        <template v-if="!draft.id" #project-field>
+        <template v-if="!draft.id && context?.constructionMains" #project-field>
           <label class="field-block">
             <span class="field-label">工程名称 *</span>
             <LookupSelect :model-value="constructionMain?.id ?? null" :fetch="fetchEngineering" :disabled-reason="commandSession.pending ? '请先核对原提交' : undefined" placeholder="搜索工程及施工主合同" @update:model-value="selectEngineering" />
@@ -403,7 +403,7 @@ useTabTitle(title)
       <section v-if="draft.isSupplement && originalContract" class="panel p-3 text-12px" aria-label="原合同继承信息">
         项目：{{ context?.projects.find(row => row.id === originalContract?.projectId)?.label ?? '未记录' }} · 分供方：{{ context?.suppliers.find(row => row.id === originalContract?.supplierId)?.label ?? '未记录' }}；归属由原合同继承。
       </section>
-      <label v-if="!draft.id && draft.isSupplement" class="field-block panel p-4">
+      <label v-if="!draft.id && draft.isSupplement && context?.constructionMains" class="field-block panel p-4">
         <span class="field-label">工程名称 *</span>
         <LookupSelect :model-value="constructionMain?.id ?? null" :fetch="fetchEngineering" :disabled-reason="commandSession.pending ? '请先核对原提交' : originalContract?.constructionMain ? '继承原合同工程' : undefined" placeholder="搜索原合同工程对应的施工主合同" @update:model-value="selectEngineering" />
       </label>

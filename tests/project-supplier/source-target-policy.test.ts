@@ -4,7 +4,7 @@ import { isVerifiedProjectSupplierSourceTarget } from '~/lib/project-supplier/so
 describe('项目分供方源单目标策略', () => {
   it.each([
     ['demo', 'contract', 'detail', true],
-    ['demo', 'payment-application', 'detail', true],
+    ['demo', 'payment-application', 'detail', false],
     ['real', 'contract', 'detail', false],
     ['demo', 'invoice', 'detail', false],
     ['demo', 'payment-record', 'detail', false],

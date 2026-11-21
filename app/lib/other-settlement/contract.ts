@@ -4,7 +4,11 @@ import type { ContractFormAttachment, ContractFormAttachmentChanges } from '../c
 import type { ExpenseClearanceAllocationDTO, ExpenseClearanceAllocationInput, ExpenseClearanceLink, ExpenseClearanceLinkEdit } from '../finance/clearance-verification'
 
 export const OTHER_SETTLEMENT_PATH = '/contract/other-settlement'
-export const OTHER_SETTLEMENT_STATUS_LABELS: Record<string, string> = { draft: '草稿', pending: '待确认', confirmed: '已确认', 已确认: '已确认' }
+export const OTHER_SETTLEMENT_STATUS_LABELS: Record<string, string> = { draft: '草稿', pending: '待确认', confirmed: '已确认' }
+
+export function canonicalOtherSettlementStatus(status: string): string {
+  return status === '已确认' ? 'confirmed' : status
+}
 export interface OtherSettlementExpenseInput {
   originalExpenseLineId: string
   sourceVersion: string

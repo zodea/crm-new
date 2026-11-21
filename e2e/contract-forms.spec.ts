@@ -338,8 +338,11 @@ test.describe('F2 canonical 合同与支出结算整页表单', () => {
     await page.getByLabel('结算日期 *').fill('2026-07-25')
     await page.getByRole('checkbox', { name: '【保存】后关闭' }).uncheck()
     await page.getByRole('button', { name: '保存并提交' }).click()
+    const settlementCommand = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/api/commands/other-settlements')
     await page.getByRole('dialog').getByRole('button', { name: '提交', exact: true }).click()
-    await expect(page).toHaveURL(/\/contract\/other-settlement\/form\/[^/?]+(?:\?|$)/)
+    const settlementResult = await settlementCommand
+    expect(settlementResult.ok(), await settlementResult.text()).toBe(true)
+    await expect(page).toHaveURL(/\/contract\/other-settlement\/form\/[^/?]+(?:\?|$)/, { timeout: 15_000 })
     await expect(page.getByRole('button', { name: '确认结算', exact: true })).toBeEnabled()
     const settlementId = new URL(page.url()).pathname.split('/').at(-1)!
     const settlementRead = await page.request.get(`/api/read/other-settlements/${settlementId}`, { params: { origin: 'real' } })

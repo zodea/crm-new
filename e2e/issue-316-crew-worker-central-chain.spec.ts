@@ -1,7 +1,7 @@
 import type { APIRequestContext, TestInfo } from '@playwright/test'
 import { Buffer } from 'node:buffer'
 import { expect, test } from '@playwright/test'
-import { expectNoPageOverflow, RESPONSIVE_WIDTHS } from './helpers/responsive'
+import { checkResponsiveWidths, expectNoPageOverflow, RESPONSIVE_WIDTHS } from './helpers/responsive'
 
 const DATA_VISIBILITY_STORAGE_KEY = 'ruihang:workspace-default:include-demo'
 function testSession(testInfo: TestInfo) {
@@ -218,6 +218,7 @@ test.describe('Issue #316：班组—工人中央关系链', () => {
     await expect(page.getByRole('heading', { name: '虞建华' })).toBeVisible()
 
     await page.getByRole('link', { name: '2026-07工资单' }).click()
+    await expect(page).toHaveURL(url => url.pathname === '/subcontract/payroll/wage-demo-1', { timeout: 20_000 })
     await expect(page.getByRole('heading', { name: '2026-07工资单' })).toBeFocused()
     await expect(page.getByText('历史未记录', { exact: true })).toBeVisible()
     await page.getByRole('link', { name: '返回来源详情' }).click()
@@ -423,38 +424,45 @@ test.describe('Issue #316：班组—工人中央关系链', () => {
     })
   }
 
-  for (const width of [...RESPONSIVE_WIDTHS, 1280].sort((a, b) => a - b)) {
-    test(`${width}px 班组工人列表—详情—表单无页面级横滚`, async ({ page }, testInfo) => {
-      const sessionId = testSession(testInfo)
-      const crewId = await createFormalCrew(page.context().request, sessionId, `-${width}`)
-      const workerId = await createFormalWorker(page.context().request, sessionId, crewId)
-      await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
-      await page.goto('/base/worker')
-      await expect(page.getByRole('heading', { name: '工人资料库' })).toBeVisible({ timeout: 20_000 })
-      await expectNoPageOverflow(page, `#316 工人列表 @ ${width}px`)
-      await page.goto(`/base/worker/${workerId}?origin=real`)
-      await expect(page.getByRole('heading', { name: '中央链路工人' })).toBeVisible()
-      await expectNoPageOverflow(page, `#316 工人详情 @ ${width}px`)
-      await page.getByRole('link', { name: '编辑', exact: true }).click()
-      await expect(page.getByRole('heading', { name: '编辑 · 工人' })).toBeVisible()
-      await expectNoPageOverflow(page, `#316 工人表单 @ ${width}px`)
-      const workerName = page.getByLabel('姓名 *')
-      await workerName.focus()
-      await expect(workerName).toBeFocused()
-      await page.keyboard.press('Tab')
-      expect(await page.evaluate(() => document.activeElement?.tagName)).not.toBe('BODY')
-      await page.getByRole('group', { name: '表单操作' }).getByRole('button', { name: '保存', exact: true }).scrollIntoViewIfNeeded()
-      await expect(page.getByRole('group', { name: '表单操作' }).getByRole('button', { name: '保存', exact: true })).toBeInViewport()
+  test('多档视口班组工人列表—详情—表单无页面级横滚', async ({ page }, testInfo) => {
+    test.slow()
+    const sessionId = testSession(testInfo)
+    const crewId = await createFormalCrew(page.request, sessionId, '-布局')
+    const workerId = await createFormalWorker(page.request, sessionId, crewId)
+    const widths = [...RESPONSIVE_WIDTHS, 1280].sort((a, b) => a - b)
+    for (const entity of [
+      { kind: 'worker', id: workerId, label: '工人', name: '中央链路工人' },
+      { kind: 'crew', id: crewId, label: '班组', name: '中央泥水班组-布局' },
+    ]) {
+      const { kind, id, label, name } = entity
+      await page.goto(`/base/${kind}`)
+      await expect(page.getByRole('heading', { name: `${label}资料库` })).toBeVisible({ timeout: 45_000 })
+      await checkResponsiveWidths(page, widths, width => expectNoPageOverflow(page, `#316 ${label}列表 @ ${width}px`))
 
-      await page.goto('/base/crew')
-      await expect(page.getByRole('heading', { name: '班组资料库' })).toBeVisible()
-      await expectNoPageOverflow(page, `#316 班组列表 @ ${width}px`)
-      await page.goto(`/base/crew/${crewId}?origin=real`)
-      await expect(page.getByRole('heading', { name: `中央泥水班组-${width}` })).toBeVisible()
-      await expectNoPageOverflow(page, `#316 班组详情 @ ${width}px`)
-      await page.getByRole('link', { name: '编辑', exact: true }).click()
-      await expect(page.getByRole('heading', { name: '编辑 · 班组' })).toBeVisible()
-      await expectNoPageOverflow(page, `#316 班组表单 @ ${width}px`)
-    })
-  }
+      await page.goto(`/base/${kind}/${id}?origin=real`)
+      await expect(page.getByRole('heading', { name })).toBeVisible()
+      const edit = page.getByRole('link', { name: '编辑', exact: true })
+      await checkResponsiveWidths(page, widths, async (width) => {
+        await expectNoPageOverflow(page, `#316 ${label}详情 @ ${width}px`)
+        const target = await edit.getAttribute('href')
+        expect(new URL(target!, page.url()).pathname).toBe(`/base/${kind}/form/${id}`)
+        await edit.click({ trial: true })
+      })
+      await edit.click()
+      await expect(page.getByRole('heading', { name: `编辑 · ${label}` })).toBeVisible()
+      await checkResponsiveWidths(page, widths, async (width) => {
+        await expectNoPageOverflow(page, `#316 ${label}表单 @ ${width}px`)
+        if (kind === 'worker') {
+          const workerName = page.getByLabel('姓名 *')
+          await workerName.focus()
+          await expect(workerName).toBeFocused()
+          await page.keyboard.press('Tab')
+          expect(await page.evaluate(() => document.activeElement?.tagName)).not.toBe('BODY')
+          const save = page.getByRole('group', { name: '表单操作' }).getByRole('button', { name: '保存', exact: true })
+          await save.scrollIntoViewIfNeeded()
+          await expect(save).toBeInViewport()
+        }
+      })
+    }
+  })
 })

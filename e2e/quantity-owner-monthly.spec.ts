@@ -12,14 +12,14 @@ async function setupMonthly(request: APIRequestContext) {
   const headers = { 'x-ruihang-test-session': `quantity-monthly-${randomUUID()}` }
   const session = await (await request.get('/api/read/business-session', { headers })).json()
   const create = async (entity: string, capability: string, draft: Record<string, unknown>, action = 'draft') => {
-    const response = await request.post(`/api/commands/${entity}`, { headers, data: { ...session, requiredCapability: capability, commandId: randomUUID(), baseVersion: null, action, draft, attachments: {} } })
+    const response = await request.post(`/api/commands/${entity}`, { headers, data: { workspaceId: session.workspaceId, actorId: session.actorId, requiredCapability: capability, commandId: randomUUID(), baseVersion: null, action, draft, attachments: {} } })
     expect(response.ok(), await response.text()).toBe(true)
     return response.json()
   }
   const project = await create('projects', 'project:write', { name: '月报当前链合成项目', manager: '合成经办人', status: '筹备中' })
   const projectId = project.id as string
   const contract = await create('construction-contracts', 'construction-contract:write', { name: '月报当前链施工合同', projectId, content: '合成验收', signDate: '2026-09-11', amount: 5200 })
-  const ownerEnvelope = { ...session, requiredCapability: 'owner-document:write', kind: 'owner_change', attachments: { add: [], removeIds: [], restoreIds: [] } }
+  const ownerEnvelope = { workspaceId: session.workspaceId, actorId: session.actorId, requiredCapability: 'owner-document:write', kind: 'owner_change', attachments: { add: [], removeIds: [], restoreIds: [] } }
   const changeResponse = await request.post('/api/commands/owner-documents', { headers, data: { ...ownerEnvelope, commandId: randomUUID(), action: 'submit', id: null, baseVersion: null, draft: { name: '新增验收清单', reason: '合成端到端测试', projectId, contractId: contract.id, applicationDate: '2026-09-11', lines: [{ operation: 'add', itemName: '墙面抹灰', unit: '㎡', deltaQty: 100, newUnitPrice: 52 }] } } })
   expect(changeResponse.ok(), await changeResponse.text()).toBe(true)
   const change = await changeResponse.json()
@@ -34,7 +34,7 @@ async function setupMonthly(request: APIRequestContext) {
   }
   let version = (await read('/api/read/quantity/region')).sourceVersion
   const execute = async (action: QuantityCommand['action']) => {
-    const response = await request.post('/api/commands/quantity', { headers, data: { ...session, projectId, origin: 'real', requiredCapability: 'quantity:write', commandId: randomUUID(), baseVersion: version, action } })
+    const response = await request.post('/api/commands/quantity', { headers, data: { workspaceId: session.workspaceId, actorId: session.actorId, projectId, origin: 'real', requiredCapability: 'quantity:write', commandId: randomUUID(), baseVersion: version, action } })
     expect(response.ok(), await response.text()).toBe(true)
     const result = await response.json()
     version = result.sourceVersion
@@ -77,7 +77,7 @@ test('当前清单、中央完工与甲方月报经真实 HTTP 联通，三量�
   expect(field).toEqual([expect.objectContaining({ id: boq.id, autoQty: 6, missingQtyCount: 0 })])
   expect(await read('/api/commands/owner-documents/boq-lines', { ...monthlyQuery, quantityBasis: 'contract' })).toEqual([expect.objectContaining({ autoQty: 0, missingQtyCount: 0 })])
   expect(await read('/api/commands/owner-documents/boq-lines', { ...monthlyQuery, quantityBasis: 'provisional' })).toEqual([expect.objectContaining({ autoQty: 0, missingQtyCount: 1 })])
-  const response = await request.post('/api/commands/owner-documents', { headers, data: { ...session, requiredCapability: 'owner-document:write', commandId: randomUUID(), kind: 'owner_report', action: 'submit', id: null, baseVersion: null, draft: { ...monthlyQuery, applicationDate: '2026-09-11', quantityBasis: 'field', lines: [{ boqLineId: boq.id }] }, attachments: { add: [], removeIds: [], restoreIds: [] } } })
+  const response = await request.post('/api/commands/owner-documents', { headers, data: { workspaceId: session.workspaceId, actorId: session.actorId, requiredCapability: 'owner-document:write', commandId: randomUUID(), kind: 'owner_report', action: 'submit', id: null, baseVersion: null, draft: { ...monthlyQuery, applicationDate: '2026-09-11', quantityBasis: 'field', lines: [{ boqLineId: boq.id }] }, attachments: { add: [], removeIds: [], restoreIds: [] } } })
   expect(response.ok(), await response.text()).toBe(true)
   const report = await response.json()
   const before = await read(`/api/commands/owner-documents/owner_report/${report.id}/form`, {})

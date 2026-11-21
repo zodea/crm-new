@@ -1,12 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { runMigrations } from '~/lib/db/migrations'
 import { loadProjectExpenditureRelations } from '~/lib/project/expenditure-relations'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 describe('project expenditure relation read model', () => {
-  it('keeps real foreign-key ownership and formal amount boundaries', async () => {
-    const db = await createMemoryDb()
-    await runMigrations(db)
+  it('keeps real foreign-key ownership and formal amount boundaries', async ({ onTestFinished }) => {
+    const db = await createMigratedMemoryDb()
+    onTestFinished(db.close)
     await db.execute(`INSERT INTO customers (id, name) VALUES ('customer-expense', '支出客户')`)
     await db.execute(`
       INSERT INTO projects (id, name, customer_id)

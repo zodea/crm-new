@@ -19,6 +19,7 @@ import { validateFinanceJournal } from '../../server/utils/production-finance-jo
 import { createProductionFinanceService } from '../../server/utils/production-finance-service'
 import { createProductionOtherSettlementService, readProductionOtherSettlementReference } from '../../server/utils/production-other-settlement-service'
 import { createProductionPayrollService } from '../../server/utils/production-payroll-service'
+import { createProductionStorage } from '../../server/utils/production-storage'
 import { createProductionSubcontractContractService } from '../../server/utils/production-subcontract-contract-service'
 import { constructionScopeCommand, createConstructionScopeFixture } from '../helpers/production-construction-scope-fixture'
 
@@ -314,12 +315,15 @@ it('真实其他支出合同同tx关联后进入Other候选和承诺，公司头
     const source = { domain: 'auxiliary-contract' as const, id: saved.id }
     const original = constructionScopeCommand(await f.scope.read(source, f.session), 'scope-aux-exact-original', f.main.id)
     const linked = await f.scope.execute(original, f.session)
-    const descriptor = { commandId: original.commandId, workspaceId: f.actor.workspaceId, actorId: f.actor.actorId, family: 'construction-scope', action: 'bind', targetId: constructionScopeSourceKey(source), scopeId: saved.id }
+    const descriptor: CommandRecoveryDescriptor = { commandId: original.commandId, workspaceId: f.actor.workspaceId, actorId: f.actor.actorId, family: 'construction-scope', action: 'bind', targetId: constructionScopeSourceKey(source), scopeId: saved.id }
     await expect(f.scope.resolve({ ...descriptor, scopeId: f.expense.id }, f.session)).rejects.toMatchObject({ problem: { code: 'conflict' } })
     await f.storage.close()
-    const child = await promisify(execFile)(process.execPath, [resolve('node_modules/vite-node/dist/cli.mjs'), '--config', resolve('vitest.config.ts'), resolve('tests/helpers/production-construction-scope-cold.ts')], { windowsHide: true, cwd: resolve('.'), env: { ...process.env, CRM_CONSTRUCTION_SCOPE_COLD: JSON.stringify({ options: f.options, actor: f.actor, descriptors: [descriptor] }) } })
-    expect(JSON.parse(child.stdout).results).toEqual([{ outcome: 'applied', result: linked }])
-    await f.storage.withTransaction(validateProductionConstructionScopeState)
+    const reopened = createProductionStorage(f.options)
+    try {
+      expect(await createProductionConstructionScopeService(reopened).resolve(descriptor, f.session)).toEqual({ outcome: 'applied', result: linked })
+      await reopened.withTransaction(validateProductionConstructionScopeState)
+    }
+    finally { await reopened.close() }
     f.actor.capabilities = f.actor.capabilities.filter(cap => cap !== 'auxiliary-contract:read')
     const denied = await other.context(f.session)
     expect(denied.contracts).toEqual([])

@@ -3,10 +3,9 @@ import type { TestDb } from '../helpers/memory-db'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { loadF2Form } from '~/lib/contract/forms'
-import { runMigrations } from '~/lib/db/migrations'
 import { restoreRecord, softDelete } from '~/lib/db/soft-delete'
 import { useContractStore } from '~/stores/contract'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 let mem: TestDb
 
@@ -58,12 +57,12 @@ vi.mock('~/lib/db/connection', () => ({
   },
 }))
 
-beforeEach(async () => {
+beforeEach(async ({ onTestFinished }) => {
   contractStoreTestState.failCompanyExpenseSelect = false
   contractStoreTestState.failCoreContractSelect = false
   contractStoreTestState.companyExpenseSelectOverrides = []
-  mem = await createMemoryDb()
-  await runMigrations(mem)
+  mem = await createMigratedMemoryDb()
+  onTestFinished(mem.close)
   await mem.execute(`INSERT INTO customers (id, name) VALUES ('customer-1', '演示客户')`)
   await mem.execute(`
     INSERT INTO projects (id, name, customer_id)

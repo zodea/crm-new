@@ -1,10 +1,9 @@
 import type { TestDb } from '../helpers/memory-db'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { runMigrations } from '~/lib/db/migrations'
 import { SCHEDULE_TASK_TEMPLATES } from '~/lib/schedule/template'
 import { useScheduleStore } from '~/stores/schedule'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 let mem: TestDb
 
@@ -36,8 +35,7 @@ vi.mock('~/lib/db/connection', () => ({
 }))
 
 beforeEach(async () => {
-  mem = await createMemoryDb()
-  await runMigrations(mem)
+  mem = await createMigratedMemoryDb()
   await mem.execute(`INSERT INTO projects (id, name) VALUES ('p1', '演示项目')`)
   await mem.execute(`INSERT INTO buildings (id, project_id, code, name) VALUES
     ('b1', 'p1', '1', '1栋'),

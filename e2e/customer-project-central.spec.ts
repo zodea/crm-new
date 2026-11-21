@@ -127,9 +127,9 @@ for (const input of CUSTOMER_INPUTS) {
       const secondary = await readCustomer(page, b.id)
       expect(secondary.projects[0]).toMatchObject({ relationRole: '次客户', project: { id: primary.projects[0].project.id } })
       expect((await readCustomer(page, c.id)).projects).toEqual([])
+      await page.goto(`/base/customer/${b.id}?origin=real`)
       for (const width of [390, 768, 1024, 1280, 1440]) {
         await page.setViewportSize({ width, height: width === 390 ? 844 : 1024 })
-        await page.goto(`/base/customer/${b.id}?origin=real`)
         const link = page.getByRole('link', { name: named('Excel关联项目424'), exact: true })
         await expect(link).toBeVisible()
         await expect(page.getByRole('tabpanel', { name: '名下项目' })).toContainText('次客户')

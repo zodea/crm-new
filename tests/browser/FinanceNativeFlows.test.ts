@@ -30,6 +30,7 @@ import { getPaymentApplicationSummary, listFinanceFormAttachments, loadFinanceFo
 import { F3_FORM_META, financeFormPath } from '~/lib/finance/page'
 import { loadFileRefContent } from '~/lib/forms/file-refs'
 import { useFinanceStore } from '~/stores/finance'
+import { checkFinanceViewports } from './finance-viewports'
 import 'vxe-pc-ui/lib/style.css'
 import 'vxe-table/lib/style.css'
 import '~/assets/css/vxe-theme.css'
@@ -188,7 +189,9 @@ describe('承接 finance-forms Native 写保护：真实 SFC、SQLite、store、
       const restored = await coldRead(input.kind, view.route.params.id!)
       expect(restored?.id).toBe(view.route.params.id)
       expect(view.feedback.error).not.toHaveBeenCalled()
-      expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(document.documentElement.clientWidth + 1)
+      await checkFinanceViewports(() => {
+        expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(document.documentElement.clientWidth + 1)
+      })
     })
   }
 
@@ -239,6 +242,7 @@ describe('承接 finance-forms Native 写保护：真实 SFC、SQLite、store、
     it(`${input.label}：公司付款无虚拟项目、真实申请分摊、人工确认和撤回`, async () => {
       const view = await mountForm('payment_application')
       await page.getByRole('button', { name: '公司付款', exact: true }).click()
+      await choose('检索分供方', '临时金', '个人临时金分供方')
       const name = `E2E公司付款-${input.label}`
       await field('finance-name').fill(name)
       await field('finance-amount').fill(input.amount)
@@ -250,8 +254,9 @@ describe('承接 finance-forms Native 写保护：真实 SFC、SQLite、store、
       await page.getByRole('button', { name: '保存并提交', exact: true }).click()
       await expect.poll(() => view.route.params.id).toBeTruthy()
       const applicationId = view.route.params.id!
-      expect(await loadFinanceForm('payment_application', applicationId)).toMatchObject({ projectId: null, name, applyAmount: Number(input.amount) })
+      expect(await loadFinanceForm('payment_application', applicationId)).toMatchObject({ projectId: null, supplierId: 'supplier-native', name, applyAmount: Number(input.amount) })
       await view.change('payment_record')
+      await choose('检索分供方', '临时金', '个人临时金分供方')
       await field('finance-name').fill(`E2E收款方-${input.label}`)
       await field('finance-date').fill(input.date)
       await field('finance-amount').fill(input.amount)
@@ -269,7 +274,7 @@ describe('承接 finance-forms Native 写保护：真实 SFC、SQLite、store、
       await expect.element(page.getByText('已人工确认', { exact: true })).toBeVisible()
       const paymentId = view.route.params.id!
       const confirmed = await coldRead('payment_record', paymentId)
-      expect(confirmed).toMatchObject({ id: paymentId, projectId: null, amount: Number(input.amount), paymentDate: input.date, voucherNo: `V-E2E-${input.label}`, bankSerialNo: `BANK-E2E-${input.label}`, confirmationStatus: 'confirmed', confirmedBy: 'E2E 财务' })
+      expect(confirmed).toMatchObject({ id: paymentId, projectId: null, supplierId: 'supplier-native', amount: Number(input.amount), paymentDate: input.date, voucherNo: `V-E2E-${input.label}`, bankSerialNo: `BANK-E2E-${input.label}`, confirmationStatus: 'confirmed', confirmedBy: 'E2E 财务' })
       expect(confirmed!.applicationAllocations).toEqual([expect.objectContaining({ paymentApplicationId: applicationId, allocatedAmount: Number(input.amount) })])
       expect((await getPaymentApplicationSummary(applicationId)).paidAmount).toBe(Number(input.amount))
       await field('unconfirm-payment').click()

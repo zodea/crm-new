@@ -29,7 +29,7 @@ it('c1 原金额原键在丢响应、换单和冷恢复期间固定，不与 A �
   const form = await store.loadC1Form({ origin: 'real' }, { statementId: 'c1' })
   const release = { actualAmount: 10, allocations: [{ workerId: 'w', amount: 10 }] }
   repo.executeC1.mockRejectedValueOnce(new Error('响应丢失'))
-  await expect(store.releaseC1(form, release)).rejects.toThrow()
+  await expect(store.releaseC1(form, release)).rejects.toThrow('响应丢失')
   release.actualAmount = 20
   const pending = store.getC1Pending(form)!
   expect(pending.command.action).toMatchObject({ release: { actualAmount: 10 } })
@@ -52,16 +52,16 @@ it('成功回执保原稿到同目标完整冷读，旧读、他人、其他单�
   await store.releaseC1(old, { actualAmount: 10, allocations: [{ workerId: 'w', amount: 10 }] })
   const pending = store.getC1Pending(old)!
   expect(pending.state).toBe('awaiting-read')
-  expect(() => store.acknowledgeC1(pending, old)).toThrow()
+  expect(() => store.acknowledgeC1(pending, old)).toThrow('原目标尚未完整读取确认')
   const other = await store.loadC1Form({ origin: 'real' }, { statementId: 'other' })
-  expect(() => store.acknowledgeC1(pending, other)).toThrow()
+  expect(() => store.acknowledgeC1(pending, other)).toThrow('原目标尚未完整读取确认')
   repo.c1Form.mockResolvedValueOnce(read('c1', 'other'))
   const foreign = await store.loadC1Form({ origin: 'real' }, { statementId: 'c1' })
-  expect(() => store.acknowledgeC1(pending, foreign)).toThrow()
+  expect(() => store.acknowledgeC1(pending, foreign)).toThrow('原目标尚未完整读取确认')
   const refreshed = await store.loadC1Form({ origin: 'real' }, { statementId: 'c1' })
-  expect(() => store.acknowledgeC1(pending, refreshed)).toThrow()
+  expect(() => store.acknowledgeC1(pending, refreshed)).toThrow('原目标尚未完整读取确认')
   repo.c1Output.mockRejectedValueOnce(new Error('冻结输出断线'))
-  await expect(store.loadC1Output({ origin: 'real' }, 'c1')).rejects.toThrow()
+  await expect(store.loadC1Output({ origin: 'real' }, 'c1')).rejects.toThrow('冻结输出断线')
   expect(store.getC1Pending(old)?.command).toEqual(pending.command)
   const output = await store.loadC1Output({ origin: 'real' }, 'c1')
   store.acknowledgeC1(pending, refreshed, output)
@@ -76,15 +76,15 @@ it('命令前已开始的读不算后读，撤权和本地改动读内容均保�
   const pending = store.getC1Pending(read())!
   resolve(read())
   const awaitRead = await inflight
-  expect(() => store.acknowledgeC1(pending, awaitRead)).toThrow()
+  expect(() => store.acknowledgeC1(pending, awaitRead)).toThrow('原目标尚未完整读取确认')
   repo.c1Form.mockResolvedValueOnce({ ...read(), context: { ...read().context, readonly: true, capabilities: ['payroll:read'] } })
   const revoked = await store.loadC1Form({ origin: 'real' }, { statementId: 'c1' })
-  expect(() => store.acknowledgeC1(pending, revoked)).toThrow()
+  expect(() => store.acknowledgeC1(pending, revoked)).toThrow('原目标尚未完整读取确认')
   const changed = await store.loadC1Form({ origin: 'real' }, { statementId: 'c1' })
   changed.draft.note = '本地改成其他证据'
-  expect(() => store.acknowledgeC1(pending, changed)).toThrow()
+  expect(() => store.acknowledgeC1(pending, changed)).toThrow('原目标尚未完整读取确认')
   const preview = await store.loadC1Form({ origin: 'real' }, { statementId: 'c1', draft: { note: '仍是预览，不是已存原单冷读' } })
-  expect(() => store.acknowledgeC1(pending, preview)).toThrow()
+  expect(() => store.acknowledgeC1(pending, preview)).toThrow('原目标尚未完整读取确认')
   expect(store.getC1Pending(read())?.command).toEqual(pending.command)
   const refreshed = await store.loadC1Form({ origin: 'real' }, { statementId: 'c1' })
   store.acknowledgeC1(pending, refreshed)
@@ -111,7 +111,7 @@ it('回执保存或最终确认的存储故障保命令，恢复仍发送原编�
   const absent = payrollProblem('stale-source', '矛盾的未应用回执')
   Object.assign(absent.problem, { commandId: original.command.commandId, commandOutcome: 'not-applied' })
   repo.executeC1.mockRejectedValueOnce(absent)
-  await expect(cold.recoverC1(original)).rejects.toThrow()
+  await expect(cold.recoverC1(original)).rejects.toThrow('矛盾的未应用回执')
   expect(cold.getC1Pending(read())?.state).toBe('awaiting-read')
   const refreshed = await cold.loadC1Form({ origin: 'real' }, { statementId: 'c1' })
   vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
@@ -132,7 +132,7 @@ it('新建按原 draftKey 保管成功回执，冷实例读取真实新单号才
   const cold = usePayrollC1Store()
   expect(cold.getC1Pending(original)).toEqual(pending)
   const wrong = await cold.loadC1Form({ origin: 'real' }, { statementId: 'other' })
-  expect(() => cold.acknowledgeC1(pending, wrong)).toThrow()
+  expect(() => cold.acknowledgeC1(pending, wrong)).toThrow('原目标尚未完整读取确认')
   const refreshed = await cold.loadC1Form({ origin: 'real' }, { statementId: 'created-c1' })
   cold.acknowledgeC1(pending, refreshed)
   expect(cold.getC1Pending(original)).toBeNull()
@@ -146,7 +146,7 @@ it('配置确认只接受原项目月份班组的冷读，成功回执不清零�
   const pending = store.getC1Pending(config)!
   expect(pending.command.action).toMatchObject({ rates: [{ dailyWage: 0, overtimeRate: null }] })
   const other = await store.loadC1Config({ origin: 'real' }, { ...config.scope, month: '2026-09' })
-  expect(() => store.acknowledgeC1(pending, other)).toThrow()
+  expect(() => store.acknowledgeC1(pending, other)).toThrow('原目标尚未完整读取确认')
   const refreshed = await store.loadC1Config({ origin: 'real' }, config.scope)
   store.acknowledgeC1(pending, refreshed)
   expect(store.getC1Pending(config)).toBeNull()
@@ -154,12 +154,12 @@ it('配置确认只接受原项目月份班组的冷读，成功回执不清零�
 it('拒权与不明错误保留原键，只有原命令明确未应用才释放，存储故障不发送', async () => {
   const store = usePayrollC1Store()
   repo.executeC1.mockRejectedValueOnce(payrollProblem('forbidden', '权限撤销'))
-  await expect(store.checkC1(read())).rejects.toThrow()
+  await expect(store.checkC1(read())).rejects.toThrow('权限撤销')
   const pending = store.getC1Pending(read())!
   const absent = payrollProblem('stale-source', '确认未应用')
   Object.assign(absent.problem, { commandId: pending.command.commandId, commandOutcome: 'not-applied' })
   repo.executeC1.mockRejectedValueOnce(absent)
-  await expect(store.recoverC1(pending)).rejects.toThrow()
+  await expect(store.recoverC1(pending)).rejects.toThrow('确认未应用')
   expect(store.getC1Pending(read())).toBeNull()
   const count = repo.executeC1.mock.calls.length
   vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {

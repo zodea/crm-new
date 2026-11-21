@@ -1,12 +1,11 @@
 import type { TestDb } from '../helpers/memory-db'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { runMigrations } from '~/lib/db/migrations'
 import { summarizeDeliveryAmounts } from '~/lib/delivery/review'
 import { buildMaterialPriceCatalog } from '~/lib/material/price-analysis'
 import { useDeliveryStore } from '~/stores/delivery'
 import { useDeliveryRecordStore } from '~/stores/delivery-record'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 let mem: TestDb
 vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => true }))
@@ -72,8 +71,7 @@ function ocrResponse(markdown: string, status = 200): Response {
 }
 
 beforeEach(async () => {
-  mem = await createMemoryDb()
-  await runMigrations(mem)
+  mem = await createMigratedMemoryDb()
   await mem.execute(`INSERT INTO projects (id, name) VALUES ('p1', '合和新城')`)
   await mem.execute(`INSERT INTO suppliers (id, name) VALUES ('s1', '广州示例建材有限公司')`)
   setActivePinia(createPinia())

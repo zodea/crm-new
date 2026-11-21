@@ -1,4 +1,5 @@
 import type { TransactionDb } from '../../app/lib/db/coordinator'
+import type { CommandResolution } from '../../app/lib/forms/command-recovery'
 import type { QuantityContext } from '../../app/lib/quantity/central-contract'
 import type { ScheduleAction, ScheduleCommand, ScheduleCommandResult, ScheduleRead, ScheduleReadQuery } from '../../app/lib/schedule/central-contract'
 import type { BusinessSession } from './business-session'
@@ -16,7 +17,7 @@ import { createScheduleEngine } from '../../app/lib/schedule/engine'
 import { loadScheduleHistory } from '../../app/lib/schedule/history'
 import { loadScheduleBuildingCoverage } from '../../app/lib/schedule/read-model'
 import { toLocalDateInputValue } from '../../app/lib/util/local-date'
-import { parseScheduleCommand, parseScheduleRead } from './schedule-request'
+import { parseScheduleCommand, parseScheduleRead, parseScheduleRecoveryDescriptor } from './schedule-request'
 import { synchronizeScheduleSources } from './schedule-sources'
 
 interface Options {
@@ -223,12 +224,33 @@ export function createScheduleService(options: Options) {
         await db.execute('INSERT INTO schedule_revisions (project_id, revision) VALUES (?, 1) ON CONFLICT(project_id) DO UPDATE SET revision = revision + 1', [command.projectId])
         const [revision] = await db.select<{ revision: number }>('SELECT revision FROM schedule_revisions WHERE project_id = ?', [command.projectId])
         const result: ScheduleCommandResult = { commandId: command.commandId, projectId: command.projectId, sourceVersion: sourceVersion.replace(/\+wbs:\d+\+/, `+wbs:${revision!.revision}+`), value: value ?? null }
-        await db.execute('INSERT INTO schedule_command_receipts (command_id, project_id, actor_id, fingerprint, result_json) VALUES (?, ?, ?, ?, ?)', [command.commandId, command.projectId, context.actorId, digest, JSON.stringify(result)])
+        await db.execute('INSERT INTO schedule_command_receipts (command_id, project_id, actor_id, fingerprint, result_json, workspace_id, action) VALUES (?, ?, ?, ?, ?, ?, ?)', [command.commandId, command.projectId, context.actorId, digest, JSON.stringify(result), context.workspaceId, command.action.kind])
         return result
       }).catch((cause) => {
         if (confirmedAbsent && (cause instanceof ProjectRepositoryProblem || cause instanceof QuantityRepositoryProblem) && ['validation-failed', 'stale-source', 'relationship-mismatch', 'not-found'].includes(cause.problem.code))
           Object.assign(cause.problem, { commandId: command.commandId, commandOutcome: 'not-applied' })
         throw cause
+      })
+    },
+    async resolve(input: unknown, sessionId?: string | null): Promise<CommandResolution<ScheduleCommandResult>> {
+      const descriptor = parseScheduleRecoveryDescriptor(input)
+      const requested = options.session(sessionId)
+      authorize(requested, true)
+      if (descriptor.workspaceId !== requested.workspaceId || descriptor.actorId !== requested.actorId)
+        throw scheduleProblem('forbidden', '原WBS命令与当前可信身份不匹配')
+      return run({ projectId: descriptor.targetId, origin: 'real', includeDemo: false }, sessionId, async (db, _engine, _sourceVersion, _sources, context) => {
+        authorize(context, true)
+        if (descriptor.workspaceId !== context.workspaceId || descriptor.actorId !== context.actorId)
+          throw scheduleProblem('forbidden', '原WBS命令与当前可信身份不匹配')
+        const [receipt] = await db.select<{ project_id: string, actor_id: string, workspace_id: string | null, action: string | null, result_json: string }>('SELECT project_id, actor_id, workspace_id, action, result_json FROM schedule_command_receipts WHERE command_id = ?', [descriptor.commandId])
+        if (!receipt?.workspace_id || !receipt.action)
+          throw scheduleProblem('unavailable', '开发排程尚未核对到完整的原提交回执，请保留原编号')
+        if (receipt.project_id !== descriptor.targetId || receipt.actor_id !== descriptor.actorId || receipt.workspace_id !== descriptor.workspaceId || receipt.action !== descriptor.action)
+          throw scheduleProblem('conflict', '恢复目标、动作或身份与原回执不一致')
+        const result = JSON.parse(receipt.result_json) as ScheduleCommandResult
+        if (result?.commandId !== descriptor.commandId || result.projectId !== descriptor.targetId || !result.sourceVersion || !('value' in result))
+          throw scheduleProblem('unavailable', '开发排程的原回执内容无法核对，请保留原编号')
+        return { outcome: 'applied' as const, result }
       })
     },
   }

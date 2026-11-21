@@ -2,11 +2,10 @@ import type { TestDb } from '../helpers/memory-db'
 import type { QuantityCommand } from '~/lib/quantity/central-contract'
 import { afterEach, beforeEach, expect, it } from 'vitest'
 import { createDbCoordinator } from '~/lib/db/coordinator'
-import { runMigrations } from '~/lib/db/migrations'
 import { createQuantityService } from '~/lib/quantity/central-service'
 import { decodeQuantityAssignments } from '~/lib/quantity/central-workspace-decoder'
 import { blankQuantityTemplateDraft } from '~/lib/quantity/template'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 let memory: TestDb
 const context = { workspaceId: 'workspace', actorId: 'actor', capabilities: ['project:list:read', 'quantity:read', 'quantity:write', 'crew:list:read', 'worker:list:read'] }
@@ -14,8 +13,7 @@ const query = { projectId: 'project', origin: 'real' as const, includeDemo: fals
 let people = [{ id: 'crew', kind: 'crew' as const, name: '当前班组', trade: '泥水工', trades: ['泥水工'], itemNames: [], dataOrigin: 'real' as 'real' | 'demo' }]
 
 beforeEach(async () => {
-  memory = await createMemoryDb()
-  await runMigrations(memory)
+  memory = await createMigratedMemoryDb()
   people = [{ id: 'crew', kind: 'crew', name: '当前班组', trade: '泥水工', trades: ['泥水工'], itemNames: [], dataOrigin: 'real' }]
 })
 afterEach(() => memory.close())

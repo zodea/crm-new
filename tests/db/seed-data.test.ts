@@ -3,9 +3,8 @@ import type { TestDb } from '../helpers/memory-db'
 // 用 fs 直读 JSON + 内存库实插(复刻 seed.ts 的 INSERT OR IGNORE 语义),不依赖浏览器端 seed.ts。
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { runMigrations } from '~/lib/db/migrations'
 import { selectVisibleSql } from '~/lib/db/soft-delete'
-import { columnNames, createMemoryDb } from '../helpers/memory-db'
+import { columnNames, createMigratedMemoryDb } from '../helpers/memory-db'
 
 type SeedRow = Record<string, unknown>
 
@@ -29,8 +28,7 @@ async function insertRows(db: TestDb, table: string, rows: SeedRow[]) {
 }
 
 async function seededDb(): Promise<TestDb> {
-  const db = await createMemoryDb()
-  await runMigrations(db)
+  const db = await createMigratedMemoryDb()
   for (const t of SEED_TABLES) await insertRows(db, t, loadSeed(t))
   return db
 }
@@ -39,8 +37,7 @@ const round2 = (n: number) => Math.round(n * 100) / 100
 
 describe('seed 数据:结构与 schema 对齐', () => {
   it('每张 seed 表的行列名都是真实列;不带 deleted_at(默认 NULL 过软删过滤)', async () => {
-    const db = await createMemoryDb()
-    await runMigrations(db)
+    const db = await createMigratedMemoryDb()
     for (const t of SEED_TABLES) {
       const cols = await columnNames(db, t)
       for (const row of loadSeed(t)) {

@@ -1,18 +1,16 @@
 import { expect, it } from 'vitest'
-import { runMigrations } from '~/lib/db/migrations'
 import { initializeQuantityHollowSchema } from '~/lib/quantity/central-hollow-schema'
 import { proveQuantityHollowMigrationGraph } from '~/lib/quantity/hollow-migration-proof'
 import { parseQuantityMigrationGraph } from '~/lib/quantity/migration-graph'
 import { isQuantitySourceIdentity } from '~/lib/quantity/migration-identity'
 import { mapQuantityMigrationGraph } from '~/lib/quantity/migration-mapping'
 import { readQuantityMigrationGraphs } from '~/lib/quantity/migration-source'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 import { createQuantityHollowFixture } from '../helpers/quantity-hollow-fixture'
 
 it('空鼓来源只出现部分新表时拒绝导出，不将检查记录静默丢回旧工程量图', async () => {
-  const database = await createMemoryDb()
+  const database = await createMigratedMemoryDb()
   try {
-    await runMigrations(database)
     await database.execute('INSERT INTO projects(id,name) VALUES (?,?)', ['hollow-project', '检查来源工程'])
     await database.execute('INSERT INTO buildings(id,project_id,code,name) VALUES (?,?,?,?)', ['hollow-building', 'hollow-project', 'B', '一栋'])
     expect((await readQuantityMigrationGraphs(database))[0]!.graph.version).toBe(1)
@@ -57,9 +55,8 @@ it('真实公开检查及整改导出保原 JSON，typed 映射保指纹并拒�
 })
 
 it('新来源五表完整时输出独立 v2 子图，旧 v1 仍拒绝额外新字段', async () => {
-  const database = await createMemoryDb()
+  const database = await createMigratedMemoryDb()
   try {
-    await runMigrations(database)
     await database.execute('INSERT INTO projects(id,name) VALUES (?,?)', ['hollow-project', '检查来源工程'])
     await database.execute('INSERT INTO buildings(id,project_id,code,name) VALUES (?,?,?,?)', ['hollow-building', 'hollow-project', 'B', '一栋'])
     const old = (await readQuantityMigrationGraphs(database))[0]!.graph

@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test'
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
-import { updateProductionSnapshot } from './helpers/browser-production-snapshot'
+import { seedProductionSnapshot } from './helpers/browser-production-snapshot'
 import { expectNoPageOverflow, RESPONSIVE_WIDTHS } from './helpers/responsive'
 
 const OWNER_INPUTS = [
@@ -11,7 +11,7 @@ const OWNER_INPUTS = [
 
 type OwnerInput = typeof OWNER_INPUTS[number]
 
-async function installOwnerFixture(page: Page, input: OwnerInput) {
+async function installOwnerFixture(page: Page, input: OwnerInput, baseURL: string) {
   await page.context().setExtraHTTPHeaders({ 'x-ruihang-test-session': `owner-material-${randomUUID()}` })
   await page.clock.install({ time: new Date(input.clock) })
   const session = await (await page.request.get('/api/read/business-session')).json()
@@ -23,15 +23,12 @@ async function installOwnerFixture(page: Page, input: OwnerInput) {
   const owner = await create('customers', { name: input.owner, contact: input.applicant })
   const unrelated = await create('customers', { name: input.unrelated, contact: input.receiver })
   const project = await create('projects', { name: input.project, manager: input.applicant, customerId: owner.id, status: '筹备中' })
-  await page.goto('/owner-material/control')
-  await expect(page.getByLabel('单据列表工具栏')).toBeVisible()
   // 甲供材尚未迁入；其既有本地校验读取中央命令生成的正式身份镜像。
-  await updateProductionSnapshot(page, (database) => {
+  await seedProductionSnapshot(page, baseURL, (database) => {
     for (const customer of [{ id: owner.id, name: input.owner }, { id: unrelated.id, name: input.unrelated }])
       database.run('INSERT INTO customers (id, name, status) VALUES (?, ?, ?)', [customer.id, customer.name, 'draft'])
     database.run('INSERT INTO projects (id, name, customer_id, status, source) VALUES (?, ?, ?, ?, ?)', [project.id, input.project, owner.id, '筹备中', 'e2e-production-fixture'])
   })
-  await page.reload()
 }
 
 const OWNER_MATERIAL_ROUTES = [
@@ -115,9 +112,9 @@ test.describe('Issue #200 甲供材页面', () => {
   }
 
   for (const input of OWNER_INPUTS) {
-    test(`${input.label} 总控、下料、到货、领用与直入直出按真实甲方关系贯通派生量`, async ({ page }) => {
+    test(`${input.label} 总控、下料、到货、领用与直入直出按真实甲方关系贯通派生量`, async ({ page, baseURL }) => {
       test.setTimeout(180_000)
-      await installOwnerFixture(page, input)
+      await installOwnerFixture(page, input, baseURL!)
       const material = input.material
 
       await page.goto('/owner-material/control/new')
@@ -192,9 +189,9 @@ test.describe('Issue #200 甲供材页面', () => {
       await expect(page.getByTestId('material-stockQty')).toHaveText(input.stock)
     })
 
-    test(`${input.label} 阻断非项目甲方、超总控到货和超总控余量的业务动作`, async ({ page }) => {
+    test(`${input.label} 阻断非项目甲方、超总控到货和超总控余量的业务动作`, async ({ page, baseURL }) => {
       test.setTimeout(180_000)
-      await installOwnerFixture(page, input)
+      await installOwnerFixture(page, input, baseURL!)
       const material = `${input.material}边界`
 
       await page.goto('/owner-material/control/new')

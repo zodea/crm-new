@@ -86,11 +86,11 @@ export async function readClearanceLinks(tx: Db, originalId?: string): Promise<E
   const rows = await tx.select<Row>(`SELECT l.*,a.settlement_id,a.original_expense_line_id FROM expenditure_settlement_clearance_links l JOIN expenditure_settlement_expense_allocations a ON a.id=l.expense_allocation_id ${originalId ? 'WHERE a.original_expense_line_id=?' : ''} ORDER BY l.id`, originalId ? [originalId] : [])
   return rows.map(row => ({ id: String(row.id), expenseAllocationId: String(row.expense_allocation_id), settlementId: String(row.settlement_id), originalExpenseLineId: String(row.original_expense_line_id), verificationId: String(row.verification_id), itemId: String(row.recognition_item_id), amount: Number(row.amount), actorId: String(row.actor_id), createdAt: String(row.created_at) }))
 }
-export async function readExpenseClearanceSource(tx: Db, actor: BusinessSession, original: FinanceExpenseReference): Promise<ExpenseClearanceSourceDTO> {
+export async function readExpenseClearanceSource(tx: Db, actor: BusinessSession, original: FinanceExpenseReference, excludedLinkIds?: ReadonlySet<string>): Promise<ExpenseClearanceSourceDTO> {
   const graph = await sourceGraph(tx, original)
   const proofs = await readClearanceProofs(tx, original.id)
   const proof = proofs.at(-1) ?? null
-  const links = await readClearanceLinks(tx, original.id)
+  const links = (await readClearanceLinks(tx, original.id)).filter(link => !excludedLinkIds?.has(link.id))
   const allocations = await tx.select<Row>(`SELECT a.*,h.status,h.project_id,h.payee_supplier_id,h.payee_worker_id,h.payee_name_snapshot FROM expenditure_settlement_expense_allocations a JOIN expenditure_settlements h ON h.id=a.settlement_id WHERE a.original_expense_line_id=? AND h.status IN (${CONFIRMED_SETTLEMENT_SQL_VALUES})`, [original.id])
   const recorded = verifiedFinanceSum(graph.clearances.filter(row => row.status === 'confirmed').map(row => row.amount))
   const hasCashRead = actor.capabilities.includes('finance-payment-record:read') && actor.capabilities.includes('finance-payment-application:read')

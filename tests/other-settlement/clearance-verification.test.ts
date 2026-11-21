@@ -51,8 +51,11 @@ it('原费用100/缺原纸清偿30替代核实，新70及旧30显式同结算续
     expect(source.qualification).toMatchObject({ state: 'verified', verifiedHandledAmount: 30, newAdoptableAmount: 70, legacyObligationAmount: 30, legacyPaidAmount: 0, legacyUnpaidAmount: 30 })
     expect(source.clearances).toEqual([expect.objectContaining({ id: f.paperMissingLine, missingOriginalDocument: true, originalDocumentState: 'not-digitized' })])
     const proof = source.clearanceProofs.at(-1)!
-    const request = { ...f.identity, requiredCapability: 'other-settlement:write', commandId: 'clearance-new-and-old-one-settlement', baseVersion: null, action: 'submit' as const, attachments: {}, draft: { name: '新70及旧30明确承接', projectId: null, contractId: null, settlementDate: '2026-10-05', totalAmount: 100, originalExpenses: [{ originalExpenseLineId: source.id, sourceVersion: source.version, sourceRevision: source.sourceRevision, amount: 100, clearanceAllocations: [{ verificationId: proof.id, itemId: proof.items[0]!.id, amount: 30 }] }] } }
+    const request = { ...f.identity, requiredCapability: 'other-settlement:write', commandId: 'clearance-new-and-old-one-settlement', baseVersion: null, action: 'submit' as const, attachments: {}, draft: { name: '新70及旧30明确承接', projectId: null, contractId: null, settlementDate: '2026-10-05', totalAmount: 100, originalExpenses: [{ originalExpenseLineId: source.id, sourceVersion: source.version, sourceRevision: source.sourceRevision, consumptionVersion: source.consumptionVersion, amount: 100, clearanceAllocations: [{ verificationId: proof.id, itemId: proof.items[0]!.id, amount: 30 }] }] } }
     const saved = await f.owner.execute(request, f.session)
+    const pending = (await f.owner.expenses(f.session)).items[0]!
+    expect(pending.consumptionVersion).not.toBe(source.consumptionVersion)
+    expect(pending.clearanceItemAvailability).toEqual([{ verificationId: proof.id, itemId: proof.items[0]!.id, amountRemaining: 0 }])
     await f.owner.execute({ ...request, id: saved.id, commandId: 'clearance-confirm-all', baseVersion: saved.version, action: 'confirm' }, f.session)
     source = (await f.owner.expenses(f.session)).items[0]!
     expect(source.qualification).toMatchObject({ newAdoptableAmount: 0, confirmedOtherAdoptedAmount: 100, verifiedOverlapAmount: 30, legacyObligationAmount: 30 })
@@ -67,6 +70,30 @@ it('原费用100/缺原纸清偿30替代核实，新70及旧30显式同结算续
     expect(await f.finance.execute(paymentRequest, f.session)).toEqual(payment)
     expect((await f.finance.resolve('reimbursement', verified.commandId, f.session)).outcome).toBe('applied')
     expect((await f.owner.expenses(f.session)).items[0]!.qualification.newAdoptableAmount).toBe(0)
+  }
+  finally { await f.storage.close() }
+})
+
+it('待确认结算保留自己的旧份额，同时拒绝其他结算消耗后的旧来源', async () => {
+  const f = await fixture()
+  try {
+    await f.verify()
+    const source = (await f.owner.expenses(f.session)).items[0]!
+    const proof = source.clearanceProofs.at(-1)!
+    const input = { originalExpenseLineId: source.id, sourceVersion: source.version, sourceRevision: source.sourceRevision, consumptionVersion: source.consumptionVersion }
+    const command = { ...f.identity, requiredCapability: 'other-settlement:write', action: 'submit', baseVersion: null, attachments: {} }
+    const details = { name: '采用真实原费用', settlementDate: '2026-10-05' }
+    const reservedDraft = { ...details, totalAmount: 100, originalExpenses: [{ ...input, amount: 100, clearanceAllocations: [{ verificationId: proof.id, itemId: proof.items[0]!.id, amount: 30 }] }] }
+    const reserved = await f.owner.execute({ ...command, commandId: 'clearance-pending-reservation', draft: reservedDraft }, f.session)
+    const afterReservation = (await f.owner.expenses(f.session)).items[0]!
+    const separateDraft = { ...details, totalAmount: 10, originalExpenses: [{ ...input, consumptionVersion: afterReservation.consumptionVersion, amount: 10 }] }
+    const separate = await f.owner.execute({ ...command, commandId: 'clearance-separate-submission', draft: separateDraft }, f.session)
+    await f.owner.execute({ ...command, commandId: 'clearance-separate-confirmation', action: 'confirm', id: separate.id, baseVersion: separate.version, draft: separateDraft }, f.session)
+
+    await expect(f.owner.execute({ ...command, commandId: 'clearance-reservation-conflict', action: 'confirm', id: reserved.id, baseVersion: reserved.version, draft: reservedDraft }, f.session)).rejects.toMatchObject({ problem: { code: 'conflict' } })
+    const unchanged = (await f.owner.detail(reserved.id, { origin: 'real' }, f.session)).settlement
+    expect(unchanged).toMatchObject({ version: reserved.version, draft: { status: 'pending' } })
+    expect(unchanged.clearanceLinks).toEqual([expect.objectContaining({ settlementId: reserved.id, amount: 30 })])
   }
   finally { await f.storage.close() }
 })

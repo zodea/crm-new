@@ -6,7 +6,7 @@ import { AUXILIARY_CONTRACT_SOURCE_SQL, auxiliaryContractSourceEntity, COMPANY_C
 import { CORE_MIGRATION_CAPABILITY, CORE_MIGRATION_CONTRACT_VERSION, CORE_MIGRATION_SOURCE_MODE, CORE_MIGRATION_SOURCE_VERSION, CORE_MIGRATION_TOPOLOGY, coreMigrationSourceHashInput } from '../../app/lib/migration/core-contract'
 import { createAuxiliaryContractTestInstance } from '../../server/utils/auxiliary-contract-test-instance'
 import { createCoreMigrationTestInstance } from '../../server/utils/core-migration-test-instance'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMemoryDb, createMigratedMemoryDb } from '../helpers/memory-db'
 
 const session = { workspaceId: 'workspace-default', actorId: 'actor-default', capabilities: ['auxiliary-contract:read', 'auxiliary-contract:write'] }
 describe('aX04 受控迁移', () => {
@@ -54,9 +54,8 @@ describe('aX04 受控迁移', () => {
     expect(instance.context(session).projects).toEqual([])
   })
   it('从真实 SQLite 表读取公司和项目合同及显式关联事实，旧 ID 按类型隔离', async () => {
-    const db = await createMemoryDb()
+    const db = await createMigratedMemoryDb()
     databases.push(db)
-    await runMigrations(db)
     await db.execute('INSERT INTO company_expense_contracts (id, name, category, counterparty) VALUES (\'same-id\', \'公司租赁\', \'房租\', \'出租方\')')
     await db.execute('INSERT INTO projects (id, name) VALUES (\'p-330\', \'迁移项目\')')
     await db.execute('INSERT INTO suppliers (id, name) VALUES (\'s-330\', \'检测分供方\')')

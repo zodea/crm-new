@@ -48,7 +48,7 @@
 | [e2e/production-other-settlements.spec.ts](../../../e2e/production-other-settlements.spec.ts) | 实际正式构建与隔离 SQLite | 无合同原费用、结算、申请及实付全链；普通申请与历史未知批复分别验收；E100／缺原纸清偿30替代核定、新70与旧30明确合并、银行现金只计100；整页真实原件、未知原键、版本冲突、冻结历史、Native 迁入及冷开五档 |
 | [e2e/helpers/other-settlement-migration-source.ts](../../../e2e/helpers/other-settlement-migration-source.ts) | 辅助／夹具 | 实际 Native60 原费用及结算图、冻结历史、原回执和原件，逐项显式映射后供正式页面采用 |
 | [e2e/helpers/historical-clearance-migration-source.ts](../../../e2e/helpers/historical-clearance-migration-source.ts) | 辅助／夹具 | 实际 Native60 原费用100与纸单清偿30；原纸从未电子化的缺失状态、独立原费用正文及原审计保全，供真实替代核定流程使用 |
-| [e2e/contract-forms.spec.ts](../../../e2e/contract-forms.spec.ts) | Playwright E2E | F2 canonical 合同与支出结算整页表单 |
+| [e2e/contract-forms.spec.ts](../../../e2e/contract-forms.spec.ts) | Playwright E2E | F2 合同与支出结算在开发服务的草稿、提交、附件和来源往返。提供施工主合同候选的正式来源由正式隔离库用例验证实际工程必选及保存回读。 |
 | [e2e/contract-list-toolbar.spec.ts](../../../e2e/contract-list-toolbar.spec.ts) | Playwright E2E | 分包合同工具栏在 ${width}px 保持稳定且仅表格内部横滚 |
 | [e2e/contract-multifilter.spec.ts](../../../e2e/contract-multifilter.spec.ts) | Playwright E2E | ${domain} 合同固定多选贯通中央查询，刷新保留表格与四档滚动边界 |
 | [e2e/issue-322-contract-supplement-focus.spec.ts](../../../e2e/issue-322-contract-supplement-focus.spec.ts) | Playwright E2E | Issue #322：补充协议稳定聚焦与来源恢复 |

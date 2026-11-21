@@ -3,6 +3,7 @@ import type { FormFooterAction } from '~/lib/master-data/page'
 import type { OtherSettlementDraft } from '~/lib/other-settlement/contract'
 import { onBeforeRouteLeave } from 'vue-router'
 import { clearanceBindingEdit, emptyClearanceBindingInput } from '~/components/other-settlement/clearance-binding-input'
+import { auxiliaryProblem } from '~/lib/auxiliary-contract/contract'
 import { validateAuxiliaryReturnTo } from '~/lib/auxiliary-contract/navigation'
 import { auxiliaryProblemFromUnknown } from '~/lib/auxiliary-contract/repository'
 import { isConfirmedExpenditureSettlement } from '~/lib/contract/effective-status'
@@ -18,7 +19,8 @@ export function useOtherSettlementForm() {
   const repository = useNuxtApp().$repositories.otherSettlements
   const expectedLinkIds = shallowRef<string[]>([])
   const commandRepository = {
-    ...repository,
+    context: () => repository.context(),
+    loadForm: (id: string) => repository.loadForm(id),
     execute: async (request: Parameters<typeof repository.execute>[0]) => {
       const result = await repository.execute(request)
       expectedLinkIds.value = result.clearanceLinkIds ?? []
@@ -46,7 +48,7 @@ export function useOtherSettlementForm() {
       throw new Error('已保存的旧份额关联尚未可靠读取，请保留原编号，只重试读取')
   }, conflict: (latest) => {
     latestConflict.value = latest
-    return new Error('结算已有更新；当前输入和原件已保留，请核对版本')
+    return auxiliaryProblem('conflict', '结算已有更新；当前输入和原件已保留，请核对版本')
   } })
   const session = actions.createSession()
   const files = useContractFormAttachments()
@@ -73,7 +75,8 @@ export function useOtherSettlementForm() {
   const dirty = computed(() => hydrated.value && !loading.value && (ordinaryDirty.value || bindingDirty.value))
   const savedId = computed(() => id.value ?? session.targetId)
   const title = computed(() => `${savedId.value ? '编辑' : '新建'} · 其他支出结算`)
-  const backTo = computed(() => validateAuxiliaryReturnTo(route.query.returnTo) ?? (savedId.value ? `${OTHER_SETTLEMENT_PATH}/${savedId.value}?origin=real` : OTHER_SETTLEMENT_PATH))
+  const sourceReturn = computed(() => validateAuxiliaryReturnTo(route.query.returnTo))
+  const backTo = computed(() => sourceReturn.value ?? (savedId.value ? `${OTHER_SETTLEMENT_PATH}/${savedId.value}?origin=real` : OTHER_SETTLEMENT_PATH))
   const selectedContract = computed(() => context.value?.contracts.find(c => c.id === draft.value.contractId && c.projectId === draft.value.projectId))
   const fetchProjects = async (keyword: string) => context.value?.projects.filter(row => row.label.includes(keyword)) ?? []
   const fetchContracts = async (keyword: string) => context.value?.contracts.filter(c => c.projectId === draft.value.projectId && c.name.includes(keyword)).map(c => ({ id: c.id, label: c.name })) ?? []
@@ -86,6 +89,13 @@ export function useOtherSettlementForm() {
   let submittedFiles: ReturnType<typeof files.capture> | null = null
   let submittedBinding: string | null = null
   const inputs = () => JSON.stringify({ draft: draft.value, files: files.capture(), bindingInput: bindingInput.value })
+  function detailTarget(target: string) {
+    const path = `${OTHER_SETTLEMENT_PATH}/${target}`
+    const returnTo = sourceReturn.value
+    if (returnTo && router.resolve(returnTo).path === path)
+      return returnTo
+    return { path, query: { origin: 'real', returnTo: returnTo ?? undefined } }
+  }
   async function canonicalTarget(target: string) {
     if (id.value === target || session.targetId !== target || dirty.value)
       return
@@ -93,7 +103,7 @@ export function useOtherSettlementForm() {
     const previousAllowLeave = allowLeave
     allowLeave = true
     try {
-      await router.replace(`${OTHER_SETTLEMENT_PATH}/form/${target}?origin=real`)
+      await router.replace({ path: `${OTHER_SETTLEMENT_PATH}/form/${target}`, query: { origin: 'real', returnTo: sourceReturn.value ?? undefined } })
     }
     finally {
       allowLeave = previousAllowLeave
@@ -152,7 +162,7 @@ export function useOtherSettlementForm() {
         adopt(result.form, !retain)
         if (frozen.value && !retain && (result.form.draft.contractId || !result.form.expenseAllocations?.length)) {
           allowLeave = true
-          await router.replace(`${OTHER_SETTLEMENT_PATH}/${result.form.draft.id}?origin=real`)
+          await router.replace(detailTarget(result.form.draft.id))
           allowLeave = false
           return
         }
@@ -235,12 +245,10 @@ export function useOtherSettlementForm() {
       allowLeave = true
       try {
         if (action === 'saveNew') {
-          actions.startNew(session)
           await router.push(`${OTHER_SETTLEMENT_PATH}/form`)
-          await initialize()
         }
         else if (closeAfterSave.value || confirming) {
-          await router.push(`${OTHER_SETTLEMENT_PATH}/${result.id}?origin=real`)
+          await router.push(detailTarget(result.id))
         }
         else {
           await canonicalTarget(result.id)
@@ -350,13 +358,23 @@ export function useOtherSettlementForm() {
     loading.value = false
   })
   onBeforeRouteLeave(async () => allowLeave || !dirty.value || await kit.confirm({ variant: 'simple', title: '放弃修改', message: '当前结算尚未保存，确认离开？', confirmLabel: '放弃修改' }))
-  watch(() => `${id.value}:${route.query.origin}`, () => {
+  watch(() => `${id.value}:${route.query.origin}:${route.query.contractId}`, () => {
+    if (!active)
+      return
     if (retainRoute) {
       retainRoute = false
       return
     }
     void initialize()
   }, { immediate: true })
+  onActivated(() => {
+    active = true
+    if (!id.value && session.targetId && !session.pending && !dirty.value)
+      void initialize()
+  })
+  onDeactivated(() => {
+    active = false
+  })
   onBeforeUnmount(() => {
     active = false
     generation++

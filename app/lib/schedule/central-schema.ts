@@ -4,7 +4,12 @@ import type { TransactionDb } from '../db/coordinator'
 export async function initializeScheduleSchema(db: TransactionDb) {
   await db.execute(`CREATE TABLE IF NOT EXISTS schedule_command_receipts (
     command_id TEXT PRIMARY KEY, project_id TEXT NOT NULL, actor_id TEXT NOT NULL,
-    fingerprint TEXT NOT NULL, result_json TEXT NOT NULL)`)
+    fingerprint TEXT NOT NULL, result_json TEXT NOT NULL, workspace_id TEXT, action TEXT)`)
+  const receiptColumns = await db.select<{ name: string }>('PRAGMA table_info(schedule_command_receipts)')
+  if (!receiptColumns.some(column => column.name === 'workspace_id'))
+    await db.execute('ALTER TABLE schedule_command_receipts ADD COLUMN workspace_id TEXT')
+  if (!receiptColumns.some(column => column.name === 'action'))
+    await db.execute('ALTER TABLE schedule_command_receipts ADD COLUMN action TEXT')
   await db.execute(`CREATE TABLE IF NOT EXISTS schedule_revisions (
     project_id TEXT PRIMARY KEY, revision INTEGER NOT NULL DEFAULT 0)`)
   await db.execute(`CREATE TABLE IF NOT EXISTS schedule_floor_quantity_snapshots (

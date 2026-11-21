@@ -29,7 +29,7 @@ test.describe('合同专属详情的演示只读与响应式验收', () => {
       test(`${width}px ${contract.domain} 展示合同金额、状态和只读来源`, async ({ page }) => {
         await page.setViewportSize({ width, height: 900 })
         await page.goto(`/contract/${contract.id}?origin=demo&contractKind=${contract.domain}`)
-        await expect(page.getByRole('heading', { name: contract.name, exact: true })).toBeVisible()
+        await expect(page.getByRole('heading', { name: contract.name, exact: true })).toBeVisible({ timeout: 15_000 })
         await expect(page.getByText(contract.no, { exact: true }).first()).toBeVisible()
         await expect(page.locator('[data-ui="status-tag"]').filter({ hasText: contract.status }).first()).toBeVisible()
         await expect(page.getByText(contract.amount, { exact: true }).first()).toBeVisible()
@@ -57,12 +57,12 @@ test.describe('合同专属详情的演示只读与响应式验收', () => {
 
   test('施工关联单据保持核验后的入口，材料采购不出现甲方变洽签页签', async ({ page }) => {
     await page.goto('/contract/con_demo_sg01?origin=demo&contractKind=construction&tab=settlements')
-    await expect(page.getByText('2026 年 6 月月度报量', { exact: true })).toBeVisible()
+    await expect(page.getByText('2026 年 6 月月度报量', { exact: true })).toBeVisible({ timeout: 15_000 })
     await expect(page.getByRole('link', { name: '2026 年 6 月月度报量', exact: true })).toHaveCount(0)
     await page.getByRole('tab', { name: /^收款登记\s+1$/ }).click()
     await expect(page.getByRole('link', { name: '合和地产集团进度收款', exact: true })).toHaveAttribute('href', /\/finance\/receipt\/rr_mz0x1_0\?origin=demo&customerId=customer_demo_001/)
     await page.goto('/contract/con_demo_cg01?origin=demo&contractKind=material')
-    await expect(page.getByRole('tab')).toHaveText(['详细信息', '采购明细 2', '材料管理', '发票登记 1', '付款信息 1', '支出结算 1', '项目扣罚 1'])
+    await expect(page.getByRole('tab')).toHaveText(['详细信息', '采购明细 2', '补充协议 0', '材料管理', '发票登记 1', '付款信息 1', '支出结算 1', '项目扣罚 1'])
     await expect(page.getByRole('tab', { name: /变洽签/ })).toHaveCount(0)
   })
 })

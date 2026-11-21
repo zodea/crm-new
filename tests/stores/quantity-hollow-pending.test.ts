@@ -27,7 +27,7 @@ it('响应丢失冷恢复保原键原正文，后来版本不能覆盖原提交'
   let store = useQuantityHollowStore()
   const read = await store.load(hollowQuery)
   repository.execute.mockRejectedValueOnce(new Error('响应丢失'))
-  await expect(store.submit(read, create)).rejects.toThrow()
+  await expect(store.submit(read, create)).rejects.toThrow('响应丢失')
   const original = store.getPending(read)!
   expect(original.state).toBe('unknown')
   setActivePinia(createPinia())
@@ -35,7 +35,7 @@ it('响应丢失冷恢复保原键原正文，后来版本不能覆盖原提交'
   repository.hollow.mockResolvedValueOnce(hollowRead([], 'quantity-newer'))
   const newer = await store.load(hollowQuery)
   expect(store.getPending(newer)).toEqual(original)
-  await expect(store.submit(newer, { ...create, input: { ...hollowInput, count: 30 } })).rejects.toThrow()
+  await expect(store.submit(newer, { ...create, input: { ...hollowInput, count: 30 } })).rejects.toThrow('请先核对原空鼓提交')
   await store.recover(original)
   expect(repository.execute.mock.calls.at(-1)![0]).toEqual(original.command)
   expect(store.getPending(newer)?.state).toBe('awaiting-read')
@@ -46,9 +46,9 @@ it('成功回执只能由可信同目标后读核实，历史原修订不必仍�
   const read = await store.load(hollowQuery)
   await store.submit(read, create)
   const original = store.getPending(read)!
-  expect(() => store.acknowledge(original, read)).toThrow()
+  expect(() => store.acknowledge(original, read)).toThrow('原空鼓记录尚未完整读取确认')
   const missing = await store.load(hollowQuery)
-  expect(() => store.acknowledge(original, missing)).toThrow()
+  expect(() => store.acknowledge(original, missing)).toThrow('原空鼓记录尚未完整读取确认')
   const record = hollowRecord(original.command)
   const later = { ...record.inspection, revisionId: 'revision-later', previousRevisionId: 'revision', commandId: 'later-command', logId: 'later-log', reason: '后来复查', input: { ...hollowInput, count: 20 } }
   record.revisions.push(later)
@@ -56,7 +56,7 @@ it('成功回执只能由可信同目标后读核实，历史原修订不必仍�
   record.remainingCount = 20
   record.proof = { ...record.proof, revisionId: later.revisionId, headLogId: later.logId }
   const response = hollowRead([record], 'quantity-v3')
-  expect(() => store.acknowledge(original, response)).toThrow()
+  expect(() => store.acknowledge(original, response)).toThrow('原空鼓记录尚未完整读取确认')
   repository.hollow.mockResolvedValueOnce(response)
   const fresh = await store.load(hollowQuery)
   store.acknowledge(original, fresh)
@@ -73,7 +73,7 @@ it('提交前启动的迟到读取不能冒充提交后核对', async () => {
   const original = store.getPending(read)!
   finish(hollowRead([hollowRecord(original.command)], 'quantity-v2'))
   const late = await earlier
-  expect(() => store.acknowledge(original, late)).toThrow()
+  expect(() => store.acknowledge(original, late)).toThrow('原空鼓记录尚未完整读取确认')
   expect(store.getPending(read)?.state).toBe('awaiting-read')
 })
 
@@ -83,24 +83,24 @@ it('重新读取失败不清回执，改正文的伪造后读不能解除等待'
   await store.submit(read, create)
   const original = store.getPending(read)!
   repository.hollow.mockRejectedValueOnce(new Error('读失败'))
-  await expect(store.load(hollowQuery)).rejects.toThrow()
+  await expect(store.load(hollowQuery)).rejects.toThrow('读失败')
   expect(store.getPending(read)?.state).toBe('awaiting-read')
   repository.hollow.mockResolvedValueOnce(hollowRead([hollowRecord(original.command)], 'quantity-v2'))
   const fresh = await store.load(hollowQuery)
   fresh.data.records[0]!.originalPartyName = '伪造的姓名'
-  expect(() => store.acknowledge(original, fresh)).toThrow()
+  expect(() => store.acknowledge(original, fresh)).toThrow('原空鼓记录尚未完整读取确认')
 })
 
 it('当前身份变化或撤权不能重放原提交，原正文仍可供原身份恢复', async () => {
   const store = useQuantityHollowStore()
   const read = await store.load(hollowQuery)
   repository.execute.mockRejectedValueOnce(new Error('响应丢失'))
-  await expect(store.submit(read, create)).rejects.toThrow()
+  await expect(store.submit(read, create)).rejects.toThrow('响应丢失')
   const original = store.getPending(read)!
   context.mockResolvedValueOnce({ ...hollowIdentity, actorId: 'other-actor' })
-  await expect(store.recover(original)).rejects.toThrow()
+  await expect(store.recover(original)).rejects.toThrow('当前身份不能核对这份原空鼓提交')
   context.mockResolvedValueOnce({ ...hollowIdentity, capabilities: ['quantity:read'] })
-  await expect(store.recover(original)).rejects.toThrow()
+  await expect(store.recover(original)).rejects.toThrow('当前身份不能核对这份原空鼓提交')
   expect(repository.execute).toHaveBeenCalledTimes(1)
   await store.recover(original)
   expect(repository.execute.mock.calls.at(-1)![0]).toEqual(original.command)
@@ -112,11 +112,11 @@ it('无法可靠保存原命令时不发送，错目标回执保留未知状态'
   const persist = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
     throw new Error('storage unavailable')
   })
-  await expect(store.submit(read, create)).rejects.toThrow()
+  await expect(store.submit(read, create)).rejects.toThrow('无法可靠保存原空鼓提交')
   expect(repository.execute).not.toHaveBeenCalled()
   persist.mockRestore()
   repository.execute.mockImplementationOnce(async (command: QuantityHollowCommand) => ({ ...hollowResult(command), commandId: 'another-command' }))
-  await expect(store.submit(read, create)).rejects.toThrow()
+  await expect(store.submit(read, create)).rejects.toThrow('空鼓回执身份或来源版本不完整')
   expect(store.getPending(read)?.state).toBe('unknown')
 })
 
@@ -126,7 +126,7 @@ it('正式空鼓仅持久最小定位；冷恢复查原编号，读取失败与�
   const read = await store.load(hollowQuery)
   store.rememberDraft('formal-draft', { fields: { target: JSON.stringify(hollowTarget), inspectedOn: hollowInput.inspectedOn, rectifiedOn: '', count: '19', note: '正式私密原备注', reason: '' }, baseline: '', sourceVersion: read.sourceVersion, revisionId: null })
   repository.execute.mockRejectedValueOnce(new Error('原结果未知'))
-  await expect(store.submit(read, create)).rejects.toThrow()
+  await expect(store.submit(read, create)).rejects.toThrow('原结果未知')
   const original = store.getPending(read)!
   const entries = Object.entries(sessionStorage)
   expect(entries).toEqual([[expect.stringContaining('crm:form-command:v1:quantity:'), expect.any(String)]])
@@ -143,11 +143,11 @@ it('正式空鼓仅持久最小定位；冷恢复查原编号，读取失败与�
   await expect(store.submit(await store.load(hollowQuery), create)).rejects.toThrow('原空鼓提交')
   expect(repository.execute).toHaveBeenCalledTimes(1)
   context.mockResolvedValueOnce({ ...hollowIdentity, actorId: 'another-actor' })
-  await expect(store.recoverDescriptor(descriptor, hollowQuery)).rejects.toThrow()
+  await expect(store.recoverDescriptor(descriptor, hollowQuery)).rejects.toThrow('请回到原正式户与身份核对')
   expect(repository.resolve).not.toHaveBeenCalled()
   repository.resolve.mockResolvedValue({ outcome: 'applied', result: hollowResult(original.command) })
   repository.hollow.mockRejectedValueOnce(new Error('保存后读取失败'))
-  await expect(store.recoverDescriptor(descriptor, hollowQuery)).rejects.toThrow()
+  await expect(store.recoverDescriptor(descriptor, hollowQuery)).rejects.toThrow('保存后读取失败')
   expect(sessionStorage.getItem(entries[0]![0])).toBe(entries[0]![1])
   repository.hollow.mockResolvedValueOnce(hollowRead([hollowRecord(original.command)]))
   await store.recoverDescriptor(descriptor, hollowQuery)

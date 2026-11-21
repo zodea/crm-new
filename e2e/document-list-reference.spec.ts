@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { installFinanceListFixtures } from './helpers/finance-list-fixture'
 
 const lists = [
   { path: '/material/requisition', label: '下料单' },
@@ -20,6 +21,7 @@ const lists = [
 
 test('Issue #419：十五类单据列表均保留紧凑工具与真实可操作表头', async ({ page }, testInfo) => {
   test.setTimeout(120_000)
+  await installFinanceListFixtures(page)
   await page.setViewportSize({ width: 1440, height: 900 })
   const errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
@@ -45,7 +47,9 @@ test('Issue #419：十五类单据列表均保留紧凑工具与真实可操作�
     await expect(toolbar.getByRole('searchbox')).toBeVisible()
     await expect(toolbar.getByRole('button', { name: '刷新', exact: true })).toBeVisible()
     await expect(toolbar.getByRole('button', { name: `新建${list.label}`, exact: true })).toBeVisible()
-    await page.getByRole('button', { name: '筛选项目', exact: true }).click()
+    const projectHeader = page.getByRole('button', { name: '筛选项目', exact: true })
+    await expect(projectHeader, `${list.path} 应挂载可操作项目列`).toBeVisible()
+    await projectHeader.click()
     await expect(page.getByRole('group', { name: '项目筛选值' })).toBeVisible()
     await expect(page.getByRole('checkbox', { name: '不限', exact: true })).toBeChecked()
     await page.getByRole('button', { name: '清除', exact: true }).click()
@@ -62,6 +66,7 @@ test('Issue #419：十五类单据列表均保留紧凑工具与真实可操作�
 
 test('Issue #419：材料和资金列表在390、768、1024px保留局部滚动与筛选焦点', async ({ page }, testInfo) => {
   test.setTimeout(90_000)
+  await installFinanceListFixtures(page)
   for (const path of ['/material/arrival', '/finance/payment']) {
     for (const width of [390, 768, 1024]) {
       await page.setViewportSize({ width, height: 900 })

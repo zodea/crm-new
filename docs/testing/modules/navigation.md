@@ -42,6 +42,6 @@
 | [e2e/issue-398-audit-form-tabs.spec.ts](../../../e2e/issue-398-audit-form-tabs.spec.ts) | Playwright E2E | 关联项目：草稿页签关闭／刷新保护 |
 | [e2e/shell-visual.spec.ts](../../../e2e/shell-visual.spec.ts) | Playwright E2E | Issue #419：外壳保持深色侧栏与清晰可读的全站导航尺寸 |
 | [e2e/sidebar-accordion.spec.ts](../../../e2e/sidebar-accordion.spec.ts) | Playwright E2E | 侧栏一级目录单开模式 |
-| [e2e/tab-reopen.spec.ts](../../../e2e/tab-reopen.spec.ts) | Playwright E2E | 旧详情恢复失败后，五档业务列表和直接链接均可主动重新打开 |
+| [e2e/tab-reopen.spec.ts](../../../e2e/tab-reopen.spec.ts) | Playwright E2E | 隔离正式服务中保留付款草稿的显式零，旧详情恢复失败后可由五档列表及直接链接重新打开 |
 | [e2e/tab-session-restore.spec.ts](../../../e2e/tab-session-restore.spec.ts) | Playwright E2E | 初始导航完成后才恢复活动页，刷新与关闭保留正确集合 |
 | [e2e/tabs-smoke.spec.ts](../../../e2e/tabs-smoke.spec.ts) | Playwright E2E | 页签完整旅程：打开、切换、右键关闭并触发上限提示 |

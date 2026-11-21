@@ -1,18 +1,16 @@
 import type { TestDb } from '../helpers/memory-db'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { runMigrations } from '~/lib/db/migrations'
 import {
   createScheduleProcessLibraryVersion,
   loadScheduleProcessLibraryDetail,
 } from '~/lib/schedule/process-library'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 describe('标准工序库版本维护', () => {
   let db: TestDb
 
   beforeEach(async () => {
-    db = await createMemoryDb()
-    await runMigrations(db)
+    db = await createMigratedMemoryDb()
   })
 
   afterEach(() => {

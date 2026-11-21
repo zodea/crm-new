@@ -233,11 +233,11 @@
 | [tests/components/PayrollC1Completion.test.ts](../../../tests/components/PayrollC1Completion.test.ts) | 组件（jsdom） | c1 回执后的同目标状态读取 |
 | [tests/components/PayrollC1Config.test.ts](../../../tests/components/PayrollC1Config.test.ts) | 组件（jsdom） | c1 每人标准输入 |
 | [tests/components/PayrollC1ConfigRecovery.test.ts](../../../tests/components/PayrollC1ConfigRecovery.test.ts) | 组件（jsdom） | 冷实例重新打开同一配置，真实 store 保原编号及54/空日薪；读回成功才解除 |
-| [tests/components/PayrollC1DetailPrecision.test.ts](../../../tests/components/PayrollC1DetailPrecision.test.ts) | 组件（jsdom） | c1 详情及保存的明细保留60.125原时薪，金额仍到分，未知价不补零 |
-| [tests/components/PayrollC1Form.test.ts](../../../tests/components/PayrollC1Form.test.ts) | 组件（jsdom） | c1 页面固定草稿 |
+| [tests/components/PayrollC1C2DetailPrecision.test.ts](../../../tests/components/PayrollC1C2DetailPrecision.test.ts) | 组件（jsdom） | C1、C2 原单价、未知与金额精度 |
+| [tests/components/PayrollC1C2Form.test.ts](../../../tests/components/PayrollC1C2Form.test.ts) | 组件（jsdom） | C1、C2 页面固定草稿与负责人选择 |
 | [tests/components/PayrollC1FrozenPrint.test.ts](../../../tests/components/PayrollC1FrozenPrint.test.ts) | 组件（jsdom） | c1 配对打印材料 |
 | [tests/components/PayrollC1Release.test.ts](../../../tests/components/PayrollC1Release.test.ts) | 组件（jsdom） | c1 实际发放确认 |
-| [tests/components/PayrollC1ReleasedEvidence.test.ts](../../../tests/components/PayrollC1ReleasedEvidence.test.ts) | 组件（jsdom） | 旧已发头缺配对证据只说明原记录只读，不宣告完整冻结或显示新建重核要求 |
+| [tests/components/PayrollC1C2ReleasedEvidence.test.ts](../../../tests/components/PayrollC1C2ReleasedEvidence.test.ts) | 组件（jsdom） | C1、C2 发放证据缺失与配对输出 |
 | [tests/components/PayrollC1SourceReturn.test.ts](../../../tests/components/PayrollC1SourceReturn.test.ts) | 组件（jsdom） | c1 来源返回验证 |
 | [tests/payroll/attendance-facts.test.ts](../../../tests/payroll/attendance-facts.test.ts) | 单元／服务／状态 | 逐日事实保原组、7.51小数和真零，坏未来日期不消失且软删原行仍可读 |
 | [tests/payroll/attendance-safety.test.ts](../../../tests/payroll/attendance-safety.test.ts) | 单元／服务／状态 | attendance write boundary |
@@ -268,11 +268,8 @@
 | [e2e/payroll-c2-recovery.spec.ts](../../../e2e/payroll-c2-recovery.spec.ts) | Playwright E2E | 新签工失响应后冷页按原编号保存一次，日期和正文不丢失 |
 | [tests/components/PayrollC2Completion.test.ts](../../../tests/components/PayrollC2Completion.test.ts) | 组件（jsdom） | c2 回执后的同目标状态读取 |
 | [tests/components/PayrollC2Config.test.ts](../../../tests/components/PayrollC2Config.test.ts) | 组件（jsdom） | 原缺单价不伪零、规则 null 不伪空；显式选择空规则后按原固定读提交 |
-| [tests/components/PayrollC2DetailPrecision.test.ts](../../../tests/components/PayrollC2DetailPrecision.test.ts) | 组件（jsdom） | c2 详情及保存的明细保留350.125原工价，金额仍到分，未知价不补零 |
-| [tests/components/PayrollC2Form.test.ts](../../../tests/components/PayrollC2Form.test.ts) | 组件（jsdom） | c2 页面固定草稿 |
 | [tests/components/PayrollC2FrozenPrint.test.ts](../../../tests/components/PayrollC2FrozenPrint.test.ts) | 组件（jsdom） | 工资和签工两个输出保原半工、证明、空规则及全成员真实分配，不输出考勤 |
 | [tests/components/PayrollC2Release.test.ts](../../../tests/components/PayrollC2Release.test.ts) | 组件（jsdom） | c2 实际发放确认 |
-| [tests/components/PayrollC2ReleasedEvidence.test.ts](../../../tests/components/PayrollC2ReleasedEvidence.test.ts) | 组件（jsdom） | 旧已发头缺配对证据只说明原记录只读，不宣告完整冻结或显示新建重核要求 |
 | [tests/components/PayrollC2SourceReturn.test.ts](../../../tests/components/PayrollC2SourceReturn.test.ts) | 组件（jsdom） | c2 来源返回验证 |
 | [tests/components/PayrollC2SourceReview.test.ts](../../../tests/components/PayrollC2SourceReview.test.ts) | 组件（jsdom） | 待确认与被占用原记录仍显示具体时段、证明及未采用原因；只以服务采用集合标记 |
 | [tests/components/PayrollC2SpecIndependent.test.ts](../../../tests/components/PayrollC2SpecIndependent.test.ts) | 组件（jsdom） | 独立规格反例：重新读取已撤写权的同一签工，保留本地草稿但停止可编辑与提交 |

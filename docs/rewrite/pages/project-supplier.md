@@ -117,7 +117,7 @@ type ProjectSupplierStatus = 'collecting' | 'contracted' | 'claiming' | 'paid' |
 | 来源 | 当前来源状态 |
 | --- | --- |
 | 合同 | 演示来源可进入 `/contract/:id` 只读详情并返回 |
-| 付款申请 | 演示来源可进入 `/finance/payment/:id/detail` 只读详情并返回 |
+| 付款申请 | 显示可核对的请款事实；同来源详情待核验 |
 | 发票 | 现有 `/finance/invoice/:id` 读写混用，工作台保持 `unverified-target` |
 | 支付记录 | 现有 `/finance/records/:id` 读写混用，工作台保持 `unverified-target` |
 | 分包结算 | #328 已有专属中央只读详情；工作台的同来源能力、父关系与返回链仍须 #408 / #410 联验 |

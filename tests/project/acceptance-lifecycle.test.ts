@@ -1,12 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { runMigrations } from '~/lib/db/migrations'
 import { loadProjectAcceptanceLifecycle } from '~/lib/project/acceptance-lifecycle'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 describe('project acceptance lifecycle read model', () => {
-  it('preserves stored lifecycle states and enforces project/contract ownership', async () => {
-    const db = await createMemoryDb()
-    await runMigrations(db)
+  it('preserves stored lifecycle states and enforces project/contract ownership', async ({ onTestFinished }) => {
+    const db = await createMigratedMemoryDb()
+    onTestFinished(db.close)
     await db.execute(`INSERT INTO customers (id, name) VALUES ('customer-acceptance', '验收客户')`)
     await db.execute(`
       INSERT INTO projects (id, name, customer_id)

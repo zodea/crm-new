@@ -173,7 +173,8 @@ describe('项目×分供方中央 Repository 契约', () => {
       counts: { contracts: 1, claims: 1, invoices: 1, payments: 1, settlements: 1, files: 1 },
     })
     expect(detail.contracts[0].navigation).toMatchObject({ kind: 'source-record', subject: { id: 'contract-1' }, variant: 'detail', filters: { dataOrigin: 'demo' } })
-    expect(detail.claims[0].navigation).toMatchObject({ kind: 'source-record', subject: { id: 'claim-1' }, variant: 'detail', filters: { dataOrigin: 'demo' } })
+    expect(detail.claims[0]).toMatchObject({ application: { id: 'claim-1' }, applyAmount: '80.00', approvedAmount: '70.00' })
+    expect(detail.claims[0].navigation).toEqual({ kind: 'unavailable', reason: 'unverified-target' })
     expect(detail.invoices[0].navigation).toEqual({ kind: 'unavailable', reason: 'unverified-target' })
     expect(detail.payments[0].navigation).toEqual({ kind: 'unavailable', reason: 'unverified-target' })
     expect(detail.settlements[0].navigation).toEqual({ kind: 'unavailable', reason: 'unverified-target' })

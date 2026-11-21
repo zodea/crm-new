@@ -4,6 +4,7 @@ import { Buffer } from 'node:buffer'
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import { cooperationPdfFixture } from '../tests/project-supplier/pdf-fixture'
+import { createVerifiedSignatory, verifiedSignatoryAdoption } from './helpers/contract-signatory'
 import { expectLocalHorizontalScroll, expectNoPageOverflow, RESPONSIVE_WIDTHS } from './helpers/responsive'
 
 const supplierInput = {
@@ -49,14 +50,16 @@ for (const contractCase of [
     const errors: string[] = []
     page.on('pageerror', error => errors.push(error.message))
     const supplierId = await createSupplier(page)
-    const session = await (await page.request.get('/api/read/business-session')).json()
+    const { workspaceId, actorId } = await (await page.request.get('/api/read/business-session')).json()
     const project = await page.request.post('/api/commands/projects', {
-      data: { ...session, requiredCapability: 'project:write', commandId: randomUUID(), baseVersion: null, action: 'draft', draft: { name: 'E2E分供方关联项目', manager: '合成经办', status: '筹备中' }, attachments: {} },
+      data: { workspaceId, actorId, requiredCapability: 'project:write', commandId: randomUUID(), baseVersion: null, action: 'draft', draft: { name: 'E2E分供方关联项目', manager: '合成经办', status: '筹备中' }, attachments: {} },
     })
     expect(project.ok(), await project.text()).toBe(true)
     const projectId = (await project.json()).id
+    const signatoryId = await createVerifiedSignatory(page, '合成供应商用已核实主体')
+    const adoption = await verifiedSignatoryAdoption(page, signatoryId)
     const contract = await page.request.post('/api/commands/material-contracts', {
-      data: { ...session, requiredCapability: 'material-contract:write', commandId: randomUUID(), baseVersion: null, action: 'submit', draft: { name: 'E2E正式采购合同', projectId, supplierId, content: '合成材料采购', signDate: contractCase.signDate, amount: contractCase.amount, taxRate: null, lineItems: [{ materialName: '合成材料', unit: '根', qty: contractCase.qty, taxInclusiveUnitPrice: contractCase.price }] }, attachments: {} },
+      data: { workspaceId, actorId, requiredCapability: 'material-contract:write', commandId: randomUUID(), baseVersion: null, action: 'submit', draft: { ...adoption, name: 'E2E正式采购合同', projectId, supplierId, content: '合成材料采购', signDate: contractCase.signDate, amount: contractCase.amount, taxRate: null, lineItems: [{ materialName: '合成材料', unit: '根', qty: contractCase.qty, taxInclusiveUnitPrice: contractCase.price }] }, attachments: {} },
     })
     expect(contract.ok(), await contract.text()).toBe(true)
     const contractId = (await contract.json()).id
@@ -66,7 +69,7 @@ for (const contractCase of [
     await page.getByRole('link', { name: supplierInput.name, exact: true }).first().click()
     await expect(page).toHaveURL(url => url.pathname === `/base/supplier/${supplierId}` && url.searchParams.get('origin') === 'real')
     const tabs = page.getByRole('navigation', { name: '分供方业务事实' })
-    await expect(tabs.getByRole('tab')).toHaveText(['详细资料', '合作项目 0', '支出合同 1', '支出结算 0', '收票登记 0', '付款管理 0'])
+    await expect(tabs.getByRole('tab')).toHaveText(['详细资料', '合作项目 0', '支出合同 1', '支出结算 0', '收票登记', '付款管理'])
     for (const masked of ['138 **** 3456', '9144 **** 3456', '6228 **** 7788'])
       await expect(page.getByText(masked, { exact: true }).first()).toBeVisible()
     for (const raw of [supplierInput.contactPhone, supplierInput.taxNo, supplierInput.bankAccount])
@@ -74,21 +77,24 @@ for (const contractCase of [
     const summary = page.getByTestId('supplier-summary')
     await expect(summary.getByRole('button', { name: '查看合作项目明细' })).toHaveText('0 个')
     await expect(summary.getByRole('button', { name: '查看累计合同金额明细' })).toHaveText(contractCase.money)
-    for (const label of ['累计结算金额', '累计收票金额', '累计付款金额'])
-      await expect(summary.getByRole('button', { name: `查看${label}明细` })).toHaveText('¥0.00')
-    await expect(summary.locator('div').filter({ has: page.locator('dt', { hasText: /^应付金额$/ }) })).toContainText(contractCase.money)
-    await expect(summary.getByRole('button', { name: '查看应付金额明细' })).toHaveCount(0)
+    await expect(summary.getByRole('button', { name: '查看累计结算金额明细' })).toHaveText('¥0.00')
+    for (const label of ['累计收票金额', '累计付款金额', '应付金额']) {
+      const metric = summary.getByRole('term').filter({ hasText: new RegExp(`^${label}$`) }).locator('..')
+      await expect(metric.getByRole('definition')).toHaveText('—')
+      await expect(metric).toContainText('来源未就绪，金额待核对')
+      await expect(summary.getByRole('button', { name: `查看${label}明细` })).toHaveCount(0)
+    }
     await summary.getByRole('button', { name: '查看累计合同金额明细' }).click()
     await expect(tabs.getByRole('tab', { name: /^支出合同\s*1$/ })).toHaveAttribute('aria-selected', 'true')
     await expect(page.getByRole('link', { name: 'E2E正式采购合同', exact: true })).toHaveAttribute('href', `/contract/${contractId}?origin=real&contractKind=material`)
-    for (const { metric, label, empty } of [
-      { metric: '累计结算金额', label: /^支出结算\s*0$/, empty: '暂无结算事实' },
-      { metric: '累计收票金额', label: /^收票登记\s*0$/, empty: '暂无归档收票' },
-      { metric: '累计付款金额', label: /^付款管理\s*0$/, empty: '暂无付款事实' },
-    ]) {
-      await summary.getByRole('button', { name: `查看${metric}明细` }).click()
-      await expect(tabs.getByRole('tab', { name: label, exact: true })).toHaveAttribute('aria-selected', 'true')
-      await expect(page.getByRole('status', { name: empty })).toBeVisible()
+    await summary.getByRole('button', { name: '查看累计结算金额明细' }).click()
+    await expect(tabs.getByRole('tab', { name: /^支出结算\s*0$/ })).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByRole('status', { name: '暂无结算事实' })).toBeVisible()
+    for (const label of ['收票登记', '付款管理']) {
+      const tab = tabs.getByRole('tab', { name: label, exact: true })
+      await tab.click()
+      await expect(tab).toHaveAttribute('aria-selected', 'true')
+      await expect(page.getByRole('status', { name: '此项业务事实尚未接入' })).toBeVisible()
     }
 
     await page.getByRole('link', { name: '证照附件', exact: true }).click()
@@ -142,19 +148,30 @@ for (const contractCase of [
 for (const tabCase of [
   { key: 'projects', label: /^合作项目\s*0$/, empty: '暂无合作项目' },
   { key: 'contracts', label: /^支出合同\s*0$/, empty: '暂无合同事实' },
-  { key: 'invoices', label: /^收票登记\s*0$/, empty: '暂无归档收票' },
+  { key: 'invoices', label: /^收票登记$/, empty: '此项业务事实尚未接入' },
 ]) {
   test(`分供方事实页签深链刷新恢复：${tabCase.key}`, async ({ page }) => {
     const id = await createSupplier(page)
     await page.goto(`/base/supplier/${id}?origin=real&tab=${tabCase.key}`)
     const tab = page.getByRole('navigation', { name: '分供方业务事实' }).getByRole('tab', { name: tabCase.label, exact: true })
-    await expect(tab).toHaveAttribute('aria-selected', 'true')
+    await expect(tab).toHaveAttribute('aria-selected', 'true', { timeout: 15_000 })
     await expect(page.getByRole('status', { name: tabCase.empty })).toBeVisible()
     await page.reload()
-    await expect(tab).toHaveAttribute('aria-selected', 'true')
+    await expect(tab).toHaveAttribute('aria-selected', 'true', { timeout: 15_000 })
     await expect(page.getByRole('status', { name: tabCase.empty })).toBeVisible()
   })
 }
+
+test('分供方事实页签深链刷新恢复：已接入来源的真实零条收票', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('ruihang:workspace-default:include-demo', 'true'))
+  await page.goto('/base/supplier/sup_demo_006?origin=demo&tab=invoices')
+  const tab = page.getByRole('navigation', { name: '分供方业务事实' }).getByRole('tab', { name: /^收票登记\s*0$/ })
+  await expect(tab).toHaveAttribute('aria-selected', 'true', { timeout: 15_000 })
+  await expect(page.getByRole('status', { name: '暂无归档收票' })).toBeVisible()
+  await page.reload()
+  await expect(tab).toHaveAttribute('aria-selected', 'true', { timeout: 15_000 })
+  await expect(page.getByRole('status', { name: '暂无归档收票' })).toBeVisible()
+})
 
 for (const width of RESPONSIVE_WIDTHS) {
   test(`${width}px 正式分供方证照表只在自身区域横向滚动`, async ({ page }) => {

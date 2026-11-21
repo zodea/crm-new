@@ -110,7 +110,7 @@ test('原工资独立更正、真退40、后月处理60与跨页同源冷读', a
   expect((await f.repository.c2Output(f.query, f.statementId)).document).toEqual(originalOutput.document)
   const ledger = `/subcontract/payroll/payments?${new URLSearchParams({ origin: 'real', project: f.projectId, returnTo: sourcePath })}`
   await page.goto(ledger)
-  await expect(page.getByRole('heading', { name: '工资实际收付', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '工资实际收付', exact: true, level: 1 })).toBeVisible()
   await capture(page, info, 'net-1900-ledger')
   for (const [kind, id] of [['worker', f.workerId], ['crew', f.crewId], ['project', f.projectId]]) {
     await page.goto(`${kind === 'project' ? '/project' : `/base/${kind}`}/${encodeURIComponent(id!)}?origin=real`)
@@ -153,12 +153,12 @@ async function verifyPaymentAndReversal(page: Page, info: TestInfo, f: Awaited<R
   await expect(wages).toContainText('1,900.00')
   await capture(page, info, 'payment-readonly-cold-project', '[aria-label="工资收付独立来源"]')
   await page.getByRole('link', { name: '打开工资实际收付', exact: true }).click()
-  await expect(page.getByRole('heading', { name: '工资实际收付', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '工资实际收付', exact: true, level: 1 })).toBeVisible()
   await page.getByRole('link', { name: '实际退款', exact: true }).click()
   await expect(page.getByRole('heading', { name: '工资实际退款详情', exact: true })).toBeVisible()
   await page.reload()
   await page.getByRole('link', { name: '返回来源', exact: true }).click()
-  await expect(page.getByRole('heading', { name: '工资实际收付', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '工资实际收付', exact: true, level: 1 })).toBeVisible()
   await page.getByRole('link', { name: '返回来源', exact: true }).click()
   await expect(page).toHaveURL(url => url.pathname + url.search === payment)
   await expect(wages).toContainText('1,900.00')

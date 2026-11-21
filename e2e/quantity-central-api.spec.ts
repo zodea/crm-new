@@ -8,7 +8,7 @@ test('工程量真实 HTTP 从中央新项目保存区域与模板，重读并�
   const session = await (await request.get('/api/read/business-session', { headers })).json()
   const projectResponse = await request.post('/api/commands/projects', {
     headers,
-    data: { ...session, requiredCapability: 'project:write', commandId: randomUUID(), baseVersion: null, action: 'draft', draft: { name: '中央工程量接口项目', manager: '合成经办人', status: '筹备中' }, attachments: {} },
+    data: { workspaceId: session.workspaceId, actorId: session.actorId, requiredCapability: 'project:write', commandId: randomUUID(), baseVersion: null, action: 'draft', draft: { name: '中央工程量接口项目', manager: '合成经办人', status: '筹备中' }, attachments: {} },
   })
   expect(projectResponse.ok(), await projectResponse.text()).toBe(true)
   const project = await projectResponse.json()
@@ -18,7 +18,7 @@ test('工程量真实 HTTP 从中央新项目保存区域与模板，重读并�
   const first = decodeQuantityRegion(await initial.json(), query)
   let version = first.sourceVersion
   const execute = async (action: Record<string, unknown>) => {
-    const command = { ...session, projectId: project.id, origin: 'real', requiredCapability: 'quantity:write', commandId: randomUUID(), baseVersion: version, action }
+    const command = { workspaceId: session.workspaceId, actorId: session.actorId, projectId: project.id, origin: 'real', requiredCapability: 'quantity:write', commandId: randomUUID(), baseVersion: version, action }
     const response = await request.post('/api/commands/quantity', { headers, data: command })
     expect(response.ok(), await response.text()).toBe(true)
     const saved = await response.json()
@@ -39,7 +39,7 @@ test('工程量真实 HTTP 从中央新项目保存区域与模板，重读并�
   expect(area.data).toMatchObject({ projectName: '中央工程量接口项目', buildings: [{ id: building.id }], floors: [{ id: floor.id }], units: [{ id: unit.id }] })
   const templates = decodeQuantityTemplates(await (await request.get('/api/read/quantity/templates', { headers, params: query })).json(), query)
   expect(templates.data.lines).toEqual([expect.objectContaining({ contractQty: 0, provisionalQty: null, fieldQty: 6 })])
-  const base = { ...session, projectId: project.id, origin: 'real', requiredCapability: 'quantity:write', commandId: randomUUID(), baseVersion: version, action: { kind: 'create-building', draft: { code: 'B2', name: '2栋' } } }
+  const base = { workspaceId: session.workspaceId, actorId: session.actorId, projectId: project.id, origin: 'real', requiredCapability: 'quantity:write', commandId: randomUUID(), baseVersion: version, action: { kind: 'create-building', draft: { code: 'B2', name: '2栋' } } }
   expect((await request.post('/api/commands/quantity', { headers, data: { ...base, actorId: 'forged' } })).status()).toBe(403)
   expect((await request.post('/api/commands/quantity', { headers, data: { ...base, baseVersion: first.sourceVersion } })).status()).toBe(409)
   expect((await request.get('/api/read/quantity/region', { headers, params: { ...query, origin: 'demo' } })).status()).toBe(403)

@@ -2,6 +2,8 @@ import type { OwnerCommercialDocumentSource } from '../app/lib/owner-document/ce
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import { buildOwnerCommercialDocumentListPage, parseOwnerCommercialDocumentListQuery } from '../app/lib/owner-document/central-repository'
+import { attachOriginReadMeta } from '../app/lib/read-model/meta'
+import { publicReadMeta } from '../tests/helpers/public-read-meta'
 import { expectNoPageOverflow } from './helpers/responsive'
 
 test.use({ screenshot: 'off', trace: 'off', video: 'off' })
@@ -58,7 +60,12 @@ for (const input of [
       const documents = [{ ...source, no: input.firstNo, documentType: input.firstType, amount: input.firstAmount }, { ...source, id: 'filter-document-2', no: input.nextNo, status: input.nextStatus, documentType: input.nextType, amount: input.nextAmount }]
       await page.route('**/api/read/owner-documents/owner_change?*', async (route) => {
         const query = parseOwnerCommercialDocumentListQuery('owner_change', Object.fromEntries(new URL(route.request().url()).searchParams))
-        await route.fulfill({ json: buildOwnerCommercialDocumentListPage({ documents, query, asOf: '2026-09-08T00:00:00.000Z', sourceVersion: 'multifilter-synthetic', capabilities: ['owner-document:read'] }) })
+        const data = { documents, query, asOf: '2026-09-08T00:00:00.000Z', sourceVersion: 'multifilter-synthetic', capabilities: ['owner-document:read'] }
+        const evidence = { schemaVersion: 'owner-document-read-v2', asOf: data.asOf, sourceVersion: data.sourceVersion, capabilities: data.capabilities, scope: query }
+        await route.fulfill({ json: attachOriginReadMeta(buildOwnerCommercialDocumentListPage(data), {
+          real: publicReadMeta({ ...evidence, dataOrigin: 'real', requested: true }),
+          demo: publicReadMeta({ ...evidence, dataOrigin: 'demo', requested: false }),
+        }) })
       })
       await page.goto('/owner/change')
       const table = page.locator('[data-ui="owner-document-table"]')

@@ -11,6 +11,7 @@ export default defineConfig({
     },
   },
   test: {
+    experimental: { fsModuleCache: true },
     projects: [
       {
         extends: true,

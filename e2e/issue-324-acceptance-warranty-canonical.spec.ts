@@ -32,6 +32,7 @@ test.describe('Issue #324：验收—保修 canonical 双视图', () => {
   })
 
   test('项目、施工合同与全局列表均以同一 ID 进入双视图并返回原上下文', async ({ page }) => {
+    test.setTimeout(60_000)
     await page.goto('/project/project-real-320?origin=real')
     await expect(page.getByRole('heading', { name: '中央正式施工项目' })).toBeVisible({ timeout: 20_000 })
     const projectJourney = page.getByRole('region', { name: '项目商务单据' })

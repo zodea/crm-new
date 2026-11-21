@@ -233,7 +233,7 @@ export function createCoreMigrationStoreDefinition(
               confirmedAt: assertStep(confirmed.confirmedAt, '中央确认结果缺少确认时间'),
               rollbackExpiresAt: assertStep(confirmed.rollbackExpiresAt, '中央确认结果缺少回滚截止时间'),
             }
-            await dependencies.localSource.confirmSwitch(recoveredMarker)
+            await dependencies.localSource.confirmSwitch(recoveredMarker, pendingMarker.snapshotSha256)
             activeMigration.value = recoveredMarker
             batch.value = confirmed
             phase.value = 'confirmed'
@@ -443,7 +443,7 @@ export function createCoreMigrationStoreDefinition(
           ),
         }
         try {
-          await dependencies.localSource.confirmSwitch(marker)
+          await dependencies.localSource.confirmSwitch(marker, protectedBackup.snapshotSha256)
         }
         catch (cause) {
           const rolledBack = assertBatchStatus(

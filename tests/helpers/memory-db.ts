@@ -8,6 +8,7 @@ export interface TestDb extends MigrationDb {
 }
 
 let sqlJsPromise: ReturnType<typeof initSqlJs> | null = null
+let migratedSnapshot: Promise<Uint8Array> | undefined
 
 /** node 环境的 sql.js 内存库，形状与 connection.ts 的 DbDriver 对齐 */
 export async function createMemoryDb(bytes?: Uint8Array): Promise<TestDb> {
@@ -34,6 +35,30 @@ export async function createMemoryDb(bytes?: Uint8Array): Promise<TestDb> {
       conn.close()
     },
   }
+}
+
+async function snapshotMigratedDatabase(): Promise<Uint8Array> {
+  const { runMigrations } = await import('../../app/lib/db/migrations')
+  const base = await createMemoryDb()
+  try {
+    await runMigrations(base)
+    return base.raw.export()
+  }
+  finally {
+    base.close()
+  }
+}
+
+/** 同一测试环境复用空库的迁移结果，每次返回可独立写入和关闭的连接。 */
+export async function createMigratedMemoryDb(): Promise<TestDb> {
+  migratedSnapshot ??= snapshotMigratedDatabase().catch((error: unknown) => {
+    migratedSnapshot = undefined
+    throw error
+  })
+  const db = await createMemoryDb(await migratedSnapshot)
+  // sql.js 导出的文件不含连接设置；当前全量迁移结束时已启用外键。
+  await db.execute('PRAGMA foreign_keys = ON')
+  return db
 }
 
 /** 列出库内全部业务表名（排除 sqlite 内部表） */

@@ -1,5 +1,6 @@
 import type { ScheduleCommand, ScheduleReadQuery } from '../../app/lib/schedule/central-contract'
 import { scheduleProblem } from '../../app/lib/schedule/central-contract'
+import { SCHEDULE_COMMAND_RECOVERY_ACTIONS } from '../../app/lib/schedule/command-recovery'
 import { calendarDays } from '../../app/lib/schedule/planning'
 
 export function scheduleObject(value: unknown): value is Record<string, unknown> {
@@ -16,6 +17,18 @@ export function parseScheduleRead(value: unknown): ScheduleReadQuery {
   if (value.today !== undefined && (typeof value.today !== 'string' || calendarDays(value.today, value.today) !== 0))
     invalid()
   return { projectId: value.projectId, origin: value.origin as 'real' | 'demo', includeDemo: value.includeDemo === true || value.includeDemo === 'true', ...(typeof value.today === 'string' ? { today: value.today } : {}) }
+}
+
+export function parseScheduleRecoveryDescriptor(value: unknown) {
+  if (!scheduleObject(value) || Object.keys(value).sort().join(',') !== 'action,actorId,commandId,family,targetId,workspaceId')
+    throw scheduleProblem('validation-failed', 'WBS恢复只接受原编号与最小定位证据')
+  const { commandId, workspaceId, actorId, family, targetId, action } = value
+  if (family !== 'schedule' || typeof commandId !== 'string' || !/^[a-z0-9][\w-]{2,79}$/i.test(commandId)
+    || typeof workspaceId !== 'string' || !workspaceId.trim() || typeof actorId !== 'string' || !actorId.trim()
+    || typeof targetId !== 'string' || !targetId.trim() || typeof action !== 'string' || !SCHEDULE_COMMAND_RECOVERY_ACTIONS.includes(action)) {
+    throw scheduleProblem('validation-failed', '原WBS恢复编号或动作无效')
+  }
+  return { commandId, workspaceId, actorId, family, targetId, action }
 }
 const actions: Record<string, string[]> = {
   'create-group': ['draft'],

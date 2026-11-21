@@ -1,6 +1,7 @@
 import type { SupplierListSourceRow } from '../app/lib/supplier/read-contract'
 import { expect, test } from '@playwright/test'
-import { buildSupplierListPage, parseSupplierListQuery } from '../app/lib/supplier/read-page'
+import { parseSupplierListQuery } from '../app/lib/supplier/read-page'
+import { buildSupplierListPage } from '../tests/helpers/supplier-read-meta'
 import { expectNoPageOverflow } from './helpers/responsive'
 
 test.use({ screenshot: 'off', video: 'off', trace: 'off' })
@@ -39,7 +40,7 @@ const suppliers: SupplierListSourceRow[] = Array.from({ length: 30 }, (_, index)
 test.beforeEach(async ({ page }) => {
   await page.route('**/api/read/suppliers?*', async (route) => {
     const query = parseSupplierListQuery(Object.fromEntries(new URL(route.request().url()).searchParams))
-    await route.fulfill({ json: buildSupplierListPage({ suppliers, query, projectSuppliers: [], contracts: [], paymentApplications: [], paymentRecords: [], paymentAllocations: [], settlements: [], asOf: '2026-09-08T00:00:00.000Z', sourceVersion: 'multi-enum-fixture', capabilities: ['supplier:read', 'supplier:write'] }) })
+    await route.fulfill({ json: buildSupplierListPage({ suppliers, query, projectSuppliers: [], contracts: [], paymentApplications: [], paymentRecords: [], paymentAllocations: [], settlements: [], asOf: '2026-09-08T00:00:00.000Z', sourceVersion: 'multi-enum-fixture', capabilities: ['supplier:list:read', 'supplier:write'] }) })
   })
 })
 

@@ -11,6 +11,7 @@ import FinanceMigrationPanel from '~/components/migration/FinanceMigrationPanel.
 import { migrations, runMigrations } from '~/lib/db/migrations'
 import { openBrowserSqlite } from '~/lib/db/sqljs'
 import { useProductionAccessStore } from '~/stores/production-access'
+import { checkFinanceViewports } from '../finance-viewports'
 
 vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => false }))
 // The browser reads actual SQLite bytes; Native export is outside this component path.
@@ -127,7 +128,7 @@ async function keyboardActivate(name: string) {
   button.element().scrollIntoView({ block: 'center' })
   button.element().focus()
   await expect.element(button).toHaveFocus()
-  assertLayout()
+  await checkFinanceViewports(assertLayout)
   await userEvent.keyboard('{Enter}')
 }
 function attach(input: HTMLInputElement, bytes: Uint8Array, name: string) {
@@ -160,7 +161,7 @@ async function completeMappingAndOriginal() {
   attach(original, externalBytes, '原临时金凭证.bin')
   await expect.element(adopt).toBeEnabled()
   await expect.element(page.getByText('原库确实只有元数据的历史附件会保留缺件标记，不能当作零字节文件。', { exact: true })).toBeVisible()
-  assertLayout()
+  await checkFinanceViewports(assertLayout)
 }
 async function changeAccess(authenticated: boolean) {
   accessStatus = { mode: 'production', purpose: 'verification', authenticated, ownerId: actorId, expiresAt: '2099-01-01T00:00:00.000Z' }
@@ -259,7 +260,7 @@ describe('财务迁入实际 SFC、Native SQLite 文件、原键恢复与五档�
     expect(calls('/api/commands/finance/import/resolve')[0]![1].body).toEqual({ commandId })
     expect(requestCount('/api/commands/finance/import/resolve')).toBe(1)
     expect(sessionStorage.getItem(recoveryKey)).toBeNull()
-    assertLayout()
+    await checkFinanceViewports(assertLayout)
   })
 
   it('已保存回执后 GET503 保原键，恢复只读不再次 resolve 或 adopt', async () => {
@@ -283,7 +284,7 @@ describe('财务迁入实际 SFC、Native SQLite 文件、原键恢复与五档�
     expect(requestCount('/api/commands/finance/import')).toBe(1)
     expect(requestCount('/api/commands/finance/import/resolve')).toBe(0)
     expect(sessionStorage.getItem(recoveryKey)).toBeNull()
-    assertLayout()
+    await checkFinanceViewports(assertLayout)
   })
 
   it('真实授权事件隐藏旧预检，迟到候选不发布；原文件输入可在原身份下再次核验', async () => {
@@ -306,7 +307,7 @@ describe('财务迁入实际 SFC、Native SQLite 文件、原键恢复与五档�
     await keyboardActivate('重新核验当前来源')
     await expect.element(page.getByRole('combobox', { name: '原分供方：原临时金个人身份 · native-supplier' })).toBeVisible()
     expect(requestCount('/api/commands/finance/import')).toBe(0)
-    assertLayout()
+    await checkFinanceViewports(assertLayout)
   })
 
   it('原键核对迟到跨授权事件不显示原身份或结果、不清原键', async () => {
@@ -327,7 +328,7 @@ describe('财务迁入实际 SFC、Native SQLite 文件、原键恢复与五档�
     assertMinimumStorage(commandId)
     expect(document.body.textContent).not.toContain('已核对迁入')
     await expect.element(page.getByRole('alert')).toHaveTextContent('登录已失效')
-    assertLayout()
+    await checkFinanceViewports(assertLayout)
   })
 
   it('卸载后原键核对响应不追加读取或清恢复键，下次界面仍定位原命令', async () => {
@@ -352,7 +353,7 @@ describe('财务迁入实际 SFC、Native SQLite 文件、原键恢复与五档�
     await keyboardActivate('核对原财务迁入')
     await expect.element(recovered()).toHaveTextContent(commandId)
     expect(requestCount('/api/commands/finance/import')).toBe(0)
-    assertLayout()
+    await checkFinanceViewports(assertLayout)
   })
 
   it('已保存后迟到 GET 跨授权事件不清键，恢复原身份仍只读既知结果', async () => {
@@ -384,6 +385,6 @@ describe('财务迁入实际 SFC、Native SQLite 文件、原键恢复与五档�
     expect(requestCount('/api/commands/finance/import')).toBe(1)
     expect(requestCount('/api/commands/finance/import/resolve')).toBe(0)
     expect(sessionStorage.getItem(recoveryKey)).toBeNull()
-    assertLayout()
+    await checkFinanceViewports(assertLayout)
   })
 })

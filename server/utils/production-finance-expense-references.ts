@@ -14,7 +14,7 @@ async function authorize(tx: TransactionDb, actor: BusinessSession) {
   if (!metadata || metadata.workspace_id !== actor.workspaceId || metadata.owner_id !== actor.actorId || participant?.schema_version !== 1)
     financeFailure('unavailable', '原费用正式来源不属于当前工作区或尚未接通。')
 }
-export async function readOriginalExpenseReference(tx: TransactionDb, actor: BusinessSession, id: string) {
+export async function readOriginalExpenseReference(tx: TransactionDb, actor: BusinessSession, id: string, excludedLinkIds?: ReadonlySet<string>) {
   await authorize(tx, actor)
   const expense = await readVerifiedOriginalExpense(tx, id)
   if (!expense)
@@ -23,7 +23,7 @@ export async function readOriginalExpenseReference(tx: TransactionDb, actor: Bus
   const source = (await tx.select<{ revision: number }>('SELECT revision FROM finance_revision WHERE singleton=1'))[0]
   if (!version || !source || !Number.isSafeInteger(version.version) || version.version < 1 || !Number.isSafeInteger(source.revision) || source.revision < 0)
     financeFailure('unavailable', '原费用正式记录版本或来源版本缺失。')
-  const current = await readExpenseClearanceSource(tx, actor, { ...expense, version: String(version.version), sourceRevision: `finance-${source.revision}` })
+  const current = await readExpenseClearanceSource(tx, actor, { ...expense, version: String(version.version), sourceRevision: `finance-${source.revision}` }, excludedLinkIds)
   // Metadata versions and old frozen proofs remain literal. New adoption gates
   // only the selected original identity/amount and the eligibility it consumes.
   const consumptionVersion = `expense-consumption-v1:${createHash('sha256').update(expenseConsumptionFingerprint(current)).digest('hex')}`

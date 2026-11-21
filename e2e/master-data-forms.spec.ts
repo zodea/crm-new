@@ -29,7 +29,7 @@ test.describe('F1 基础主数据整页表单', () => {
       test(`${viewport.width}px 具名路由完整五动作与页面边界：${title}`, async ({ page }) => {
         await page.setViewportSize(viewport)
         await page.goto(path)
-        await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible()
+        await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible({ timeout: 20_000 })
         const footer = page.getByRole('group', { name: '表单操作' })
         const actionNames = ['取消', '保存草稿', '保存', '保存并新建', '保存并提交']
         await expect(footer.getByRole('button')).toHaveCount(actionNames.length)

@@ -1,10 +1,10 @@
 // 发票归档归属 + §4.2 台账聚合口径回归（issue #57）。
 // 权威口径：DATABASE.md §4.2（进项票额/税额 = SUM(amount/tax_amount) WHERE project_id=? AND
 // account_status='archived'）+ ADR-0001 归属铁律（无归属禁止归档）。
+import type { TestDb } from '../helpers/memory-db'
 import { describe, expect, it } from 'vitest'
-import { runMigrations } from '~/lib/db/migrations'
 import { checkArchiveOwnership, checkInvoiceArchiveReady, checkNotDuplicate, checkReviewed } from '~/lib/invoice/archive'
-import { createMemoryDb } from '../helpers/memory-db'
+import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 describe('checkReviewed:归档前置——未校对一律拒绝(DATABASE.md §2.4「核对完成是归档唯一前置」)', () => {
   it.each([
@@ -116,8 +116,7 @@ describe('#257 票据归档终态门禁与数据守恒', () => {
 
 describe('§4.2 台账聚合口径:进项票额/税额按 project_id + account_status=archived', () => {
   async function seedInvoices() {
-    const db = await createMemoryDb()
-    await runMigrations(db)
+    const db = await createMigratedMemoryDb()
     await db.execute(`INSERT INTO projects (id, name) VALUES ('p1', '合和新城'), ('p2', '锦绣华庭')`)
     // p1: 一条已归档(计入) + 一条未归档(none，不计入——account_status 只有 none|archived 两态)
     await db.execute(
@@ -146,7 +145,7 @@ describe('§4.2 台账聚合口径:进项票额/税额按 project_id + account_s
     return db
   }
 
-  async function ledgerSum(db: Awaited<ReturnType<typeof createMemoryDb>>, projectId: string) {
+  async function ledgerSum(db: TestDb, projectId: string) {
     const [row] = await db.select<{ amount_sum: number, tax_sum: number }>(
       `SELECT SUM(amount) AS amount_sum, SUM(tax_amount) AS tax_sum
        FROM invoices WHERE project_id = ? AND account_status = 'archived'`,

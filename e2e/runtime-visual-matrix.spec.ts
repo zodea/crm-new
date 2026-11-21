@@ -139,8 +139,10 @@ async function navigateFromSidebar(page: Page, width: number, label: string, pat
   }
 
   await sidebar.getByRole('searchbox', { name: '搜索菜单' }).fill(label)
-  await sidebar.getByRole('link', { name: label, exact: true }).click()
-  await expect.poll(() => new URL(page.url()).pathname).toBe(pathname)
+  const link = sidebar.getByRole('link', { name: label, exact: true })
+  await expect(link).toHaveAttribute('href', pathname)
+  await link.click()
+  await expect.poll(() => new URL(page.url()).pathname, { timeout: 20_000 }).toBe(pathname)
   await expect(page.locator('[data-shell-topbar] h1')).toHaveText(label)
   if (width < 1024)
     await expect(sidebar).toBeHidden()
@@ -229,7 +231,7 @@ const SAMPLES: VisualSample[] = [
         await navigateFromSidebar(page, width, label, pathname)
 
       await expect(page.locator('[data-ui="supplier-list-table"] .vxe-body--row').first())
-        .toBeVisible()
+        .toBeVisible({ timeout: 30_000 })
 
       const tabList = page.getByRole('navigation', { name: '已打开页面' })
       const overflow = await tabList.evaluate(element => element.scrollWidth > element.clientWidth)
@@ -400,7 +402,7 @@ test.describe('#184 / #186 / #187 / #188 / #189 运行态视觉基线', () => {
     for (const width of RESPONSIVE_WIDTHS) {
       test(`${sample.key} @ ${width}px`, async ({ page }, testInfo) => {
         // 独立开发服务首次编译客户端可能超过默认 30s，断言仍等待真实就绪。
-        test.setTimeout(sample.key === 'shell-stress' ? 90_000 : 60_000)
+        test.setTimeout(sample.key === 'shell-stress' ? 120_000 : 60_000)
         await page.setViewportSize({ width, height: VIEWPORT_HEIGHTS[width] })
         const path = typeof sample.path === 'function' ? sample.path(width) : sample.path
         await page.goto(path)
@@ -408,6 +410,9 @@ test.describe('#184 / #186 / #187 / #188 / #189 运行态视觉基线', () => {
         await expectVisualEnvironment(page)
         await sample.prepare(page, width)
         await page.waitForLoadState('networkidle')
+        await page.evaluate(async () => {
+          await document.fonts.ready
+        })
         // 夹具可能通过正式回执地址重新加载文档，截图脱敏样式须注入最终文档。
         await page.addStyleTag({
           content: `

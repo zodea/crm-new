@@ -40,6 +40,7 @@ const props = defineProps<{
 }>()
 
 const route = useRoute()
+const router = useRouter()
 const store = useOwnerDocumentStore()
 const tabsStore = useTabsStore()
 const { confirm, success, warning, error } = useKitUI()
@@ -100,8 +101,9 @@ let allowLeave = false
 
 async function completeCentralLifecycle() {
   allowLeave = true
-  tabsStore.close(pageKey)
-  await navigateTo(returnTarget.value)
+  const failure = await router.push(returnTarget.value)
+  if (!failure)
+    tabsStore.close(pageKey)
 }
 
 async function recoverCentralConflict(cause: unknown): Promise<boolean> {
@@ -590,11 +592,13 @@ async function persist(action: OwnerDocumentSaveAction, footerAction: FormFooter
       return
     }
     allowLeave = true
+    const sameRecord = routeId.value === result.id
     await navigateTo({
       path: ownerDocumentFormPath(props.kind, result.id),
       query: route.query?.returnTo ? { returnTo: String(route.query.returnTo) } : {},
     }, { replace: true })
-    await initialize()
+    if (sameRecord)
+      await initialize()
     allowLeave = false
   }
   catch (cause) {
