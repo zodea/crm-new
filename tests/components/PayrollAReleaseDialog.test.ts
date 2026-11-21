@@ -1,8 +1,8 @@
 import type { PayrollAFormRead, PayrollAReleaseDraft } from '~/lib/payroll/central-a-contract'
 import { fireEvent, render, screen } from '@testing-library/vue'
 import { describe, expect, it } from 'vitest'
-import PayrollAReleaseDialog from '~/components/payroll/PayrollAReleaseDialog.vue'
 import { payrollReleaseDefault, payrollReleaseError } from '~/lib/payroll/a-presentation'
+import PayrollAReleaseDialog from '~/pages/subcontract/payroll/_components/PayrollAReleaseDialog.vue'
 import { createPayrollHollowFixture } from '../helpers/payroll-hollow-fixture'
 
 function form(): PayrollAFormRead {

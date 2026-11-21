@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/vue'
 import { flushPromises } from '@vue/test-utils'
 import { beforeEach, expect, it, vi } from 'vitest'
 import { defineComponent, h, ref } from 'vue'
-import PayrollReleaseAdjustmentSelection from '~/components/payroll/PayrollReleaseAdjustmentSelection.vue'
+import PayrollReleaseAdjustmentSelection from '~/pages/subcontract/payroll/_components/PayrollReleaseAdjustmentSelection.vue'
 import { payrollAdjustmentFormRead } from '../helpers/payroll-adjustment-ui-fixture'
 
 const load = vi.fn()

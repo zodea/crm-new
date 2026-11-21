@@ -2,9 +2,9 @@ import { fireEvent, render, screen } from '@testing-library/vue'
 import { flushPromises } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, defineComponent, h, KeepAlive, nextTick, reactive, ref, shallowRef, watch } from 'vue'
-import DeliveryArchiveFormPage from '~/components/delivery/DeliveryArchiveFormPage.vue'
 import KitButton from '~/components/ui/KitButton.vue'
 import { deliveryProblem } from '~/lib/delivery-record/contract'
+import DeliveryArchiveFormPage from '~/pages/material/delivery/archive/form/_components/DeliveryArchiveFormPage.vue'
 
 vi.mock('vue-router', () => ({
   onBeforeRouteLeave: vi.fn(),

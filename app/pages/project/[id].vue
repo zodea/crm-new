@@ -1,7 +1,5 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import ProjectDetailScreen from '~/components/project/ProjectDetailScreen.vue'
-import TargetCostProjectReturn from '~/components/target-cost/TargetCostProjectReturn.vue'
 import { validateAuxiliaryDetailReturnTo } from '~/lib/auxiliary-contract/navigation'
 import { validateCrewWorkerReturnTo } from '~/lib/crew-worker/return-context'
 import { validateCustomerDetailReturnTo } from '~/lib/customer/return-context'
@@ -11,6 +9,8 @@ import {
 } from '~/lib/nav/return-to'
 import { validateOwnerDocumentDetailReturnTo } from '~/lib/owner-document/return-context'
 import { validateProjectSupplierIdentityReturnTo } from '~/lib/project-supplier/return-context'
+import ProjectDetailScreen from '~/pages/project/_components/ProjectDetailScreen.vue'
+import TargetCostProjectReturn from '~/pages/project/_components/TargetCostProjectReturn.vue'
 import { isDataOriginDTO } from '~/types/read-model'
 
 const route = useRoute()

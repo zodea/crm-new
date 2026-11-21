@@ -1,8 +1,8 @@
 import { render, screen, within } from '@testing-library/vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h } from 'vue'
-import ProjectDetailTab from '~/components/project/ProjectDetailTab.vue'
-import ProjectReturnLink from '~/components/project/ProjectReturnLink.vue'
+import ProjectDetailTab from '~/pages/project/_components/ProjectDetailTab.vue'
+import ProjectReturnLink from '~/pages/project/_components/ProjectReturnLink.vue'
 
 const project = {
   id: 'project-1',

@@ -3,7 +3,7 @@ import { expect, it } from 'vitest'
 import { render } from 'vitest-browser-vue'
 import { page, userEvent } from 'vitest/browser'
 import { defineComponent, h } from 'vue'
-import ContractPriceTable from '~/components/material/price/ContractPriceTable.vue'
+import ContractPriceTable from '~/pages/material/_components/ContractPriceTable.vue'
 
 it('真实约定价表在五档视口保未知税点/真零、依据门禁、原价、源链接和键盘局部滚动', async () => {
   const base: ContractPriceFact = { dataOrigin: 'real', contractId: 'price-a', lineId: 'line-a', parentContractId: null, contractName: '原吨合同', contractNo: 'A01', supplierId: 'supplier-a', supplierName: '供方甲', projectId: 'project-a', projectName: '原项目', date: '2026-10-04', materialName: '方管', spec: '40×40×2', materialGrade: '304', unit: '吨', quantity: 1, taxInclusiveUnitPrice: 18000, applicableTaxRate: null }

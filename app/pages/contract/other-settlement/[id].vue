@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import OtherSettlementDetailScreen from '~/components/other-settlement/OtherSettlementDetailScreen.vue'
+import OtherSettlementDetailScreen from '~/pages/contract/other-settlement/_components/OtherSettlementDetailScreen.vue'
 
 const route = useRoute()
 </script>

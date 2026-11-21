@@ -4,9 +4,9 @@ import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { defineComponent, h, KeepAlive, ref, shallowRef } from 'vue'
 import CrewWorkerCentralDetailScreen from '~/components/crew-worker/CrewWorkerCentralDetailScreen.vue'
-import PayrollDayworkConfirmDialog from '~/components/payroll/PayrollDayworkConfirmDialog.vue'
 import { usePayrollC2Statement } from '~/composables/usePayrollC2Statement'
 import { usePayrollDayworkForm } from '~/composables/usePayrollDayworkForm'
+import PayrollDayworkConfirmDialog from '~/pages/subcontract/daywork/_components/PayrollDayworkConfirmDialog.vue'
 import { c2Form, c2Frozen, dayworkForm } from '../helpers/payroll-c2-ui'
 
 const load = vi.fn()

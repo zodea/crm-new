@@ -2,8 +2,8 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/vue'
 import { flushPromises } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import { beforeEach, expect, it, vi } from 'vitest'
-import CrewWorkerMigrationPanel from '~/components/migration/CrewWorkerMigrationPanel.vue'
 import { commandRecoveryKey, createCommandRecoveryStorage } from '~/lib/forms/command-recovery'
+import CrewWorkerMigrationPanel from '~/pages/settings/_components/CrewWorkerMigrationPanel.vue'
 import { useProductionAccessStore } from '~/stores/production-access'
 
 const host = vi.hoisted(() => ({ native: false, exportSnapshot: vi.fn(), inspect: vi.fn() }))

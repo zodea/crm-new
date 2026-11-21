@@ -1,13 +1,13 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, defineComponent, h, KeepAlive, reactive, ref, shallowRef, watch } from 'vue'
-import QuantityTemplateFormPage from '~/components/quantity/QuantityTemplateFormPage.vue'
 import EntityFormShell from '~/components/ui/EntityFormShell.vue'
 import FormFooter from '~/components/ui/FormFooter.vue'
 import { createQuantityBrowserState } from '~/lib/quantity/browser-state'
 import { quantityProblem } from '~/lib/quantity/central-contract'
 import { createQuantityRepository } from '~/lib/quantity/central-repository'
 import { createQuantityReadAdapter } from '~/lib/quantity/read-adapter'
+import QuantityTemplateFormPage from '~/pages/subcontract/quantity/_components/QuantityTemplateFormPage.vue'
 
 vi.mock('vue-router', () => ({ onBeforeRouteLeave: vi.fn(), onBeforeRouteUpdate: vi.fn() }))
 const identity = { workspaceId: 'w', actorId: 'a', capabilities: ['quantity:read', 'quantity:write'] }

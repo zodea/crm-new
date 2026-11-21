@@ -2,7 +2,7 @@ import { fireEvent, render } from '@testing-library/vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, shallowRef } from 'vue'
 import InvoiceRecognitionFieldMark from '~/components/invoice/InvoiceRecognitionFieldMark.vue'
-import InvoiceReviewForm from '~/components/invoice/InvoiceReviewForm.vue'
+import InvoiceReviewForm from '~/pages/finance/invoice/_components/InvoiceReviewForm.vue'
 
 const store = { correctField: vi.fn(), confirmField: vi.fn() }
 

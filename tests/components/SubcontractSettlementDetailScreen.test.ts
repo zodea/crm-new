@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, reactive } from 'vue'
-import SubcontractSettlementDetailScreen from '~/components/owner-document/SubcontractSettlementDetailScreen.vue'
+import SubcontractSettlementDetailScreen from '~/pages/subcontract/[kind]/_components/SubcontractSettlementDetailScreen.vue'
 
 const mocks = vi.hoisted(() => ({
   store: {

@@ -2,9 +2,9 @@ import type { QuantityStageWorkspace } from '../../app/lib/quantity/central-stag
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, KeepAlive, reactive, ref } from 'vue'
-import QuantityStageFormPage from '../../app/components/quantity/QuantityStageFormPage.vue'
 import { quantityProblem } from '../../app/lib/quantity/central-contract'
 import { createQuantityStageState } from '../../app/lib/quantity/stage-state'
+import QuantityStageFormPage from '../../app/pages/subcontract/quantity/_components/QuantityStageFormPage.vue'
 
 let state: ReturnType<typeof reactive<ReturnType<typeof createQuantityStageState>>>
 vi.mock('~/stores/quantity-stage', () => ({ useQuantityStageStore: () => state }))

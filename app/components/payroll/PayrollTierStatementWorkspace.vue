@@ -7,9 +7,9 @@ import { computed, nextTick, shallowRef } from 'vue'
 import KitButton from '~/components/ui/KitButton.vue'
 import SectionHeader from '~/components/ui/SectionHeader.vue'
 import { toErrorMessage } from '~/lib/util/error'
+import PayrollReleaseAdjustmentSelection from '../../pages/subcontract/payroll/_components/PayrollReleaseAdjustmentSelection.vue'
 import PayrollACommandState from './PayrollACommandState.vue'
 import PayrollHollowReview from './PayrollHollowReview.vue'
-import PayrollReleaseAdjustmentSelection from './PayrollReleaseAdjustmentSelection.vue'
 import PayrollTierReleaseDialog from './PayrollTierReleaseDialog.vue'
 
 type StatementWorkspace = ReturnType<typeof usePayrollC1Statement> | ReturnType<typeof usePayrollC2Statement>

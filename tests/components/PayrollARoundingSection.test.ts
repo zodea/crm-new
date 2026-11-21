@@ -1,7 +1,7 @@
 import type { PayrollARoundingRead } from '~/lib/payroll/central-a-rounding-contract'
 import { fireEvent, render, screen, waitFor } from '@testing-library/vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import PayrollARoundingSection from '~/components/payroll/PayrollARoundingSection.vue'
+import PayrollARoundingSection from '~/pages/subcontract/payroll/_components/PayrollARoundingSection.vue'
 
 const scope = { projectId: 'project-a', leaderWorkerId: 'leader-a', book: { bookPurpose: 'ordinary' as const, managementBookId: null }, month: '2026-08' }
 function read(): PayrollARoundingRead {

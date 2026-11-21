@@ -2,7 +2,7 @@ import type { TargetCostListRead, TargetCostPending } from '~/lib/target-cost/ce
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, reactive, shallowRef } from 'vue'
-import CentralTargetCostListScreen from '~/components/target-cost/CentralTargetCostListScreen.vue'
+import CentralTargetCostListScreen from '~/pages/project/target-cost/_components/CentralTargetCostListScreen.vue'
 
 const route = reactive({ path: '/project/target-cost', query: { origin: 'real' } as Record<string, unknown> })
 const load = vi.fn()

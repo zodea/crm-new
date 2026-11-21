@@ -2,7 +2,7 @@ import type { QuantityCompletionWorkspace } from '~/lib/quantity/completion'
 import { render, screen, within } from '@testing-library/vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, defineComponent, nextTick, reactive, shallowRef, watch } from 'vue'
-import QuantityUnitDetailScreen from '~/components/quantity/QuantityUnitDetailScreen.vue'
+import QuantityUnitDetailScreen from '~/pages/subcontract/quantity/[pid]/_components/QuantityUnitDetailScreen.vue'
 
 vi.mock('~/lib/db/client', () => ({ db: {} }))
 

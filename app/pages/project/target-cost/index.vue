@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import TargetCostListScreen from '~/components/target-cost/TargetCostListScreen.vue'
+import TargetCostListScreen from '~/pages/project/target-cost/_components/TargetCostListScreen.vue'
 </script>
 
 <template>

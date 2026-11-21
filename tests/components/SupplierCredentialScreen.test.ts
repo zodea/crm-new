@@ -1,6 +1,6 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import SupplierCredentialScreen from '~/components/supplier/SupplierCredentialScreen.vue'
+import SupplierCredentialScreen from '~/pages/base/supplier/credential/_components/SupplierCredentialScreen.vue'
 
 const localLoad = vi.hoisted(() => vi.fn())
 const readStore = vi.hoisted(() => ({

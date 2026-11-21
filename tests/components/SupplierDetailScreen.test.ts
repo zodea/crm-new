@@ -1,8 +1,8 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, reactive } from 'vue'
-import SupplierDetailScreen from '~/components/supplier/SupplierDetailScreen.vue'
 import ReadOnlySection from '~/components/ui/ReadOnlySection.vue'
+import SupplierDetailScreen from '~/pages/base/supplier/_components/SupplierDetailScreen.vue'
 
 const supplierStoreMock = vi.hoisted(() => ({
   detailState: { kind: 'idle' } as any,

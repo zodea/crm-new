@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import OwnerAcceptanceDetailScreen from '~/components/owner-document/OwnerAcceptanceDetailScreen.vue'
-import OwnerCommercialDocumentDetailScreen from '~/components/owner-document/OwnerCommercialDocumentDetailScreen.vue'
 import OwnerDocumentFormPage from '~/components/owner-document/OwnerDocumentFormPage.vue'
-import OwnerFinalSettlementDetailScreen from '~/components/owner-document/OwnerFinalSettlementDetailScreen.vue'
-import OwnerPenaltyDetailScreen from '~/components/owner-document/OwnerPenaltyDetailScreen.vue'
 import { ownerDocumentKindFromRoute } from '~/lib/owner-document/page'
+import OwnerAcceptanceDetailScreen from '~/pages/owner/[kind]/_components/OwnerAcceptanceDetailScreen.vue'
+import OwnerCommercialDocumentDetailScreen from '~/pages/owner/[kind]/_components/OwnerCommercialDocumentDetailScreen.vue'
+import OwnerFinalSettlementDetailScreen from '~/pages/owner/[kind]/_components/OwnerFinalSettlementDetailScreen.vue'
+import OwnerPenaltyDetailScreen from '~/pages/owner/[kind]/_components/OwnerPenaltyDetailScreen.vue'
 import { isDataOriginDTO } from '~/types/read-model'
 
 const route = useRoute()

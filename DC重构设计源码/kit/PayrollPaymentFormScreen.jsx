@@ -1,5 +1,5 @@
 // PayrollPaymentFormScreen — 登记工资实际补退整页（/subcontract/payroll/payments/new；#412 P4）。
-// 对应 app/components/payroll/PayrollActualPaymentFormPage.vue + PayrollActualPaymentFields.vue + usePayrollActualPaymentForm.ts。
+// 对应 app/pages/subcontract/payroll/payments/_components/PayrollActualPaymentFormPage.vue + PayrollActualPaymentFields.vue + usePayrollActualPaymentForm.ts。
 // 流程：核对原工资 → 选方向（补发正数 / 退款负数）、真实发生日期、有符号实额、核对依据 → 按实际填写原成员收付
 //       （未参与留空，真实零填 0）→ 填本次对各原更正的处理额（可分次，合计 = 本次实额，不超剩余）→ 核对 → 确认真实收付。
 // 口径：只登记已经真实发生的钱；不生成付款申请或银行支付记录，不要求编造银行流水号；原工资签字表保持原金额。

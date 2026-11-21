@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import OurSignatorySettingsScreen from '~/components/settings/OurSignatorySettingsScreen.vue'
+import OurSignatorySettingsScreen from '~/pages/settings/our-signatories/_components/OurSignatorySettingsScreen.vue'
 </script>
 
 <template>

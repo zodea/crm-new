@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/vue'
 import { describe, expect, it } from 'vitest'
-import OcrRuntimeStatusCard from '~/components/ocr/OcrRuntimeStatusCard.vue'
+import OcrRuntimeStatusCard from '~/pages/settings/_components/OcrRuntimeStatusCard.vue'
 
 describe('ocr 运行状态卡', () => {
   it('已配置时展示固定引擎、模型和服务端私有凭证边界', () => {

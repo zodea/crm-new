@@ -1,5 +1,5 @@
 // DayworkScreen — 零星签工台账（C2 来源；#244 设计稿回填，#412 按现行实现修正）。
-// 依据：app/components/payroll/CentralSignedDayworkScreen.vue、PayrollDayworkTable.vue、
+// 依据：app/pages/subcontract/daywork/_components/CentralSignedDayworkScreen.vue、PayrollDayworkTable.vue、
 //       PayrollDayworkConfirmDialog.vue、PayrollDayworkLocks.vue 与 docs/rewrite/pages/subcontract-payroll.md「C2 零星签工」。
 // 口径：按项目 × 月份 × 班组维护逐日签工；每条含日期、施工内容、起止时间、用工人、整工/半工、证明人和确认日期。
 //       待确认（draft）保留在台账但不计薪；补齐证明人与确认日期后「人工确认」转为已确认（confirmed），已确认才是 C2 唯一计薪来源。

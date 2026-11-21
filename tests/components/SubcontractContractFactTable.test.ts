@@ -1,6 +1,6 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
-import SubcontractContractFactTable from '~/components/contract/SubcontractContractFactTable.vue'
+import SubcontractContractFactTable from '~/pages/contract/_components/SubcontractContractFactTable.vue'
 
 const KitTableStub = {
   props: ['data', 'empty'],

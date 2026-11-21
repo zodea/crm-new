@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/vue'
 import { describe, expect, it } from 'vitest'
-import OcrRecognitionSettingsForm from '~/components/ocr/OcrRecognitionSettingsForm.vue'
 import { createDefaultOcrRecognitionSettings } from '~/lib/ocr/settings'
+import OcrRecognitionSettingsForm from '~/pages/settings/_components/OcrRecognitionSettingsForm.vue'
 
 describe('ocr 识别设置表单', () => {
   it('编辑真实能力并提供保存、恢复动作', async () => {

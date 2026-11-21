@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import WorkerPrivateProfileScreen from '~/components/worker/WorkerPrivateProfileScreen.vue'
+import WorkerPrivateProfileScreen from '~/pages/base/worker/private/_components/WorkerPrivateProfileScreen.vue'
 
 const route = useRoute()
 </script>

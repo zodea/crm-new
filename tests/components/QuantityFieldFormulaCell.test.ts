@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/vue'
 import { describe, expect, it } from 'vitest'
-import QuantityFieldFormulaCell from '~/components/quantity/QuantityFieldFormulaCell.vue'
+import QuantityFieldFormulaCell from '~/pages/subcontract/quantity/_components/QuantityFieldFormulaCell.vue'
 
 describe('quantity field formula cell', () => {
   it('阅读态显示计算结果，点击后才显示计算式', async () => {

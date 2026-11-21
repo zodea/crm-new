@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import OcrSettingsScreen from '~/components/ocr/OcrSettingsScreen.vue'
+import OcrSettingsScreen from '~/pages/settings/_components/OcrSettingsScreen.vue'
 </script>
 
 <template>

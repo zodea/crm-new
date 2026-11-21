@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import OwnerDocumentFormPage from '~/components/owner-document/OwnerDocumentFormPage.vue'
-import SubcontractChangeDetailScreen from '~/components/owner-document/SubcontractChangeDetailScreen.vue'
-import SubcontractSettlementDetailScreen from '~/components/owner-document/SubcontractSettlementDetailScreen.vue'
 import { ownerDocumentKindFromRoute } from '~/lib/owner-document/page'
+import SubcontractChangeDetailScreen from '~/pages/subcontract/[kind]/_components/SubcontractChangeDetailScreen.vue'
+import SubcontractSettlementDetailScreen from '~/pages/subcontract/[kind]/_components/SubcontractSettlementDetailScreen.vue'
 import { isDataOriginDTO } from '~/types/read-model'
 
 const route = useRoute()

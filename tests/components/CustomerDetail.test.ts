@@ -1,9 +1,9 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import { computed, defineComponent } from 'vue'
-import CustomerDetailOverview from '~/components/master-data/CustomerDetailOverview.vue'
-import CustomerDetailRelations from '~/components/master-data/CustomerDetailRelations.vue'
 import CustomerFormFields from '~/components/master-data/CustomerFormFields.vue'
+import CustomerDetailOverview from '~/pages/base/customer/_components/CustomerDetailOverview.vue'
+import CustomerDetailRelations from '~/pages/base/customer/_components/CustomerDetailRelations.vue'
 
 vi.stubGlobal('computed', computed)
 

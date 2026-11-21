@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import CustomerListScreen from '~/components/master-data/CustomerListScreen.vue'
+import CustomerListScreen from '~/pages/base/customer/_components/CustomerListScreen.vue'
 </script>
 
 <template>

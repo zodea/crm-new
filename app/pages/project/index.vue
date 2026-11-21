@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import ProjectListScreen from '~/components/project/ProjectListScreen.vue'
+import ProjectListScreen from '~/pages/project/_components/ProjectListScreen.vue'
 </script>
 
 <template>

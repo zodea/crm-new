@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import CustomerDetailScreen from '~/components/master-data/CustomerDetailScreen.vue'
+import CustomerDetailScreen from '~/pages/base/customer/_components/CustomerDetailScreen.vue'
 import { isDataOriginDTO } from '~/types/read-model'
 
 const route = useRoute()

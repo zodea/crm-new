@@ -2,7 +2,7 @@ import type { PayrollActualFact, PayrollActualPaymentDetailRead } from '~/lib/pa
 import { render, screen } from '@testing-library/vue'
 import { beforeEach, expect, it, vi } from 'vitest'
 import PayrollActualFactsTable from '~/components/payroll/PayrollActualFactsTable.vue'
-import PayrollActualPaymentDetailScreen from '~/components/payroll/PayrollActualPaymentDetailScreen.vue'
+import PayrollActualPaymentDetailScreen from '~/pages/subcontract/payroll/payments/_components/PayrollActualPaymentDetailScreen.vue'
 import { knownPayrollSigned, payrollAdjustmentFormRead, payrollAdjustmentOriginal } from '../helpers/payroll-adjustment-ui-fixture'
 
 const source = '/subcontract/payroll/payments/reversal-record?origin=real'

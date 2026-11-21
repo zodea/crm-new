@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import ScheduleProcessLibraryDetail from '~/components/schedule/ScheduleProcessLibraryDetail.vue'
+import ScheduleProcessLibraryDetail from '~/pages/schedule/process-library/_components/ScheduleProcessLibraryDetail.vue'
 </script>
 
 <template>

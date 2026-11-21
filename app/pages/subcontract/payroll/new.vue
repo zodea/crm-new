@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import PayrollDraftFormPage from '~/components/payroll/PayrollDraftFormPage.vue'
+import PayrollDraftFormPage from '~/pages/subcontract/payroll/_components/PayrollDraftFormPage.vue'
 </script>
 
 <template>

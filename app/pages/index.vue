@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import HomeDashboard from '~/components/home/HomeDashboard.vue'
+import HomeDashboard from '~/pages/_components/HomeDashboard.vue'
 </script>
 
 <template>

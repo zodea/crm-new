@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import CentralPayrollSourcesScreen from '~/components/payroll/CentralPayrollSourcesScreen.vue'
+import CentralPayrollSourcesScreen from '~/pages/subcontract/payroll/_components/CentralPayrollSourcesScreen.vue'
 </script>
 
 <script setup lang="ts">

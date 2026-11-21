@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import SubcontractContractListScreen from '~/components/contract/SubcontractContractListScreen.vue'
+import SubcontractContractListScreen from '~/pages/contract/subcontract/_components/SubcontractContractListScreen.vue'
 </script>
 
 <script setup lang="ts">

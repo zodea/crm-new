@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/vue'
 import { createPinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import CoreIdentityMigrationScreen from '~/components/migration/CoreIdentityMigrationScreen.vue'
+import CoreIdentityMigrationScreen from '~/pages/settings/_components/CoreIdentityMigrationScreen.vue'
 
 vi.mock('~/composables/useKitUI', async (importOriginal) => {
   const original = await importOriginal<typeof import('~/composables/useKitUI')>()

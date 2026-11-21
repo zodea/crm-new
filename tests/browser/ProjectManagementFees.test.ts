@@ -5,7 +5,7 @@ import { render } from 'vitest-browser-vue'
 import { page, userEvent } from 'vitest/browser'
 import { defineComponent, h, reactive } from 'vue'
 import { createMemoryHistory, createRouter, RouterLink } from 'vue-router'
-import ProjectManagementFees from '~/components/project/ProjectManagementFees.vue'
+import ProjectManagementFees from '~/pages/project/_components/ProjectManagementFees.vue'
 
 const asOf = '2026-10-04T10:00:00.000Z'
 function metric(value: string | null, knownValue: string | null, status: MetricDTO['status'], missingSources: string[], participatingCount: number | null, missingCount: number | null): MetricDTO {

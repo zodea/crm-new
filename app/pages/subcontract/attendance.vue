@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import AttendanceScreen from '~/components/payroll/AttendanceScreen.vue'
+import AttendanceScreen from '~/pages/subcontract/_components/AttendanceScreen.vue'
 </script>
 
 <template>

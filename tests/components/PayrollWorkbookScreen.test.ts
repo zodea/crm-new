@@ -1,7 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { computed, ref } from 'vue'
-import PayrollWorkbookScreen from '~/components/payroll/PayrollWorkbookScreen.vue'
+import PayrollWorkbookScreen from '~/pages/subcontract/payroll/_components/PayrollWorkbookScreen.vue'
 
 let ui: ReturnType<typeof fixture>
 vi.mock('~/composables/usePayrollWorkbook', () => ({ usePayrollWorkbook: () => ui }))

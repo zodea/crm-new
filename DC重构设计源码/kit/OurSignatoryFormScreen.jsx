@@ -1,5 +1,5 @@
 // OurSignatoryFormScreen — 我方签约主体新增 / 编辑整页表单（路由 ourSignatoryForm，对应实现
-// /settings/our-signatories/form/:id?）。依据：app/components/settings/OurSignatoryFormPage.vue、
+// /settings/our-signatories/form/:id?）。依据：app/pages/settings/our-signatories/form/_components/OurSignatoryFormPage.vue、
 // app/lib/our-signatory/contract.ts、ADR 0014（实体新增/编辑一律独立整页表单）。
 // 不走 KitFormPage 注册表：本表单需要「不可变核实历史」「版本冲突核对」「原提交恢复」三块
 // FormPage 规格无法表达的只读区，且没有草稿/提交态；视觉沿用 FormPage 的返回 + 标题 + 分区卡片 + 吸底动作条。

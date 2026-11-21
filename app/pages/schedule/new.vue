@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import ScheduleGroupNewScreen from '~/components/schedule/ScheduleGroupNewScreen.vue'
+import ScheduleGroupNewScreen from '~/pages/schedule/_components/ScheduleGroupNewScreen.vue'
 </script>
 
 <template>

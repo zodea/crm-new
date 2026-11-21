@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import DeliveryArchiveScreen from '~/components/delivery/DeliveryArchiveScreen.vue'
+import DeliveryArchiveScreen from '~/pages/material/delivery/archive/_components/DeliveryArchiveScreen.vue'
 </script>
 
 <template>

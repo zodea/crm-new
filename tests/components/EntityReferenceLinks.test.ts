@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { defineComponent } from 'vue'
 import CustomerRelationLink from '~/components/master-data/CustomerRelationLink.vue'
 import ReceiptReferenceLink from '~/components/receipt/ReceiptReferenceLink.vue'
-import SupplierRelationLink from '~/components/supplier/SupplierRelationLink.vue'
+import SupplierRelationLink from '~/pages/base/supplier/_components/SupplierRelationLink.vue'
 
 const global = { components: { NuxtLink: defineComponent({ props: ['to'], template: '<a :href="to"><slot /></a>' }) } }
 afterEach(cleanup)

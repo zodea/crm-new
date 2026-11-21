@@ -1,5 +1,5 @@
 // QuotationImportScreen — 报价来源迁入（route quotationImport ↔ 实现 /material/quotations/import，
-// 对应 app/components/material/quotation/QuotationImportPage.vue；Q-A02-03 报价图显式迁入）。
+// 对应 app/pages/material/quotations/_components/QuotationImportPage.vue；Q-A02-03 报价图显式迁入）。
 // 口径：
 //   ① 核验本地报价来源：说明（保留原报价身份、材料行、版本、原件和原命令；本地报价完整核验迁入后才能切换平台；
 //      中央已有报价时拒绝覆盖）+「从桌面设置导出完整一致快照」+ 选择完整 SQLite 来源快照（Native v58–v60）+ 清除当前来源包；

@@ -1,6 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, expect, it, vi } from 'vitest'
-import CentralPayrollDetailScreen from '~/components/payroll/CentralPayrollDetailScreen.vue'
+import CentralPayrollDetailScreen from '~/pages/subcontract/payroll/_components/CentralPayrollDetailScreen.vue'
 import { payrollDetailFixture } from '../helpers/payroll-central-read-fixture'
 
 afterEach(() => vi.unstubAllGlobals())

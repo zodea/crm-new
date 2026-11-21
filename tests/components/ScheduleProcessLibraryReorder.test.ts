@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/vue
 import { createPinia, defineStore, setActivePinia } from 'pinia'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, reactive, shallowRef } from 'vue'
-import ScheduleProcessLibraryFormPage from '~/components/schedule/ScheduleProcessLibraryFormPage.vue'
+import ScheduleProcessLibraryFormPage from '~/pages/schedule/process-library/_components/ScheduleProcessLibraryFormPage.vue'
 
 vi.mock('~/composables/useTabCloseGuard', () => ({ useTabCloseGuard: vi.fn() }))
 vi.mock('vue-router', async importOriginal => ({ ...await importOriginal<typeof import('vue-router')>(), onBeforeRouteUpdate: vi.fn(), onBeforeRouteLeave: vi.fn() }))

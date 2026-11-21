@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import PayrollAdjustmentDetailScreen from '~/components/payroll/PayrollAdjustmentDetailScreen.vue'
+import PayrollAdjustmentDetailScreen from '~/pages/subcontract/payroll/adjustments/_components/PayrollAdjustmentDetailScreen.vue'
 </script>
 
 <template>

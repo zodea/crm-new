@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import WorkerRosterArchiveScreen from '~/components/worker/WorkerRosterArchiveScreen.vue'
+import WorkerRosterArchiveScreen from '~/pages/subcontract/payroll/_components/WorkerRosterArchiveScreen.vue'
 
 const route = useRoute()
 </script>

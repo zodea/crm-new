@@ -3,9 +3,9 @@ import type { ReadState } from '~/types/read-model'
 import { fireEvent, render, screen, waitFor } from '@testing-library/vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, defineComponent, h, nextTick, onActivated, onMounted, reactive, ref, shallowRef, watch } from 'vue'
-import ConstructionContractListScreen from '~/components/contract/ConstructionContractListScreen.vue'
 import StatePanel from '~/components/ui/StatePanel.vue'
 import { constructionContractProblem } from '~/lib/construction-contract/repository'
+import ConstructionContractListScreen from '~/pages/contract/construction/_components/ConstructionContractListScreen.vue'
 
 const listState = shallowRef<ReadState<ConstructionContractListPageDTO>>({ kind: 'idle' })
 const store = {

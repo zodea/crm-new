@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import DeliveryRecognitionScreen from '~/components/delivery/DeliveryRecognitionScreen.vue'
+import DeliveryRecognitionScreen from '~/pages/material/delivery/_components/DeliveryRecognitionScreen.vue'
 </script>
 
 <template>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import QuantityRegionFormPage from '~/components/quantity/QuantityRegionFormPage.vue'
 import { readQuantityOrigin } from '~/lib/quantity/navigation'
+import QuantityRegionFormPage from '~/pages/subcontract/quantity/_components/QuantityRegionFormPage.vue'
 
 const route = useRoute()
 const projectId = computed(() => String(route.query.project ?? ''))

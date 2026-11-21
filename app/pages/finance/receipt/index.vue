@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import ReceiptRegistrationListScreen from '~/components/receipt/ReceiptRegistrationListScreen.vue'
+import ReceiptRegistrationListScreen from '~/pages/finance/receipt/_components/ReceiptRegistrationListScreen.vue'
 </script>
 
 <script setup lang="ts">

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/vue'
 import { describe, expect, it, vi } from 'vitest'
-import AttendanceGrid from '~/components/payroll/CentralAttendanceGrid.vue'
-import PayrollAttendanceCellDialog from '~/components/payroll/PayrollAttendanceCellDialog.vue'
+import AttendanceGrid from '~/pages/subcontract/_components/CentralAttendanceGrid.vue'
+import PayrollAttendanceCellDialog from '~/pages/subcontract/_components/PayrollAttendanceCellDialog.vue'
 import { c1AttendanceFact, c1Matrix } from '../helpers/payroll-c1-ui'
 
 describe('中央原单元格输入', () => {

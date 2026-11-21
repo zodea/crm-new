@@ -3,9 +3,9 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/vue'
 import { createPinia, defineStore, setActivePinia } from 'pinia'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, KeepAlive, nextTick, reactive, shallowRef } from 'vue'
-import ScheduleProcessLibraryDetail from '~/components/schedule/ScheduleProcessLibraryDetail.vue'
-import ScheduleProcessLibraryScreen from '~/components/schedule/ScheduleProcessLibraryScreen.vue'
 import { createProcessLibraryState } from '~/lib/schedule/process-library-state'
+import ScheduleProcessLibraryDetail from '~/pages/schedule/process-library/_components/ScheduleProcessLibraryDetail.vue'
+import ScheduleProcessLibraryScreen from '~/pages/schedule/process-library/_components/ScheduleProcessLibraryScreen.vue'
 
 function version(id = 'old'): ProcessLibraryVersion {
   return { id, code: 'interior', name: '精装修', version: 1, description: '旧版说明', taskCount: 1, isDefault: false, usageCount: null, dataOrigin: 'real', sourceVersion: `source-${id}`, sourceVersionId: null, sortOrder: 0, createdAt: null, createdBy: null, updatedAt: null, deletedAt: null, migrationBatchId: null, legacyId: null, tasks: [{ id: 'task-a', libraryId: id, libraryVersion: 1, key: 'a', name: `放线-${id}`, durationDays: 3, trade: '泥水工', color: '#64748b', stageCode: 'stage-1', itemCodes: ['wall'], sortOrder: 10, predecessorKey: null, predecessorDisabled: false, legacyId: null, createdAt: null, updatedAt: null, deletedAt: null }] }

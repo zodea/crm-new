@@ -1,8 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/vue'
 import { describe, expect, it } from 'vitest'
 import { defineComponent, h } from 'vue'
-import PaymentManagementToolbar from '~/components/finance/payment-management/PaymentManagementToolbar.vue'
 import SearchInput from '~/components/ui/SearchInput.vue'
+import PaymentManagementToolbar from '~/pages/finance/payment-management/_components/PaymentManagementToolbar.vue'
 
 const SelectFilterStub = defineComponent({
   props: {

@@ -3,8 +3,8 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/vue'
 import { flushPromises } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, defineComponent, h, onMounted, reactive, shallowRef, watch } from 'vue'
-import DeliveryArchiveScreen from '~/components/delivery/DeliveryArchiveScreen.vue'
 import KitButton from '~/components/ui/KitButton.vue'
+import DeliveryArchiveScreen from '~/pages/material/delivery/archive/_components/DeliveryArchiveScreen.vue'
 
 const createZip = vi.hoisted(() => vi.fn())
 

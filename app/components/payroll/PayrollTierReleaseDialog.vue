@@ -5,7 +5,7 @@ import { Button } from '~/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from '~/components/ui/dialog'
 import { payrollAmount } from '~/lib/payroll/read-presentation'
 import { payrollInputNumber, payrollReleaseDefault, payrollReleaseError } from '~/lib/payroll/release-presentation'
-import PayrollReleaseAdjustmentSummary from './PayrollReleaseAdjustmentSummary.vue'
+import PayrollReleaseAdjustmentSummary from '../../pages/subcontract/payroll/_components/PayrollReleaseAdjustmentSummary.vue'
 
 const props = defineProps<{ open: boolean, read: PayrollTierReleaseRead, busy: boolean, pending: boolean, awaitingRead?: boolean, error: string, initial?: PayrollTierReleaseDraft | null, readonly?: boolean }>()
 const emit = defineEmits<{ 'update:open': [value: boolean], 'submit': [value: PayrollTierReleaseDraft], 'change': [value: PayrollTierReleaseDraft], 'recover': [] }>()

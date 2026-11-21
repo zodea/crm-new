@@ -1,0 +1,738 @@
+<script setup lang="ts">
+import type { ConfiguredExportSource, ExportData } from '~/lib/kit/export'
+import type { KitTableColumn } from '~/lib/kit/table'
+import type { TreeNode } from '~/lib/kit/tree-nav'
+import type { ProjectListPageDTO, ProjectListQueryDTO } from '~/lib/project/repository'
+import type { MetricDTO } from '~/types/read-model'
+import { useDebounceFn } from '@vueuse/core'
+import * as XLSX from 'xlsx'
+import EntityDeletedList from '~/components/shared/EntityDeletedList.vue'
+import EntityPendingRecovery from '~/components/shared/EntityPendingRecovery.vue'
+import KitStatusTag from '~/components/ui/KitStatusTag.vue'
+import RowActionMenu from '~/components/ui/RowActionMenu.vue'
+import { useProjectListReturnContext } from '~/composables/useProjectListReturnContext'
+import { resolveNavigationTarget } from '~/lib/nav/target-registry'
+import { projectLedgerRows } from '~/lib/project/export'
+import { projectListViewRow } from '~/lib/project/list'
+import { IMPORTED_PROJECT_STATUS } from '~/lib/project/repository'
+import { PROJECT_STATUSES, projectStatusTone } from '~/lib/project/status'
+import { readProblemTitle } from '~/lib/read-model/state'
+import { toErrorMessage } from '~/lib/util/error'
+import { yuan } from '~/lib/util/money'
+import ProjectListToolbar from '~/pages/project/_components/ProjectListToolbar.vue'
+import { useProjectProductionStore } from '~/stores/project-production'
+
+const readStore = useProjectListStore()
+const commandStore = useProjectCommandStore()
+const productionStore = useProjectProductionStore()
+const dataVisibilityStore = useDataVisibilityStore()
+const route = useRoute()
+const router = useRouter()
+const includeDemo = computed(() => dataVisibilityStore.includeDemo)
+const { error, exportFile, openImportTab } = useKitUI()
+
+const searchText = shallowRef('')
+const selectedPhase = shallowRef('all')
+const sortMode = shallowRef<'updated-desc' | 'name-asc'>('updated-desc')
+const filtersVisible = shallowRef(true)
+const density = shallowRef<'compact' | 'comfortable'>('compact')
+const page = shallowRef(1)
+const pageSize = shallowRef(10)
+const columnFilters = shallowRef<{ field: string, values: unknown[] }[]>([])
+const tableRef = useTemplateRef<{ clearFilter: () => Promise<void> }>('tableRef')
+
+const IMPORTED_PHASES_KEY = 'imported-phases'
+const DELETE_DISABLED_REASON = '项目删除不在当前实施范围'
+const listViews = [
+  { key: 'updated-desc', label: '最近更新' },
+  { key: 'name-asc', label: '项目名称' },
+]
+
+const readPage = computed<ProjectListPageDTO | null>(() => {
+  const state = readStore.state
+  if (state.kind === 'ready' || state.kind === 'empty')
+    return state.data
+  if (state.kind === 'loading' || (state.kind === 'error' || state.kind === 'unavailable'))
+    return state.previous
+  return null
+})
+
+const sourceRows = computed(() => readPage.value?.items.map(projectListViewRow) ?? [])
+const tableRows = computed(() => sourceRows.value)
+const statusCounts = computed(() => Object.fromEntries(
+  (readPage.value?.summary.facets.statuses ?? []).map(facet => [facet.value, facet.count]),
+))
+const availableTotal = computed(() => Object.values(statusCounts.value)
+  .reduce((total, count) => total + count, 0))
+const visibleTotal = computed(() => readPage.value?.pagination.total ?? 0)
+const summary = computed(() => readPage.value?.summary ?? null)
+const realSummary = computed(() => summary.value?.origins.real ?? null)
+const demoSummary = computed(() => summary.value?.origins.demo ?? null)
+function metricLabel(metric: MetricDTO | undefined): string {
+  if (!metric)
+    return '—'
+  if (metric.status === 'complete')
+    return yuan(metric.value)
+  if (metric.knownValue !== null)
+    return `未知（已知小计 ${yuan(metric.knownValue)}）`
+  return metric.status === 'undefined' ? '无记录' : '未知'
+}
+function scopeLabel(origin: 'real' | 'demo'): string {
+  return readPage.value?.originMeta[origin].authorizedScope.coverage === 'complete' ? '当前筛选范围' : '当前可见范围'
+}
+const listSummary = computed<Record<string, string | number>>(() => {
+  const result: Record<string, string | number> = {
+    正式项目: realSummary.value?.projectCount ?? 0,
+    正式收入: metricLabel(realSummary.value?.income),
+    正式预算: metricLabel(realSummary.value?.budget),
+  }
+  if (includeDemo.value) {
+    result.测试项目 = demoSummary.value?.projectCount ?? 0
+    result.测试收入 = metricLabel(demoSummary.value?.income)
+    result.测试预算 = metricLabel(demoSummary.value?.budget)
+  }
+  return result
+})
+const loading = computed(() => readStore.state.kind === 'loading')
+const problem = computed(() => {
+  const state = readStore.state
+  return state.kind === 'forbidden'
+    || state.kind === 'not-found'
+    || state.kind === 'mismatch'
+    || (state.kind === 'error' || state.kind === 'unavailable')
+    ? state.problem
+    : null
+})
+const createDisabledReason = computed(() =>
+  readPage.value?.capabilities.includes('project:write')
+    ? undefined
+    : '无项目写入权限',
+)
+function newConstructionContract(projectId: string) {
+  if (!readPage.value?.capabilities.includes('construction-contract:write'))
+    return
+  return router.push({ path: '/contract/construction/form', query: { origin: 'real', projectId, returnTo: `/project/${encodeURIComponent(projectId)}?origin=real` } })
+}
+
+const importedPhases = computed(() =>
+  Object.keys(statusCounts.value)
+    .filter(status => status && !PROJECT_STATUSES.includes(status as typeof PROJECT_STATUSES[number]))
+    .sort((a, b) => a.localeCompare(b, 'zh-CN')),
+)
+
+const phaseTree = computed<TreeNode[]>(() => {
+  const count = (phase: string) => statusCounts.value[phase] ?? 0
+  const visibleCount = (value: number) => includeDemo.value ? undefined : value
+  const items: TreeNode[] = [
+    {
+      key: 'all',
+      label: '全部项目',
+      icon: 'i-lucide-folder',
+      count: visibleCount(availableTotal.value),
+    },
+    ...PROJECT_STATUSES.map(status => ({
+      key: status,
+      label: status,
+      icon: status === '施工中'
+        ? 'i-lucide-hard-hat'
+        : status === '筹备中'
+          ? 'i-lucide-clipboard-check'
+          : status === '停工'
+            ? 'i-lucide-circle-pause'
+            : 'i-lucide-circle-check-big',
+      count: visibleCount(count(status)),
+    })),
+  ]
+  if (importedPhases.value.length) {
+    items.push({
+      key: IMPORTED_PHASES_KEY,
+      label: '待归一阶段',
+      icon: 'i-lucide-archive',
+      count: visibleCount(importedPhases.value.reduce((total, status) => total + count(status), 0)),
+      children: importedPhases.value.map(status => ({
+        key: status,
+        label: status,
+        count: visibleCount(count(status)),
+      })),
+    })
+  }
+  return items
+})
+
+const tableRowHeight = computed(() => density.value === 'compact' ? 36 : 44)
+
+const hasActiveFilters = computed(() => Boolean(
+  searchText.value.trim()
+  || selectedPhase.value !== 'all'
+  || columnFilters.value.some(filter => filter.values.length > 0),
+))
+
+const emptyState = computed(() => {
+  return hasActiveFilters.value
+    ? {
+        title: '没有符合条件的项目',
+        description: '可清除搜索、状态和表头筛选后查看全部项目。',
+        actionLabel: '清除筛选',
+      }
+    : {
+        title: '还没有施工项目',
+        description: includeDemo.value
+          ? '当前正式与测试来源都没有项目记录。'
+          : '正式工作区暂无项目。测试数据默认隐藏，可在顶部显式开启“包含测试数据”。',
+        actionLabel: '新增项目',
+      }
+})
+
+// 运行参考列序；本地没有采购/仓管/预算/生产经理字段，因此不生成虚假空列。
+const columns = computed<KitTableColumn[]>(() => [
+  { field: 'name', title: '项目名称', minWidth: 170, fixed: 'left', slot: 'name' },
+  { field: 'dataOrigin', title: '数据来源', width: 88, slot: 'origin' },
+  { field: 'status', title: '业务阶段', width: 128, filterable: controlledFacets('status', summary.value?.facets.statuses), slot: 'status' },
+  { field: 'income', title: '累计收入合同金额', type: 'money', width: 150 },
+  { field: 'budget', title: '预算总额', type: 'money', width: 130 },
+  { field: 'plannedEnd', title: '计划竣工', type: 'date', width: 112, filterable: controlledFacets('plannedEnd', summary.value?.facets.plannedEnds) },
+  { field: 'actualEnd', title: '实际竣工', type: 'date', width: 112 },
+  { field: 'manager', title: '项目经理', width: 92, filterable: controlledFacets('manager', summary.value?.facets.managers) },
+  { field: 'execManager', title: '执行经理', width: 92 },
+  { field: 'contractName', title: '项目合同名称', minWidth: 200 },
+  { field: 'developer', title: '客户', minWidth: 150, filterable: controlledFacets('developer', summary.value?.facets.customers), slot: 'developer' },
+  { field: 'builder', title: '施工员', width: 88 },
+  { title: '操作', type: 'action', width: 116 },
+])
+
+function controlledFacets(
+  field: string,
+  facets: readonly { label: string, value: string }[] | undefined,
+) {
+  const selected = new Set(columnFilterValues(field))
+  return (facets ?? []).map(facet => ({
+    ...facet,
+    checked: selected.has(facet.value),
+  }))
+}
+
+function handlePageChange(payload: { page: number, pageSize: number }) {
+  page.value = payload.page
+  pageSize.value = payload.pageSize
+}
+
+function handleColumnFilter(payload: { filters: { field: string, values: unknown[] }[] }) {
+  columnFilters.value = payload.filters
+  resetPageAndLoad()
+}
+
+async function refresh() {
+  await loadProjects()
+}
+
+async function clearFilters() {
+  const hadColumnFilters = columnFilters.value.some(filter => filter.values.length > 0)
+  const unchanged = !searchText.value
+    && selectedPhase.value === 'all'
+    && !hadColumnFilters
+    && page.value === 1
+  searchText.value = ''
+  selectedPhase.value = 'all'
+  columnFilters.value = []
+  page.value = 1
+  await tableRef.value?.clearFilter()
+  if (unchanged || hadColumnFilters)
+    await loadProjects()
+}
+
+async function handleEmptyAction() {
+  if (hasActiveFilters.value)
+    await clearFilters()
+  else if (createDisabledReason.value)
+    error(createDisabledReason.value)
+  else
+    await navigateTo('/project/form')
+}
+
+async function createProject() {
+  if (createDisabledReason.value) {
+    error(createDisabledReason.value)
+    return
+  }
+  await navigateTo('/project/form')
+}
+
+function columnFilterValues(field: string): string[] {
+  return (columnFilters.value.find(filter => filter.field === field)?.values ?? [])
+    .filter((value): value is string => typeof value === 'string')
+}
+
+function currentQuery(): ProjectListQueryDTO {
+  return {
+    includeDemo: includeDemo.value,
+    search: searchText.value,
+    status: selectedPhase.value === 'all'
+      ? null
+      : selectedPhase.value === IMPORTED_PHASES_KEY
+        ? IMPORTED_PROJECT_STATUS
+        : selectedPhase.value,
+    filters: {
+      statuses: columnFilterValues('status'),
+      plannedEnds: columnFilterValues('plannedEnd'),
+      managers: columnFilterValues('manager'),
+      customerIds: columnFilterValues('developer'),
+    },
+    sort: sortMode.value,
+    page: page.value,
+    pageSize: pageSize.value as ProjectListQueryDTO['pageSize'],
+  }
+}
+
+const returnContext = useProjectListReturnContext({
+  readState: () => ({
+    search: searchText.value,
+    phase: selectedPhase.value,
+    sort: sortMode.value,
+    page: page.value,
+    pageSize: pageSize.value === 20 || pageSize.value === 50 || pageSize.value === 100 ? pageSize.value : 10,
+    filters: {
+      statuses: columnFilterValues('status'),
+      plannedEnds: columnFilterValues('plannedEnd'),
+      managers: columnFilterValues('manager'),
+      customerIds: columnFilterValues('developer'),
+    },
+  }),
+  applyState: (state) => {
+    searchText.value = state.search
+    selectedPhase.value = state.phase
+    sortMode.value = state.sort
+    page.value = state.page
+    pageSize.value = state.pageSize
+    columnFilters.value = [
+      { field: 'status', values: state.filters.statuses },
+      { field: 'plannedEnd', values: state.filters.plannedEnds },
+      { field: 'manager', values: state.filters.managers },
+      { field: 'developer', values: state.filters.customerIds },
+    ].filter(filter => filter.values.length > 0)
+  },
+  fallbackFocus: () => document.querySelector<HTMLElement>('[data-project-list-return-fallback]'),
+})
+
+function projectDetailTarget(row: typeof tableRows.value[number]): string {
+  const resolution = resolveNavigationTarget(row.navigation, {
+    returnTo: returnContext.returnToFor(row.rowIdentity),
+    returnContextId: returnContext.contextId,
+  })
+  return resolution.state === 'resolved'
+    ? resolution.to
+    : row.target.state === 'resolved'
+      ? row.target.to
+      : '/project'
+}
+
+let listActive = true
+let latestViewLoad = 0
+async function loadProjects() {
+  const request = ++latestViewLoad
+  const query = currentQuery()
+  const path = route.fullPath
+  await readStore.load(query)
+  if (!listActive || request !== latestViewLoad || path !== route.fullPath || JSON.stringify(currentQuery()) !== JSON.stringify(query))
+    return
+  const state = readStore.state
+  if (state.kind !== 'ready' && state.kind !== 'empty')
+    return
+  const pagination = state.data.pagination
+  if (pagination.requestedPage !== query.page || pagination.pageSize !== query.pageSize)
+    return
+  if (pagination.page !== page.value) {
+    page.value = pagination.page
+    await router.replace({ query: { ...route.query, page: String(pagination.page) } })
+  }
+}
+
+let loadedWriteKey = ''
+
+function latestWriteKey(): string {
+  const write = commandStore.latestWrite
+  return write ? `${write.id}:${write.version}` : ''
+}
+
+function reloadForLatestWrite(): void {
+  const key = latestWriteKey()
+  if (!key || key === loadedWriteKey)
+    return
+  loadedWriteKey = key
+  void loadProjects()
+}
+
+function resetPageAndLoad() {
+  if (page.value === 1)
+    void loadProjects()
+  else
+    page.value = 1
+}
+
+const loadSearch = useDebounceFn(resetPageAndLoad, 180)
+
+watch(searchText, () => {
+  void loadSearch()
+})
+
+watch([selectedPhase, sortMode, includeDemo], resetPageAndLoad)
+
+watch([page, pageSize], () => {
+  void loadProjects()
+})
+
+watch(
+  () => commandStore.latestWrite,
+  () => {
+    if (listActive)
+      reloadForLatestWrite()
+  },
+)
+
+const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+
+function today(): string {
+  return new Date().toISOString().slice(0, 10)
+}
+
+/** 把导出行序列化为 xlsx 字节（单 sheet）。 */
+function rowsToXlsx(rows: Record<string, unknown>[], sheetName: string): ExportData {
+  const worksheet = XLSX.utils.json_to_sheet(rows)
+  const workbook = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(workbook, worksheet, sheetName)
+  return XLSX.write(workbook, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer
+}
+
+// 导出路一：单文件台账 → ADR 0004「直接保存」（系统文件夹选择器，无需分类目录）。
+async function exportLedger() {
+  try {
+    const rows = (await readStore.listAll(currentQuery())).map(projectListViewRow)
+    if (!rows.length) {
+      error('当前没有可导出的项目')
+      return
+    }
+    await exportFile({
+      data: rowsToXlsx(projectLedgerRows(rows), '项目台账'),
+      defaultName: `施工项目台账_${today()}.xlsx`,
+      mimeType: XLSX_MIME,
+    })
+  }
+  catch (err) {
+    error(`导出失败：${toErrorMessage(err)}`)
+  }
+}
+
+// 导出路二：按客户/阶段分两级目录、每个项目一个文件 → ADR 0004「配置导出」页签。
+async function exportByCategory() {
+  try {
+    const rows = (await readStore.listAll(currentQuery())).map(projectListViewRow)
+    if (!rows.length) {
+      error('当前没有可导出的项目')
+      return
+    }
+    const source: ConfiguredExportSource = {
+      label: '项目台账',
+      fields: [
+        { key: 'developer', label: '客户' },
+        { key: 'status', label: '业务流程阶段' },
+        { key: 'name', label: '项目名称' },
+        { key: 'region', label: '工程地域' },
+      ],
+      files: rows.map(project => ({
+        row: {
+          developer: project.developer,
+          status: project.status,
+          name: project.name,
+          region: project.region,
+        },
+        data: rowsToXlsx(projectLedgerRows([project]), '项目'),
+        mimeType: XLSX_MIME,
+      })),
+    }
+    await exportFile({
+      requiresDirectoryStructure: true,
+      source,
+      structure: { levels: [{ field: 'developer', fallback: '未分类客户' }, { field: 'status', fallback: '未分阶段' }] },
+      naming: { parts: [{ field: 'name', fallback: '未命名项目' }], extension: 'xlsx' },
+    })
+  }
+  catch (err) {
+    error(`分类导出失败：${toErrorMessage(err)}`)
+  }
+}
+
+onMounted(async () => {
+  loadedWriteKey = latestWriteKey()
+  await loadProjects()
+  await returnContext.restore({ allowFallback: true })
+})
+
+watch(readPage, (value) => {
+  if (value)
+    void returnContext.restore()
+}, { flush: 'post' })
+
+onActivated(() => {
+  listActive = true
+  reloadForLatestWrite()
+  if (readPage.value)
+    void returnContext.restore({ allowFallback: true })
+})
+
+onDeactivated(() => {
+  listActive = false
+  latestViewLoad++
+})
+</script>
+
+<template>
+  <div class="flex min-w-0 flex-col gap-4">
+    <EntityPendingRecovery
+      v-if="readPage?.capabilities.includes('project:original:write')"
+      entity-label="项目"
+      description="刷新前的保存结果还未确认。先核对原提交，再填写新的项目资料。"
+      :load-pending-forms="commandStore.pendingForms"
+    />
+    <EntityDeletedList
+      v-if="readPage?.capabilities.includes('project:lifecycle:write')"
+      entity-label="项目"
+      :load-deleted="productionStore.deleted"
+      :get-detail-path="id => `/project/${encodeURIComponent(id)}?origin=real`"
+    />
+    <StatePanel
+      v-if="readStore.state.kind === 'loading' && !readPage"
+      kind="loading"
+      title="正在加载项目列表"
+      compact
+    />
+
+    <StatePanel
+      v-else-if="readStore.state.kind === 'forbidden'"
+      kind="forbidden"
+      :title="readProblemTitle(problem, '无项目查看权限')"
+      :description="problem?.message"
+      compact
+    />
+
+    <StatePanel
+      v-else-if="readStore.state.kind === 'not-found'"
+      kind="empty"
+      title="项目列表来源不存在"
+      :description="problem?.message"
+      compact
+    />
+
+    <StatePanel
+      v-else-if="readStore.state.kind === 'mismatch'"
+      kind="error"
+      title="项目列表关系不匹配"
+      :description="problem?.message"
+      compact
+    />
+
+    <StatePanel
+      v-else-if="(readStore.state.kind === 'error' || readStore.state.kind === 'unavailable')"
+      kind="error"
+      title="项目列表加载失败"
+      :description="problem?.message"
+      action-label="重新加载"
+      compact
+      @action="readStore.retry"
+    />
+
+    <ListShell
+      v-if="readPage"
+      v-model:tree-key="selectedPhase"
+      v-model:view-key="sortMode"
+      continuous
+      :tree="filtersVisible ? phaseTree : []"
+      :views="listViews"
+      :summary="listSummary"
+    >
+      <template #toolbar>
+        <ProjectListToolbar
+          v-model:search="searchText"
+          v-model:sort-mode="sortMode"
+          v-model:filters-visible="filtersVisible"
+          v-model:density="density"
+          class="project-list-toolbar"
+          :real-total="realSummary?.projectCount ?? 0"
+          :demo-total="demoSummary?.projectCount ?? 0"
+          :include-demo="includeDemo"
+          :visible="visibleTotal"
+          :loading="loading"
+          :import-disabled-reason="createDisabledReason"
+          :create-disabled-reason="createDisabledReason"
+          @create="createProject"
+          @import="openImportTab({ entity: 'project' })"
+          @refresh="refresh"
+          @export-ledger="exportLedger"
+          @export-by-category="exportByCategory"
+        />
+      </template>
+
+      <template #table>
+        <KitTable
+          ref="tableRef"
+          :columns="columns"
+          :data="tableRows"
+          :loading="loading && !readPage"
+          :aria-busy="loading"
+          :row-height="tableRowHeight"
+          row-key="rowIdentity"
+          :page="{ page: readPage.pagination.page, pageSize: readPage.pagination.pageSize, total: readPage.pagination.total }"
+          remote-filter
+          :empty="emptyState"
+          @page-change="handlePageChange"
+          @filter-change="handleColumnFilter"
+          @empty-action="handleEmptyAction"
+        >
+          <template #name="{ row }">
+            <span :id="returnContext.anchorId(row.rowIdentity)">
+              <EntityLink
+                :id="row.id"
+                type="project"
+                :label="row.name"
+                :data-origin="row.dataOrigin"
+                :intent="row.navigation"
+                :return-to="returnContext.returnToFor(row.rowIdentity)"
+                :return-context-id="returnContext.contextId"
+                @navigate="returnContext.capture(row.rowIdentity)"
+              />
+            </span>
+          </template>
+
+          <template #origin="{ row }">
+            <span
+              v-if="row.dataOrigin === 'demo'"
+              class="chip chip-warn"
+            >测试数据</span>
+            <span v-else class="text-11px font-600 text-ink-soft">正式数据</span>
+          </template>
+
+          <template #status="{ row }">
+            <KitStatusTag :tone="projectStatusTone(row.status)">
+              {{ row.status }}
+            </KitStatusTag>
+          </template>
+
+          <template #developer="{ row }">
+            <EntityLink
+              v-if="row.customer.state === 'resolved'"
+              :id="row.customer.id"
+              type="customer"
+              :label="row.customer.label"
+              :data-origin="row.dataOrigin"
+            />
+            <span v-else-if="row.customer.state === 'forbidden'" class="text-ink-soft">无权限</span>
+            <span v-else-if="row.customer.state === 'unavailable'" class="text-ink-soft">来源暂不可用</span>
+            <span v-else class="text-ink-faint">—</span>
+          </template>
+
+          <template #action="{ row }">
+            <div class="flex items-center justify-end gap-1">
+              <NuxtLink
+                v-if="row.target.state === 'resolved'"
+                :to="projectDetailTarget(row)"
+                class="icon-btn"
+                title="详情"
+                :aria-label="`查看${row.name}项目详情`"
+                @click="returnContext.capture(row.rowIdentity)"
+              >
+                <span class="i-lucide-file-text text-14px" aria-hidden="true" />
+              </NuxtLink>
+              <button
+                v-else
+                class="icon-btn disabled:cursor-not-allowed disabled:opacity-45"
+                :title="row.target.message"
+                :aria-label="`${row.name}项目详情${row.target.message}`"
+                disabled
+              >
+                <span class="i-lucide-file-text text-14px" aria-hidden="true" />
+              </button>
+              <NuxtLink
+                v-if="row.dataOrigin === 'real' && !createDisabledReason"
+                :to="`/project/form/${encodeURIComponent(row.id)}?origin=real`"
+                class="icon-btn"
+                :aria-label="`编辑${row.name}项目`"
+                title="编辑项目"
+              >
+                <span class="i-lucide-square-pen text-14px" aria-hidden="true" />
+              </NuxtLink>
+              <button
+                v-else
+                class="icon-btn disabled:cursor-not-allowed disabled:opacity-45"
+                :title="row.dataOrigin === 'demo' ? '测试数据不能从正式入口修改' : createDisabledReason"
+                aria-label="编辑项目"
+                disabled
+              >
+                <span class="i-lucide-square-pen text-14px" aria-hidden="true" />
+              </button>
+              <button
+                class="icon-btn-danger disabled:cursor-not-allowed disabled:opacity-45"
+                :title="row.dataOrigin === 'demo' ? '测试数据不能从正式入口修改' : DELETE_DISABLED_REASON"
+                aria-label="删除项目"
+                disabled
+              >
+                <span class="i-lucide-trash-2 text-14px" aria-hidden="true" />
+              </button>
+              <RowActionMenu :label="`${row.name}项目操作`" :items="[{ key: 'construction', label: '新建施工主合同', icon: 'i-lucide-file-plus', disabled: row.dataOrigin !== 'real' || !readPage?.capabilities.includes('construction-contract:write') }]" @select="key => key === 'construction' && newConstructionContract(row.id)" />
+            </div>
+          </template>
+        </KitTable>
+      </template>
+
+      <template #summary>
+        <div
+          class="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-1"
+          aria-label="项目列表汇总"
+        >
+          <span data-origin-summary="real" class="inline-flex flex-wrap items-center gap-x-2">
+            <b class="text-ink">正式数据</b>
+            <small class="text-ink-faint">{{ scopeLabel('real') }}</small>
+            <span><b class="font-mono text-ink">{{ realSummary?.projectCount ?? 0 }}</b> 个</span>
+            <span>累计收入 <b class="font-mono text-ink">{{ metricLabel(realSummary?.income) }}</b></span>
+            <small v-if="realSummary?.income.missingCount" class="text-ink-faint">收入缺失 {{ realSummary.income.missingCount }} 个</small>
+            <span>预算总额 <b class="font-mono text-ink">{{ metricLabel(realSummary?.budget) }}</b></span>
+            <small v-if="realSummary?.budget.missingCount" class="text-ink-faint">预算缺失 {{ realSummary.budget.missingCount }} 个</small>
+          </span>
+          <span
+            v-if="includeDemo"
+            data-origin-summary="demo"
+            class="inline-flex flex-wrap items-center gap-x-2 border-l border-line pl-5"
+          >
+            <b class="text-warn">测试数据</b>
+            <small class="text-ink-faint">{{ scopeLabel('demo') }}</small>
+            <span><b class="font-mono text-warn">{{ demoSummary?.projectCount ?? 0 }}</b> 个</span>
+            <span>累计收入 <b class="font-mono text-ink">{{ metricLabel(demoSummary?.income) }}</b></span>
+            <small v-if="demoSummary?.income.missingCount" class="text-ink-faint">收入缺失 {{ demoSummary.income.missingCount }} 个</small>
+            <span>预算总额 <b class="font-mono text-ink">{{ metricLabel(demoSummary?.budget) }}</b></span>
+            <small v-if="demoSummary?.budget.missingCount" class="text-ink-faint">预算缺失 {{ demoSummary.budget.missingCount }} 个</small>
+          </span>
+        </div>
+      </template>
+    </ListShell>
+  </div>
+</template>
+
+<style scoped>
+:deep(.project-list-toolbar) {
+  overflow: visible;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+:deep(.project-list-toolbar > div) {
+  flex-wrap: wrap;
+  overflow: visible;
+  padding-bottom: 0;
+}
+
+:deep(.project-list-toolbar > div > div) {
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+</style>

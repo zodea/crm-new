@@ -1,10 +1,10 @@
 import { fireEvent, render, screen, within } from '@testing-library/vue'
 import { expect, it } from 'vitest'
 import { defineComponent, h, shallowRef } from 'vue'
-import PayrollAFeeBasisEditor from '~/components/payroll/PayrollAFeeBasisEditor.vue'
-import PayrollAFeeEditor from '~/components/payroll/PayrollAFeeEditor.vue'
 import PayrollAManagementScopeEditor from '~/components/payroll/PayrollAManagementScopeEditor.vue'
 import PayrollANegativeLineEditor from '~/components/payroll/PayrollANegativeLineEditor.vue'
+import PayrollAFeeBasisEditor from '~/pages/subcontract/payroll/_components/PayrollAFeeBasisEditor.vue'
+import PayrollAFeeEditor from '~/pages/subcontract/payroll/_components/PayrollAFeeEditor.vue'
 import { feeConfigRead, feeDraft, negativeDraft } from '../helpers/payroll-fees-ui-fixture'
 
 const global = { stubs: { KitButton: { template: '<button><slot /></button>' }, EntityLink: true, NuxtLink: true } }

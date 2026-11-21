@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import DeliveryArchiveFormPage from '~/components/delivery/DeliveryArchiveFormPage.vue'
+import DeliveryArchiveFormPage from '~/pages/material/delivery/archive/form/_components/DeliveryArchiveFormPage.vue'
 
 definePageMeta({ name: 'deliveryArchiveForm' })
 </script>

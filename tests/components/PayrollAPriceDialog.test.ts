@@ -2,8 +2,8 @@ import { fireEvent, render, screen } from '@testing-library/vue'
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, expect, it, vi } from 'vitest'
 import { defineComponent, h, KeepAlive, shallowRef } from 'vue'
-import PayrollAPriceDialog from '~/components/payroll/PayrollAPriceDialog.vue'
 import PayrollAPriceEditor from '~/components/payroll/PayrollAPriceEditor.vue'
+import PayrollAPriceDialog from '~/pages/subcontract/payroll/_components/PayrollAPriceDialog.vue'
 import { payrollUiConfig, payrollUiLine } from '../helpers/payroll-a-ui-fixture'
 
 const save = vi.fn()

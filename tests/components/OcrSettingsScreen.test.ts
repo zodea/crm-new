@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/vue'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import OcrSettingsScreen from '~/components/ocr/OcrSettingsScreen.vue'
+import OcrSettingsScreen from '~/pages/settings/_components/OcrSettingsScreen.vue'
 
 const database = vi.hoisted(() => ({
   execute: vi.fn(async () => {}),

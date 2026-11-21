@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import OurSignatoryFormPage from '~/components/settings/OurSignatoryFormPage.vue'
+import OurSignatoryFormPage from '~/pages/settings/our-signatories/form/_components/OurSignatoryFormPage.vue'
 </script>
 
 <template>

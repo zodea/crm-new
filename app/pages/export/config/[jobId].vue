@@ -4,8 +4,8 @@ import type {
   ConfiguredExportSettings,
   ConfiguredExportSource,
 } from '~/lib/kit/export'
-import ExportConfigForm from '~/components/export/ExportConfigForm.vue'
 import { Button } from '~/components/ui/button'
+import ExportConfigForm from '~/pages/export/config/_components/ExportConfigForm.vue'
 
 const EMPTY_SOURCE: ConfiguredExportSource = {
   label: '导出任务',

@@ -1,8 +1,8 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { expect, it, vi } from 'vitest'
 import { defineComponent, h } from 'vue'
-import PayrollACreateFromQuantity from '~/components/payroll/PayrollACreateFromQuantity.vue'
 import PayrollASourceReview from '~/components/payroll/PayrollASourceReview.vue'
+import PayrollACreateFromQuantity from '~/pages/subcontract/quantity/_components/PayrollACreateFromQuantity.vue'
 import { payrollUiFact, payrollUiForm, payrollUiLine } from '../helpers/payroll-a-ui-fixture'
 
 const Table = defineComponent({

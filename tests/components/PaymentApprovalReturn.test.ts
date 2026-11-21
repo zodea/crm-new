@@ -1,7 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { computed, defineComponent, h, KeepAlive, onActivated, onDeactivated, reactive, shallowRef, watch } from 'vue'
-import PaymentApplicationDetailScreen from '~/components/finance/PaymentApplicationDetailScreen.vue'
+import PaymentApplicationDetailScreen from '~/pages/finance/payment/[id]/_components/PaymentApplicationDetailScreen.vue'
 
 const load = vi.hoisted(() => vi.fn())
 vi.mock('~/stores/finance', () => ({ useFinanceStore: () => ({ paymentApplicationDetail: load }) }))

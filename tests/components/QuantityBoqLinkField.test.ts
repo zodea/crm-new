@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/vue'
 import { describe, expect, it } from 'vitest'
-import QuantityBoqLinkField from '~/components/quantity/QuantityBoqLinkField.vue'
+import QuantityBoqLinkField from '~/pages/subcontract/quantity/_components/QuantityBoqLinkField.vue'
 
 const oldLine = { id: 'old', contractId: 'contract', contractNo: 'C-01', contractName: '施工合同', itemName: '墙面', unit: '㎡', qty: 12, unitPrice: null, effectiveUnitPrice: null, approvedDeltaQty: 4, building: null, updatedAt: null }
 const newLine = { ...oldLine, id: 'new', qty: null, contractNo: 'C-02', itemName: '另一清单' }

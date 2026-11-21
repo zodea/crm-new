@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/vue'
 import { flushPromises } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h } from 'vue'
-import QuantityVarianceDialog from '~/components/quantity/QuantityVarianceDialog.vue'
+import QuantityVarianceDialog from '~/pages/subcontract/quantity/_components/QuantityVarianceDialog.vue'
 
 const loadQuantityVarianceFacts = vi.hoisted(() => vi.fn())
 beforeEach(() => vi.stubGlobal('useQuantityStore', () => ({ loadVariance: loadQuantityVarianceFacts })))

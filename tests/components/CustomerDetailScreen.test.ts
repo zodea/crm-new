@@ -1,8 +1,8 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, reactive } from 'vue'
-import CustomerDetailScreen from '~/components/master-data/CustomerDetailScreen.vue'
 import StatePanel from '~/components/ui/StatePanel.vue'
+import CustomerDetailScreen from '~/pages/base/customer/_components/CustomerDetailScreen.vue'
 
 const customerStoreMock = vi.hoisted(() => ({
   detailState: { kind: 'idle' } as any,

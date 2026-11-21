@@ -15,9 +15,9 @@ import {
   useTemplateRef,
   watch,
 } from 'vue'
-import ProjectListScreen from '~/components/project/ProjectListScreen.vue'
 import ListShell from '~/components/ui/ListShell.vue'
 import { buildProjectListPage } from '~/lib/project/repository'
+import ProjectListScreen from '~/pages/project/_components/ProjectListScreen.vue'
 import { withOriginReadMeta } from '../../server/utils/read-meta'
 import { projectSnapshotEvidence } from '../helpers/project-read-meta'
 

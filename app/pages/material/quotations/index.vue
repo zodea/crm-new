@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import QuotationListScreen from '~/components/material/quotation/QuotationListScreen.vue'
+import QuotationListScreen from '~/pages/material/quotations/_components/QuotationListScreen.vue'
 </script>
 
 <template>

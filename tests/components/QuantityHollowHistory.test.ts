@@ -1,9 +1,9 @@
 import { mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { computed, defineComponent, h } from 'vue'
-import QuantityHollowHistory from '~/components/quantity/QuantityHollowHistory.vue'
-import QuantityHollowRecordSummary from '~/components/quantity/QuantityHollowRecordSummary.vue'
 import UnitRoute from '~/pages/subcontract/quantity/[pid]/[uid].vue'
+import QuantityHollowHistory from '~/pages/subcontract/quantity/[pid]/[uid]/hollow/_components/QuantityHollowHistory.vue'
+import QuantityHollowRecordSummary from '~/pages/subcontract/quantity/[pid]/[uid]/hollow/_components/QuantityHollowRecordSummary.vue'
 import { hollowIdentity, hollowInput, hollowRecord, hollowTarget } from '../helpers/quantity-hollow-ui-fixture'
 
 describe('空鼓历史', () => {

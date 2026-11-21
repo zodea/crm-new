@@ -4,10 +4,10 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/vue'
 import { flushPromises } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, nextTick, onActivated, reactive } from 'vue'
-import CustomerListScreen from '~/components/master-data/CustomerListScreen.vue'
 import { useCustomerListReturnContext } from '~/composables/useCustomerListReturnContext'
 import { buildCustomerListPage } from '~/lib/customer/read-page'
 import { attachOriginReadMeta } from '~/lib/read-model/meta'
+import CustomerListScreen from '~/pages/base/customer/_components/CustomerListScreen.vue'
 import { publicReadMeta } from '../helpers/public-read-meta'
 
 const fixtures = vi.hoisted(() => ({ store: null as unknown }))

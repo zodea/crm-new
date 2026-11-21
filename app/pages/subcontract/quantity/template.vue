@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import QuantityTemplateFormPage from '~/components/quantity/QuantityTemplateFormPage.vue'
 import { readQuantityOrigin } from '~/lib/quantity/navigation'
+import QuantityTemplateFormPage from '~/pages/subcontract/quantity/_components/QuantityTemplateFormPage.vue'
 
 const route = useRoute()
 

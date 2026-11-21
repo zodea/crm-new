@@ -1,7 +1,7 @@
 import type { ScheduleProcessLibraryTaskDraft } from '~/lib/schedule/process-library'
 import { fireEvent, render, screen, within } from '@testing-library/vue'
 import { describe, expect, it } from 'vitest'
-import ScheduleProcessLibraryTaskEditor from '~/components/schedule/ScheduleProcessLibraryTaskEditor.vue'
+import ScheduleProcessLibraryTaskEditor from '~/pages/schedule/process-library/_components/ScheduleProcessLibraryTaskEditor.vue'
 
 const tasks: ScheduleProcessLibraryTaskDraft[] = [
   {

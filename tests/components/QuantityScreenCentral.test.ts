@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/vue'
 import { flushPromises } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, defineComponent, onMounted, reactive, shallowRef, watch } from 'vue'
-import QuantityScreen from '~/components/quantity/QuantityScreen.vue'
+import QuantityScreen from '~/pages/subcontract/quantity/_components/QuantityScreen.vue'
 
 const databaseRead = vi.hoisted(() => vi.fn(() => {
   throw new Error('浏览器不得直读 SQLite')

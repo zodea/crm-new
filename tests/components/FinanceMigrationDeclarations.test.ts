@@ -3,8 +3,8 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/vue'
 import { flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, expect, it, vi } from 'vitest'
-import FinanceMigrationPanel from '~/components/migration/FinanceMigrationPanel.vue'
 import { CENTRAL_FINANCE_KINDS, FINANCE_CAPABILITIES, FINANCE_IMPORT_CAPABILITY } from '~/lib/finance/central-contract'
+import FinanceMigrationPanel from '~/pages/settings/_components/FinanceMigrationPanel.vue'
 import { createReadMeta, withReadMeta } from '../../server/utils/read-meta'
 
 vi.mock('~/lib/db/native-snapshot', () => ({ inspectNativeMigrationSnapshot: async (bytes: Uint8Array) => ({ sha256: createHash('sha256').update(bytes).digest('hex'), schemaVersion: 60 }) }))

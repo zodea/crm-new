@@ -2,10 +2,10 @@ import { fireEvent, render, screen } from '@testing-library/vue'
 import { storeToRefs } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, defineComponent, h, nextTick, onActivated, onMounted, onScopeDispose, ref, shallowReactive, shallowRef, toRef, useTemplateRef, watch } from 'vue'
-import PaymentManagementScreen from '~/components/finance/payment-management/PaymentManagementScreen.vue'
-import InvoiceQueuePanel from '~/components/invoice/InvoiceQueuePanel.vue'
-import InvoiceWorkspaceScreen from '~/components/invoice/InvoiceWorkspaceScreen.vue'
 import NotificationDrawer from '~/components/shared/NotificationDrawer.vue'
+import InvoiceQueuePanel from '~/pages/finance/invoice/_components/InvoiceQueuePanel.vue'
+import InvoiceWorkspaceScreen from '~/pages/finance/invoice/_components/InvoiceWorkspaceScreen.vue'
+import PaymentManagementScreen from '~/pages/finance/payment-management/_components/PaymentManagementScreen.vue'
 
 vi.mock('~/lib/read-model/authority', () => ({ bindReadAuthority: () => undefined }))
 

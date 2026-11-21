@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import SignedDayworkScreen from '~/components/payroll/SignedDayworkScreen.vue'
+import SignedDayworkScreen from '~/pages/subcontract/daywork/_components/SignedDayworkScreen.vue'
 </script>
 
 <template>

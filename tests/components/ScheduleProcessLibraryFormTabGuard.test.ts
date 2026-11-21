@@ -4,7 +4,7 @@ import { createPinia, defineStore, setActivePinia } from 'pinia'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, KeepAlive, shallowRef } from 'vue'
 import { createMemoryHistory, createRouter, RouterView, useRoute, useRouter } from 'vue-router'
-import ScheduleProcessLibraryFormPage from '~/components/schedule/ScheduleProcessLibraryFormPage.vue'
+import ScheduleProcessLibraryFormPage from '~/pages/schedule/process-library/_components/ScheduleProcessLibraryFormPage.vue'
 import { useTabsStore } from '~/stores/tabs'
 
 const detail: ScheduleProcessLibraryDetail = {

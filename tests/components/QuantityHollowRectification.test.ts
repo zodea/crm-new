@@ -1,8 +1,8 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import QuantityHollowRectification from '~/components/quantity/QuantityHollowRectification.vue'
 import { createQuantityRepository } from '~/lib/quantity/central-repository'
+import QuantityHollowRectification from '~/pages/subcontract/quantity/[pid]/[uid]/hollow/_components/QuantityHollowRectification.vue'
 import { createQuantityHollowFixture } from '../helpers/quantity-hollow-fixture'
 
 vi.mock('vue-router', () => ({ onBeforeRouteLeave: vi.fn() }))

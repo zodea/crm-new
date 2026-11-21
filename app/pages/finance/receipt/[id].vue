@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import ReceiptRegistrationDetailScreen from '~/components/receipt/ReceiptRegistrationDetailScreen.vue'
+import ReceiptRegistrationDetailScreen from '~/pages/finance/receipt/_components/ReceiptRegistrationDetailScreen.vue'
 
 definePageMeta({ name: 'receiptDetail' })
 </script>
