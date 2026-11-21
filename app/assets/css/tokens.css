@@ -18,6 +18,7 @@
   --z-shell-tabbar: 19;
   --z-shell-header: 20;
   --z-shell-sidebar: 40;
+  --z-page-mask: 50;
   --z-page-fullscreen: 100;
   --z-overlay-plane: 9000;
   --z-overlay-backdrop: var(--z-overlay-plane);

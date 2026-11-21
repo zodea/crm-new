@@ -503,11 +503,11 @@ onMounted(() => {
 </script>
 
 <template>
-  <div ref="pageRef" class="relative">
+  <div ref="pageRef" class="relative isolate">
     <!-- 全页拖拽虚线遮罩（#60：拖入即上传进识别队列；「+ 上传发票」走 useFileDialog 无需宿主元素） -->
     <div
       v-if="isOverDropZone"
-      class="absolute inset-0 z-50 flex items-center justify-center border-2 border-dashed border-brand bg-brand-soft/40 pointer-events-none"
+      class="absolute inset-0 z-[var(--z-page-mask)] flex items-center justify-center border-2 border-dashed border-brand bg-brand-soft/40 pointer-events-none"
     >
       <div class="text-center">
         <span class="i-lucide-file-down text-32px text-brand block mx-auto mb-2" />

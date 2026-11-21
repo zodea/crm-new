@@ -62,10 +62,10 @@ const {
 </script>
 
 <template>
-  <div ref="pageRef" class="relative flex min-w-0 flex-col gap-3">
+  <div ref="pageRef" class="relative isolate flex min-w-0 flex-col gap-3">
     <div
       v-if="isOverDropZone"
-      class="pointer-events-none absolute inset-0 z-50 flex items-center justify-center rounded-[var(--radius-card)] border-2 border-dashed border-brand bg-brand-soft/80"
+      class="pointer-events-none absolute inset-0 z-[var(--z-page-mask)] flex items-center justify-center rounded-[var(--radius-card)] border-2 border-dashed border-brand bg-brand-soft/80"
     >
       <div class="text-center text-brand-deep">
         <span class="i-lucide-file-down mx-auto mb-2 block text-32px" />
