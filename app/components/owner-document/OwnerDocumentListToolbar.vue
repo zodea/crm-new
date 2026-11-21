@@ -42,7 +42,7 @@ const view = defineModel<string | string[]>('view', { required: true })
   <section
     data-ui="owner-document-list-toolbar"
     :aria-label="`${title}列表工具栏`"
-    class="owner-document-toolbar panel min-w-0 p-3.5"
+    class="owner-document-toolbar min-w-0"
   >
     <div class="owner-document-toolbar__top grid min-w-0 items-center gap-3">
       <div class="min-w-0 flex items-center gap-1.5">

@@ -93,6 +93,7 @@ const KitTableStub = defineComponent({
         ` ${row.name} `,
         slots.contract?.({ row }),
         slots.supplier?.({ row }),
+        slots.status?.({ row }),
       ])),
       ...(props.data as any[]).length === 0
         ? [h('div', { 'role': 'status', 'aria-label': props.empty.title }, [
@@ -185,6 +186,8 @@ describe('owner document list screen', () => {
       pageSize: 20,
     })))
     expect(screen.getByRole('status', { name: '甲方变洽签列表汇总' }).textContent).toContain('变更单数：25')
+    expect(document.querySelector('[data-list-shell]')?.classList.contains('list-shell--continuous')).toBe(true)
+    expect(within(screen.getByRole('region', { name: '业务单据宽表' })).getByText('已签证').getAttribute('data-ui')).toBe('status-tag')
     expect(screen.getByRole('link', { name: '合和新城施工合同' }).getAttribute('href'))
       .toBe('/contract/contract-1?origin=real&contractKind=construction')
   })
