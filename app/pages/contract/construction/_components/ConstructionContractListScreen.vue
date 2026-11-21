@@ -3,9 +3,10 @@ import type { ConstructionContractListPageDTO } from '~/lib/construction-contrac
 import type { KitTableColumn } from '~/lib/kit/table'
 import type { NavigationIntentDTO, ReadState } from '~/types/read-model'
 import { useDebounceFn } from '@vueuse/core'
+import ContractListStatusTag from '~/components/contract/ContractListStatusTag.vue'
+import ContractOriginTag from '~/components/contract/ContractOriginTag.vue'
 import KitColumnHeader from '~/components/ui/KitColumnHeader.vue'
 import KitMultiSelectFilter from '~/components/ui/KitMultiSelectFilter.vue'
-import KitStatusTag from '~/components/ui/KitStatusTag.vue'
 import ListShell from '~/components/ui/ListShell.vue'
 import {
   constructionContractProblemFromUnknown,
@@ -21,7 +22,7 @@ import {
   saveConstructionContractReturnOrigin,
 } from '~/lib/construction-contract/return-context'
 import { contractListFilterValues } from '~/lib/contract/list-filters'
-import { CONTRACT_STATUSES, contractStatusTone } from '~/lib/contract/status'
+import { CONTRACT_STATUSES } from '~/lib/contract/status'
 import { resolveNavigationTarget } from '~/lib/nav/target-registry'
 import { readProblemTitle } from '~/lib/read-model/state'
 import { yuan } from '~/lib/util/money'
@@ -231,9 +232,7 @@ useTabTitle('施工合同')
             <KitColumnHeader :title="column.title" kind="multi-enum" :value="selectedStatuses" :options="statusOptions" @apply="Array.isArray($event) && patchQuery({ status: $event, page: 1 })" />
           </template>
           <template #status="{ row }">
-            <KitStatusTag :tone="contractStatusTone(row.status)">
-              {{ row.status }}
-            </KitStatusTag>
+            <ContractListStatusTag :status="row.status" />
           </template>
           <template #name="{ row }">
             <NuxtLink v-if="link(row)" :id="`construction-contract-row-${row.rowKey}`" :to="link(row)!" class="font-700 text-brand hover:underline" @click="captureReturnOrigin(row)">
@@ -241,7 +240,7 @@ useTabTitle('施工合同')
             </NuxtLink><span v-else>{{ row.name }}</span>
           </template>
           <template #origin="{ row }">
-            <span class="chip" :class="row.dataOrigin === 'demo' ? 'chip-warn' : 'chip-brand'">{{ row.dataOrigin === 'demo' ? '演示' : '正式' }}</span>
+            <ContractOriginTag :origin="row.dataOrigin" />
           </template>
           <template #project="{ row }">
             <NuxtLink v-if="relationshipTarget(row.projectNavigation)" :to="relationshipTarget(row.projectNavigation)!" class="text-brand hover:underline">

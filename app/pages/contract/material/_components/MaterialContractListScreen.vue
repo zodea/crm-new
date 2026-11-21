@@ -4,13 +4,14 @@ import type { MaterialContractListPageDTO } from '~/lib/material-contract/reposi
 import type { NavigationIntentDTO, ReadState } from '~/types/read-model'
 import { useDebounceFn } from '@vueuse/core'
 import { onBeforeUnmount, onDeactivated, useTemplateRef } from 'vue'
+import ContractListStatusTag from '~/components/contract/ContractListStatusTag.vue'
+import ContractOriginTag from '~/components/contract/ContractOriginTag.vue'
 import TargetCostSourceReturn from '~/components/target-cost/TargetCostSourceReturn.vue'
 import KitColumnHeader from '~/components/ui/KitColumnHeader.vue'
 import KitMultiSelectFilter from '~/components/ui/KitMultiSelectFilter.vue'
-import KitStatusTag from '~/components/ui/KitStatusTag.vue'
 import ListShell from '~/components/ui/ListShell.vue'
 import { contractListFilterValues } from '~/lib/contract/list-filters'
-import { CONTRACT_STATUSES, contractStatusTone } from '~/lib/contract/status'
+import { CONTRACT_STATUSES } from '~/lib/contract/status'
 import { materialContractProblemFromUnknown } from '~/lib/material-contract/read-decoder'
 import { materialContractReferenceLabel } from '~/lib/material-contract/reference-state'
 import { parseMaterialContractListQuery } from '~/lib/material-contract/repository'
@@ -281,9 +282,9 @@ useTabTitle('材料采购合同')
     <template v-if="page && !queryProblem" #summary>
       <div v-for="summary in summaries" :key="summary.origin" class="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1 tabular-nums" :aria-label="`${summary.label}数据汇总`">
         <strong class="font-600 text-ink">{{ summary.label }} · {{ summary.contractCount }} 份</strong>
-        <span>变更后合同金额 <strong class="font-600 text-ink">{{ summary.changedAmount == null ? '待核实' : yuan(Number(summary.changedAmount)) }}</strong></span>
-        <span>累计收票金额 <strong class="font-600 text-ink">{{ summary.invoicedAmount == null ? '待核实' : yuan(Number(summary.invoicedAmount)) }}</strong></span>
-        <span>累计支付金额 <strong class="font-600 text-ink">{{ summary.paidAmount == null ? '待核实' : yuan(Number(summary.paidAmount)) }}</strong></span>
+        <span>变更后合同金额 <strong class="font-600 text-ink">{{ yuan(summary.changedAmount, '待核实') }}</strong></span>
+        <span>累计收票金额 <strong class="font-600 text-ink">{{ yuan(summary.invoicedAmount, '待核实') }}</strong></span>
+        <span>累计支付金额 <strong class="font-600 text-ink">{{ yuan(summary.paidAmount, '待核实') }}</strong></span>
       </div>
     </template>
 
@@ -327,7 +328,7 @@ useTabTitle('材料采购合同')
               </NuxtLink><span v-else>{{ unavailableLabel(row.name, row.navigation) }}</span>
             </template>
             <template #origin="{ row }">
-              <span class="chip" :class="row.dataOrigin === 'demo' ? 'chip-warn' : 'chip-brand'">{{ row.dataOrigin === 'demo' ? '演示' : '正式' }}</span>
+              <ContractOriginTag :origin="row.dataOrigin" />
             </template>
             <template #project="{ row }">
               <NuxtLink v-if="relationshipTarget(row.projectNavigation)" :to="relationshipTarget(row.projectNavigation)!" class="text-brand hover:underline">
@@ -342,33 +343,31 @@ useTabTitle('材料采购合同')
               <span v-else>{{ row.supplier.state === 'resolved' ? unavailableLabel(row.supplier.label, row.supplierNavigation) : materialContractReferenceLabel(row.supplier) }}</span>
             </template>
             <template #contract="{ row }">
-              {{ row.amounts.contract == null ? '待核实' : yuan(Number(row.amounts.contract)) }}
+              {{ yuan(row.amounts.contract, '待核实') }}
             </template>
             <template #changed="{ row }">
-              {{ row.amounts.changed == null ? '待核实' : yuan(Number(row.amounts.changed)) }}
+              {{ yuan(row.amounts.changed, '待核实') }}
             </template>
             <template #invoiced="{ row }">
-              {{ row.amounts.invoiced == null ? '待核实' : yuan(Number(row.amounts.invoiced)) }}
+              {{ yuan(row.amounts.invoiced, '待核实') }}
             </template>
             <template #paid="{ row }">
-              {{ row.amounts.paid == null ? '待核实' : yuan(Number(row.amounts.paid)) }}
+              {{ yuan(row.amounts.paid, '待核实') }}
             </template>
             <template #settled="{ row }">
-              {{ row.amounts.settled == null ? '待核实' : yuan(Number(row.amounts.settled)) }}
+              {{ yuan(row.amounts.settled, '待核实') }}
             </template>
             <template #payable="{ row }">
-              {{ row.amounts.payable == null ? '待核实' : yuan(Number(row.amounts.payable)) }}
+              {{ yuan(row.amounts.payable, '待核实') }}
             </template>
             <template #invoicePayable="{ row }">
-              {{ row.amounts.invoiced == null || row.amounts.paid == null ? '待核实' : yuan(Number(row.amounts.invoiced) - Number(row.amounts.paid)) }}
+              {{ yuan(row.amounts.invoiced == null || row.amounts.paid == null ? null : Number(row.amounts.invoiced) - Number(row.amounts.paid), '待核实') }}
             </template>
             <template #signDate="{ row }">
               {{ row.signDate || '未记录' }}
             </template>
             <template #status="{ row }">
-              <KitStatusTag :tone="contractStatusTone(row.status)">
-                {{ row.status }}
-              </KitStatusTag>
+              <ContractListStatusTag :status="row.status" />
             </template>
           </KitTable>
         </section>
