@@ -9,15 +9,19 @@ const customerStoreMock = vi.hoisted(() => ({
   detailState: { kind: 'idle' } as any,
   loadDetail: vi.fn().mockResolvedValue(undefined),
 }))
+const customerProduction = vi.hoisted(() => ({ recover: vi.fn(), lifecycle: vi.fn(), change: vi.fn() }))
 
 vi.mock('~/stores/customer-read', () => ({
   useCustomerReadStore: () => customerStoreMock,
 }))
+vi.mock('~/stores/customer-production', () => ({ useCustomerProductionStore: () => customerProduction }))
 
 const route = reactive({
   query: {} as Record<string, string>,
 })
 const routerReplace = vi.fn()
+const confirm = vi.fn()
+const success = vi.fn()
 
 const detail = {
   dataOrigin: 'real' as const,
@@ -88,6 +92,7 @@ const SegTabStub = defineComponent({
 vi.stubGlobal('useRoute', () => route)
 vi.stubGlobal('useRouter', () => ({ replace: routerReplace }))
 vi.stubGlobal('useTabTitle', () => {})
+vi.stubGlobal('useKitUI', () => ({ confirm, success }))
 
 describe('客户详情业务页签', () => {
   it('其他客户刷新共享状态时，不把其姓名写入当前详情或页签', () => {
@@ -108,6 +113,38 @@ describe('客户详情业务页签', () => {
     routerReplace.mockReset()
     customerStoreMock.detailState = { kind: 'ready', data: detail }
     customerStoreMock.loadDetail.mockClear()
+    customerProduction.recover.mockReset()
+    customerProduction.lifecycle.mockReset()
+    customerProduction.change.mockReset()
+    confirm.mockReset()
+    success.mockReset()
+  })
+
+  it('从原回执恢复客户状态，确认后才按当前版本发起恢复并重读客户详情', async () => {
+    customerStoreMock.detailState = { kind: 'ready', data: { ...detail, capabilities: [...detail.capabilities, 'customer:lifecycle:write'] } }
+    const deleted = { id: 'customer-1', name: detail.customer.name, version: 'customer-v2', deletedAt: '2026-09-22' }
+    customerProduction.recover.mockResolvedValue({ current: deleted, applied: true })
+    customerProduction.change.mockResolvedValue({ current: { ...deleted, version: 'customer-v3', deletedAt: null }, recovered: false })
+    confirm.mockResolvedValueOnce(false).mockResolvedValueOnce(true)
+    render(CustomerDetailScreen, {
+      props: { customerId: deleted.id, origin: 'real', includeDemo: false },
+      global: { components: { EntityDetailShell: EntityDetailShellStub, SegTab: SegTabStub }, stubs: ['CustomerDetailOverview', 'CustomerDetailRelations', 'MetricGrid', 'Metric', 'NuxtLink'] },
+    })
+
+    const restore = await screen.findByRole('button', { name: '恢复客户' })
+    expect(customerProduction.recover).toHaveBeenCalledWith(deleted.id)
+    expect(customerProduction.lifecycle).not.toHaveBeenCalled()
+    expect(screen.getByRole('status').textContent).toContain('上次操作已保存，现已核对当前状态。')
+    customerStoreMock.loadDetail.mockClear()
+    await fireEvent.click(restore)
+    expect(customerProduction.change).not.toHaveBeenCalled()
+
+    await fireEvent.click(restore)
+    await screen.findByRole('button', { name: '删除客户' })
+    expect(confirm).toHaveBeenLastCalledWith({ title: '恢复客户', message: `恢复“${deleted.name}”及其原有附件可见性？`, confirmLabel: '恢复客户' })
+    expect(customerProduction.change).toHaveBeenCalledExactlyOnceWith(deleted)
+    expect(customerStoreMock.loadDetail).toHaveBeenCalledWith({ id: deleted.id, origin: 'real', includeDemo: false })
+    expect(success).toHaveBeenCalledWith('客户已恢复')
   })
 
   it.each(['forbidden', 'unavailable'] as const)('项目源 %s 时数量未知、不渲染假空列表，仅失败可重试', async (code) => {

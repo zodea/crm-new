@@ -9,6 +9,7 @@ import ProjectConstructionManagementFees from '~/components/project/ProjectConst
 import ProjectManagementFees from '~/components/project/ProjectManagementFees.vue'
 import ProjectMaterialContractJourney from '~/components/project/ProjectMaterialContractJourney.vue'
 import ProjectReturnLink from '~/components/project/ProjectReturnLink.vue'
+import EntityStorageActions from '~/components/shared/EntityStorageActions.vue'
 import KitStatusTag from '~/components/ui/KitStatusTag.vue'
 import { resolveCustomerRelationReturnOrigin, validateCustomerDetailReturnTo } from '~/lib/customer/return-context'
 import {
@@ -31,6 +32,7 @@ import { projectProblem, projectProblemFromUnknown } from '~/lib/project/reposit
 import { projectStatusTone } from '~/lib/project/status'
 import { loadReceiptSourceOrigin, saveReceiptSourceOrigin } from '~/lib/receipt/return-context'
 import { yuan } from '~/lib/util/money'
+import { useProjectProductionStore } from '~/stores/project-production'
 
 const props = withDefaults(defineProps<{
   projectId: string
@@ -51,6 +53,7 @@ const props = withDefaults(defineProps<{
 const repository = useNuxtApp().$repositories.projectList
 const ownerDocumentRepository = useNuxtApp().$repositories.ownerCommercialDocumentRead
 const commandStore = useProjectCommandStore()
+const productionStore = useProjectProductionStore()
 const projectSupplierCommandStore = useProjectSupplierCommandStore()
 const detail = shallowRef<ProjectDetailReadDTO | null>(null)
 const deleted = shallowRef<boolean | null>(null)
@@ -563,7 +566,13 @@ onActivated(() => {
     <ProjectManagementFees :fees="detail.managementFees" :return-to="journeyReturnTo" @retry="loadProject" />
     <ConstructionSpendingPanel v-if="item.dataOrigin === 'real' && detail.capabilities.includes('construction-scope:read')" class="panel min-w-0 overflow-hidden p-4" :project-id="projectId" />
 
-    <ProjectStorageActions v-if="hasLifecycle" :project-id="projectId" @state="deleted = $event" />
+    <EntityStorageActions
+      v-if="hasLifecycle"
+      :entity-id="projectId"
+      entity-label="项目"
+      :actions="productionStore"
+      @state="deleted = $event"
+    />
     <section class="panel flex min-w-0 flex-wrap items-center justify-between gap-3 p-4" aria-label="项目收款">
       <div class="min-w-0">
         <SectionHeader title="项目收款" /><p class="mb-0 mt-2 text-12px text-ink-soft">

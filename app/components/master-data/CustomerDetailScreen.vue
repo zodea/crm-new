@@ -2,6 +2,7 @@
 import type { CustomerRelationTab } from './CustomerDetailRelations.vue'
 import type { DataOriginDTO } from '~/types/read-model'
 import { computed, nextTick, onActivated, shallowRef, watch } from 'vue'
+import EntityStorageActions from '~/components/shared/EntityStorageActions.vue'
 import { useCustomerRelationReturnContext } from '~/composables/useCustomerRelationReturnContext'
 import {
   createCustomerDetailReturnTo,
@@ -14,6 +15,7 @@ import {
 import { validateOwnerDocumentDetailReturnTo } from '~/lib/owner-document/return-context'
 import { readProblemTitle } from '~/lib/read-model/state'
 import { yuan } from '~/lib/util/money'
+import { useCustomerProductionStore } from '~/stores/customer-production'
 import { useCustomerReadStore } from '~/stores/customer-read'
 
 const props = defineProps<{
@@ -25,6 +27,7 @@ const props = defineProps<{
 }>()
 const route = useRoute()
 const router = useRouter()
+const productionStore = useCustomerProductionStore()
 const store = useCustomerReadStore()
 const relationTabs = new Set<CustomerRelationTab>(['projects', 'contracts', 'receipts'])
 const activeTab = shallowRef<CustomerRelationTab>(validTab(route.query.tab))
@@ -166,7 +169,14 @@ onActivated(() => void load())
       </MetricGrid>
     </template>
     <div v-if="customer && detail" class="flex min-w-0 flex-col gap-4">
-      <CustomerStorageActions v-if="hasLifecycle" :customer-id="customerId" @state="deleted = $event" @changed="load" />
+      <EntityStorageActions
+        v-if="hasLifecycle"
+        :entity-id="customerId"
+        entity-label="客户"
+        :actions="productionStore"
+        @state="deleted = $event"
+        @changed="load"
+      />
       <StatePanel
         v-if="(store.detailState.kind === 'error' || store.detailState.kind === 'unavailable')"
         kind="error"
