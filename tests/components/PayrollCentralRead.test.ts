@@ -14,7 +14,7 @@ import CentralPayrollSourcesScreen from '~/pages/subcontract/payroll/_components
 import PayrollSnapshotEvidence from '~/pages/subcontract/payroll/_components/PayrollSnapshotEvidence.vue'
 import { payrollDetailFixture, payrollListFixture, payrollSourcesFixture } from '../helpers/payroll-central-read-fixture'
 
-const table = defineComponent({ props: ['columns', 'data', 'empty'], template: '<div role="table"><div v-for="row in data"><span v-for="column in columns"><slot v-if="column.slot" :name="column.slot" :row="row"/><template v-else>{{ row[column.field] }}</template></span></div></div>' })
+const table = defineComponent({ props: ['columns', 'data', 'empty', 'minRows'], template: '<div role="table"><div v-for="row in data"><span v-for="column in columns" :data-column="column.field"><slot v-if="column.slot" :name="column.slot" :row="row"/><template v-else>{{ row[column.field] }}</template></span></div></div>' })
 const link = defineComponent({ props: ['to'], setup: (props, { slots }) => () => h('a', { href: typeof props.to === 'string' ? props.to : `${props.to.path}?${new URLSearchParams(props.to.query)}` }, slots.default?.()) })
 const components = { PayrollReadNotice, PayrollReadDiagnostics, PayrollReadFilters, PayrollReadHistory, PayrollEvidenceTable, PayrollSnapshotEvidence, PayrollSourceEvidence, KitStatusTag }
 const stubs = {
@@ -69,6 +69,11 @@ describe('工资中央只读资料', () => {
     route.query = { origin: 'real', project: 'project-a', month: '2026-08' }
     const wrapper = mount(CentralPayrollScreen, { global: { components, stubs } })
     await flushPromises()
+    expect(wrapper.get('[data-list-shell]').classes()).toContain('list-shell--continuous')
+    expect(wrapper.findComponent(table).props('minRows')).toBe(10)
+    expect(wrapper.get('[data-column="grossAmount"]').text()).toBe('¥0.00')
+    expect(wrapper.get('[data-column="actualAmount"]').text()).toBe('未记录')
+    expect(wrapper.get('[aria-label="工资台账汇总"]').text()).toContain('3 份记录 · 1 份已发放 · 1 份隔离历史')
     const checks = wrapper.findAll('input[type="checkbox"]')
     expect(checks).toHaveLength(1)
     await checks[0]!.setValue(true)

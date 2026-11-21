@@ -6,6 +6,7 @@ import { computed, ref, watch } from 'vue'
 import PayrollReadDiagnostics from '~/components/payroll/PayrollReadDiagnostics.vue'
 import PayrollReadFilters from '~/components/payroll/PayrollReadFilters.vue'
 import PayrollReadNotice from '~/components/payroll/PayrollReadNotice.vue'
+import ListShell from '~/components/ui/ListShell.vue'
 import { usePayrollRead } from '~/composables/usePayrollRead'
 import { payrollReadLocation, payrollReadQuery, payrollStatusSelection, payrollViewQuery, payrollViewScope } from '~/lib/payroll/central-navigation'
 import { payrollStatementTarget } from '~/lib/payroll/central-target'
@@ -58,8 +59,8 @@ const columns: KitTableColumn[] = [
   { field: 'crewName', title: '班组', minWidth: 150, slot: 'crew' },
   { field: 'formatFamily', title: '格式 / 请款簿', minWidth: 165, slot: 'format' },
   { field: 'status', title: '工资状态', width: 120, slot: 'status' },
-  { field: 'grossAmount', title: '核算应发', width: 145, align: 'right', slot: 'gross' },
-  { field: 'actualAmount', title: '实际发放', width: 145, align: 'right', slot: 'actual' },
+  { field: 'grossAmount', title: '核算应发', width: 145, type: 'money', slot: 'gross' },
+  { field: 'actualAmount', title: '实际发放', width: 145, type: 'money', slot: 'actual' },
   { field: 'snapshot', title: '发放记录', minWidth: 165, slot: 'snapshot' },
   { field: 'recordKind', title: '记录范围', minWidth: 170, slot: 'record' },
 ]
@@ -92,107 +93,120 @@ useTabTitle('工资台账')
 
 <template>
   <main class="grid min-w-0 gap-4">
-    <header class="flex flex-wrap items-start justify-between gap-3">
-      <div>
-        <h1 class="text-20px font-800">
-          工资台账
-        </h1><p class="mt-1 text-12px text-ink-faint">
-          按原项目、月份与班组查询工资和已保留的发放记录。
-        </p>
-      </div>
-      <div class="flex flex-wrap gap-2">
-        <KitButton v-if="canBatch" variant="secondary" :disabled="!batchEligibleRows.length" @click="toggleAll">
-          {{ selectedRows.length === batchEligibleRows.length ? '清空选择' : '选择本期可处理工资' }}
-        </KitButton>
-        <KitButton v-if="canBatch" :disabled="!selectedRows.length" @click="batchOpen = true">
-          批量核对 / 资金（{{ selectedRows.length }}）
-        </KitButton>
-        <NuxtLink v-if="canArchive" :to="{ path: '/subcontract/payroll/workbooks', query: { origin: 'real', project: scope.projectId } }" class="btn-secondary">
-          完整工作簿
-        </NuxtLink>
-        <NuxtLink :to="{ path: '/subcontract/payroll/payments', query: { origin: scope.origin || 'real', project: scope.projectId, returnTo } }" class="btn-secondary">
-          工资实际收付
-        </NuxtLink>
-        <NuxtLink v-if="canCreate" :to="createTo" class="btn-primary">
-          新建 A 工资草稿
-        </NuxtLink>
-        <NuxtLink v-if="canCreate" :to="createC1To" class="btn-primary">
-          新建 C1 工资草稿
-        </NuxtLink><NuxtLink v-if="canCreate" :to="createC2To" class="btn-primary">
-          新建 C2 工资草稿
-        </NuxtLink>
-        <NuxtLink :to="attendanceTo" class="btn-secondary">
-          考勤管理
-        </NuxtLink>
-        <NuxtLink v-if="canCreate" :to="configTo" class="btn-secondary">
-          工资配置
-        </NuxtLink>
-        <NuxtLink :to="sources" class="btn-secondary">
-          查看工资来源
-        </NuxtLink><NuxtLink v-if="scope.origin === 'real' && current?.context.capabilities.includes('worker:sensitive:read')" :to="{ path: '/subcontract/payroll/roster', query: { origin: 'real', project: scope.projectId } }" class="btn-secondary">
-          实名名册归档
-        </NuxtLink><KitButton :disabled="loading" @click="load">
-          刷新
-        </KitButton>
-      </div>
-    </header>
-    <PayrollReadNotice />
-    <label class="flex flex-wrap items-center gap-2 text-12px">资料来源<select class="field-input max-w-full" :value="scope.origin || ''" @change="change({ origin: ($event.target as HTMLSelectElement).value === 'demo' ? 'demo' : 'real', projectId: '', crewId: '' })"><option value="real">正式工资</option><option value="demo">演示工资（只读）</option></select></label>
-    <PayrollReadFilters :scope="scope" :projects="current?.projects || []" :crews="crews" @change="change" />
-    <section v-if="error" role="alert" class="panel p-4 text-13px text-danger">
-      {{ error }}<p class="mt-2 text-ink-soft">
-        当前来源未成功读取，可重新核对；不会改用其他项目或本机资料。
-      </p>
-    </section>
-    <template v-else>
-      <PayrollReadDiagnostics :issues="current?.diagnostics || []" />
-      <section class="panel min-w-0 overflow-hidden" aria-label="工资只读台账">
-        <KitTable :columns="columns" :data="rows" :loading="loading" :min-rows="6" :row-height="48" :empty="{ title: '当前筛选下没有工资记录', description: '没有工资单的项目也可在工资来源中查询配置、考勤和签工。' }">
-          <template #select="{ row }">
-            <input
-              v-if="batchEligibleRows.some(item => item.id === row.id)"
-              type="checkbox"
-              :checked="selectedIds.includes(row.id)"
-              :aria-label="`选择 ${row.leaderName || row.id} 的工资`"
-              @change="toggle(row, ($event.target as HTMLInputElement).checked)"
-            >
-            <span v-else class="text-ink-faint">—</span>
-          </template>
-          <template #detail="{ row }">
-            <NuxtLink v-if="detail(row)" :to="detail(row)!" class="cell--link">
-              {{ row.month || '月份未记录' }}
-            </NuxtLink><span v-else>{{ row.month || '月份未记录' }}</span>
-          </template>
-          <template #leader="{ row }">
-            {{ row.leaderName || '姓名未记录' }}
-          </template><template #crew="{ row }">
-            {{ row.crewName || '班组未记录' }}
-          </template>
-          <template #status="{ row }">
-            <KitStatusTag :tone="payrollStatusTone(row.status)">
-              {{ payrollStatusLabel(row.status) }}
-            </KitStatusTag>
-          </template>
-          <template #format="{ row }">
-            {{ row.formatFamily }}<span v-if="row.book" class="block text-11px text-ink-soft">{{ row.book.bookPurpose === 'management' ? '独立管理费簿' : '普通施工簿' }}</span>
-          </template>
-          <template #gross="{ row }">
-            {{ payrollAmount(row.grossAmount) }}
-          </template><template #actual="{ row }">
-            {{ payrollAmount(row.actualAmount) }}
-          </template>
-          <template #snapshot="{ row }">
-            {{ payrollSnapshotLabel(row.snapshot.state) }}
-          </template>
-          <template #record="{ row }">
-            {{ row.recordKind === 'isolated' ? '隔离历史 · 只读' : row.deletedAt ? '已删除历史' : '当前记录' }}
-          </template>
-        </KitTable>
-      </section>
-      <p role="status" class="text-12px text-ink-faint">
-        当前 {{ rows.length }} 份记录 · {{ rows.filter(row => row.status === 'released').length }} 份已发放 · {{ rows.filter(row => row.recordKind === 'isolated').length }} 份隔离历史。未记录的金额保留为空。
-      </p>
-    </template>
+    <ListShell continuous summary-label="工资台账汇总">
+      <template #toolbar>
+        <div class="w-full flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 class="text-20px font-800">
+              工资台账
+            </h1><p class="mt-1 text-12px text-ink-faint">
+              按原项目、月份与班组查询工资和已保留的发放记录。
+            </p>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <KitButton v-if="canBatch" variant="secondary" :disabled="!batchEligibleRows.length" @click="toggleAll">
+              {{ selectedRows.length === batchEligibleRows.length ? '清空选择' : '选择本期可处理工资' }}
+            </KitButton>
+            <KitButton v-if="canBatch" :disabled="!selectedRows.length" @click="batchOpen = true">
+              批量核对 / 资金（{{ selectedRows.length }}）
+            </KitButton>
+            <NuxtLink v-if="canArchive" :to="{ path: '/subcontract/payroll/workbooks', query: { origin: 'real', project: scope.projectId } }" class="btn-secondary">
+              完整工作簿
+            </NuxtLink>
+            <NuxtLink :to="{ path: '/subcontract/payroll/payments', query: { origin: scope.origin || 'real', project: scope.projectId, returnTo } }" class="btn-secondary">
+              工资实际收付
+            </NuxtLink>
+            <NuxtLink v-if="canCreate" :to="createTo" class="btn-primary">
+              新建 A 工资草稿
+            </NuxtLink>
+            <NuxtLink v-if="canCreate" :to="createC1To" class="btn-primary">
+              新建 C1 工资草稿
+            </NuxtLink><NuxtLink v-if="canCreate" :to="createC2To" class="btn-primary">
+              新建 C2 工资草稿
+            </NuxtLink>
+            <NuxtLink :to="attendanceTo" class="btn-secondary">
+              考勤管理
+            </NuxtLink>
+            <NuxtLink v-if="canCreate" :to="configTo" class="btn-secondary">
+              工资配置
+            </NuxtLink>
+            <NuxtLink :to="sources" class="btn-secondary">
+              查看工资来源
+            </NuxtLink><NuxtLink v-if="scope.origin === 'real' && current?.context.capabilities.includes('worker:sensitive:read')" :to="{ path: '/subcontract/payroll/roster', query: { origin: 'real', project: scope.projectId } }" class="btn-secondary">
+              实名名册归档
+            </NuxtLink><KitButton :disabled="loading" @click="load">
+              刷新
+            </KitButton>
+          </div>
+        </div>
+      </template>
+      <template #filters>
+        <div class="grid min-w-0 gap-2">
+          <PayrollReadNotice />
+          <label class="flex flex-wrap items-center gap-2 text-12px">资料来源<select class="field-input max-w-full" :value="scope.origin || ''" @change="change({ origin: ($event.target as HTMLSelectElement).value === 'demo' ? 'demo' : 'real', projectId: '', crewId: '' })"><option value="real">正式工资</option><option value="demo">演示工资（只读）</option></select></label>
+          <PayrollReadFilters :scope="scope" :projects="current?.projects || []" :crews="crews" @change="change" />
+        </div>
+      </template>
+      <template #table>
+        <section v-if="error" role="alert" class="panel p-4 text-13px text-danger">
+          {{ error }}<p class="mt-2 text-ink-soft">
+            当前来源未成功读取，可重新核对；不会改用其他项目或本机资料。
+          </p>
+        </section>
+        <template v-else>
+          <PayrollReadDiagnostics :issues="current?.diagnostics || []" />
+          <section class="min-w-0" aria-label="工资只读台账">
+            <KitTable :columns="columns" :data="rows" :loading="loading" :min-rows="10" :empty="{ title: '当前筛选下没有工资记录', description: '没有工资单的项目也可在工资来源中查询配置、考勤和签工。' }">
+              <template #select="{ row }">
+                <input
+                  v-if="batchEligibleRows.some(item => item.id === row.id)"
+                  type="checkbox"
+                  :checked="selectedIds.includes(row.id)"
+                  :aria-label="`选择 ${row.leaderName || row.id} 的工资`"
+                  @change="toggle(row, ($event.target as HTMLInputElement).checked)"
+                >
+                <span v-else class="text-ink-faint">—</span>
+              </template>
+              <template #detail="{ row }">
+                <NuxtLink v-if="detail(row)" :to="detail(row)!" class="cell--link">
+                  {{ row.month || '月份未记录' }}
+                </NuxtLink><span v-else>{{ row.month || '月份未记录' }}</span>
+              </template>
+              <template #leader="{ row }">
+                {{ row.leaderName || '姓名未记录' }}
+              </template><template #crew="{ row }">
+                {{ row.crewName || '班组未记录' }}
+              </template>
+              <template #status="{ row }">
+                <KitStatusTag :tone="payrollStatusTone(row.status)">
+                  {{ payrollStatusLabel(row.status) }}
+                </KitStatusTag>
+              </template>
+              <template #format="{ row }">
+                {{ row.formatFamily }}<span v-if="row.book" class="block text-11px text-ink-soft">{{ row.book.bookPurpose === 'management' ? '独立管理费簿' : '普通施工簿' }}</span>
+              </template>
+              <template #gross="{ row }">
+                {{ payrollAmount(row.grossAmount) }}
+              </template>
+              <template #actual="{ row }">
+                {{ payrollAmount(row.actualAmount) }}
+              </template>
+              <template #snapshot="{ row }">
+                {{ payrollSnapshotLabel(row.snapshot.state) }}
+              </template>
+              <template #record="{ row }">
+                {{ row.recordKind === 'isolated' ? '隔离历史 · 只读' : row.deletedAt ? '已删除历史' : '当前记录' }}
+              </template>
+            </KitTable>
+          </section>
+        </template>
+      </template>
+      <template v-if="!error && current" #summary>
+        <span>
+          当前 {{ rows.length }} 份记录 · {{ rows.filter(row => row.status === 'released').length }} 份已发放 · {{ rows.filter(row => row.recordKind === 'isolated').length }} 份隔离历史。未记录的金额保留为空。
+        </span>
+      </template>
+    </ListShell>
     <PayrollBatchDialog
       v-if="current && canBatch"
       v-model:open="batchOpen"
