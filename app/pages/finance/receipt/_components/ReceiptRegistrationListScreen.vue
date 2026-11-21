@@ -175,7 +175,9 @@ onScopeDispose(() => {
             <ReceiptRowLink :detail="row.detail" :source="route.fullPath" :context-id="contextId" />
           </template>
           <template #origin="{ row }">
-            <span class="chip" :class="row.dataOrigin === 'demo' ? 'chip-warn' : 'chip-brand'">{{ row.dataOrigin === 'demo' ? '演示' : '正式' }}</span>
+            <KitStatusTag :tone="row.dataOrigin === 'demo' ? 'warn' : 'brand'">
+              {{ row.dataOrigin === 'demo' ? '演示' : '正式' }}
+            </KitStatusTag>
           </template>
           <template #project="{ row }">
             <ReceiptReferenceLink :reference="row.detail.project" :origin="row.dataOrigin" />
@@ -190,7 +192,7 @@ onScopeDispose(() => {
             <span class="text-ink-faint">未记录</span>
           </template>
           <template #amount="{ row }">
-            {{ row.amount === null ? '未填写' : yuan(row.amount) }}
+            <span data-ui="receipt-list-amount">{{ yuan(row.amount) }}</span>
           </template>
           <template #cumulativeReceipt="{ row }">
             <span :title="row.detail.contractProblem?.message ?? ''">{{ yuan(row.cumulativeReceipt) }}</span>
