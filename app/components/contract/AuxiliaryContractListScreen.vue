@@ -5,9 +5,12 @@ import { useMutationObserver } from '@vueuse/core'
 import TargetCostSourceReturn from '~/components/target-cost/TargetCostSourceReturn.vue'
 import KitEnumFilterOptions from '~/components/ui/KitEnumFilterOptions.vue'
 import KitMultiSelectFilter from '~/components/ui/KitMultiSelectFilter.vue'
+import KitStatusTag from '~/components/ui/KitStatusTag.vue'
+import ListShell from '~/components/ui/ListShell.vue'
 import { AUXILIARY_CATEGORIES, AUXILIARY_LABELS, auxiliaryListPath } from '~/lib/auxiliary-contract/contract'
 import { validateAuxiliaryReturnTo } from '~/lib/auxiliary-contract/navigation'
 import { auxiliaryColumns, auxiliaryMoney, auxiliaryTableRow } from '~/lib/auxiliary-contract/presentation'
+import { contractAuxStatusTone } from '~/lib/contract/aux-list'
 import { commandRecoveryKey, createCommandRecoveryStorage } from '~/lib/forms/command-recovery'
 import { fileRefDraftFromFile } from '~/lib/forms/file-refs'
 import { enumFilterValues } from '~/lib/kit/enum-filter'
@@ -200,6 +203,8 @@ const statuses = ['草稿', '审批中', '已签订', '履约中', '已结算', 
 const columns = computed(() => auxiliaryColumns(props.kind))
 const rows = computed(() => page.value?.items.map(auxiliaryTableRow) ?? [])
 const canWrite = computed(() => shellState.value === 'ready' && (page.value?.capabilities.includes('auxiliary-contract:write') ?? false))
+const canImport = computed(() => page.value?.capabilities.includes('auxiliary-contract:import') ?? false)
+const sourceReturnTo = computed(() => validateAuxiliaryReturnTo(route.query.returnTo))
 const hasFilters = computed(() => ['search', 'projectId', 'supplierId', 'project', 'supplier'].some(key => route.query[key]) || category.value.length > 0 || status.value.length > 0)
 const empty = computed(() => ({ title: hasFilters.value ? '没有符合条件的合同' : `暂无${AUXILIARY_LABELS[props.kind]}`, description: hasFilters.value ? '请调整或清除筛选。' : '当前范围内还没有合同。', actionLabel: hasFilters.value ? '清除筛选' : '' }))
 async function filter(patch: Record<string, string | string[] | undefined>) {
@@ -268,119 +273,141 @@ useTabTitle(() => AUXILIARY_LABELS[props.kind])
 <template>
   <div ref="listRoot" class="flex min-w-0 flex-col gap-3" data-testid="auxiliary-list">
     <TargetCostSourceReturn />
-    <header class="panel flex min-w-0 flex-wrap items-center gap-2 p-3">
-      <h1 class="m-0 mr-auto text-15px font-800">
-        {{ AUXILIARY_LABELS[kind] }}
-      </h1>
-      <KitMultiSelectFilter v-model="category" :options="categories" label="类别" class="lg:hidden" />
-      <KitMultiSelectFilter v-model="status" :options="statuses" label="状态" />
-      <LookupSelect v-if="kind === 'other_expense'" v-model="project" :fetch="fetchProjects" placeholder="筛选项目" class="w-48 max-w-full" />
-      <form class="flex min-w-0 flex-wrap gap-2" @submit.prevent="filter({ search: search || undefined })">
-        <input v-model="search" class="field-input min-w-0 max-w-full" placeholder="搜索合同名称 / 编号 / 对方单位" aria-label="搜索合同名称 / 编号 / 对方单位">
-        <KitButton type="submit">
-          搜索
-        </KitButton>
-      </form>
-      <KitButton aria-label="刷新合同列表" @click="refresh">
-        刷新
-      </KitButton>
-      <KitButton v-if="canWrite" variant="primary" @click="navigateTo(`${auxiliaryListPath(kind)}/form?returnTo=${encodeURIComponent(route.fullPath)}`)">
-        新建合同
-      </KitButton>
-    </header>
-    <div v-if="hasFilters" class="flex flex-wrap items-center gap-2 text-12px">
-      <span>当前筛选：{{ route.query.projectId || route.query.project ? '限定项目 · ' : '' }}{{ route.query.supplierId || route.query.supplier ? '限定分供方 · ' : '' }}{{ route.query.search || route.query.category || route.query.status || '来源范围' }}</span>
-      <KitButton @click="clearFilters">
-        清除筛选
-      </KitButton>
-    </div>
-    <details v-if="page?.capabilities.includes('auxiliary-contract:import')" class="panel min-w-0 p-3" @toggle="($event.target as HTMLDetailsElement).open && loadMigration()">
-      <summary class="cursor-pointer text-13px font-700">
-        完整 Native 辅助合同迁入与受保护恢复
-      </summary>
-      <div class="mt-3 flex min-w-0 flex-col gap-3">
-        <p class="m-0 text-12px text-ink-soft">
-          同次核验其他支出、公司支出合同与全部原增补、原件及审计。完整原库留在导出位置，正式库只保存本领域原图。
-        </p>
-        <p v-if="migrationError" role="alert" class="m-0 break-words text-13px text-danger">
-          {{ migrationError }}
-        </p>
-        <p v-if="!migration && !migrationError" role="status" class="m-0 text-12px text-ink-soft">
-          正在核对迁入来源…
-        </p>
-        <KitButton v-if="!migration && migrationError" :disabled="migrationBusy" @click="loadMigration">
-          重新核对来源
-        </KitButton>
-        <div v-if="migrationPending" role="status" class="flex min-w-0 flex-wrap items-center gap-2">
-          <span class="min-w-0 break-all text-12px">原编号：{{ migrationPending.commandId }}；{{ migrationResult ? '已应用待读取，仅重试读取' : '结果未知，请核对原编号' }}</span>
-          <KitButton :disabled="migrationBusy" @click="recoverMigration">
-            核对原采用结果
+    <ListShell continuous>
+      <template #toolbar>
+        <div class="flex min-w-0 flex-wrap items-center gap-2">
+          <h1 class="m-0 mr-auto text-15px font-800">
+            {{ AUXILIARY_LABELS[kind] }}
+          </h1>
+          <KitMultiSelectFilter v-model="category" :options="categories" label="类别" class="lg:hidden" />
+          <KitMultiSelectFilter v-model="status" :options="statuses" label="状态" />
+          <LookupSelect v-if="kind === 'other_expense'" v-model="project" :fetch="fetchProjects" placeholder="筛选项目" class="w-48 max-w-full" />
+          <form class="flex min-w-0 flex-wrap gap-2" @submit.prevent="filter({ search: search || undefined })">
+            <input v-model="search" class="field-input min-w-0 max-w-full" placeholder="搜索合同名称 / 编号 / 对方单位" aria-label="搜索合同名称 / 编号 / 对方单位">
+            <KitButton type="submit">
+              搜索
+            </KitButton>
+          </form>
+          <KitButton aria-label="刷新合同列表" @click="refresh">
+            刷新
+          </KitButton>
+          <KitButton v-if="canWrite" variant="primary" @click="navigateTo(`${auxiliaryListPath(kind)}/form?returnTo=${encodeURIComponent(route.fullPath)}`)">
+            新建合同
           </KitButton>
         </div>
-        <fieldset :disabled="!migration || migrationBusy || Boolean(migrationPending)" class="m-0 grid min-w-0 gap-3 border-0 p-0">
-          <label class="field-block"><span class="field-label">完整 SQLite 来源文件</span><input type="file" accept=".sqlite,.db,.sqlite3" aria-label="完整辅助合同来源文件" @change="selectNative"></label>
-          <template v-if="preview">
-            <p class="m-0 break-all text-12px">
-              来源 SHA-256：{{ preview.sourceSha256 }} · 两类合同 {{ preview.contracts.length }} 份
-            </p>
-            <div v-for="reference in preview.references" :key="`${reference.kind}:${reference.id}`" class="field-block">
-              <span class="field-label">原{{ reference.kind === 'project' ? '工程' : reference.kind === 'supplier' ? '分供方' : '我方主体版本' }}：{{ reference.label }}（{{ reference.id }}）</span>
-              <select class="field-input w-full" :aria-label="`采用${reference.id}`" @change="bindReference(reference, ($event.target as HTMLSelectElement).value)">
-                <option value="">
-                  明确选择真实主档及版本
-                </option>
-                <option v-for="candidate in reference.candidates" :key="`${candidate.id}@${candidate.version}`" :value="`${candidate.id}@${candidate.version}`">
-                  {{ candidate.label }} · {{ candidate.id }} · 版本 {{ candidate.version }}{{ candidate.deletedAt ? ' · 已归档，仅保历史关联' : '' }}
-                </option>
-              </select>
-            </div>
-            <label v-for="file in preview.requiredOriginals" :key="file.id" class="field-block"><span class="field-label">补齐原目录文件：{{ file.name }}（{{ file.id }}）</span><input type="file" :aria-label="`补齐${file.id}`" @change="selectOriginal(file.id, $event)"></label>
-            <KitButton :disabled="!canAdopt" variant="primary" @click="adoptNative">
-              采用完整辅助合同原图
-            </KitButton>
-          </template>
-          <div v-for="source in migration?.sources ?? []" :key="source.importId" class="flex min-w-0 flex-wrap items-center gap-2 border-t border-line pt-2 text-12px">
-            <span class="min-w-0 break-all">{{ source.importId }} · {{ source.ids.length }} 份原合同 · {{ source.restored ? '已退役采用，原历史保留' : '已采用' }}</span>
-            <KitButton v-if="!source.restored" @click="restoreNative(source.importId)">
-              受保护整批恢复
+      </template>
+      <template v-if="hasFilters || canImport || sourceReturnTo" #filters>
+        <div class="grid min-w-0 gap-2">
+          <div v-if="hasFilters" class="flex flex-wrap items-center gap-2 text-12px">
+            <span>当前筛选：{{ route.query.projectId || route.query.project ? '限定项目 · ' : '' }}{{ route.query.supplierId || route.query.supplier ? '限定分供方 · ' : '' }}{{ route.query.search || route.query.category || route.query.status || '来源范围' }}</span>
+            <KitButton @click="clearFilters">
+              清除筛选
             </KitButton>
           </div>
-        </fieldset>
-      </div>
-    </details>
-    <NuxtLink v-if="validateAuxiliaryReturnTo(route.query.returnTo)" :to="validateAuxiliaryReturnTo(route.query.returnTo)!" class="text-13px text-brand">
-      返回来源
-    </NuxtLink>
-    <p v-if="problem && page" role="alert" class="m-0 rounded-sm bg-danger-soft p-3 text-12px text-danger">
-      {{ problem.message }}；当前保留上一次成功读取的列表。
-      <button v-if="problem.retryable" type="button" class="ml-2 underline" @click="refresh">
-        重试
-      </button>
-    </p>
-    <StatePanel v-if="problem && !page" :kind="shellState === 'forbidden' ? 'forbidden' : 'error'" :title="problem.message" :action-label="problem.retryable ? '重新加载' : ''" @action="refresh" />
-    <div v-else class="grid min-w-0 gap-3 lg:grid-cols-[150px_minmax(0,1fr)]" :aria-busy="shellState === 'loading'">
-      <aside class="panel hidden min-w-0 p-2 lg:block" aria-label="合同类别">
-        <p class="m-0 border-b border-line px-2 py-3 text-12px font-700">
-          合同分类
-        </p>
-        <KitEnumFilterOptions v-model="category" label="合同类别" :options="categories" class="mt-2" />
-      </aside>
-      <div class="relative min-w-0">
-        <span v-if="shellState === 'loading' && page" role="status" class="pointer-events-none absolute right-3 top-1 z-1 rounded-sm bg-panel px-2 py-1 text-12px text-ink-soft">正在更新列表…</span>
-        <KitTable :columns="columns" :data="rows" :loading="shellState === 'loading' && !page" :page="page?.pagination ?? { page: 1, pageSize: 20, total: 0 }" :empty="empty" @empty-action="clearFilters" @page-change="navigateTo({ path: route.path, query: { ...route.query, page: $event.page, pageSize: $event.pageSize } }, { replace: true })">
-          <template #name="{ row }">
-            <NuxtLink :id="`aux-row-${row.id}`" :to="target(row.source)" class="cell--link" @click="remember(row.id)">
-              {{ row.name }}
-            </NuxtLink>
-          </template>
-          <template #action="{ row }">
-            <RowActionMenu :items="[{ key: 'view', label: '查看详情', icon: 'i-lucide-eye' }]" :label="`${row.name}操作`" @select="navigateTo(target(row.source)!)" />
-          </template>
-        </KitTable>
-        <div class="flex flex-wrap justify-end gap-4 border border-line bg-surface-2 px-3 py-2 text-12px">
-          <span>当前筛选 · 正式合同 {{ page?.summary.real.count ?? 0 }} 份</span><span>合同金额合计 <strong class="font-mono">{{ auxiliaryMoney(page?.summary.real.amount ?? null) }}</strong></span>
+          <details v-if="canImport" class="min-w-0 border border-line rounded-[var(--radius-card)] p-3" @toggle="($event.target as HTMLDetailsElement).open && loadMigration()">
+            <summary class="cursor-pointer text-13px font-700">
+              完整 Native 辅助合同迁入与受保护恢复
+            </summary>
+            <div class="mt-3 flex min-w-0 flex-col gap-3">
+              <p class="m-0 text-12px text-ink-soft">
+                同次核验其他支出、公司支出合同与全部原增补、原件及审计。完整原库留在导出位置，正式库只保存本领域原图。
+              </p>
+              <p v-if="migrationError" role="alert" class="m-0 break-words text-13px text-danger">
+                {{ migrationError }}
+              </p>
+              <p v-if="!migration && !migrationError" role="status" class="m-0 text-12px text-ink-soft">
+                正在核对迁入来源…
+              </p>
+              <KitButton v-if="!migration && migrationError" :disabled="migrationBusy" @click="loadMigration">
+                重新核对来源
+              </KitButton>
+              <div v-if="migrationPending" role="status" class="flex min-w-0 flex-wrap items-center gap-2">
+                <span class="min-w-0 break-all text-12px">原编号：{{ migrationPending.commandId }}；{{ migrationResult ? '已应用待读取，仅重试读取' : '结果未知，请核对原编号' }}</span>
+                <KitButton :disabled="migrationBusy" @click="recoverMigration">
+                  核对原采用结果
+                </KitButton>
+              </div>
+              <fieldset :disabled="!migration || migrationBusy || Boolean(migrationPending)" class="m-0 grid min-w-0 gap-3 border-0 p-0">
+                <label class="field-block"><span class="field-label">完整 SQLite 来源文件</span><input type="file" accept=".sqlite,.db,.sqlite3" aria-label="完整辅助合同来源文件" @change="selectNative"></label>
+                <template v-if="preview">
+                  <p class="m-0 break-all text-12px">
+                    来源 SHA-256：{{ preview.sourceSha256 }} · 两类合同 {{ preview.contracts.length }} 份
+                  </p>
+                  <div v-for="reference in preview.references" :key="`${reference.kind}:${reference.id}`" class="field-block">
+                    <span class="field-label">原{{ reference.kind === 'project' ? '工程' : reference.kind === 'supplier' ? '分供方' : '我方主体版本' }}：{{ reference.label }}（{{ reference.id }}）</span>
+                    <select class="field-input w-full" :aria-label="`采用${reference.id}`" @change="bindReference(reference, ($event.target as HTMLSelectElement).value)">
+                      <option value="">
+                        明确选择真实主档及版本
+                      </option>
+                      <option v-for="candidate in reference.candidates" :key="`${candidate.id}@${candidate.version}`" :value="`${candidate.id}@${candidate.version}`">
+                        {{ candidate.label }} · {{ candidate.id }} · 版本 {{ candidate.version }}{{ candidate.deletedAt ? ' · 已归档，仅保历史关联' : '' }}
+                      </option>
+                    </select>
+                  </div>
+                  <label v-for="file in preview.requiredOriginals" :key="file.id" class="field-block"><span class="field-label">补齐原目录文件：{{ file.name }}（{{ file.id }}）</span><input type="file" :aria-label="`补齐${file.id}`" @change="selectOriginal(file.id, $event)"></label>
+                  <KitButton :disabled="!canAdopt" variant="primary" @click="adoptNative">
+                    采用完整辅助合同原图
+                  </KitButton>
+                </template>
+                <div v-for="source in migration?.sources ?? []" :key="source.importId" class="flex min-w-0 flex-wrap items-center gap-2 border-t border-line pt-2 text-12px">
+                  <span class="min-w-0 break-all">{{ source.importId }} · {{ source.ids.length }} 份原合同 · {{ source.restored ? '已退役采用，原历史保留' : '已采用' }}</span>
+                  <KitButton v-if="!source.restored" @click="restoreNative(source.importId)">
+                    受保护整批恢复
+                  </KitButton>
+                </div>
+              </fieldset>
+            </div>
+          </details>
+          <NuxtLink v-if="sourceReturnTo" :to="sourceReturnTo" class="text-13px text-brand">
+            返回来源
+          </NuxtLink>
         </div>
-      </div>
-    </div>
+      </template>
+      <template #table>
+        <p v-if="problem && page" role="alert" class="m-0 rounded-sm bg-danger-soft p-3 text-12px text-danger">
+          {{ problem.message }}；当前保留上一次成功读取的列表。
+          <button v-if="problem.retryable" type="button" class="ml-2 underline" @click="refresh">
+            重试
+          </button>
+        </p>
+        <StatePanel v-if="problem && !page" :kind="shellState === 'forbidden' ? 'forbidden' : 'error'" :title="problem.message" :action-label="problem.retryable ? '重新加载' : ''" @action="refresh" />
+        <div v-else class="grid min-w-0 lg:grid-cols-[150px_minmax(0,1fr)]" :aria-busy="shellState === 'loading'">
+          <aside class="hidden min-w-0 border-r border-line p-2 lg:block" aria-label="合同类别">
+            <p class="m-0 border-b border-line px-2 py-3 text-12px font-700">
+              合同分类
+            </p>
+            <KitEnumFilterOptions v-model="category" label="合同类别" :options="categories" class="mt-2" />
+          </aside>
+          <div class="relative min-w-0">
+            <span v-if="shellState === 'loading' && page" role="status" class="pointer-events-none absolute right-3 top-1 z-1 rounded-sm bg-panel px-2 py-1 text-12px text-ink-soft">正在更新列表…</span>
+            <KitTable :columns="columns" :data="rows" :loading="shellState === 'loading' && !page" :page="page?.pagination ?? { page: 1, pageSize: 20, total: 0 }" :empty="empty" @empty-action="clearFilters" @page-change="navigateTo({ path: route.path, query: { ...route.query, page: $event.page, pageSize: $event.pageSize } }, { replace: true })">
+              <template #name="{ row }">
+                <NuxtLink :id="`aux-row-${row.id}`" :to="target(row.source)" class="cell--link" @click="remember(row.id)">
+                  {{ row.name }}
+                </NuxtLink>
+              </template>
+              <template #status="{ row }">
+                <KitStatusTag :tone="contractAuxStatusTone(row.status ?? '')">
+                  {{ row.status || '—' }}
+                </KitStatusTag>
+              </template>
+              <template #settlementStatus="{ row }">
+                <KitStatusTag>{{ row.settlementStatus }}</KitStatusTag>
+              </template>
+              <template #clearanceStatus="{ row }">
+                <KitStatusTag>{{ row.clearanceStatus }}</KitStatusTag>
+              </template>
+              <template #action="{ row }">
+                <RowActionMenu :items="[{ key: 'view', label: '查看详情', icon: 'i-lucide-eye' }]" :label="`${row.name}操作`" @select="navigateTo(target(row.source)!)" />
+              </template>
+            </KitTable>
+          </div>
+        </div>
+      </template>
+      <template v-if="page" #summary>
+        <span>当前筛选 · 正式合同 {{ page.summary.real.count }} 份</span>
+        <span>合同金额合计 <strong class="font-mono">{{ auxiliaryMoney(page.summary.real.amount) }}</strong></span>
+      </template>
+    </ListShell>
   </div>
 </template>

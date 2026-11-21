@@ -72,7 +72,11 @@ test.describe('AX04 辅助合同只读与编辑', () => {
       expect(response.ok(), await response.text()).toBe(true)
     }
     await page.goto('/contract/company-expense?search=分页验收&page=2&pageSize=10')
-    const row = page.getByTestId('auxiliary-list').getByRole('link', { name: /^分页验收合同/ }).first()
+    const list = page.getByTestId('auxiliary-list').locator('[data-list-shell].list-shell--continuous')
+    const table = list.locator('[data-ui="kit-table"]')
+    await expect(table).toBeVisible()
+    await expect(table.locator('[data-ui="status-tag"]').filter({ hasText: '草稿' }).first()).toBeVisible()
+    const row = table.getByRole('link', { name: /^分页验收合同/ }).first()
     const name = (await row.textContent())!.trim()
     await row.click()
     await expect(page.getByTestId('auxiliary-detail')).toContainText(name)
@@ -210,6 +214,7 @@ test.describe('Issue #196：辅助合同与结算列表', () => {
       const root = page.locator(list.root)
       await expect(root.getByRole('heading', { name: list.title }))
         .toBeVisible({ timeout: 30_000 })
+      await expect(page.locator('[data-list-shell].list-shell--continuous:visible [data-ui="kit-table"]')).toBeVisible()
       const status = root.getByRole('button', { name: /^状态，已选 0 项$/ })
       const project = list.path === '/material/settlement'
         ? root.getByRole('button', { name: /^项目，已选 0 项$/ })
