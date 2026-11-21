@@ -292,7 +292,8 @@ test.describe('分包变更', () => {
       await expect(page.getByRole('link', { name: /分包变洽签/ })).toBeFocused()
     })
 
-    test('正式草稿只能通过显式整页入口编辑，取消后恢复原详情与合同来源', async ({ page }) => {
+    test('分包变更草稿取消保留来源，更正金额后提交并回读合同汇总', async ({ page }) => {
+      test.setTimeout(60_000)
       const contractName = 'E2E 草稿劳务分包合同'
       const contractId = await createSubcontract(page, contractName)
       const changeId = await createChange(page, contractName, 'draft')
@@ -308,6 +309,26 @@ test.describe('分包变更', () => {
       await page.getByRole('link', { name: '返回来源详情' }).click()
       await expect(page).toHaveURL(contractSource)
       await expect(page.getByRole('link', { name: 'E2E 草稿分包变更' })).toBeFocused()
+      await page.getByRole('link', { name: 'E2E 草稿分包变更' }).click()
+      await page.getByTestId('subcontract-change-edit').click()
+      await expect(page.getByTestId('owner-document-approvedAmount')).toHaveValue('12700')
+      await page.getByTestId('owner-document-approvedAmount').fill('14300')
+      const submitted = page.waitForResponse(response => response.url().endsWith('/api/commands/owner-documents')
+        && response.request().method() === 'POST' && response.request().postDataJSON().action === 'submit')
+      await page.getByRole('button', { name: '保存并提交', exact: true }).click()
+      await page.getByRole('dialog', { name: '提交' }).getByRole('button', { name: '提交', exact: true }).click()
+      const response = await submitted
+      expect(response.ok(), await response.text()).toBe(true)
+      expect(await response.json()).toMatchObject({ id: changeId })
+      await page.goto(`/subcontract/change/${changeId}?origin=real`)
+      await expect(page.getByRole('group', { name: '审批金额', exact: true })).toContainText('14,300.00')
+      await page.goto(`/subcontract/change?origin=real&contractId=${contractId}&search=FB-DRAFT-327`)
+      const row = page.getByRole('row').filter({ hasText: 'FB-DRAFT-327' })
+      await expect(row).toContainText('14,300.00')
+      await expect(row).toContainText('已提交')
+      await expect(page.locator('[data-ui="owner-document-summary"]')).toContainText('14,300.00')
+      await page.goto(contractSource)
+      await expect(page.getByRole('row').filter({ hasText: 'E2E 草稿分包变更' })).toContainText('14,300.00')
     })
 
     test('真实空态显示无数据', async ({ page }, testInfo) => {
@@ -373,7 +394,7 @@ test.describe('分包结算', () => {
   }
 
   async function createSubcontract(page: Page, name: string): Promise<string> {
-    const ownName = '此流程已核实我方签约主体'
+    const ownName = `此流程已核实我方签约主体-${randomUUID()}`
     const ownId = await createVerifiedSignatory(page, ownName)
     await installContractEngineeringFixture(page, 'subcontract', '中央正式施工项目')
     await page.goto('/contract/subcontract/form')
@@ -404,7 +425,7 @@ test.describe('分包结算', () => {
       }
     })
 
-    test('保存确认后刷新仍保留结算与附件，列表、合同与项目往返恢复来源', async ({ page }) => {
+    test('分包结算草稿更正确认后只计入一次累计，列表合同与项目回读', async ({ page }) => {
       test.setTimeout(90_000)
       const contractName = 'E2E 分包结算合同 328'
       await createSubcontract(page, contractName)
@@ -415,15 +436,26 @@ test.describe('分包结算', () => {
       }
       await page.getByTestId('owner-document-no').fill('FBJS-E2E-328')
       await page.getByTestId('owner-document-name').fill('E2E 八月劳务结算')
-      await page.getByTestId('owner-document-totalAmount').fill('28000')
+      await page.getByTestId('owner-document-totalAmount').fill('18000')
       await page.getByTestId('owner-document-settlementDate').fill('2026-08-31')
       await page.getByTestId('finance-attachment-input').setInputFiles({ name: '结算确认单.pdf', mimeType: 'application/pdf', buffer: Buffer.from('AX02') })
+      const draftSaved = page.waitForResponse(response => response.url().endsWith('/api/commands/owner-documents') && response.request().method() === 'POST')
+      await page.getByRole('button', { name: '保存草稿', exact: true }).click()
+      const draftResponse = await draftSaved
+      expect(draftResponse.ok(), await draftResponse.text()).toBe(true)
+      const draft = await draftResponse.json() as { id: string }
+      await page.goto(`/subcontract/settlement/${draft.id}?origin=real`)
+      await expect(page.getByRole('group', { name: '累计已确认结算', exact: true })).toContainText('¥0.00')
+      await page.getByTestId('subcontract-settlement-edit').click()
+      await expect(page.getByTestId('owner-document-totalAmount')).toHaveValue('18000')
+      await page.getByTestId('owner-document-totalAmount').fill('28000')
       const saved = page.waitForResponse(response => response.url().endsWith('/api/commands/owner-documents') && response.request().method() === 'POST')
       await page.getByRole('group', { name: '表单操作' }).getByRole('button', { name: '保存并确认' }).click()
       await page.getByRole('dialog').getByRole('button', { name: '确认', exact: true }).click()
       const response = await saved
       expect(response.ok(), await response.text()).toBe(true)
       const { id } = await response.json()
+      expect(id).toBe(draft.id)
       await page.goto('/subcontract/settlement?status=confirmed&search=FBJS-E2E-328&pageSize=10')
       for (const title of ['奖罚抵扣', '本次结算净额', '累计申请付款', '剩余可申请', '累计已付', '剩余未付']) {
         await expect(page.getByRole('columnheader', { name: title, exact: true })).toHaveCount(1)
@@ -432,9 +464,11 @@ test.describe('分包结算', () => {
       await link.click()
       await expect(page.getByRole('heading', { name: 'E2E 八月劳务结算' })).toBeVisible()
       await expect(page.getByRole('group', { name: '含税结算额' })).toContainText('¥28,000.00')
+      await expect(page.getByRole('group', { name: '累计已确认结算', exact: true })).toContainText('¥28,000.00')
       await expect(page.getByTestId('subcontract-settlement-edit')).toHaveCount(0)
       await page.reload()
       await expect(page.getByText('结算确认单.pdf')).toBeVisible()
+      await expect(page.getByRole('group', { name: '累计已确认结算', exact: true })).toContainText('¥28,000.00')
       await page.getByRole('link', { name: '返回分包结算列表' }).click()
       await expect(link).toBeFocused()
       await expect(page.getByRole('searchbox', { name: '搜索结算编号 / 名称 / 分供方' })).toHaveValue('FBJS-E2E-328')
@@ -443,6 +477,7 @@ test.describe('分包结算', () => {
       await page.getByText('来源单据', { exact: true }).locator('..').getByRole('link').click()
       await expect(page).toHaveURL(/tab=settlements/)
       await expect(page.getByRole('link', { name: 'E2E 八月劳务结算' })).toBeFocused()
+      await expect(page.getByRole('row').filter({ hasText: 'E2E 八月劳务结算' })).toContainText('28,000.00')
       await page.getByRole('link', { name: '返回来源详情' }).click()
       await expect(page).toHaveURL(new RegExp(`/subcontract/settlement/${id}`))
 

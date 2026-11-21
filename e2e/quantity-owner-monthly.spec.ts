@@ -89,7 +89,7 @@ test('当前清单、中央完工与甲方月报经真实 HTTP 联通，三量�
   expect(await read(`/api/commands/owner-documents/owner_report/${report.id}/form`, {})).toEqual(before)
 })
 
-test('月报实际表单切换基准可取消或重算，缺量保留待核对，五档视口提交后冻结快照', async ({ page, request }) => {
+test('甲方月报换基准、申报冻结并逐行审定，刷新列表回读差额', async ({ page, request }) => {
   test.setTimeout(150_000)
   const { headers, boq, monthlyQuery, template, read, execute } = await setupMonthly(request)
   await page.setExtraHTTPHeaders(headers)
@@ -160,4 +160,31 @@ test('月报实际表单切换基准可取消或重算，缺量保留待核对�
   await expect(page.getByTestId('owner-commercial-document-detail')).toContainText('月报合成经办')
   await page.reload()
   await expect(page.getByRole('group', { name: '申报金额', exact: true })).toContainText('312.00')
+  await page.getByRole('button', { name: '处理流转', exact: true }).click()
+  await page.getByRole('spinbutton', { name: '审定量', exact: true }).fill('4')
+  const audited = page.waitForResponse(response => response.url().endsWith('/api/commands/owner-documents')
+    && response.request().method() === 'POST' && response.request().postDataJSON().action === 'audit')
+  await page.getByRole('button', { name: '确认审定', exact: true }).click()
+  await page.getByRole('dialog', { name: '确认甲方审定' }).getByRole('button', { name: '确认审定', exact: true }).click()
+  const auditResponse = await audited
+  expect(auditResponse.ok(), await auditResponse.text()).toBe(true)
+  expect(await auditResponse.json()).toMatchObject({ id: report.id })
+  const after = await read(`/api/commands/owner-documents/owner_report/${report.id}/form`, {})
+  expect(after.draft).toMatchObject({
+    reportedAmount: 312,
+    auditedAmount: 208,
+    lines: [expect.objectContaining({ boqLineId: boq.id, autoQty: 6, reportedQty: 6, auditedQty: 4 })],
+  })
+  await page.goto(`/owner/report/${report.id}?origin=real`)
+  await expect(page.getByRole('group', { name: '申报金额', exact: true })).toContainText('312.00')
+  await expect(page.getByRole('group', { name: '审定金额', exact: true })).toContainText('208.00')
+  await expect(page.getByRole('group', { name: '审定差额', exact: true })).toContainText('¥-104.00')
+  await page.goto(`/owner/report?origin=real&projectId=${monthlyQuery.projectId}&status=audited`)
+  const reportLink = page.locator(`a[href^="/owner/report/${report.id}?"]`)
+  await expect(reportLink).toBeVisible()
+  const auditedRow = page.getByRole('row').filter({ has: page.getByRole('cell', { name: '已审定', exact: true }) })
+  await expect(auditedRow).toContainText('208.00')
+  await expect(auditedRow).toContainText('-104.00')
+  await reportLink.click()
+  await expect(page.getByRole('group', { name: '审定金额', exact: true })).toContainText('208.00')
 })

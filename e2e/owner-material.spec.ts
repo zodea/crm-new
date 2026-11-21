@@ -115,7 +115,7 @@ test.describe('Issue #200 甲供材页面', () => {
   }
 
   for (const input of OWNER_INPUTS) {
-    test(`${input.label} 总控、下料、到货、领用与直入直出按真实甲方关系贯通派生量`, async ({ page }) => {
+    test(`${input.label} 甲供材五页贯通，删除并撤回直入直出后重算派生量`, async ({ page }) => {
       test.setTimeout(180_000)
       await installOwnerFixture(page, input)
       const material = input.material
@@ -183,13 +183,36 @@ test.describe('Issue #200 甲供材页面', () => {
       await expect(page).not.toHaveURL(/\/owner-material\/direct\/new$/)
       await expect(page).toHaveURL(/\/owner-material\/direct\/[^/?]+$/)
       await expect(page.getByText('已生效', { exact: true })).toBeVisible()
+      const directPath = new URL(page.url()).pathname
 
-      await page.goto(`/owner-material/control/${controlId}`)
-      await expect(page.getByTestId('material-controlQty')).toHaveValue(input.control)
-      await expect(page.getByTestId('material-arrivedQty')).toHaveText(input.arrived)
-      await expect(page.getByTestId('material-usedQty')).toHaveText(input.used)
-      await expect(page.getByTestId('material-remainingQty')).toHaveText(input.remaining)
-      await expect(page.getByTestId('material-stockQty')).toHaveText(input.stock)
+      const readTotals = async (target: Page, arrived: string, used: string, remaining: string) => {
+        await expect(target.getByTestId('material-controlQty')).toHaveValue(input.control)
+        await expect(target.getByTestId('material-arrivedQty')).toHaveText(arrived)
+        await expect(target.getByTestId('material-usedQty')).toHaveText(used)
+        await expect(target.getByTestId('material-remainingQty')).toHaveText(remaining)
+        await expect(target.getByTestId('material-stockQty')).toHaveText(input.stock)
+      }
+
+      const controlPage = await page.context().newPage()
+      await controlPage.goto(`/owner-material/control/${controlId}`)
+      await readTotals(controlPage, input.arrived, input.used, input.remaining)
+      await page.goto('/owner-material/direct')
+      const directRow = page.getByRole('row').filter({ has: page.getByRole('cell', { name: input.project, exact: true }) })
+      await expect(directRow).toHaveCount(1)
+      await page.getByRole('button', { name: '删除', exact: true }).click({ timeout: 15_000 })
+      await page.getByRole('dialog', { name: '删除甲供材直入直出' }).getByRole('button', { name: '删除', exact: true }).click()
+      await expect(directRow).toHaveCount(0)
+      await controlPage.reload()
+      await readTotals(controlPage, input.arrival, input.use, String(Number(input.control) - Number(input.use)))
+      await page.getByRole('button', { name: '撤回', exact: true }).click()
+      await expect(directRow).toBeVisible()
+      await page.reload()
+      await page.getByRole('button', { name: material, exact: true }).click()
+      await expect(page).toHaveURL(new RegExp(`${directPath}$`))
+      await expect(page.getByTestId('material-qty')).toHaveValue(input.direct)
+      await controlPage.reload()
+      await readTotals(controlPage, input.arrived, input.used, input.remaining)
+      await controlPage.close()
     })
 
     test(`${input.label} 阻断非项目甲方、超总控到货和超总控余量的业务动作`, async ({ page }) => {

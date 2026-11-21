@@ -310,6 +310,74 @@ test.describe('验收保修', () => {
       await expect(page.getByRole('link', { name: 'YS-2026-324' })).toBeFocused()
     })
 
+    test('上报验收、确认验收并进入保修后，两张列表回读同一单据及附件审计', async ({ page }) => {
+      test.setTimeout(120_000)
+      const no = 'YS-E2E-LIFECYCLE'
+      await page.goto('/owner/acceptance/new')
+      await page.getByTestId('owner-document-no').fill(no)
+      await page.getByTestId('owner-document-name').fill('合成验收保修闭环')
+      for (const [label, value] of [['检索项目', '中央正式施工项目'], ['检索施工合同', '既有中央施工合同']] as const) {
+        await page.getByRole('combobox', { name: label, exact: true }).fill(value)
+        await page.getByRole('option').filter({ hasText: value }).first().click()
+      }
+      await page.getByTestId('finance-attachment-input').setInputFiles({ name: '合成验收报告.pdf', mimeType: 'application/pdf', buffer: Buffer.from(cooperationPdfFixture('Acceptance report')) })
+      await expect(page.getByRole('textbox', { name: '附件分类' })).toHaveValue('acceptance-report')
+
+      const submitted = page.waitForResponse(response => response.url().endsWith('/api/commands/owner-documents')
+        && response.request().method() === 'POST' && response.request().postDataJSON().action === 'submit')
+      await page.getByRole('button', { name: '保存并提交', exact: true }).click()
+      await page.getByRole('dialog', { name: '提交' }).getByRole('button', { name: '提交', exact: true }).click()
+      const submittedResponse = await submitted
+      expect(submittedResponse.ok(), await submittedResponse.text()).toBe(true)
+      const { id } = await submittedResponse.json() as { id: string }
+      const detailPath = `/owner/acceptance/${id}`
+      const transition = async (label: string, target: 'accepted' | 'warranty') => {
+        const changed = page.waitForResponse((response) => {
+          const request = response.request()
+          if (!response.url().endsWith('/api/commands/owner-documents') || request.method() !== 'POST')
+            return false
+          const body = request.postDataJSON()
+          return body.action === 'transition-acceptance' && body.target === target
+        })
+        await page.getByRole('button', { name: label, exact: true }).click()
+        await page.getByRole('dialog', { name: label }).getByRole('button', { name: label, exact: true }).click()
+        const response = await changed
+        expect(response.ok(), await response.text()).toBe(true)
+        expect(await response.json()).toMatchObject({ id })
+        await expect(page.getByTestId('owner-acceptance-detail')).toBeVisible()
+      }
+
+      await page.goto(`${detailPath}?origin=real`)
+      await page.getByTestId('owner-acceptance-process').click()
+      await page.getByTestId('owner-document-acceptanceOrganization').fill('合成验收组')
+      await page.getByTestId('owner-document-acceptancePerson').fill('合成经办人')
+      await page.getByTestId('owner-document-acceptanceDate').fill('2026-09-01')
+      await page.getByTestId('owner-document-acceptanceConclusion').fill('验收合格')
+      await transition('确认验收', 'accepted')
+
+      await page.getByTestId('owner-acceptance-process').click()
+      await page.getByTestId('owner-document-warrantyOwner').fill('合成保修单位')
+      await page.getByTestId('owner-document-warrantyStartDate').fill('2026-09-02')
+      await page.getByTestId('owner-document-warrantyEndDate').fill('2028-09-01')
+      await page.getByTestId('finance-attachment-input').setInputFiles({ name: '合成保修凭据.pdf', mimeType: 'application/pdf', buffer: Buffer.from(cooperationPdfFixture('Warranty evidence')) })
+      await expect(page.getByRole('textbox', { name: '附件分类' })).toHaveValue('warranty-confirmation')
+      await transition('进入保修', 'warranty')
+
+      for (const variant of ['acceptance', 'warranty']) {
+        await page.goto(`/owner/acceptance?origin=real&variant=${variant}`)
+        const link = page.getByRole('link', { name: no, exact: true })
+        await expect(link).toBeVisible()
+        await link.click()
+        await expect(page).toHaveURL(new RegExp(`${detailPath}\\?`))
+        const filename = variant === 'acceptance' ? '合成验收报告.pdf' : '合成保修凭据.pdf'
+        await expect(page.getByText(filename, { exact: true })).toBeVisible()
+        const timeline = page.getByRole('list', { name: '验收生命周期审计记录' })
+        await expect(timeline).toContainText('提交验收')
+        await expect(timeline).toContainText('确认验收')
+        await expect(timeline).toContainText('进入保修')
+      }
+    })
+
     test('保修到期只经显式生命周期命令追加审计并锁定终态', async ({ page }) => {
       await page.goto('/owner/acceptance/acceptance-real-324?origin=real&variant=warranty')
       await expect(page.getByTestId('owner-acceptance-detail')).toBeVisible({ timeout: 20_000 })
@@ -439,7 +507,7 @@ test.describe('最终结算', () => {
       { label: '尚有收款差额', amount: '1250000', formatted: '¥1,250,000.00', gap: '350,000.00', date: '2026-09-12' },
       { label: '收款差额为零与闰日', amount: '900000', formatted: '¥900,000.00', gap: '0.00', date: '2028-02-29' },
     ]) {
-      test(`正式整页表单只经中央命令提交，刷新仍可读真实聚合与附件：${input.label}`, async ({ page }) => {
+      test(`最终结算草稿更正后提交，列表和合同回读金额与附件：${input.label}`, async ({ page }) => {
         await page.goto('/owner/final-settlement/new')
         await expect(page.getByRole('heading', { name: '新建 · 最终结算' })).toBeVisible({ timeout: 20_000 })
         await page.getByTestId('owner-document-name').fill('E2E 甲方最终结算')
@@ -447,9 +515,8 @@ test.describe('最终结算', () => {
         await chooseLookup(page, '检索施工合同', '既有中央施工合同')
         await expect(page.getByTestId('owner-document-changedContractAmount')).toContainText('1,040,000.00')
         await expect(page.getByTestId('owner-document-receivedAmount')).toContainText('900,000.00')
-        await page.getByTestId('owner-document-settlementAmount').fill(input.amount)
+        await page.getByTestId('owner-document-settlementAmount').fill('1000000')
         await page.getByTestId('owner-document-submissionDate').fill(input.date)
-        await expect(page.getByTestId('owner-document-settlementReceiptGap')).toContainText(input.gap)
         await page.getByTestId('owner-document-basis').fill('施工合同、已确认补充协议与结算书')
         await page.getByTestId('owner-document-differenceNote').fill('审定事实待甲方回传')
         await page.getByTestId('finance-attachment-input').setInputFiles({
@@ -458,22 +525,40 @@ test.describe('最终结算', () => {
           buffer: Buffer.from(cooperationPdfFixture('Synthetic final settlement')),
         })
 
+        const saved = page.waitForResponse(response => response.url().endsWith('/api/commands/owner-documents') && response.request().method() === 'POST')
+        await page.getByRole('button', { name: '保存草稿', exact: true }).click()
+        const savedResponse = await saved
+        expect(savedResponse.ok(), await savedResponse.text()).toBe(true)
+        const draft = await savedResponse.json() as { id: string }
+        await page.goto(`/owner/final-settlement/${draft.id}?origin=real`)
+        await page.getByTestId('final-settlement-edit').click()
+        await expect(page.getByTestId('owner-document-settlementAmount')).toHaveValue('1000000')
+        await page.getByTestId('owner-document-settlementAmount').fill(input.amount)
+        await expect(page.getByTestId('owner-document-settlementReceiptGap')).toContainText(input.gap)
         await page.getByRole('group', { name: '表单操作' }).getByRole('button', { name: '保存并提交' }).click()
         const command = page.waitForResponse(response => response.url().endsWith('/api/commands/owner-documents') && response.request().method() === 'POST')
         await page.getByRole('dialog', { name: '提交' }).getByRole('button', { name: '提交', exact: true }).click()
         const response = await command
         expect(response.ok(), await response.text()).toBe(true)
         const body = await response.json() as { id: string }
+        expect(body.id).toBe(draft.id)
 
         await expect(page).toHaveURL('/owner/final-settlement')
-        await page.goto(`/owner/final-settlement/${body.id}?origin=real`)
+        await page.goto('/owner/final-settlement?origin=real&search=E2E')
+        const entry = page.locator(`a[href^="/owner/final-settlement/${body.id}?"]`).first()
+        await expect(page.getByRole('row').filter({ has: entry })).toContainText(input.formatted)
+        await entry.click()
         await expect(page.getByRole('heading', { name: 'E2E 甲方最终结算' })).toBeVisible({ timeout: 20_000 })
         await expect(page.getByRole('group', { name: '报审金额' })).toContainText(input.formatted)
         await expect(page.getByRole('group', { name: '审定金额' })).toContainText('未记录')
+        await expect(page.getByRole('group', { name: '结算收款差额', exact: true }).getByText(`¥${input.gap}`, { exact: true })).toBeVisible()
         await expect(page.getByText('e2e-甲方最终结算书.pdf')).toBeVisible()
         await expect(page.getByTestId('final-settlement-edit')).toHaveCount(0)
         await page.reload()
         await expect(page.getByRole('heading', { name: 'E2E 甲方最终结算' })).toBeVisible()
+        await page.goto('/contract/construction-contract-existing-320?origin=real&contractKind=construction&tab=settlements')
+        const contractRow = page.getByRole('row').filter({ hasText: 'E2E 甲方最终结算' })
+        await expect(contractRow).toContainText(input.formatted)
       })
     }
 
@@ -564,31 +649,46 @@ test.describe('甲方罚扣', () => {
       await expect(page.getByRole('link', { name: 'FK-2026-326' })).toBeFocused()
     })
 
-    test('正式整页表单经中央命令提交，详情与刷新保留罚扣事实和附件', async ({ page }) => {
+    test('甲方罚扣草稿更正后提交，列表、合同与详情回读罚扣事实和附件', async ({ page }) => {
       await page.goto('/owner/penalty/new')
       await expect(page.getByRole('heading', { name: '新建 · 甲方罚扣单' })).toBeVisible({ timeout: 20_000 })
       await chooseLookup(page, '检索项目', '中央正式施工项目')
       await chooseLookup(page, '检索施工合同', '既有中央施工合同')
       await page.getByTestId('owner-document-noticeNo').fill('LX-E2E-326')
-      await page.getByTestId('owner-document-amount').fill('26800')
+      await page.getByTestId('owner-document-amount').fill('16800')
       await page.getByTestId('owner-document-penaltyDate').fill('2026-08-26')
       await page.getByTestId('owner-document-reason').fill('E2E 现场进度罚扣')
-      await page.getByTestId('owner-document-appealNote').fill('已提交现场签证与工期顺延证据')
+      await page.getByTestId('owner-document-appealNote').fill('拟补充现场签证证据')
       await page.getByTestId('finance-attachment-input').setInputFiles({
         name: 'e2e-甲方联系单.pdf',
         mimeType: 'application/pdf',
         buffer: Buffer.from('issue-326-owner-penalty'),
       })
 
+      const saved = page.waitForResponse(response => response.url().endsWith('/api/commands/owner-documents') && response.request().method() === 'POST')
+      await page.getByRole('button', { name: '保存草稿', exact: true }).click()
+      const savedResponse = await saved
+      expect(savedResponse.ok(), await savedResponse.text()).toBe(true)
+      const draft = await savedResponse.json() as { id: string }
+      await page.goto(`/owner/penalty/${draft.id}?origin=real`)
+      await page.getByTestId('owner-penalty-edit').click()
+      await expect(page.getByTestId('owner-document-amount')).toHaveValue('16800')
+      await expect(page.getByTestId('owner-document-appealNote')).toHaveValue('拟补充现场签证证据')
+      await page.getByTestId('owner-document-amount').fill('26800')
+      await page.getByTestId('owner-document-appealNote').fill('已提交现场签证与工期顺延证据')
       await page.getByRole('group', { name: '表单操作' }).getByRole('button', { name: '保存并提交' }).click()
       const command = page.waitForResponse(response => response.url().endsWith('/api/commands/owner-documents') && response.request().method() === 'POST')
       await page.getByRole('dialog', { name: '提交' }).getByRole('button', { name: '提交', exact: true }).click()
       const response = await command
       expect(response.ok(), await response.text()).toBe(true)
       const body = await response.json() as { id: string }
+      expect(body.id).toBe(draft.id)
 
-      await expect(page).toHaveURL('/owner/penalty')
-      await page.goto(`/owner/penalty/${body.id}?origin=real`)
+      await expect(page.getByRole('heading', { name: 'E2E 现场进度罚扣' })).toBeVisible()
+      await page.goto('/owner/penalty?origin=real&search=LX-E2E-326')
+      const entry = page.locator(`a[href^="/owner/penalty/${body.id}?"]`).first()
+      await expect(page.getByRole('row').filter({ has: entry })).toContainText('26,800.00')
+      await entry.click()
       await expect(page.getByRole('heading', { name: 'E2E 现场进度罚扣' })).toBeVisible({ timeout: 20_000 })
       await expect(page.getByRole('group', { name: '罚扣金额' })).toContainText('-¥26,800.00')
       await expect(page.getByText('LX-E2E-326')).toBeVisible()
@@ -597,9 +697,12 @@ test.describe('甲方罚扣', () => {
       await expect(page.getByTestId('owner-penalty-edit')).toHaveCount(0)
       await page.reload()
       await expect(page.getByRole('heading', { name: 'E2E 现场进度罚扣' })).toBeVisible()
+      await page.goto('/contract/construction-contract-existing-320?origin=real&contractKind=construction&tab=settlements')
+      await expect(page.getByRole('row').filter({ hasText: 'E2E 现场进度罚扣' })).toContainText('26,800.00')
     })
 
-    test('草稿罚扣显式编辑取消后恢复原详情与施工合同来源', async ({ page }) => {
+    test('草稿罚扣编辑取消保留来源，正式删除命令后列表及汇总同步', async ({ page }, testInfo) => {
+      test.setTimeout(60_000)
       await page.goto('/owner/penalty/new')
       await expect(page.getByRole('heading', { name: '新建 · 甲方罚扣单' })).toBeVisible({ timeout: 20_000 })
       await chooseLookup(page, '检索项目', '中央正式施工项目')
@@ -613,10 +716,11 @@ test.describe('甲方罚扣', () => {
       await page.getByRole('group', { name: '表单操作' }).getByRole('button', { name: '保存草稿' }).click()
       const response = await command
       expect(response.ok(), await response.text()).toBe(true)
-      const body = await response.json() as { id: string }
+      const body = await response.json() as { id: string, version: string }
       await expect(page).toHaveURL(new RegExp(`/owner/penalty/form/${body.id}`))
 
-      const source = `/contract/construction-contract-existing-320?origin=real&contractKind=construction&tab=settlements&focus=${body.id}`
+      const contractPath = '/contract/construction-contract-existing-320?origin=real&contractKind=construction&tab=settlements'
+      const source = `${contractPath}&focus=${body.id}`
       await page.goto(`/owner/penalty/${body.id}?origin=real&returnTo=${encodeURIComponent(source)}`)
       await expect(page.getByRole('heading', { name: 'E2E 草稿罚扣' })).toBeVisible({ timeout: 20_000 })
       await page.getByTestId('owner-penalty-edit').click()
@@ -628,6 +732,31 @@ test.describe('甲方罚扣', () => {
       await page.getByRole('link', { name: '返回来源详情' }).click()
       await expect(page).toHaveURL(source)
       await expect(page.getByRole('link', { name: 'E2E 草稿罚扣' })).toBeFocused()
+
+      await page.goto('/owner/penalty?origin=real&search=LX-DRAFT-326')
+      const row = page.getByRole('row').filter({ has: page.locator(`a[href^="/owner/penalty/${body.id}?"]`) })
+      await expect(row).toContainText('16,800.00')
+      const summary = page.locator('[data-ui="owner-document-summary"]')
+      await expect(summary).toContainText('16,800.00')
+      await row.getByRole('button', { name: /操作$/ }).click()
+      const menu = page.getByRole('menu', { name: /甲方罚扣单操作$/ })
+      await expect(menu.getByRole('menuitem', { name: '查看详情' })).toBeVisible()
+      await expect(menu.getByRole('menuitem', { name: '删除', exact: true })).toHaveCount(0)
+      const { workspaceId, actorId, requiredCapability } = response.request().postDataJSON()
+      const deletion = await page.request.post('/api/commands/owner-documents', {
+        headers: { 'x-ruihang-test-session': session(testInfo) },
+        data: { workspaceId, actorId, requiredCapability, kind: 'owner_penalty', action: 'delete', commandId: `delete-${body.id}`, id: body.id, baseVersion: body.version },
+      })
+      expect(deletion.ok(), await deletion.text()).toBe(true)
+      expect(await deletion.json()).toMatchObject({ id: body.id, deleted: true })
+      await page.reload()
+      await expect(page.getByRole('status', { name: '没有符合条件的甲方罚扣单', exact: true })).toBeVisible()
+      await expect(row).toHaveCount(0)
+      await expect(summary.getByText('0', { exact: true })).toBeVisible()
+      await expect(summary.getByText('¥0.00', { exact: true })).toBeVisible()
+      await page.goto(contractPath)
+      await expect(page.getByRole('link', { name: '施工进度延误', exact: true })).toBeVisible()
+      await expect(page.getByRole('link', { name: 'E2E 草稿罚扣' })).toHaveCount(0)
     })
 
     test('空列表、无权限与错类型稳定 ID 分别呈现可测试状态', async ({ page }, testInfo) => {

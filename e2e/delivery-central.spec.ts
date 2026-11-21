@@ -85,7 +85,7 @@ async function waitForPdfPaint(preview: Locator) {
   await preview.page().evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))
 }
 
-test('两页真实 PDF 经人工核对形成共享原件的两张逻辑记录，刷新修订下载与五档界面保持同源', async ({ page }, info) => {
+test('两页送货归档、修订、删除撤回与价格来源保持同一原件和逻辑记录', async ({ page }, info) => {
   test.setTimeout(180_000)
   const errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
@@ -282,6 +282,48 @@ test('两页真实 PDF 经人工核对形成共享原件的两张逻辑记录，
   await printQueue.getByRole('button', { name: '排除打印', exact: true }).click()
   await page.getByRole('dialog').getByRole('button', { name: '排除打印', exact: true }).click()
   await expect.poll(async () => (await records(page)).every(record => record.printDisposition === 'excluded' && record.printedAt === '')).toBe(true)
+
+  const pricePage = await page.context().newPage()
+  await pricePage.goto('/material/price?origin=real')
+  const priceSearch = pricePage.getByRole('searchbox', { name: '搜索材料名称、规格或单位' })
+  await priceSearch.fill('水泥')
+  await expect(pricePage.getByRole('option', { name: /复核水泥/ })).toBeVisible()
+  await expect(pricePage.getByRole('option', { name: /水泥2/ })).toBeVisible()
+
+  await page.goto('/material/delivery/archive?origin=real')
+  const revisedLink = page.getByRole('link', { name: first.orderNo, exact: true })
+  await revisedLink.click()
+  await page.getByRole('button', { name: '删除', exact: true }).click()
+  await page.getByRole('dialog', { name: '删除送货单' }).getByRole('button', { name: '删除', exact: true }).click()
+  await expect(page.getByRole('link', { name: second.orderNo, exact: true })).toBeVisible()
+  await expect(revisedLink).toHaveCount(0)
+  await pricePage.reload()
+  await priceSearch.fill('水泥')
+  await expect(pricePage.getByRole('option', { name: /水泥2/ })).toBeVisible()
+  await expect(pricePage.getByRole('option', { name: /复核水泥/ })).toHaveCount(0)
+  await page.getByRole('button', { name: '撤回', exact: true }).click()
+  await expect(revisedLink).toBeVisible()
+  await pricePage.reload()
+  await priceSearch.fill('水泥')
+  await pricePage.getByRole('option', { name: /复核水泥/ }).click()
+  await pricePage.getByText(/查看全部 \d+ 个价格来源/).click()
+  await expect(pricePage.locator('details').getByRole('link', { name: new RegExp(first.orderNo) })).toHaveAttribute('href', `/material/delivery/archive/${first.id}?origin=real`)
+  await pricePage.close()
+
+  await page.reload()
+  await revisedLink.click()
+  await expect(page.getByText('复核水泥', { exact: true }).first()).toBeVisible()
+  const restored = (await records(page)).find(record => record.id === first.id)
+  expect(restored).toMatchObject({ id: revised.id, assetId: revised.assetId, deliveryDate: revised.deliveryDate, lines: revised.lines })
+  await page.getByRole('button', { name: '查看修订历史' }).click()
+  await history.getByRole('button', { name: `版本 ${revised.version} · 字段与明细修订`, exact: true }).click()
+  await expect(history).toContainText('核对原件后修正日期和材料名称')
+  await history.getByRole('button', { name: '修改前', exact: true }).click()
+  await expect(history.getByText('水泥1', { exact: true })).toBeVisible()
+  await page.goto(`/material/delivery/archive/${second.id}?origin=real`)
+  const siblingOriginal = page.waitForEvent('download')
+  await page.getByRole('button', { name: '下载原件', exact: true }).click()
+  expect(await bytes(await siblingOriginal)).toEqual(original)
   expect(errors).toEqual([])
 })
 

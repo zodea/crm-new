@@ -97,7 +97,7 @@
 | [e2e/quantity-import.spec.ts](../../../e2e/quantity-import.spec.ts) | Playwright E2E | 三类实际 CSV 经中央导入：零与未知、唯一责任、缺照拒绝和草稿反馈 |
 | [e2e/quantity-matrix.spec.ts](../../../e2e/quantity-matrix.spec.ts) | Playwright E2E | Issue #103 Slice 2：只读工程量矩阵 |
 | [e2e/quantity-migration.spec.ts](../../../e2e/quantity-migration.spec.ts) | Playwright E2E | 工程量真实SQLite十五表经HTTP迁移，更正与独立新增保留，回滚撤下原批次事实 |
-| [e2e/quantity-owner-monthly.spec.ts](../../../e2e/quantity-owner-monthly.spec.ts) | Playwright E2E | 当前清单、中央完工与甲方月报经真实 HTTP 联通，三量不回退且已提交快照不漂移 |
+| [e2e/quantity-owner-monthly.spec.ts](../../../e2e/quantity-owner-monthly.spec.ts) | Playwright E2E | 当前清单、中央完工与甲方月报经真实 HTTP 联通；月报申报冻结并逐行审定，列表与详情回读同一单据的结果 |
 | [e2e/quantity-stages.spec.ts](../../../e2e/quantity-stages.spec.ts) | Playwright E2E | 中央新项目建立两个阶段，显式报量逐项保存不丢草稿，五档可操作且取消归档修改保留输入 |
 | [e2e/quantity-template.spec.ts](../../../e2e/quantity-template.spec.ts) | Playwright E2E | Issue #103 Slice 3：户型模板活链接与三量 |
 | [e2e/quantity-totals.spec.ts](../../../e2e/quantity-totals.spec.ts) | Playwright E2E | Issue #440 工程量三量合计与真实导出 |

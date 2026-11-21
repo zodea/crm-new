@@ -49,8 +49,8 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
-| [e2e/owner-document-readonly.spec.ts](../../../e2e/owner-document-readonly.spec.ts) | Playwright E2E | Issue #283：甲方六类单据专属只读详情与双视图；Issue #323：甲方变洽签与月度报量专属中央详情；Issue #324：验收—保修 canonical 双视图；Issue #325：甲方最终结算专属只读链；Issue #326：甲方罚扣专属只读链 |
-| [e2e/subcontract-documents.spec.ts](../../../e2e/subcontract-documents.spec.ts) | Playwright E2E | Issue #327：分包变洽签专属只读链；AX02 分包结算中央只读链 |
+| [e2e/owner-document-readonly.spec.ts](../../../e2e/owner-document-readonly.spec.ts) | Playwright E2E | #283 甲方单据详情与双视图；#323 变洽签与月度报量详情；#324 验收提交、确认和进入保修，双视图回读同一单据、分类附件及审计；#325 最终结算草稿更正并提交，回读收款差额；#326 罚扣草稿更正、申诉、提交及删除草稿后的汇总 |
+| [e2e/subcontract-documents.spec.ts](../../../e2e/subcontract-documents.spec.ts) | Playwright E2E | #327 分包变洽签草稿更正后提交，列表和合同回读；AX02 分包结算确认后仅计入一次累计，跨列表、合同和项目回读 |
 | [e2e/issue-329-project-penalty.spec.ts](../../../e2e/issue-329-project-penalty.spec.ts) | Playwright E2E | AX03 项目罚扣真实结算抵扣 |
 | [e2e/owner-document-forms.spec.ts](../../../e2e/owner-document-forms.spec.ts) | Playwright E2E | Issue #197：甲方、分包单据与项目罚扣 |
 | [e2e/owner-document-lists.spec.ts](../../../e2e/owner-document-lists.spec.ts) | Playwright E2E | ${width}px 单据列表 |
