@@ -23,7 +23,7 @@ it('表格只转换已映射列，保留缺省、显式零及可调整的百分�
 
 it('预览重复、明确替换并保持未映射字段，变更后拒绝旧版本', async () => {
   const service = createCrewWorkerCommandService({ createId: () => 'synthetic-crew' })
-  const original = { name: '合成班组', trade: '泥工', note: '原备注', defaultPayRatio: null, rentSubsidyEnabled: true, rentSubsidyPrice: 0 }
+  const original = { name: '合成班组', trade: '泥工', note: '原备注', defaultPayRatio: null, rentSubsidyEnabled: false, rentSubsidyPrice: 0 }
   const initial = service.previewCrewExcel([original], actor)[0]!
   await service.importCrewExcel(command('crew-initial', original, { kind: 'create', fingerprint: initial.fingerprint }), actor)
   const change = { name: '合成班组', note: '新备注' }
@@ -31,7 +31,7 @@ it('预览重复、明确替换并保持未映射字段，变更后拒绝旧版�
   expect(preview.candidates).toMatchObject([{ id: 'synthetic-crew', version: '1', fields: { note: '原备注' } }])
   const decision = { kind: 'replace', fingerprint: preview.fingerprint, id: 'synthetic-crew', version: '1' }
   const applied = await service.importCrewExcel(command('crew-replace', change, decision), actor)
-  expect(service.crewForm(applied.id, actor).draft).toMatchObject({ trade: '泥工', note: '新备注', defaultPayRatio: null, rentSubsidyEnabled: true, rentSubsidyPrice: 0 })
+  expect(service.crewForm(applied.id, actor).draft).toMatchObject({ trade: '泥工', note: '新备注', defaultPayRatio: null, rentSubsidyEnabled: false, rentSubsidyPrice: 0 })
   expect(await service.importCrewExcel(command('crew-replace', change, decision), actor)).toEqual(applied)
   await expect(service.importCrewExcel(command('crew-replace', { ...change, note: '试图修改原命令' }, decision), actor)).rejects.toThrow('同一命令编号')
   await expect(service.importCrewExcel(command('crew-stale', change, decision), actor)).rejects.toThrow('重新预览')

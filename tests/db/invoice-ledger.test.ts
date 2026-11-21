@@ -1,9 +1,9 @@
-import type { createMemoryDb } from '../helpers/memory-db'
 // 发票归档归属 + §4.2 台账聚合口径回归（issue #57）。
 // 权威口径：DATABASE.md §4.2（进项票额/税额 = SUM(amount/tax_amount) WHERE project_id=? AND
 // account_status='archived'）+ ADR-0001 归属铁律（无归属禁止归档）。
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, onTestFinished } from 'vitest'
 import { checkArchiveOwnership, checkInvoiceArchiveReady, checkNotDuplicate, checkReviewed } from '~/lib/invoice/archive'
+import { loadArchivedInvoiceAggregates } from '~/lib/project/detail-aggregate'
 import { createMigratedMemoryDb } from '../helpers/memory-db'
 
 describe('checkReviewed:归档前置——未校对一律拒绝(DATABASE.md §2.4「核对完成是归档唯一前置」)', () => {
@@ -117,6 +117,7 @@ describe('#257 票据归档终态门禁与数据守恒', () => {
 describe('§4.2 台账聚合口径:进项票额/税额按 project_id + account_status=archived', () => {
   async function seedInvoices() {
     const db = await createMigratedMemoryDb()
+    onTestFinished(db.close)
     await db.execute(`INSERT INTO projects (id, name) VALUES ('p1', '合和新城'), ('p2', '锦绣华庭')`)
     // p1: 一条已归档(计入) + 一条未归档(none，不计入——account_status 只有 none|archived 两态)
     await db.execute(
@@ -145,45 +146,23 @@ describe('§4.2 台账聚合口径:进项票额/税额按 project_id + account_s
     return db
   }
 
-  async function ledgerSum(db: Awaited<ReturnType<typeof createMemoryDb>>, projectId: string) {
-    const [row] = await db.select<{ amount_sum: number, tax_sum: number }>(
-      `SELECT SUM(amount) AS amount_sum, SUM(tax_amount) AS tax_sum
-       FROM invoices WHERE project_id = ? AND account_status = 'archived'`,
-      [projectId],
-    )
-    return row
-  }
-
-  it('已归档发票按项目正确累加，未归档/其他项目不计入', async () => {
+  it('已归档发票按项目累加，未归档和无项目的个人开支不计入', async () => {
     const db = await seedInvoices()
-    const p1 = await ledgerSum(db, 'p1')
-    expect(p1.amount_sum).toBe(12000) // inv1(10000) + inv3(2000)，inv2(未归档 none)不计入
-    expect(p1.tax_sum).toBe(1560) // 1300 + 260
-
-    const p2 = await ledgerSum(db, 'p2')
-    expect(p2.amount_sum).toBe(8000)
-    expect(p2.tax_sum).toBe(1040)
-    db.close()
+    expect((await loadArchivedInvoiceAggregates(db)).toSorted((a, b) => a.projectId.localeCompare(b.projectId))).toEqual([
+      { projectId: 'p1', inputAmount: 12000, inputTax: 1560, archivedCount: 2 },
+      { projectId: 'p2', inputAmount: 8000, inputTax: 1040, archivedCount: 1 },
+    ])
   })
 
-  it('个人开支(不挂项目)的已归档发票不计入任何项目口径，也不误算进"无项目"查询', async () => {
-    const db = await seedInvoices()
-    const [row] = await db.select<{ n: number }>(
-      `SELECT COUNT(*) AS n FROM invoices WHERE project_id IS NULL AND account_status = 'archived' AND owner_kind = 'personal'`,
-    )
-    expect(row.n).toBe(1)
-    db.close()
-  })
-
-  it('软删除的已归档发票不计入 §4.2 口径(配合软删层可见性口径,此处验证 deleted_at 被过滤)', async () => {
+  it('软删除的已归档发票不计入项目汇总', async () => {
     const db = await seedInvoices()
     await db.execute(`UPDATE invoices SET deleted_at = ? WHERE id = 'inv1'`, ['2026-09-15T00:00:00.000Z'])
-    const [row] = await db.select<{ n: number, amount_sum: number | null }>(
-      `SELECT COUNT(*) AS n, SUM(amount) AS amount_sum
-       FROM invoices WHERE project_id = 'p1' AND account_status = 'archived' AND deleted_at IS NULL`,
-    )
-    expect(row.n).toBe(1)
-    expect(row.amount_sum).toBe(2000) // 只剩 inv3
-    db.close()
+    const result = await loadArchivedInvoiceAggregates(db)
+    expect(result.find(row => row.projectId === 'p1')).toEqual({
+      projectId: 'p1',
+      inputAmount: 2000,
+      inputTax: 260,
+      archivedCount: 1,
+    })
   })
 })

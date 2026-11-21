@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { CrewFormDraft } from '~/lib/master-data/forms'
+import { useId } from 'vue'
 
 const props = defineProps<{
   fieldErrors: Record<string, string>
@@ -10,6 +11,8 @@ const emit = defineEmits<{
 }>()
 
 const draft = defineModel<CrewFormDraft>({ required: true })
+const rentPriceErrorId = useId()
+const managementPriceErrorId = useId()
 
 function fieldClass(field: keyof CrewFormDraft) {
   return props.fieldErrors[field]
@@ -70,24 +73,52 @@ function fieldClass(field: keyof CrewFormDraft) {
       <label class="field-block">
         <span class="field-label">房租补贴</span>
         <span class="flex items-center gap-2">
-          <input v-model="draft.rentSubsidyEnabled" type="checkbox" class="accent-brand">
+          <input v-model="draft.rentSubsidyEnabled" type="checkbox" class="accent-brand" @change="emit('clearError', 'rentSubsidyPrice')">
           <span class="text-12px text-ink-soft">启用</span>
         </span>
       </label>
       <label class="field-block">
-        <span class="field-label">房租补贴单价</span>
-        <input v-model.number="draft.rentSubsidyPrice" data-field="rentSubsidyPrice" type="number" inputmode="decimal" min="0" step="0.01" :disabled="!draft.rentSubsidyEnabled" class="field-input w-full">
+        <span class="field-label">房租补贴单价<span v-if="draft.rentSubsidyEnabled" aria-hidden="true"> *</span></span>
+        <input
+          v-model.number="draft.rentSubsidyPrice"
+          data-field="rentSubsidyPrice"
+          type="number"
+          inputmode="decimal"
+          min="0"
+          step="any"
+          :disabled="!draft.rentSubsidyEnabled"
+          :aria-required="Boolean(draft.rentSubsidyEnabled)"
+          :aria-invalid="Boolean(fieldErrors.rentSubsidyPrice)"
+          :aria-describedby="fieldErrors.rentSubsidyPrice ? rentPriceErrorId : undefined"
+          :class="fieldClass('rentSubsidyPrice')"
+          @input="emit('clearError', 'rentSubsidyPrice')"
+        >
+        <span v-if="fieldErrors.rentSubsidyPrice" :id="rentPriceErrorId" class="field-error">{{ fieldErrors.rentSubsidyPrice }}</span>
       </label>
       <label class="field-block">
         <span class="field-label">管理提成</span>
         <span class="flex items-center gap-2">
-          <input v-model="draft.mgmtFeeEnabled" type="checkbox" class="accent-brand">
+          <input v-model="draft.mgmtFeeEnabled" type="checkbox" class="accent-brand" @change="emit('clearError', 'mgmtFeePrice')">
           <span class="text-12px text-ink-soft">启用</span>
         </span>
       </label>
       <label class="field-block">
-        <span class="field-label">管理提成单价</span>
-        <input v-model.number="draft.mgmtFeePrice" data-field="mgmtFeePrice" type="number" inputmode="decimal" min="0" step="0.01" :disabled="!draft.mgmtFeeEnabled" class="field-input w-full">
+        <span class="field-label">管理提成单价<span v-if="draft.mgmtFeeEnabled" aria-hidden="true"> *</span></span>
+        <input
+          v-model.number="draft.mgmtFeePrice"
+          data-field="mgmtFeePrice"
+          type="number"
+          inputmode="decimal"
+          min="0"
+          step="any"
+          :disabled="!draft.mgmtFeeEnabled"
+          :aria-required="Boolean(draft.mgmtFeeEnabled)"
+          :aria-invalid="Boolean(fieldErrors.mgmtFeePrice)"
+          :aria-describedby="fieldErrors.mgmtFeePrice ? managementPriceErrorId : undefined"
+          :class="fieldClass('mgmtFeePrice')"
+          @input="emit('clearError', 'mgmtFeePrice')"
+        >
+        <span v-if="fieldErrors.mgmtFeePrice" :id="managementPriceErrorId" class="field-error">{{ fieldErrors.mgmtFeePrice }}</span>
       </label>
     </div>
   </section>

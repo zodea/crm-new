@@ -91,7 +91,7 @@ export function verifyBackupOriginalOwner(db: DatabaseSync, row: Record<string, 
   if (row.owner_type === 'invoice_correction') {
     const participant = db.prepare('SELECT schema_version FROM production_participants WHERE domain=\'invoices\'').get()
     const binding = db.prepare('SELECT b.sha256 FROM invoice_correction_files b JOIN invoice_corrections c ON c.id=b.correction_id WHERE b.file_ref_id=? AND c.id=?').get(row.id!, row.owner_id!)
-    if (!participant || Number(participant.schema_version) !== 3 || !binding || row.category !== 'correction-evidence' || row.deleted_at !== null
+    if (!participant || ![3, 4].includes(Number(participant.schema_version)) || !binding || row.category !== 'correction-evidence' || row.deleted_at !== null
       || binding.sha256 !== row.sha256 || verifiedMetadataOnlyFileIds.has(String(row.id))) {
       backupInvalid('发票更正附件与已登记更正单、真实正文或稳定身份不一致。')
     }

@@ -50,6 +50,17 @@ export interface CentralInvoiceImportSource {
   rawSnapshot: Record<string, string | number | boolean | null>
 }
 
+export const RECORD_ORIGINAL_VERIFICATION = 'record-original-verification-candidate' as const
+export const CONFIRM_ORIGINAL_VERIFICATION = 'confirm-original-verification' as const
+
+export interface InvoiceOriginalVerificationRead {
+  candidateId: string
+  source: 'local' | 'cloud'
+  state: 'incomplete' | 'different' | 'ready' | 'confirmed' | 'stale'
+  rows: Array<{ path: string, archived: string | number | null, recognized: string | number | null, result: 'match' | 'missing' | 'different' }>
+  unrecognizedPageIndexes: number[]
+}
+
 interface InvoiceCommandBase {
   workspaceId: string
   actorId: string
@@ -64,6 +75,8 @@ export type CentralInvoiceCommand = InvoiceCommandBase & (
   | { action: 'import', baseVersion: null, fields: CentralInvoiceFields, items: CentralInvoiceItem[], ownerKind: 'project' | 'personal', projectId: string | null, supplierId: string | null, source: CentralInvoiceImportSource, confirmed: true, taxNumbersConfirmed?: true, taxVerification?: InvoiceTaxVerificationSelection }
   | { action: 'import-replace', invoiceId: string, baseVersion: string, fields: CentralInvoiceFields, items: CentralInvoiceItem[], ownerKind: 'project' | 'personal', projectId: string | null, supplierId: string | null, source: CentralInvoiceImportSource, confirmed: true, taxNumbersConfirmed?: true, taxVerification?: InvoiceTaxVerificationSelection }
   | { action: 'attach-original', invoiceId: string, baseVersion: string, original: CentralInvoiceOriginalInput, confirmed: true }
+  | { action: typeof RECORD_ORIGINAL_VERIFICATION, invoiceId: string, baseVersion: string, originalId: string, originalSha256: string, source: 'local' | 'cloud', textPages: string[], unrecognizedPageIndexes: number[] }
+  | { action: typeof CONFIRM_ORIGINAL_VERIFICATION, invoiceId: string, baseVersion: string, originalId: string, originalSha256: string, candidateId: string, confirmed: true }
   | { action: 'link-contract', invoiceId: string, baseVersion: string, contract: InvoiceContractReference | null, confirmed: true }
   | { action: 'confirm-legacy', invoiceId: string, baseVersion: string, confirmed: true }
   | { action: 'recognize', invoiceId: string, baseVersion: string, fields: CentralInvoiceFields, items: CentralInvoiceItem[], source: 'local' | 'cloud', textPages: string[], unrecognizedPageIndexes: number[] }
@@ -82,6 +95,7 @@ export interface CentralInvoiceCommandResult {
   version: string
   updatedAt: string
   originalId: string | null
+  verificationSha256?: string
 }
 
 export interface CentralInvoicePrintCommand extends InvoiceCommandBase {
@@ -115,6 +129,7 @@ export interface CentralInvoiceRecord {
   contract: InvoiceContractReference | null
   archivedAt: string | null
   original: { id: string, fileName: string, fileSize: number, mimeType: string, sha256: string } | null
+  originalVerificationId?: string
   legacy?: { source: 'scan' | 'excel', originalState: 'recorded' | 'legacy-path-unverified' | 'session-original-unavailable' | 'no-original-recorded', ambiguousZeroFields: Array<'amount' | 'tax_amount' | 'total_amount'>, ambiguousItemNumbers: boolean }
   createdAt: string
   updatedAt: string

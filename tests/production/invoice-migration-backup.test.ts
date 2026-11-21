@@ -64,11 +64,11 @@ it('正式登记的发票 owner 备份和隔离恢复保留迁入证据、原回
     await oldStorage.close()
     oldClosed = true
     storage = createProductionStorage(options)
-    expect((await storage.status()).schemaVersion).toBe(32)
+    expect((await storage.status()).schemaVersion).toBe(33)
     expect(await storage.select('SELECT * FROM invoices WHERE id=?', ['legacy-backup'])).toEqual(oldRows)
     expect(await createProductionInvoiceMigration(storage).resolve({ workspaceId: actor.workspaceId, actorId: actor.actorId, commandId: request.commandId }, session)).toEqual({ outcome: 'applied', result })
     const backup = await createLocalBackup(storage, backupDirectory, `backup-${randomUUID()}`, () => new Date().toISOString())
-    expect(backup.inventory.schemaVersion).toBe(32)
+    expect(backup.inventory.schemaVersion).toBe(33)
     expect(backup.inventory.participants).toHaveProperty('invoices')
     const restored = await restoreBackupIsolated(backupDirectory, backup.id, restoreDirectory, 'invoice-restore-check')
     expect(restored.inventory).toEqual(backup.inventory)
@@ -82,7 +82,7 @@ it('正式登记的发票 owner 备份和隔离恢复保留迁入证据、原回
     await restoredStorage.close()
     const child = `const {DatabaseSync}=require('node:sqlite');const db=new DatabaseSync(process.argv[1],{readOnly:true});const meta=db.prepare('SELECT schema_version FROM production_metadata').get();const row=db.prepare('SELECT i.id,i.source_kind,p.content FROM invoices i JOIN file_payloads p ON p.file_ref_id=i.original_file_id WHERE i.id=?').get('legacy-backup');const receipt=db.prepare('SELECT result_json FROM invoice_legacy_commands WHERE command_id=?').get('legacy-backup-publish');process.stdout.write(JSON.stringify({version:meta.schema_version,id:row.id,source:row.source_kind,body:Buffer.from(row.content).toString('base64'),receipt:JSON.parse(receipt.result_json),foreignKeys:db.prepare('PRAGMA foreign_key_check').all()}));db.close()`
     const cold = JSON.parse(execFileSync(process.execPath, ['-e', child, join(restored.directory, 'ruihang.sqlite')], { encoding: 'utf8' }))
-    expect(cold).toEqual({ version: 32, id: 'legacy-backup', source: 'legacy', body: 'iVBORw0KGgo=', receipt: result, foreignKeys: [] })
+    expect(cold).toEqual({ version: 33, id: 'legacy-backup', source: 'legacy', body: 'iVBORw0KGgo=', receipt: result, foreignKeys: [] })
   }
   finally {
     if (!oldClosed)

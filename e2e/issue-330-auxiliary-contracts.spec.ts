@@ -130,9 +130,6 @@ test.describe('AX04 辅助合同只读与编辑', () => {
   })
   test('四档实际视口覆盖列表详情表单、局部滚动、菜单与离开确认', async ({ page }) => {
     test.setTimeout(180000)
-    const evidence = 'docs/design/evidence/issue-330'
-    if (process.env.RUIHANG_CAPTURE_EVIDENCE === '1')
-      await mkdir(evidence, { recursive: true })
     for (const [kind, name] of [['other-expense', '验收检测服务合同'], ['company-expense', '办公室租赁合同']] as const) {
       for (const width of RESPONSIVE_WIDTHS) {
         const capture = async (state: string) => {

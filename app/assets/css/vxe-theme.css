@@ -36,20 +36,18 @@
 /* 表头和数据行统一 36px，对齐登录态运行参考的紧凑数据密度。 */
 .vxe-table .vxe-header--column {
   height: 36px;
-  padding: 0 !important;
   font-size: 13px;
   font-weight: 700;
 }
 
 .vxe-table .vxe-body--column {
   height: 36px;
-  padding: 0 !important;
   font-size: 14px;
 }
 
 .vxe-table .vxe-cell {
-  padding-right: 6px;
-  padding-left: 6px;
+  padding-right: var(--vxe-ui-table-cell-padding-default);
+  padding-left: var(--vxe-ui-table-cell-padding-default);
 }
 
 /* 金额列等宽 */
@@ -79,11 +77,6 @@
   text-decoration-thickness: 2px;
   text-underline-offset: 3px;
 }
-
-/* 兼容未迁移的纯文字状态；新列表业务状态使用 KitStatusTag。 */
-.vxe-table .cell--status-ok { color: var(--ok); font-weight: 600; }
-.vxe-table .cell--status-warn { color: var(--warn); font-weight: 600; }
-.vxe-table .cell--status-danger { color: var(--danger); font-weight: 600; }
 
 /* 紧凑列表工具：图标始终可见，真实能力由调用方提供。 */
 .list-tool-button { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; width: 28px; height: 28px; border: 1px solid var(--line); border-radius: 2px; background: var(--panel); color: var(--ink-soft); cursor: pointer; }

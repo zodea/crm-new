@@ -2,6 +2,7 @@
 import type { CentralInvoiceRecord } from '~/lib/invoice/central-contract'
 import { computed, ref, watch } from 'vue'
 import { centralInvoiceSourceLabel } from '~/lib/invoice/central-source-label'
+import { hasPrintableCentralOriginal } from '~/lib/invoice/print-layout'
 
 interface ReferenceOption { id: string, label: string }
 const props = defineProps<{ records: readonly CentralInvoiceRecord[], projects: readonly ReferenceOption[], busy?: boolean }>()
@@ -37,7 +38,9 @@ const total = computed(() => {
   }
   return cents / 100
 })
-const invalidPrint = computed(() => selected.value.filter(record => record.sourceKind !== 'scan' || !record.original || record.ocrStatus !== 'done' || record.reviewStatus !== 'reviewed' || record.duplicateStatus !== 'normal' || record.fields.totalAmount === null || record.fields.totalAmount <= 0))
+const invalidPrint = computed(() => selected.value.filter(record => !hasPrintableCentralOriginal(record.sourceKind, record.original)
+  || (record.sourceKind === 'excel' ? !record.originalVerificationId : record.ocrStatus !== 'done')
+  || record.reviewStatus !== 'reviewed' || record.duplicateStatus !== 'normal' || record.fields.totalAmount === null || record.fields.totalAmount <= 0))
 watch(archived, (rows) => {
   checked.value = checked.value.filter(id => rows.some(record => record.id === id))
 })
@@ -136,8 +139,12 @@ function print() {
             </td>
             <td class="p-2">
               {{ record.printCount ? `已打印 ${record.printCount} 次` : '未打印' }}
+              <span v-if="record.sourceKind === 'excel'" class="block text-ink-soft">{{ record.originalVerificationId ? '原件已核验' : '原件待核验' }}</span>
             </td>
             <td class="p-2">
+              <NuxtLink v-if="!busy && record.sourceKind === 'excel'" :to="{ path: '/finance/invoice/manual-new', query: { invoice: record.id } }" :aria-label="`核验原件 ${record.fields.invoiceNumber || record.id}`" class="mr-3 text-brand underline">
+                核验原件
+              </NuxtLink>
               <NuxtLink v-if="!busy" :to="`/finance/invoice/correction/${encodeURIComponent(record.id)}`" :aria-label="`更正发票 ${record.fields.invoiceNumber || record.id}`" class="mr-3 text-brand underline">
                 更正
               </NuxtLink>

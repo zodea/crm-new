@@ -1,4 +1,26 @@
+import type { Locator } from '@playwright/test'
 import { expect, test } from '@playwright/test'
+
+async function expectColumnWidthsAligned(table: Locator) {
+  await expect.poll(() => table.evaluate((root) => {
+    const differences: number[] = []
+    for (const region of root.querySelectorAll('.vxe-table--main-wrapper, .vxe-table--fixed-left-wrapper, .vxe-table--fixed-right-wrapper')) {
+      if (!region.getBoundingClientRect().width)
+        continue
+      const row = region.querySelector('.vxe-body--row')
+      for (const head of region.querySelectorAll('.vxe-header--column[colid]:not(.fixed--hidden)')) {
+        const width = head.getBoundingClientRect().width
+        if (!width)
+          continue
+        const body = row?.querySelector(`.vxe-body--column[colid="${CSS.escape(head.getAttribute('colid')!)}"]`)
+        if (!body)
+          return Number.POSITIVE_INFINITY
+        differences.push(Math.abs(width - body.getBoundingClientRect().width))
+      }
+    }
+    return differences.length ? Math.max(...differences) : Number.POSITIVE_INFINITY
+  }), '同一列的表头和正文宽度差不超过 1.5px').toBeLessThanOrEqual(1.5)
+}
 
 async function expectDocumentDoesNotOverflow(page: import('@playwright/test').Page) {
   const widths = await page.evaluate(() => ({
@@ -57,6 +79,7 @@ test.describe('KitTable 公共表格规格', () => {
 
     await handle.dblclick()
     expect((await header.boundingBox())!.width).toBeLessThan(before + 10)
+    await expectColumnWidthsAligned(table)
   })
 
   // 当前施工合同专属列表不再提供旧本地操作列；通用编辑/删除项目由 RowActionMenu.test.ts 验证。
@@ -88,6 +111,7 @@ test.describe('KitTable 公共表格规格', () => {
     expect(page.url()).toBe(initialUrl)
     await expect(page.getByRole('alertdialog')).toHaveCount(0)
     await expect(actionColumn.locator('.vxe-cell--col-resizable')).toHaveCount(0)
+    await expectColumnWidthsAligned(page.locator('[data-ui="kit-table"]').first())
     await expectDocumentDoesNotOverflow(page)
   })
 
@@ -112,6 +136,7 @@ test.describe('KitTable 公共表格规格', () => {
         const [tableBox, scrollBox] = await Promise.all([vxeTable.boundingBox(), scrollX.boundingBox()])
         return scrollBox!.x >= tableBox!.x && scrollBox!.x + scrollBox!.width <= tableBox!.x + tableBox!.width + 1
       }, `${viewport.width}px 横滚条应位于表格容器内`).toBe(true)
+      await expectColumnWidthsAligned(table)
       await expectDocumentDoesNotOverflow(page)
     }
   })

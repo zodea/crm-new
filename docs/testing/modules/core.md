@@ -8,6 +8,7 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
+| [tests/tooling/lazy-repositories.test.ts](../../../tests/tooling/lazy-repositories.test.ts) | 单元／服务／状态 | 仓储方法可同步解构和展开，按域首次加载、并发共用、失败重试与 HTTP 工厂方法对照 |
 | [tests/stores/public-read-state.test.ts](../../../tests/stores/public-read-state.test.ts) | 单元／服务／状态 | 权限、来源与会话切换撤下旧私有事实 |
 | [tests/server/related-read-meta.test.ts](../../../tests/server/related-read-meta.test.ts) | 单元／服务／状态 | 相关来源的真实读取证据 |
 | [tests/server/public-read-problems.test.ts](../../../tests/server/public-read-problems.test.ts) | 单元／服务／状态 | 公共HTTP错误与原命令封存证明 |

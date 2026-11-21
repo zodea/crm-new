@@ -10,10 +10,11 @@ const PRODUCTION_SPEC = /[\\/]production-[^\\/]+\.spec\.ts$/
 // 每组内仍只有一个 worker：迁入验收会重置该组 dev server 的默认中央仓库，每案独占重置、接管和回读旅程。
 const centralSpecs = readdirSync('e2e').filter(name => name.endsWith('.spec.ts') && !name.startsWith('production-') && !VISUAL_SPEC.test(name)).sort()
 const centralGroups = [0, 1].map(group => centralSpecs.filter((_, index) => index % 2 === group).map(name => `**/e2e/${name}`))
-const centralServers = [
+const centralServerOptions: { port: number, env: Record<string, string> }[] = [
   { port: Number(process.env.PLAYWRIGHT_PORT ?? 3100), env: {} },
   { port: Number(process.env.PLAYWRIGHT_PORT_B ?? 3102), env: { NUXT_BUILD_DIR: process.env.PLAYWRIGHT_NUXT_BUILD_DIR_B ?? '.tmp/e2e-nuxt-b' } },
-].map(server => ({ ...server, url: `http://127.0.0.1:${server.port}` }))
+]
+const centralServers = centralServerOptions.map(server => ({ ...server, url: `http://127.0.0.1:${server.port}` }))
 
 // 只选 production 项目时不启动 dev server：这些 spec 各自启动 .output 构建产物与隔离数据目录。
 // 与 Playwright CLI 一致：`--project a b` 连续取值到下一个选项为止，`--project=a` 取单值。

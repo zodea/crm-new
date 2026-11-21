@@ -1,6 +1,4 @@
 import { Buffer } from 'node:buffer'
-import { mkdir } from 'node:fs/promises'
-import process from 'node:process'
 import { expect, test } from '@playwright/test'
 import { expectEscapeReturnsFocus, expectLocalHorizontalScroll, expectNoPageOverflow, expectOverlayAboveShell, RESPONSIVE_WIDTHS } from './helpers/responsive'
 
@@ -77,8 +75,6 @@ test.describe('AX05 其他支出结算中央往返', () => {
     const created = await page.request.post('/api/commands/other-settlements', { data: { ...context, commandId: 'viewport-fixture', requiredCapability: 'other-settlement:write', baseVersion: null, action: 'save', draft: { name: '视口合成结算', no: 'JS-VIEW-331', projectId: contract.draft.projectId, contractId: contract.id, totalAmount: 0, settlementDate: '2026-09-06' }, attachments: {} } })
     expect(created.ok(), await created.text()).toBe(true)
     const { id } = await created.json()
-    if (process.env.AX05_EVIDENCE)
-      await mkdir('docs/design/evidence/issue-331', { recursive: true })
     for (const width of RESPONSIVE_WIDTHS) {
       await page.setViewportSize({ width, height: 900 })
       await page.goto('/contract/other-settlement')

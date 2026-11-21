@@ -74,6 +74,8 @@ const AGGREGATE_ROW_RE = /合\s*计|总\s*计|小计|^计[:：]|本页(?:金额|
 const NOISE_ITEM_RE = /^(?:备注|说明|大写|送货方式|注意|白色联|红色联|黄色联|绿色联|蓝色联|存根)$/
 const UNIT_RE = /^(?:[个件套张块片条支根包袋盒箱瓶桶罐卷捆扎台把只双副米方吨斤车次项mt㎡]|厘米|cm|平方|平方米|m2|立方|m3|公斤|kg)$/i
 const ITEM_HEADER_VALUE_RE = /^(?:商品名称|材料名称|产品名称|货品名称|名称及规格|名称规格|品名及规格|品名规格|品名|货名|材料|产品|项目)$/
+// Exact short aliases from zodea/invoice-recognition-app b97a2e61, src/lib/vl-parse.js.
+const SHORT_ITEM_HEADERS = new Set(['产品', '商品', '货品', '名称'])
 const PAGE_TOTAL_LABEL_RE = /本页(?:金额|合计|小计)|分页(?:金额|合计|小计)|页(?:金额|合计|小计)/
 const CUMULATIVE_TOTAL_LABEL_RE = /累计(?:金额|合计|总计|总金额)|总计金额|总金额/
 const GENERIC_TOTAL_LABEL_RE = /合\s*计|总\s*计|应收|实收|^计\s*[:：]?$/
@@ -258,7 +260,7 @@ function mapHeader(cells: string[]): ColumnMap | null {
       columns.total ??= index
     else if (/单位/.test(cell))
       columns.unit ??= index
-    else if (/商品名称|材料名称|产品名称|货品名称|名称及?规格|品名及?规格|品名|货名|材料|项目/.test(cell) || cell === '产品')
+    else if (SHORT_ITEM_HEADERS.has(cell) || /商品名称|材料名称|产品名称|货品名称|品名|货名|材料|项目/.test(cell))
       columns.name ??= index
   }
   return columns.name != null && Object.keys(columns).length >= 3 ? columns : null
@@ -701,6 +703,12 @@ function documentsFromMarkdownPage(
   return documents
 }
 
+// Adapted from zodea/invoice-recognition-app b97a2e61, src/lib/parse.js.
+function quantityUnitToken(token: string) {
+  const match = token.match(/^(-?\d+(?:\.\d+)?)([^\d.].*)$/)
+  return match?.[2] && UNIT_RE.test(match[2]) ? { quantity: parseNumber(match[1]), unit: match[2] } : null
+}
+
 function parsePlainItems(lines: string[]): ParsedDeliveryItem[] {
   const items: ParsedDeliveryItem[] = []
   const seen = new Set<string>()
@@ -708,26 +716,33 @@ function parsePlainItems(lines: string[]): ParsedDeliveryItem[] {
     if (/品名|规格|数量|单价|金额|合计|客户|需方|送货单|销售单|出货单|地址|电话|签收|日期|单号|编号/.test(rawLine))
       continue
     const tokens = rawLine.replace(/[|,，;；]/g, ' ').replace(/\s+/g, ' ').trim().split(' ')
-    const unitIndex = tokens.findIndex((token, index) => index > 0 && UNIT_RE.test(token ?? ''))
+    const normalized = tokens.map(token => token.replace(/[\uFF01-\uFF5E]/g, char => String.fromCharCode(char.charCodeAt(0) - 0xFEE0)))
+    const standaloneIndex = normalized.findIndex((token, index) => index > 0 && UNIT_RE.test(token))
+    const attachedUnits = standaloneIndex < 1 ? normalized.map(quantityUnitToken) : []
+    const unitIndex = standaloneIndex >= 1 ? standaloneIndex : attachedUnits.findIndex((entry, index) => index > 0 && entry !== null)
     if (unitIndex < 1)
       continue
     const name = tokens.slice(0, unitIndex).join(' ').replace(/^\d+[.、)]\s*/, '').trim()
     if (!name || COMPANY_HINT_RE.test(name))
       continue
-    const numbers = tokens.slice(unitIndex + 1).map(parseNumber)
+    const attached = attachedUnits[unitIndex]
+    const unit = attached?.unit ?? normalized[unitIndex]!
+    const numbers = normalized.slice(unitIndex + 1).map(parseNumber)
+    if (attached)
+      numbers.unshift(attached.quantity)
     const quantity = numbers[0] ?? null
     const unitPrice = numbers[1] ?? null
     const total = numbers[2] ?? (quantity != null && unitPrice != null ? round2(quantity * unitPrice) : null)
     if (quantity == null && total == null)
       continue
-    const key = [name, tokens[unitIndex], quantity, unitPrice, total].join('|')
+    const key = [name, unit, quantity, unitPrice, total].join('|')
     if (seen.has(key))
       continue
     seen.add(key)
     items.push({
       name,
       spec: '',
-      unit: tokens[unitIndex] ?? '',
+      unit,
       quantity,
       unitPrice,
       total,

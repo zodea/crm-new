@@ -14,7 +14,7 @@
 | 真实浏览器组件行为 | Vitest Browser、Playwright provider、`vitest-browser-vue`：`pnpm test:browser` | [独立配置](../../vitest.browser.config.ts)，Chromium 多视口 |
 | 跨页面流程 | Playwright：`pnpm test:e2e`；精确文件用 `pnpm exec playwright test <files...>` | [E2E 配置](../../playwright.config.ts)，排除专用视觉矩阵；默认 E2E 不写存档截图 |
 | 专用视觉矩阵 | Playwright：`pnpm test:visual` | [视觉配置](../../playwright.visual.config.ts)，固定 Windows/Chromium 与隔离演示服务 |
-| 应用类型 | `pnpm typecheck` | Nuxt 项目类型；不覆盖普通测试、E2E 和测试配置的整体类型检查 |
+| 应用及 E2E 类型 | `pnpm typecheck` | 依次检查 Nuxt 应用、`e2e/**/*.ts` 和 Playwright 配置。单独检查 E2E 可运行 `pnpm typecheck:e2e` |
 | 已纳入的工资测试类型 | `pnpm exec vue-tsc --noEmit -p tests/payroll/tsconfig.json` | 仅[配置](../../tests/payroll/tsconfig.json)显式纳入的文件及依赖 |
 | 循环依赖 | dpdm：`pnpm check:cycles` | [配置](../../dpdm.config.ts)覆盖的应用与服务端 TS 模块；调整模块边界或抽取共享逻辑后运行 |
 | 依赖重复版本 | node-modules-inspector：`pnpm check:deps` | [配置](../../node-modules-inspector.config.ts)；新增、升级依赖后运行 |

@@ -10,16 +10,19 @@ import { DatabaseSync } from 'node:sqlite'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createDbCoordinator } from '../../app/lib/db/coordinator'
 import { createInvoiceWorkspaceFromSession } from '../../app/lib/invoice/central-bootstrap'
-import { CentralInvoiceProblem, INVOICE_READ_CAPABILITY, INVOICE_WRITE_CAPABILITY } from '../../app/lib/invoice/central-contract'
+import { CentralInvoiceProblem, CONFIRM_ORIGINAL_VERIFICATION, INVOICE_READ_CAPABILITY, INVOICE_WRITE_CAPABILITY, RECORD_ORIGINAL_VERIFICATION } from '../../app/lib/invoice/central-contract'
 import { createCentralInvoiceHttp } from '../../app/lib/invoice/central-http'
 import { invoiceCandidateForCommand } from '../../app/lib/invoice/central-recognition'
 import { createCentralInvoicePrintSession, createCentralInvoiceSession } from '../../app/lib/invoice/central-session'
 import { prepareInvoiceOriginal } from '../../app/lib/invoice/central-upload'
 import { createCentralInvoiceWorkspace } from '../../app/lib/invoice/central-workspace'
+import { recognizeInvoiceLocally } from '../../app/lib/invoice/recognize'
 import { OUR_SIGNATORY_SCHEMA } from '../../app/lib/our-signatory/schema'
 import { verifyBackupOriginalOwner, verifyInvoiceOriginalReferences } from '../../server/utils/production-backup-manifest'
 import { financeCommandFingerprint } from '../../server/utils/production-finance-request'
 import { PRODUCTION_INVOICE_COMPANY_UPGRADE } from '../../server/utils/production-invoice-company-upgrade'
+import { PRODUCTION_INVOICE_CORRECTION_SCHEMA } from '../../server/utils/production-invoice-correction-schema'
+import { INVOICE_ORIGINAL_VERIFICATION_SCHEMA } from '../../server/utils/production-invoice-original-verification-schema'
 import { PRODUCTION_INVOICE_SCHEMA } from '../../server/utils/production-invoice-schema'
 import { createProductionInvoiceService, listProductionInvoiceReferences, validateProductionInvoiceJournal } from '../../server/utils/production-invoice-service'
 import { testTempRoot } from '../helpers/test-temp-root'
@@ -121,6 +124,8 @@ describe('发票中央原件 owner（隔离内存）', () => {
     await f.storage.execute('UPDATE production_participants SET schema_version=3 WHERE domain=?', ['invoices'])
     expect(await listProductionInvoiceReferences(f.storage, f.actor)).toEqual([])
     await f.storage.execute('UPDATE production_participants SET schema_version=4 WHERE domain=?', ['invoices'])
+    expect(await listProductionInvoiceReferences(f.storage, f.actor)).toEqual([])
+    await f.storage.execute('UPDATE production_participants SET schema_version=5 WHERE domain=?', ['invoices'])
     await expect(listProductionInvoiceReferences(f.storage, f.actor)).rejects.toMatchObject({ problem: { code: 'unavailable' } })
   })
 
@@ -575,6 +580,26 @@ describe('发票中央原件 owner（隔离内存）', () => {
     const [sourceRow] = await f.storage.select<{ source_json: string }>('SELECT source_json FROM invoice_import_sources WHERE invoice_id=? ORDER BY rowid', [imported.invoiceId])
     expect(JSON.parse(sourceRow!.source_json)).toEqual(request.source)
     await expect(f.storage.execute('DELETE FROM invoice_import_sources')).rejects.toThrow('invoice import source is immutable')
+    const attached = await f.service.execute({
+      workspaceId: f.actor.workspaceId,
+      actorId: f.actor.actorId,
+      requiredCapability: INVOICE_WRITE_CAPABILITY,
+      action: 'attach-original',
+      commandId: 'excel-original',
+      invoiceId: imported.invoiceId,
+      baseVersion: imported.version,
+      original: f.upload.original,
+      confirmed: true,
+    }, f.session)
+    await expect(f.service.recordPrinted({
+      workspaceId: f.actor.workspaceId,
+      actorId: f.actor.actorId,
+      requiredCapability: INVOICE_WRITE_CAPABILITY,
+      action: 'record-printed',
+      commandId: 'excel-still-pending',
+      targets: [{ invoiceId: imported.invoiceId, baseVersion: attached.version, rotation: 0 }],
+    }, f.session)).rejects.toMatchObject({ problem: { code: 'validation-failed' } })
+    expect(await f.service.get(imported.invoiceId, f.session)).toMatchObject({ sourceKind: 'excel', version: attached.version, original: { id: attached.originalId }, ocrStatus: 'pending', printCount: 0 })
     await expect(validateProductionInvoiceJournal(f.storage, f.actor)).resolves.toBeUndefined()
   })
 
@@ -911,8 +936,11 @@ describe('发票中央原件 owner（隔离内存）', () => {
     const path = join(directory, 'invoice.sqlite')
     const first = fixture(path)
     const created = await first.service.execute(first.upload, first.session)
-    const fields = { invoiceNumber: '87654321', invoiceDate: '', invoiceType: '', buyer: '合成购方', buyerTaxNo: '', seller: '', sellerTaxNo: '', amount: null, taxAmount: 0, totalAmount: null, taxRate: '', remark: '' }
-    const recognized = await first.service.execute({ action: 'recognize', invoiceId: created.invoiceId, baseVersion: created.version, workspaceId: first.actor.workspaceId, actorId: first.actor.actorId, requiredCapability: INVOICE_WRITE_CAPABILITY, commandId: 'cold-recognition', fields, items: [], source: 'local', textPages: ['合成文本'], unrecognizedPageIndexes: [] }, first.session)
+    const textPages = ['发 票 号 码：８７６５４３２１\n税额：￥0.00\n价 税 合 计（ 小 写 ）：￥100.00']
+    const candidate = await recognizeInvoiceLocally({ file: new File([new Uint8Array(first.bytes)], 'synthetic.pdf', { type: 'application/pdf' }), basePath: '/' }, {
+      readDocument: async () => ({ pages: textPages, unrecognizedPageIndexes: [] }),
+    })
+    const recognized = await first.service.execute({ action: 'recognize', invoiceId: created.invoiceId, baseVersion: created.version, workspaceId: first.actor.workspaceId, actorId: first.actor.actorId, requiredCapability: INVOICE_WRITE_CAPABILITY, commandId: 'cold-recognition', ...invoiceCandidateForCommand(candidate) }, first.session)
     await first.storage.close()
     databases.splice(databases.indexOf(first.storage), 1)
     const script = `const { DatabaseSync } = require('node:sqlite'); const { createHash } = require('node:crypto');
@@ -924,11 +952,106 @@ describe('发票中央原件 owner（隔离内存）', () => {
         process.stdout.write(JSON.stringify({ integrity,id:row.id,version:row.version,amount:row.amount,taxAmount:row.tax_amount,ocrStatus:row.ocr_status,originalId:row.original_file_id,sha256:row.sha256,actualSha256:createHash('sha256').update(row.content).digest('hex'),receipt:JSON.parse(row.result_json),recognition:JSON.parse(recognition.result_json) }));
       } finally { db.close(); }`
     const output = JSON.parse(execFileSync(process.execPath, ['-e', script, path, created.invoiceId, created.commandId], { encoding: 'utf8', windowsHide: true }))
-    expect(output).toMatchObject({ integrity: 'ok', id: created.invoiceId, version: Number(recognized.version), amount: null, taxAmount: 0, ocrStatus: 'done', originalId: created.originalId, sha256: createHash('sha256').update(first.bytes).digest('hex'), receipt: created, recognition: { fields, items: [], source: 'local', textPages: ['合成文本'], unrecognizedPageIndexes: [] } })
+    expect(output).toMatchObject({ integrity: 'ok', id: created.invoiceId, version: Number(recognized.version), amount: null, taxAmount: 0, ocrStatus: 'done', originalId: created.originalId, sha256: createHash('sha256').update(first.bytes).digest('hex'), receipt: created, recognition: { fields: { invoiceNumber: '87654321', amount: null, taxAmount: 0, totalAmount: 100 }, items: [], source: 'local', textPages, unrecognizedPageIndexes: [] } })
+    expect(output.recognition.fields).not.toHaveProperty('calculatedAmounts')
     expect(output.actualSha256).toBe(output.sha256)
     const reopened = fixture(path, true)
     expect(await reopened.service.execute(reopened.upload, reopened.session)).toEqual(created)
     expect(Buffer.from((await reopened.service.original(created.invoiceId, created.originalId!, reopened.session)).bytes)).toEqual(first.bytes)
     expect(await reopened.storage.select('SELECT id FROM invoices')).toHaveLength(1)
+  })
+
+  it('已归档 Excel 原件核验冻结证据、按原编号冷恢复，并将打印绑定到实际采用的核验', { timeout: 120_000 }, async () => {
+    const root = testTempRoot('invoice-verification-cold')
+    await mkdir(root, { recursive: true })
+    const path = join(await mkdtemp(join(root, 'synthetic-')), 'invoice.sqlite')
+    const f = fixture(path)
+    f.sql.exec(PRODUCTION_INVOICE_CORRECTION_SCHEMA)
+    f.sql.exec(INVOICE_ORIGINAL_VERIFICATION_SCHEMA)
+    f.sql.exec('UPDATE production_participants SET schema_version=4 WHERE domain=\'invoices\'')
+    const buyerTaxNo = '91440000TEST00001X'
+    const sellerTaxNo = '91440000TEST00002X'
+    const [buyer] = f.sql.prepare('SELECT draft_json,created_at FROM our_signatories WHERE id=?').all('fixture-buyer')
+    const buyerDraft = JSON.stringify({ ...JSON.parse(String(buyer?.draft_json)), taxNo: buyerTaxNo })
+    const at = String(buyer?.created_at)
+    f.sql.prepare('INSERT INTO our_signatories VALUES(?,?,?,?,?)').run('verification-buyer', buyerDraft, 1, at, at)
+    f.sql.prepare('INSERT INTO our_signatory_history VALUES(?,?,?,?,?,?,?)').run('verification-buyer-v1', 'verification-buyer', 1, buyerDraft, null, null, at)
+    f.sql.prepare('UPDATE suppliers SET draft_json=json_set(draft_json,\'$.taxNo\',?)').run(sellerTaxNo)
+    const fields = { invoiceNumber: '87654321', invoiceDate: '2026-01-02', invoiceType: '电子发票（普通发票）', buyer: '合成购方有限公司', buyerTaxNo, seller: '合成分供方有限公司', sellerTaxNo, amount: 100, taxAmount: 0, totalAmount: 100, taxRate: '', remark: '归档备注' }
+    const base = { ...f.storage.identity, requiredCapability: INVOICE_WRITE_CAPABILITY }
+    const imported = await f.service.execute({
+      ...base,
+      action: 'import',
+      commandId: 'verification-import',
+      baseVersion: null,
+      fields,
+      items: [],
+      ownerKind: 'project',
+      projectId: 'fixture-project',
+      supplierId: 'fixture-supplier',
+      source: { fileName: '合成.xlsx', fileDigest: 'b'.repeat(64), sheetName: '发票', rowNumber: 1, rawSnapshot: { 税额: 0 } },
+      confirmed: true,
+      taxNumbersConfirmed: true,
+      taxVerification: { buyerId: 'verification-buyer', buyerVersion: '1', supplierVersion: '1' },
+    }, f.session)
+    const invoiceId = imported.invoiceId
+    const archive = await f.storage.select('SELECT * FROM invoice_archive_evidence')
+    const print = (baseVersion: string, commandId = 'verify-print-one') => ({ ...base, action: 'record-printed', commandId, targets: [{ invoiceId, baseVersion, rotation: 0 }] })
+    await expect(f.service.recordPrinted(print(imported.version), f.session)).rejects.toMatchObject({ problem: { code: 'validation-failed' } })
+    const attached = await f.service.execute({ ...base, invoiceId, action: 'attach-original', commandId: 'verification-attach', baseVersion: imported.version, original: f.upload.original, confirmed: true }, f.session)
+    const original = { originalId: attached.originalId, originalSha256: createHash('sha256').update(f.bytes).digest('hex') }
+    const text = [
+      '电子发票（普通发票）',
+      '发票号码：87654321',
+      '开票日期：2026年1月2日',
+      '购买方名称：合成购方有限公司',
+      `统一社会信用代码：${buyerTaxNo}`,
+      '销售方名称：合成分供方有限公司',
+      `统一社会信用代码：${sellerTaxNo}`,
+      '合计 ￥100.00 ￥0.00',
+      '价税合计（小写）：￥100.00',
+    ].join('\n')
+    const missing = { ...base, ...original, invoiceId, baseVersion: attached.version, action: RECORD_ORIGINAL_VERIFICATION, commandId: 'verification-missing', source: 'local', textPages: [''], unrecognizedPageIndexes: [0] }
+    await expect(f.service.execute({ ...missing, originalSha256: '0'.repeat(64) }, f.session)).rejects.toMatchObject({ problem: { code: 'conflict' } })
+    const incomplete = await f.service.execute(missing, f.session)
+    expect((await f.service.getRead(invoiceId, f.session)).verification?.state).toBe('incomplete')
+    const confirmation = { ...base, ...original, invoiceId, action: CONFIRM_ORIGINAL_VERIFICATION, commandId: 'verification-confirm', confirmed: true }
+    await expect(f.service.execute({ ...confirmation, baseVersion: incomplete.version, candidateId: incomplete.commandId }, f.session)).rejects.toMatchObject({ problem: { code: 'conflict' } })
+    const candidateRequest = { ...missing, baseVersion: incomplete.version, commandId: 'verification-candidate', textPages: [text], unrecognizedPageIndexes: [] }
+    const pending = await f.service.execute(candidateRequest, f.session)
+    expect((await f.service.getRead(invoiceId, f.session)).verification).toMatchObject({ state: 'ready', candidateId: pending.commandId })
+    await expect(f.service.recordPrinted(print(pending.version), f.session)).rejects.toMatchObject({ problem: { code: 'validation-failed' } })
+    await expect(f.service.execute({ ...confirmation, baseVersion: pending.version, candidateId: incomplete.commandId }, f.session)).rejects.toMatchObject({ problem: { code: 'conflict' } })
+    const submit = { ...confirmation, baseVersion: pending.version, candidateId: pending.commandId }
+    const confirmed = await f.service.execute(submit, f.session)
+    expect(await f.service.execute(submit, f.session)).toEqual(confirmed)
+    await expect(f.service.execute({ ...submit, candidateId: incomplete.commandId }, f.session)).rejects.toMatchObject({ problem: { code: 'conflict' } })
+    const printed = await f.service.recordPrinted(print(confirmed.version), f.session)
+    expect((await f.service.getRead(invoiceId, f.session)).record).toMatchObject({ originalVerificationId: confirmed.commandId, ocrStatus: 'pending', printCount: 1, fields })
+    expect(await f.storage.select('SELECT verification_id FROM invoice_print_lines')).toEqual([{ verification_id: confirmed.commandId }])
+    expect(await f.storage.select('SELECT * FROM invoice_archive_evidence')).toEqual(archive)
+    expect(await f.storage.select('SELECT id FROM invoice_recognitions')).toEqual([])
+    await expect(validateProductionInvoiceJournal(f.storage, f.actor)).resolves.toBeUndefined()
+    await expect(f.storage.execute('DELETE FROM invoice_original_verifications')).rejects.toThrow('invoice original verification is immutable')
+    await f.storage.close()
+    databases.splice(databases.indexOf(f.storage), 1)
+
+    const sqliteRead = `const { DatabaseSync } = require('node:sqlite'); const db = new DatabaseSync(process.argv[1], { readOnly:true });
+      const receipt = db.prepare('SELECT result_json FROM invoice_command_receipts WHERE command_id=?').get(process.argv[2]);
+      const proof = db.prepare('SELECT evidence_json FROM invoice_original_verifications WHERE command_id=?').get(process.argv[2]);
+      const integrity = db.prepare('PRAGMA integrity_check').get().integrity_check;
+      process.stdout.write(JSON.stringify({ integrity, receipt: JSON.parse(receipt.result_json), proof: JSON.parse(proof.evidence_json) })); db.close();`
+    const disk = JSON.parse(execFileSync(process.execPath, ['-e', sqliteRead, path, confirmed.commandId], { encoding: 'utf8', windowsHide: true }))
+    expect(disk).toMatchObject({ integrity: 'ok', receipt: confirmed, proof: { request: submit, candidateSha256: pending.verificationSha256, printCount: 0, correction: null } })
+    const reopened = fixture(path, true)
+    expect(await reopened.service.resolve(pending.commandId, reopened.session)).toEqual({ outcome: 'applied', result: pending })
+    expect(await reopened.service.resolve(confirmed.commandId, reopened.session)).toEqual({ outcome: 'applied', result: confirmed })
+    expect(await reopened.service.resolvePrinted(printed.commandId, reopened.session)).toEqual({ outcome: 'applied', result: printed })
+    const secondPrint = await reopened.service.recordPrinted(print(printed.records[0]!.version, 'verify-print-two'), reopened.session)
+    expect(secondPrint.records[0]?.printCount).toBe(2)
+    await expect(validateProductionInvoiceJournal(reopened.storage, reopened.actor)).resolves.toBeUndefined()
+    reopened.sql.exec('DROP TRIGGER invoice_print_lines_no_update')
+    await reopened.storage.execute('UPDATE invoice_print_lines SET verification_id=NULL WHERE command_id=?', [printed.commandId])
+    await expect(validateProductionInvoiceJournal(reopened.storage, reopened.actor)).rejects.toMatchObject({ problem: { code: 'unavailable' } })
   })
 })

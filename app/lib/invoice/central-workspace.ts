@@ -4,7 +4,7 @@ import type { createCentralInvoiceHttp } from './central-http'
 import type { LocalInvoiceCandidate } from './recognize'
 import { readonly, shallowRef } from 'vue'
 import { problemFromHttpFailure } from '../read-model/problem'
-import { INVOICE_READ_CAPABILITY, INVOICE_WRITE_CAPABILITY } from './central-contract'
+import { CONFIRM_ORIGINAL_VERIFICATION, INVOICE_READ_CAPABILITY, INVOICE_WRITE_CAPABILITY, RECORD_ORIGINAL_VERIFICATION } from './central-contract'
 import { invoiceCandidateForCommand } from './central-recognition'
 import { createCentralInvoicePrintSession, createCentralInvoiceSession, pendingCentralInvoiceCommands } from './central-session'
 import { prepareInvoiceOriginal } from './central-upload'
@@ -240,6 +240,30 @@ export function createCentralInvoiceWorkspace(options: {
       if (!confirmed)
         throw new Error('请先确认原件属于这张发票。')
       return execute({ ...envelope(), action: 'attach-original', invoiceId: invoice.id, baseVersion: invoice.version, original: await prepareInvoiceOriginal(file), confirmed: true })
+    },
+    async readOriginalVerification(invoice: CentralInvoiceRecord) {
+      await authorize()
+      const read = await guarded(() => options.client.get(invoice.id))
+      await authorize()
+      if (read.record.version !== invoice.version || read.record.original?.id !== invoice.original?.id
+        || read.record.original?.sha256 !== invoice.original?.sha256) {
+        throw new Error('发票或原件已变化，请重新读取发票工作区。')
+      }
+      return read.verification ?? null
+    },
+    async recordOriginalVerification(invoice: CentralInvoiceRecord, source: 'local' | 'cloud', confirmedCloud: boolean, beforeSubmit: () => boolean) {
+      if (!invoice.original)
+        throw new Error('发票没有已保存原件。')
+      const { id: originalId, sha256: originalSha256 } = invoice.original
+      const { textPages, unrecognizedPageIndexes } = await recognizeFile(invoice, source, confirmedCloud)
+      if (!beforeSubmit())
+        throw new Error('已取消核验，识别候选未提交。')
+      return execute({ ...envelope(), action: RECORD_ORIGINAL_VERIFICATION, invoiceId: invoice.id, baseVersion: invoice.version, originalId, originalSha256, source, textPages, unrecognizedPageIndexes }, beforeSubmit)
+    },
+    async confirmOriginalVerification(invoice: CentralInvoiceRecord, candidateId: string, beforeSubmit: () => boolean) {
+      if (!invoice.original || !beforeSubmit())
+        throw new Error('发票原件核验已变化。')
+      return execute({ ...envelope(), action: CONFIRM_ORIGINAL_VERIFICATION, invoiceId: invoice.id, baseVersion: invoice.version, originalId: invoice.original.id, originalSha256: invoice.original.sha256, candidateId, confirmed: true }, beforeSubmit)
     },
     async recognize(invoice: CentralInvoiceRecord, source: 'local' | 'cloud' = 'local', confirmedCloud = false) {
       return (await recognizeWithCandidate(invoice, source, confirmedCloud)).record
