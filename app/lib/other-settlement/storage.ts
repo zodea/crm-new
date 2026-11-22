@@ -38,7 +38,7 @@ export async function readOtherSettlementStored(tx: TransactionDb, identity: {
   }>('SELECT revision FROM other_settlement_revision WHERE singleton=1'))[0]
   if (!revision || !Number.isSafeInteger(revision.revision) || revision.revision < 0)
     return fail('结算读取版本损坏')
-  const heads = await tx.select<Record<string, unknown>>('SELECT * FROM expenditure_settlements ORDER BY id')
+  const heads = await tx.select<Record<string, unknown>>(`SELECT * FROM expenditure_settlements WHERE ${await otherSettlementOwnerPredicate(tx)} ORDER BY id`)
   const records: OtherSettlementStored[] = []
   for (const head of heads) {
     if (typeof head.id !== 'string' || !head.id || !Number.isSafeInteger(head.version) || Number(head.version) < 0)
@@ -124,6 +124,18 @@ export async function readOtherSettlementStored(tx: TransactionDb, identity: {
     records.push(record)
   }
   return { records, revision: revision.revision }
+}
+
+/** Read-only capability inspection for original Native schemas; no lazy upgrade or owner guess. */
+export async function otherSettlementOwnerPredicate(tx: Pick<TransactionDb, 'select'>): Promise<string> {
+  const columns = await tx.select<{ name: string }>('PRAGMA table_info(expenditure_settlements)')
+  if (columns.some(column => column.name === 'document_owner'))
+    return 'document_owner=\'other\''
+  const tables = await tx.select<{ name: string }>('SELECT name FROM sqlite_schema WHERE type=\'table\'')
+  const adoptionProof = tables.some(table => table.name === 'expenditure_settlement_expense_allocations')
+    ? ' OR EXISTS(SELECT 1 FROM expenditure_settlement_expense_allocations owner_line WHERE owner_line.settlement_id=expenditure_settlements.id)'
+    : ''
+  return `(biz_type IN ('机械','其他','其他支出')${adoptionProof})`
 }
 export async function validateOtherSettlementJournal(tx: TransactionDb, identity: {
   workspaceId: string

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type {
   FileRefDraft,
-  FileRefRecord,
+  FileRefPresentation,
 } from '~/lib/forms/file-refs'
 import AttachmentDraftRow from '~/components/shared/AttachmentDraftRow.vue'
 import AttachmentExistingRow from '~/components/shared/AttachmentExistingRow.vue'
@@ -13,7 +13,7 @@ export interface PendingFileRef extends FileRefDraft {
 }
 
 defineProps<{
-  attachments: ReadonlyArray<Readonly<FileRefRecord>>
+  attachments: ReadonlyArray<Readonly<FileRefPresentation>>
   pendingAttachments: ReadonlyArray<Readonly<PendingFileRef>>
   pendingRemoveIds: readonly string[]
   pendingRestoreIds: readonly string[]

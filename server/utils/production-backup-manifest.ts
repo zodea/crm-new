@@ -26,6 +26,8 @@ import { validateProductionInvoiceJournal } from './production-invoice-service'
 import { validateMaterialConstructionBindings } from './production-material-contract-record'
 import { notificationCommandFingerprint } from './production-notification-service'
 import { validateOtherSettlementImportEvidence } from './production-other-settlement-migration'
+import { productionOwnerDocumentOwnerType, readProductionOwnerDocumentState } from './production-owner-document-record'
+import { PRODUCTION_OWNER_DOCUMENT_HEAD_TABLES } from './production-owner-document-schema'
 import { validateProductionPayrollState } from './production-payroll-validation'
 import { validateProductionQuantityState } from './production-quantity-validation'
 import { ProductionStorageProblem, verifyProductionStorageSchema } from './production-storage'
@@ -102,6 +104,20 @@ export function verifyBackupOriginalOwner(db: DatabaseSync, row: Record<string, 
     if (!owner || row.category !== 'invoice-original' || row.deleted_at !== null || verifiedMetadataOnlyFileIds.has(String(row.id)))
       backupInvalid('发票原件与发票、稳定文件身份或正文归属不一致。')
     return
+  }
+  if (db.prepare('SELECT name FROM sqlite_schema WHERE type=\'table\' AND name=\'owner_document_files\'').get()) {
+    const business = db.prepare('SELECT * FROM owner_document_files WHERE file_ref_id=?').get(row.id!)
+    if (business) {
+      const kind = String(business.kind)
+      const expectedType = productionOwnerDocumentOwnerType(kind as Parameters<typeof productionOwnerDocumentOwnerType>[0])
+      const table = kind === 'sub_settlement' ? 'expenditure_settlements' : PRODUCTION_OWNER_DOCUMENT_HEAD_TABLES[kind as keyof typeof PRODUCTION_OWNER_DOCUMENT_HEAD_TABLES]
+      if (!table || row.owner_type !== expectedType || row.owner_id !== business.owner_id
+        || (verifiedMetadataOnlyFileIds.has(String(row.id)) ? business.body_state !== 'metadata-only' || business.sha256 !== null : business.body_state !== 'embedded' || business.sha256 !== row.sha256)) {
+        backupInvalid('商务原件缺真实单据类型、原归属或正文证据。')
+      }
+      // The full commercial validator has already checked both applied and staged original intent ownership.
+      return
+    }
   }
   if (['boq_file', 'boq_change_order', 'owner_change_order'].includes(String(row.owner_type))) {
     let qualified = false
@@ -394,6 +410,13 @@ export async function inspectProductionBackup(path: string): Promise<ProductionB
         await validateProductionInvoiceJournal(readOnlyDomainTransaction(db), { workspaceId: meta.workspace_id, actorId: meta.owner_id })
       }
       catch { backupInvalid('发票备份的原回执、版本、识别记录或审计历史不完整。') }
+    }
+    if (manifest.participants['owner-documents']) {
+      const state = await readProductionOwnerDocumentState(readOnlyDomainTransaction(db))
+      for (const file of state.files) {
+        if (file.body_state === 'metadata-only')
+          verifiedMetadataOnlyFileIds.add(file.file_ref_id)
+      }
     }
     if (manifest.participants['material-contracts'])
       await verifyMaterialOwner(db, meta.workspace_id, meta.owner_id)

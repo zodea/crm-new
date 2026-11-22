@@ -194,7 +194,7 @@ onActivated(() => void load())
       </MetricGrid>
       <MetricGrid v-else-if="penalty" :cols="4">
         <Metric label="扣罚日期" :value="penalty.penaltyDate || '—'" />
-        <Metric label="金额" :value="`¥${penalty.amount}`" />
+        <Metric label="金额" :value="penalty.amount === null ? '未记录' : `¥${penalty.amount}`" />
         <Metric label="状态" :value="penalty.status" />
         <Metric label="位置" :value="penalty.location || '—'" />
       </MetricGrid>

@@ -301,11 +301,11 @@ export async function assertProductionQuantityImportRestoreAllowed(tx: Transacti
     ? all.has(value)
     : Array.isArray(value) ? value.some(hasReference) : object(value) ? Object.values(value).some(hasReference) : false
   const participants = await tx.select<{ name: string }>('SELECT name FROM sqlite_master WHERE type=\'table\'')
-  for (const { name } of participants.filter(row => /^(?:payroll_|wage_|schedule_|task_item_map$|task_dependencies$)/.test(row.name))) {
+  for (const { name } of participants.filter(row => /^(?:payroll_|wage_|schedule_|owner_document_|monthly_statements$|task_item_map$|task_dependencies$)/.test(row.name))) {
     for (const row of await tx.select<Record<string, unknown>>(`SELECT * FROM "${name.replaceAll('"', '""')}"`)) {
       for (const value of Object.values(row)) {
         if (hasReference(value))
-          throw quantityProblem('conflict', '工资、WBS或其历史仍引用原工程量，整批恢复已拒绝')
+          throw quantityProblem('conflict', '商务月报、工资、WBS或其历史仍引用原工程量，整批恢复已拒绝')
         if (typeof value === 'string' && (value.startsWith('{') || value.startsWith('['))) {
           let parsed: unknown
           try {
@@ -313,7 +313,7 @@ export async function assertProductionQuantityImportRestoreAllowed(tx: Transacti
           }
           catch { throw quantityProblem('unavailable', '相关事实 JSON 无法核对，不能恢复工程量批次') }
           if (hasReference(parsed))
-            throw quantityProblem('conflict', '工资、WBS或其冻结目录仍引用原工程量，整批恢复已拒绝')
+            throw quantityProblem('conflict', '商务月报、工资、WBS或其冻结目录仍引用原工程量，整批恢复已拒绝')
         }
       }
     }

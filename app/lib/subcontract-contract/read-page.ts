@@ -12,7 +12,7 @@ import type {
   SubcontractContractPageSize,
 } from './read-contract'
 import { isDataOriginDTO } from '../../types/read-model'
-import { isEffectiveExpenditureContract } from '../contract/effective-status'
+import { isConfirmedExpenditureSettlement, isEffectiveExpenditureContract } from '../contract/effective-status'
 import { matchesContractListFilter, parseContractListFilter } from '../contract/list-filters'
 import { parsePageQuery, resolvePagination } from '../read-model/pagination'
 import { problemFromHttpFailure } from '../read-model/problem'
@@ -154,11 +154,11 @@ function total(rows: readonly SubcontractContractFactSource[], source: Subcontra
 }
 
 function amounts(source: SubcontractContractDetailSource, facts: SubcontractContractFactSources) {
-  const settled = total(facts.settlements, source)
+  const settled = total(facts.settlements, source, row => isConfirmedExpenditureSettlement(row.status))
   const invoiced = total(facts.invoices, source, row => row.status === '已归档')
   const paid = total(facts.paymentRecords, source, row => ['已确认', 'confirmed'].includes(row.status))
   const changed = sumKnownMoney([source.amount, total(facts.supplements, source)])
-  const completionSettlement = total(facts.settlements, source, row => validFact(row) && row.settlementKind === 'completion')
+  const completionSettlement = total(facts.settlements, source, row => isConfirmedExpenditureSettlement(row.status) && row.settlementKind === 'completion')
   return {
     contract: money(source.amount),
     changed: money(changed),
@@ -342,7 +342,8 @@ export function buildSubcontractContractDetail(input: BuildDetailInput): ReadPro
     const supplement = input.facts.supplements.find(row => row.dataOrigin === source.dataOrigin && row.id === input.query.focusId)
     const change = input.facts.changes.find(row => row.dataOrigin === source.dataOrigin && row.id === input.query.focusId)
     const settlement = input.facts.settlements.find(row => row.id === input.query.focusId && row.dataOrigin === source.dataOrigin)
-    const focus = supplement ?? change ?? settlement
+    const penalty = input.facts.penalties.find(row => row.id === input.query.focusId && row.dataOrigin === source.dataOrigin)
+    const focus = supplement ?? change ?? settlement ?? penalty
     if (!focus)
       throw new SubcontractContractRepositoryProblem(subcontractContractProblem('not-found', '聚焦的分包合同事实不存在或已删除'))
     if (focus.contractId !== source.id) {

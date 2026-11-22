@@ -6,9 +6,10 @@ import type { QuantityCompletionPhotoDraft } from '../../app/lib/quantity/comple
 import type { BusinessSession } from './business-session'
 import { Buffer } from 'node:buffer'
 import { createHash } from 'node:crypto'
-import { hiddenCtes, visibleCond } from '../../app/lib/db/soft-delete'
+import { hiddenCtes, hiddenCtesFor, visibleCond } from '../../app/lib/db/soft-delete'
 import { effectiveMasterDataCapabilities } from '../../app/lib/master-data/capabilities'
 import { loadQuantityAssignmentWorkspace } from '../../app/lib/quantity/assignment'
+import { assertQuantityBasis, QUANTITY_BASIS_COLUMNS } from '../../app/lib/quantity/basis'
 import { loadQuantityBatchCompletionPlan } from '../../app/lib/quantity/batch-completion'
 import { quantityProblem } from '../../app/lib/quantity/central-contract'
 import { validateQuantityPhoto } from '../../app/lib/quantity/central-photo'
@@ -63,6 +64,41 @@ async function quantityVersionVector(db: TransactionDb, projectId: string, scope
   if (!project || project.deleted_at)
     throw quantityProblem('not-found', '原工程量项目不可见')
   put('project', project)
+  if (consumption === 'monthly') {
+    const query = scope as QuantityReadQuery & { periodNo?: string, contractId?: string, basis?: string }
+    const basis = query.basis ?? 'field'
+    assertQuantityBasis(basis)
+    const completedCondition = query.periodNo === undefined ? '' : 'AND substr(done.completed_at,1,7)=?'
+    const contractCondition = query.contractId === undefined ? '' : 'AND EXISTS(SELECT 1 FROM quantity_boq_references ref WHERE ref.id=hti.boq_line_id AND ref.project_id=b.project_id AND ref.contract_id=?)'
+    const rows = await db.select<Record<string, unknown>>(`
+      ${hiddenCtesFor('units', 'house_type_template_items', 'construction_stage_items', 'unit_stage_completions')}
+      SELECT u.id AS unit_id,u.house_type_template_id,r.id AS room_id,hti.id AS template_line_id,
+        hti.boq_line_id,hti.item_id,hti.${QUANTITY_BASIS_COLUMNS[basis]} AS selected_qty,
+        item.unit,s.id AS stage_id,s.trade,csi.id AS reporting_mapping_id,
+        done.id AS completion_id,done.completed_at
+      FROM units u JOIN floors f ON f.id=u.floor_id JOIN buildings b ON b.id=f.building_id
+      JOIN house_type_templates ht ON ht.id=u.house_type_template_id
+      JOIN rooms r ON r.template_id=ht.id JOIN house_type_template_items hti ON hti.room_id=r.id
+      JOIN items item ON item.id=hti.item_id
+      JOIN construction_stage_items csi ON csi.item_id=item.id AND csi.is_reporting_stage=1
+      JOIN construction_stages s ON s.id=csi.stage_id AND s.trade=item.trade
+      LEFT JOIN unit_stage_completions done ON done.unit_id=u.id AND done.stage_id=s.id
+        AND done.status='completed' AND done.completed_at IS NOT NULL
+        AND ${visibleCond('unit_stage_completions', 'done')} ${completedCondition}
+      WHERE b.project_id=? AND ht.project_id=? AND item.project_id=? AND s.project_id=?
+        AND ${visibleCond('units', 'u')} AND ${visibleCond('house_type_template_items', 'hti')}
+        AND ${visibleCond('construction_stage_items', 'csi')} AND hti.boq_line_id IS NOT NULL ${contractCondition}
+      ORDER BY u.id,hti.id,csi.id,done.id`, [
+      ...(query.periodNo === undefined ? [] : [query.periodNo]),
+      projectId,
+      projectId,
+      projectId,
+      projectId,
+      ...(query.contractId === undefined ? [] : [query.contractId]),
+    ])
+    put('monthly-facts', { periodNo: query.periodNo ?? null, contractId: query.contractId ?? null, basis, rows })
+    return { projectId, consumption, parts }
+  }
   const region = await loadQuantityRegionWorkspace(db, projectId)
   for (const row of region.buildings) put(`building:${row.id}`, { id: row.id, projectId })
   for (const row of region.floors) put(`floor:${row.id}`, { id: row.id, buildingId: row.buildingId, projectId })

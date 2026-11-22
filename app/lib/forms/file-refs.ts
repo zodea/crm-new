@@ -38,6 +38,12 @@ export interface FileRefRecord {
   deletedAt: string | null
 }
 
+/** Read-only attachment presentation accepts proven legacy unknowns; new uploads keep FileRefDraft. */
+export interface FileRefPresentation extends Omit<FileRefRecord, 'fileSize' | 'uploadedAt'> {
+  fileSize: number | null
+  uploadedAt: string | null
+}
+
 export interface FileRefContent {
   bytes: Uint8Array
   mimeType: string

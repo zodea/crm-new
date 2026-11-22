@@ -7,9 +7,14 @@ const object = (value: unknown): value is Row => !!value && typeof value === 'ob
 const version = (value: unknown) => typeof value === 'string' && /^[1-9]\d*$/.test(value)
 const invalid = () => financeFailure('unavailable', '付款采用的结算合同冻结证据不完整，请核对原资料。')
 function sourcesValid(value: Row) {
-  return typeof value.sourceVersion === 'string' && /^auxiliary-contract-\d+$/.test(value.sourceVersion)
+  const prefix = value.domain === 'subcontract' ? /^subcontract-contract-\d+$/ : /^auxiliary-contract-\d+$/
+  return typeof value.sourceVersion === 'string' && prefix.test(value.sourceVersion)
     && version(value.projectVersion) && typeof value.projectSourceVersion === 'string' && /^projects:\d+$/.test(value.projectSourceVersion)
     && version(value.supplierVersion) && typeof value.supplierSourceVersion === 'string' && /^suppliers:\d+$/.test(value.supplierSourceVersion)
+}
+
+function settlementContractKindValid(value: Row) {
+  return (value.domain === 'auxiliary' && value.kind === 'other_expense') || (value.domain === 'subcontract' && value.kind === 'subcontract')
 }
 
 /** Consumes only evidence returned by the settlement owner in the current transaction. */
@@ -34,7 +39,7 @@ export function createPaymentSettlementEvidence() {
       if (value.state !== 'resolved')
         return financeFailure('unavailable', '结算合同来源尚未核实，请先完成明确映射。')
       if (value.settlementId !== input.settlementId || value.settlementVersion !== input.settlementVersion || !version(value.settlementVersion)
-        || value.domain !== 'auxiliary' || value.kind !== 'other_expense' || value.domain !== input.contract.domain || value.id !== input.contract.id || value.version !== input.contract.version
+        || !settlementContractKindValid(value) || value.domain !== input.contract.domain || value.id !== input.contract.id || value.version !== input.contract.version
         || value.projectId !== input.projectId || value.supplierId !== input.supplierId || !sourcesValid(value)
         || proofs.some(row => row.settlementId === value.settlementId)) {
         return invalid()
@@ -53,7 +58,7 @@ export async function validatePaymentSettlementEvidence(tx: Pick<TransactionDb, 
     return invalid()
   const seen = new Set<string>()
   for (const proof of snapshot.paymentSettlementEvidence) {
-    if (!object(proof) || proof.state !== 'resolved' || proof.domain !== 'auxiliary' || proof.kind !== 'other_expense'
+    if (!object(proof) || proof.state !== 'resolved' || !settlementContractKindValid(proof)
       || typeof proof.settlementId !== 'string' || seen.has(proof.settlementId) || !version(proof.settlementVersion) || !version(proof.version) || !sourcesValid(proof)
       || proof.id !== snapshot.head.contract_id || proof.domain !== snapshot.head.contract_domain || proof.version !== snapshot.head.contract_version
       || proof.projectId !== snapshot.head.project_id || proof.supplierId !== snapshot.head.supplier_id
@@ -61,18 +66,27 @@ export async function validatePaymentSettlementEvidence(tx: Pick<TransactionDb, 
       return invalid()
     }
     seen.add(proof.settlementId)
-    const [settlement] = await tx.select<{ snapshot_json: string }>('SELECT snapshot_json FROM other_settlement_history WHERE settlement_id=? AND version=?', [proof.settlementId, Number(proof.settlementVersion)])
-    const [contract] = await tx.select<{ snapshot_json: string }>('SELECT snapshot_json FROM auxiliary_contract_versions WHERE id=? AND version=?', [proof.id, Number(proof.version)])
+    const subcontract = proof.domain === 'subcontract'
+    const settlements = subcontract
+      ? await tx.select<{ snapshot_json: string }>('SELECT after_json AS snapshot_json FROM owner_document_history WHERE kind=\'sub_settlement\' AND document_id=? AND json_extract(after_json,\'$.version\')=?', [proof.settlementId, Number(proof.settlementVersion)])
+      : await tx.select<{ snapshot_json: string }>('SELECT snapshot_json FROM other_settlement_history WHERE settlement_id=? AND version=?', [proof.settlementId, Number(proof.settlementVersion)])
+    const [contract] = await tx.select<{ snapshot_json: string }>(subcontract
+      ? 'SELECT snapshot_json FROM subcontract_contract_versions WHERE id=? AND version=?'
+      : 'SELECT snapshot_json FROM auxiliary_contract_versions WHERE id=? AND version=?', [proof.id, Number(proof.version)])
+    if (settlements.length !== 1)
+      return invalid()
     let settlementSnapshot: unknown
     let contractSnapshot: unknown
     try {
-      settlementSnapshot = JSON.parse(settlement?.snapshot_json ?? '')
+      settlementSnapshot = JSON.parse(settlements[0]!.snapshot_json)
       contractSnapshot = JSON.parse(contract?.snapshot_json ?? '')
     }
     catch { return invalid() }
-    if (!object(settlementSnapshot) || !object(settlementSnapshot.draft) || settlementSnapshot.id !== proof.settlementId
-      || settlementSnapshot.draft.contractId !== proof.id || settlementSnapshot.draft.projectId !== proof.projectId || settlementSnapshot.draft.supplierId !== proof.supplierId
-      || !object(contractSnapshot) || !object(contractSnapshot.draft) || contractSnapshot.draft.id !== proof.id || contractSnapshot.draft.kind !== 'other_expense'
+    if (!object(settlementSnapshot) || settlementSnapshot.id !== proof.settlementId || (subcontract && settlementSnapshot.kind !== 'sub_settlement'))
+      return invalid()
+    const settlementDraft = subcontract ? settlementSnapshot : settlementSnapshot.draft
+    if (!object(settlementDraft) || settlementDraft.contractId !== proof.id || settlementDraft.projectId !== proof.projectId || settlementDraft.supplierId !== proof.supplierId
+      || !object(contractSnapshot) || !object(contractSnapshot.draft) || contractSnapshot.draft.id !== proof.id || (!subcontract && contractSnapshot.draft.kind !== 'other_expense')
       || contractSnapshot.draft.projectId !== proof.projectId || contractSnapshot.draft.supplierId !== proof.supplierId) {
       return invalid()
     }

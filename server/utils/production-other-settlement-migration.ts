@@ -7,7 +7,7 @@ import { createHash } from 'node:crypto'
 import { auxiliaryProblem } from '../../app/lib/auxiliary-contract/contract'
 import { OTHER_SETTLEMENT_TABLES } from '../../app/lib/other-settlement/schema'
 import { validateExpenditureSettlementSchema } from '../../app/lib/other-settlement/schema-upgrade'
-import { otherSettlementFingerprint, validateOtherSettlementJournal } from '../../app/lib/other-settlement/storage'
+import { otherSettlementFingerprint, otherSettlementOwnerPredicate, validateOtherSettlementJournal } from '../../app/lib/other-settlement/storage'
 import { withVerifiedMigrationSnapshot } from './migration-snapshot'
 import { listWorkerReferences, readWorkerReference } from './production-crew-worker-references'
 import { listMigrationReferences, readMigrationReference } from './production-migration-references'
@@ -55,7 +55,14 @@ export async function readNativeOtherSettlementGraph(tx: TransactionDb, evidence
     if (existing.some(row => row.name === name))
       tables[name] = await tx.select<Row>(`SELECT * FROM ${name}`)
   }
-  const heads = tables.expenditure_settlements!
+  const allHeads = tables.expenditure_settlements!
+  const heads = await tx.select<Row>(`SELECT * FROM expenditure_settlements WHERE ${await otherSettlementOwnerPredicate(tx)}`)
+  const headIds = new Set(heads.map(head => head.id))
+  tables.expenditure_settlements = heads
+  for (const name of ['expenditure_settlement_expense_allocations', 'other_settlement_history', 'other_settlement_commands', 'other_settlement_files']) {
+    if (tables[name])
+      tables[name] = tables[name].filter(row => headIds.has(row.settlement_id))
+  }
   if (heads.some(row => typeof row.id !== 'string' || !row.id || [row.total_amount, row.amount, row.tax_rate, row.tax_amount].some(value => value !== null && value !== undefined && (typeof value !== 'number' || !Number.isFinite(value) || value < 0))))
     return fail('原结算身份或实际数值损坏')
   const refs = new Map<string, OtherSettlementNativeGraph['references'][number]>()
@@ -94,8 +101,11 @@ export async function readNativeOtherSettlementGraph(tx: TransactionDb, evidence
     retained.penalty_records = (await tx.select<Row>('SELECT * FROM penalty_records')).filter(row => penaltyIds.has(row.id))
   const files: OtherSettlementNativeGraph['files'] = []
   for (const row of await tx.select<Row>('SELECT * FROM file_refs WHERE owner_type=\'expenditure_settlement\' ORDER BY id')) {
-    if (!heads.some(head => head.id === row.owner_id))
+    if (!heads.some(head => head.id === row.owner_id)) {
+      if (allHeads.some(head => head.id === row.owner_id))
+        continue
       return fail('原结算原件归属损坏')
+    }
     const body = (await tx.select<Row>('SELECT * FROM file_payloads WHERE file_ref_id=?', [row.id]))[0]
     if (body && body.encoding !== 'base64')
       return fail('原结算原件持久编码未核验')
@@ -153,7 +163,7 @@ export async function validateOtherSettlementImportEvidence(tx: TransactionDb, i
       return fail('结算迁入原图、摘要或回执不一致')
     }
     for (const original of evidence.graph.tables.expenditure_settlements as Row[]) {
-      const current = (await tx.select<Row>('SELECT * FROM expenditure_settlements WHERE id=?', [original.id]))[0]
+      const current = (await tx.select<Row>(`SELECT * FROM expenditure_settlements WHERE id=? AND ${await otherSettlementOwnerPredicate(tx)}`, [original.id]))[0]
       if (!current)
         return fail('迁入历史结算缺失')
       // Source journals stay in immutable evidence, never become current operational authorization.
@@ -276,7 +286,7 @@ export function createProductionOtherSettlementMigration(storage: ProductionStor
       for (const raw of sourceHeads) {
         if ((await tx.select('SELECT id FROM expenditure_settlements WHERE id=?', [raw.id])).length)
           return fail('原结算稳定ID已被占用，不能覆盖')
-        const row: Row = { ...raw, version: 0, record_json: null }
+        const row: Row = { ...raw, version: 0, record_json: null, ...(targetColumns.includes('document_owner') ? { document_owner: 'other' } : {}) }
         for (const [column, type] of Object.entries(headMappings)) {
           if (row[column])
             row[column] = mappings.find(mapping => mapping.entityType === type && mapping.legacyId === row[column])!.targetId

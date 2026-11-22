@@ -121,7 +121,7 @@ function rowActions(row: OwnerDocumentListRecord): RowActionItem[] {
       </template>
       <template #negativeAmount="{ row }">
         <span class="whitespace-nowrap font-mono font-700 text-danger">
-          {{ row.amount > 0 ? `-${yuan(row.amount)}` : yuan(row.amount) }}
+          {{ row.amount === null ? '未记录' : row.amount > 0 ? `-${yuan(row.amount)}` : yuan(row.amount) }}
         </span>
       </template>
       <template #status="{ row }">

@@ -1,17 +1,70 @@
 import type { FinanceFormData } from '../../app/lib/finance/central-contract'
 import type { PaymentApplicationDetailDTO } from '../../app/lib/finance/payment-detail-contract'
 import type { FinanceDomainTx } from '../../app/lib/finance/reference'
+import type { SubcontractSettlementEvidence, SubcontractSettlementIdentity } from '../../app/lib/owner-document/subcontract-settlement'
 import type { BusinessSession } from './business-session'
 import { approvalPaymentCap, paymentConfirmationCap, readApprovalAmount } from '../../app/lib/finance/approval-amount'
 import { financeFailure, financeProblemFromUnknown } from '../../app/lib/finance/central-contract'
 import { buildPaymentApplicationInsight, roundPaymentDetailMoney } from '../../app/lib/finance/payment-detail-model'
-import { verifiedFinanceSum } from '../../app/lib/finance/persistent-rows'
+import { hasVerifiedFinanceNumbers, verifiedFinanceSum } from '../../app/lib/finance/persistent-rows'
 import { decimalNumber } from '../../app/lib/read-model/decimal'
 import { validateFinanceInvoiceAdoptions } from './production-finance-invoice-adoption'
 import { validateFinanceImportSourceEvidence } from './production-finance-journal'
+import { hasProductionSettlementRead, productionSettlementReadCapability } from './production-finance-references'
 import { financeCommandFingerprint } from './production-finance-request'
 
 type Row = Record<string, unknown>
+
+/** Existing F3 facts, read inside the caller's transaction; no inferred settlement-level cash split. */
+export async function businessApplications(tx: FinanceDomainTx, actor: BusinessSession, settlement: SubcontractSettlementIdentity): Promise<Pick<SubcontractSettlementEvidence, 'applications' | 'cashApplications'>> {
+  const missing = { applications: null, cashApplications: null }
+  if (!settlement.projectId || !settlement.supplierId || !settlement.contractId || !actor.capabilities.includes('finance-payment-application:read'))
+    return missing
+  const participant = (await tx.select<{ schema_version: number }>('SELECT schema_version FROM production_participants WHERE domain=\'finance\''))[0]
+  if (![1, 2].includes(participant?.schema_version ?? 0))
+    return missing
+  const heads = await tx.select<Row>(`SELECT DISTINCT application.* FROM payment_applications application
+    JOIN payment_application_settlement_allocations line ON line.payment_application_id=application.id
+    WHERE line.settlement_id=? ORDER BY application.id`, [settlement.id])
+  const cashReadable = actor.capabilities.includes('finance-payment-record:read')
+  const current: NonNullable<SubcontractSettlementEvidence['applications']> = []
+  const cash: NonNullable<SubcontractSettlementEvidence['applications']> = []
+  let claimIncomplete = false
+  for (const head of heads) {
+    if (!hasVerifiedFinanceNumbers('payment_applications', head))
+      financeFailure('unavailable', '实际申请金额或未知批复来源损坏，不能回填零或推算现金。')
+    const allocations = await tx.select<Row>('SELECT * FROM payment_application_settlement_allocations WHERE payment_application_id=? ORDER BY id', [head.id])
+    allocations.forEach(row => verifiedFinanceSum([row.allocated_amount]))
+    const payments = cashReadable
+      ? await tx.select<Row>(`SELECT record.id,record.no,record.payee_name,record.payment_date,record.amount,record.project_id,record.supplier_id,record.worker_id,record.confirmation_status,
+      record.deleted_at,line.allocated_amount FROM payment_record_application_allocations line JOIN payment_records record ON record.id=line.payment_record_id
+      WHERE line.payment_application_id=? AND line.deleted_at IS NULL AND record.deleted_at IS NULL ORDER BY record.id,line.id`, [head.id])
+      : null
+    payments?.forEach((row) => {
+      verifiedFinanceSum([row.amount, row.allocated_amount])
+      if (row.project_id !== head.project_id || (row.supplier_id ?? null) !== (head.supplier_id ?? null) || (row.worker_id ?? null) !== (head.worker_id ?? null))
+        financeFailure('unavailable', '原申请与已确认支付的真实归属不一致，不能猜接结算现金。')
+    })
+    const paymentRows = payments?.map(row => ({ id: String(row.id), no: String(row.no ?? ''), name: String(row.payee_name ?? ''), date: String(row.payment_date ?? '') || null, totalAmount: Number(row.amount), amount: Number(row.allocated_amount), confirmed: row.confirmation_status === 'confirmed' })) ?? null
+    const relationsMatch = head.project_id === settlement.projectId && head.supplier_id === settlement.supplierId && head.contract_id === settlement.contractId && head.worker_id === null
+    const activeTarget = allocations.some(row => row.settlement_id === settlement.id && row.deleted_at === null)
+    const status = ({ 已提交: 'submitted', 已审批: 'approved', 付款中: 'paying', 已付款: 'paid' } as Record<string, string>)[String(head.status)] ?? String(head.status)
+    const active = relationsMatch && head.deleted_at === null && activeTarget && ['submitted', 'approved', 'paying', 'paid'].includes(status)
+    if (!relationsMatch && paymentRows?.some(row => row.confirmed))
+      return missing
+    const allAllocations = allocations.map(row => ({ settlementId: String(row.settlement_id), amount: Number(row.allocated_amount) }))
+    const approval = readApprovalAmount(head.approved_amount as number | null, head.approved_amount_origin as 'legacy' | 'user-entry')
+    const entry = { id: String(head.id), no: String(head.no ?? ''), name: String(head.name ?? ''), date: String(head.apply_date ?? '') || null, applyAmount: Number(head.apply_amount), approvedAmount: approval.amount, approvedAmountState: approval.state, projectId: head.project_id as string | null, supplierId: head.supplier_id as string | null, contractId: head.contract_id as string | null, status, allocations: allAllocations, payments: paymentRows }
+    if (relationsMatch)
+      cash.push(entry)
+    if (active)
+      current.push({ ...entry, allocations: allocations.filter(row => row.deleted_at === null).map(row => ({ settlementId: String(row.settlement_id), amount: Number(row.allocated_amount) })) })
+    else if (paymentRows?.some(row => row.confirmed))
+      claimIncomplete = true
+  }
+  return { applications: claimIncomplete ? null : current, cashApplications: cash }
+}
+
 const money = (value: unknown) => typeof value === 'number' && Number.isFinite(value) ? decimalNumber(value) : null
 export function financePersistedDateTime(value: unknown): string {
   if (typeof value !== 'string')
@@ -111,7 +164,7 @@ export async function productionPaymentApplicationDetail(tx: FinanceDomainTx, ac
   const settlements: PaymentApplicationDetailDTO['settlements'] = []
   for (const allocation of draft.settlementAllocations) {
     let row: Row | null = null
-    let sourceState: 'readable' | 'frozen' | 'unavailable' | 'forbidden' = actor.capabilities.includes('other-settlement:read') ? 'unavailable' : 'forbidden'
+    let sourceState: 'readable' | 'frozen' | 'unavailable' | 'forbidden' = hasProductionSettlementRead(actor) ? 'unavailable' : 'forbidden'
     if (sourceState !== 'forbidden') {
       try {
         row = await tx.references!.read<Row>('expenditure_settlements', allocation.settlementId)
@@ -123,9 +176,17 @@ export async function productionPaymentApplicationDetail(tx: FinanceDomainTx, ac
           sourceState = 'forbidden'
       }
       if (!row && sourceState !== 'forbidden') {
-        row = await frozenReference(tx, 'expenditure_settlements', allocation.settlementId)
-        if (row)
-          sourceState = 'frozen'
+        const frozen = await frozenReference(tx, 'expenditure_settlements', allocation.settlementId)
+        if (frozen) {
+          const cap = productionSettlementReadCapability(frozen)
+          if (cap && actor.capabilities.includes(cap)) {
+            row = frozen
+            sourceState = 'frozen'
+          }
+          else if (cap) {
+            sourceState = 'forbidden'
+          }
+        }
       }
     }
     settlements.push({ id: allocation.settlementId, no: String(row?.no ?? ''), name: String(row?.name ?? ''), totalAmount: sourceState === 'readable' ? money(row?.total_amount) : null, settlementDate: String(row?.settlement_date ?? ''), status: String(row?.status ?? ''), allocatedAmount: decimalNumber(allocation.allocatedAmount), note: allocation.note, sourceState })

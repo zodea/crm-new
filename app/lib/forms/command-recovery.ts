@@ -16,11 +16,14 @@ export type RecoveryStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'
 
 /** Scope, command identity and the invoice source digest only; drafts and originals stay in page memory. */
 export function commandRecoveryKey(scope: Pick<CommandRecoveryDescriptor, 'workspaceId' | 'actorId' | 'family' | 'targetId' | 'scopeId'>) {
-  const key = `crm:form-command:v1:${[scope.family, scope.workspaceId, scope.actorId, scope.targetId ?? 'new'].map(encodeURIComponent).join(':')}`
+  const targetId = scope.family === 'owner-document-import' ? null : scope.targetId
+  const key = `crm:form-command:v1:${[scope.family, scope.workspaceId, scope.actorId, targetId ?? 'new'].map(encodeURIComponent).join(':')}`
   // Independent drafts explicitly separate their scope; ordinary entity IDs already name their owner.
   if (scope.family === 'target-cost' && scope.targetId === null && scope.scopeId)
     return `${key}:draft:${encodeURIComponent(scope.scopeId)}`
   if (scope.family === 'auxiliary-contract' && scope.targetId === null && scope.scopeId)
+    return `${key}:kind:${encodeURIComponent(scope.scopeId)}`
+  if (scope.family === 'owner-commercial-document' && scope.scopeId)
     return `${key}:kind:${encodeURIComponent(scope.scopeId)}`
   return key
 }
@@ -152,6 +155,17 @@ export function commandRecoveryFormTarget(fullPath: string): Pick<CommandRecover
       return { family: 'target-cost', targetId, ...(scopeId ? { scopeId } : {}) }
     }
     const receipt = /^\/finance\/receipt\/(?:new|form\/([^/]+))$/.exec(url.pathname)
+    const owner = /^\/owner\/(change|report|acceptance|final-settlement|penalty)\/(?:new|form\/([^/]+))$/.exec(url.pathname)
+    const subcontract = /^\/subcontract\/(change|settlement)\/(?:new|form\/([^/]+))$/.exec(url.pathname)
+    const penalty = /^\/project\/penalty\/(?:new|form\/([^/]+))$/.exec(url.pathname)
+    if (owner || subcontract || penalty) {
+      const encoded = owner?.[2] ?? subcontract?.[2] ?? penalty?.[1]
+      const targetId = encoded ? decodeURIComponent(encoded) : null
+      if (targetId !== null && (!targetId.trim() || /[\s/\\?#]/.test(targetId) || [...targetId].some(character => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127)))
+        return null
+      const ownerKinds: Record<string, string> = { 'change': 'owner_change', 'report': 'owner_report', 'acceptance': 'acceptance', 'final-settlement': 'final_settlement', 'penalty': 'owner_penalty' }
+      return { family: 'owner-commercial-document', targetId, scopeId: owner ? ownerKinds[owner[1]!]! : subcontract ? `sub_${subcontract[1] === 'change' ? 'change' : 'settlement'}` : 'project_penalty' }
+    }
     const contract = /^\/contract\/(construction|subcontract|material|other-expense|company-expense|other-settlement)\/form(?:\/([^/]+))?$/.exec(url.pathname)
     const master = /^\/base\/(crew|worker)\/form(?:\/([^/]+))?$/.exec(url.pathname)
     const signatory = /^\/settings\/our-signatories\/form(?:\/([^/]+))?$/.exec(url.pathname)
@@ -186,7 +200,7 @@ export function commandRecoveryRouteTargets(fullPath: string): Array<Pick<Comman
     return [form]
   const url = recoveryUrl(fullPath)
   if (url?.pathname === '/settings/data-migration')
-    return [{ family: 'crew-worker-import', targetId: null }, { family: 'finance-import', targetId: null }, { family: 'target-cost-import', targetId: null }, { family: 'payroll-import', targetId: null }, { family: 'schedule-import', targetId: null }, { family: 'construction-contract-import', targetId: null }, { family: 'subcontract-contract-import', targetId: null }]
+    return [{ family: 'crew-worker-import', targetId: null }, { family: 'finance-import', targetId: null }, { family: 'target-cost-import', targetId: null }, { family: 'payroll-import', targetId: null }, { family: 'schedule-import', targetId: null }, { family: 'construction-contract-import', targetId: null }, { family: 'subcontract-contract-import', targetId: null }, { family: 'owner-document-import', targetId: null }]
   if (url && /^\/contract\/(?:other-expense|company-expense)$/.test(url.pathname))
     return [{ family: 'auxiliary-contract-import', targetId: null }]
   return []

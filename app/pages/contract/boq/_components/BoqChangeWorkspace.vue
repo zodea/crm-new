@@ -14,6 +14,7 @@ import {
   BOQ_CHANGE_TYPE_LABEL,
 } from '~/lib/boq/presentation'
 import { toLocalDateInputValue } from '~/lib/util/local-date'
+import { yuan } from '~/lib/util/money'
 
 const props = defineProps<{
   workspace: BoqWorkspace
@@ -63,7 +64,7 @@ const columns: KitTableColumn[] = [
   { field: 'changeType', title: '类型', width: 90, slot: 'changeType' },
   { field: 'status', title: '状态', width: 92, slot: 'status' },
   { field: 'directiveNo', title: '甲方指令单', width: 132 },
-  { field: 'totalAmount', title: '变更金额', type: 'money', width: 128 },
+  { field: 'totalAmount', title: '变更金额', type: 'money', width: 128, slot: 'totalAmount' },
   { field: 'approvedAt', title: '签证日期', type: 'date', width: 110 },
   { field: 'attachmentCount', title: '附件', width: 72, align: 'center' },
   { type: 'action', title: '操作', width: 56 },
@@ -379,6 +380,9 @@ onChange(async (files) => {
       </template>
       <template #changeType="{ row }">
         {{ BOQ_CHANGE_TYPE_LABEL[row.changeType] }}
+      </template>
+      <template #totalAmount="{ row }">
+        {{ yuan(row.totalAmount, '未记录') }}
       </template>
       <template #status="{ row }">
         <span :class="statusClass[row.status]">{{ BOQ_CHANGE_STATUS_LABEL[row.status] }}</span>

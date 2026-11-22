@@ -76,6 +76,6 @@ export function penaltySettlementSource(penalty: OwnerCommercialDocumentSource):
     supplierId: penalty.supplierId ?? null,
     fields: [{ label: '罚扣来源', value: origins[penalty.penaltyFacts?.origin ?? ''] ?? penalty.penaltyFacts?.origin ?? null }, { label: '罚扣原因', value: penalty.penaltyReason || penalty.name }, { label: '通知单号', value: penalty.noticeNo || null }, { label: '整改期限', value: penalty.penaltyFacts?.deadline ?? null }, { label: '整改说明', value: penalty.penaltyFacts?.rectificationNote ?? null }, { label: '扣款方式', value: penalty.penaltyFacts?.deductionMethod ?? null }, { label: '备注', value: penalty.note }, { label: '创建时间', value: penalty.createdAt }, { label: '更新时间', value: penalty.updatedAt }],
     allocations: (penalty.penaltyDeductions ?? []).map(d => ({ id: d.id, targetId: d.settlementId, kind: 'settlement', amount: money(d.amount), effective: true, unavailableReason: null })),
-    files: penalty.files.filter(f => !f.deletedAt).map(f => ({ id: f.id, fileName: f.fileName, fileSize: f.fileSize, uploader: f.uploader, uploadedAt: f.uploadedAt ?? '' })),
+    files: penalty.files.filter(f => !f.deletedAt).map(f => ({ id: f.id, fileName: f.fileName, fileSize: f.fileSize, uploader: f.uploader, uploadedAt: f.uploadedAt })),
   }
 }

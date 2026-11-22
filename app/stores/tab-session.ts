@@ -210,7 +210,7 @@ export const useTabSessionStore = defineStore('tab-session', () => {
           ? descriptor.action === 'import'
           : ['crew-worker-import', 'finance-import', 'payroll-import'].includes(descriptor.family)
               ? descriptor.action === 'adopt'
-              : ['target-cost-import', 'schedule-import', 'construction-contract-import', 'subcontract-contract-import', 'auxiliary-contract-import'].includes(descriptor.family)
+              : ['target-cost-import', 'schedule-import', 'construction-contract-import', 'subcontract-contract-import', 'auxiliary-contract-import', 'owner-document-import'].includes(descriptor.family)
                   ? ['adopt', 'restore'].includes(descriptor.action)
                   : descriptor.family === 'finance-invoice' && descriptor.targetId === null
                     ? descriptor.action === 'manual'
@@ -220,7 +220,8 @@ export const useTabSessionStore = defineStore('tab-session', () => {
                         ? ['save-header', 'save-items', 'delete', 'restore'].includes(descriptor.action)
                         : ['draft', 'save', 'submit'].includes(descriptor.action)
                           || (descriptor.family === 'other-settlement' && descriptor.targetId !== null && descriptor.action === 'confirm')
-                          || (descriptor.family === 'finance-payment-record' && ['confirm', 'unconfirm'].includes(descriptor.action)))
+                          || (descriptor.family === 'finance-payment-record' && ['confirm', 'unconfirm'].includes(descriptor.action))
+                          || (descriptor.family === 'owner-commercial-document' && descriptor.targetId !== null && descriptor.action === 'delete'))
         if (permitted) {
           return fullPath
         }

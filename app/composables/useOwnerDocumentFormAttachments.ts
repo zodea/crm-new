@@ -1,18 +1,22 @@
 import type {
   FileRefChanges,
   FileRefDraft,
-  FileRefRecord,
 } from '~/lib/forms/file-refs'
+import type { OwnerDocumentAttachmentRecord } from '~/lib/owner-document/central-command-contract'
 import { computed, readonly, shallowRef } from 'vue'
+import { fileRefDraftFromFile } from '~/lib/forms/file-refs'
+import { toErrorMessage } from '~/lib/util/error'
 
 export type PendingOwnerDocumentAttachment = FileRefDraft & { localId: string }
 
 export function useOwnerDocumentFormAttachments(options: { defaultCategory?: () => string } = {}) {
-  const { warning } = useKitUI()
-  const attachments = shallowRef<FileRefRecord[]>([])
+  const { warning, error } = useKitUI()
+  const attachments = shallowRef<OwnerDocumentAttachmentRecord[]>([])
   const pendingAttachments = shallowRef<PendingOwnerDocumentAttachment[]>([])
   const pendingRemoveIds = shallowRef<string[]>([])
   const pendingRestoreIds = shallowRef<string[]>([])
+  const readingFiles = shallowRef(false)
+  let fileGeneration = 0
 
   const dirty = computed(() =>
     pendingAttachments.value.length > 0
@@ -21,12 +25,14 @@ export function useOwnerDocumentFormAttachments(options: { defaultCategory?: () 
   )
 
   function clearPending() {
+    fileGeneration++
+    readingFiles.value = false
     pendingAttachments.value = []
     pendingRemoveIds.value = []
     pendingRestoreIds.value = []
   }
 
-  function reset(files: FileRefRecord[] = []) {
+  function reset(files: OwnerDocumentAttachmentRecord[] = []) {
     attachments.value = files
     clearPending()
   }
@@ -37,6 +43,22 @@ export function useOwnerDocumentFormAttachments(options: { defaultCategory?: () 
       removeIds: pendingRemoveIds.value,
       restoreIds: pendingRestoreIds.value,
     }
+  }
+
+  function capture() {
+    return JSON.parse(JSON.stringify({ add: pendingAttachments.value, removeIds: pendingRemoveIds.value, restoreIds: pendingRestoreIds.value })) as {
+      add: PendingOwnerDocumentAttachment[]
+      removeIds: string[]
+      restoreIds: string[]
+    }
+  }
+
+  function acknowledge(files: OwnerDocumentAttachmentRecord[], sent: ReturnType<typeof capture>) {
+    attachments.value = files
+    const submitted = new Map(sent.add.map(file => [file.localId, JSON.stringify(file)]))
+    pendingAttachments.value = pendingAttachments.value.filter(file => submitted.get(file.localId) !== JSON.stringify(file))
+    pendingRemoveIds.value = pendingRemoveIds.value.filter(id => !sent.removeIds.includes(id))
+    pendingRestoreIds.value = pendingRestoreIds.value.filter(id => !sent.restoreIds.includes(id))
   }
 
   function append(files: FileRefDraft[]) {
@@ -56,12 +78,22 @@ export function useOwnerDocumentFormAttachments(options: { defaultCategory?: () 
     ]
   }
 
-  function handleFiles(files: File[]) {
-    append(files.map(file => ({
-      fileName: file.name,
-      fileSize: file.size,
-      mimeType: file.type,
-    })))
+  async function handleFiles(files: File[]) {
+    const generation = ++fileGeneration
+    readingFiles.value = true
+    try {
+      const drafts = await Promise.all(files.map(file => fileRefDraftFromFile(file)))
+      if (generation === fileGeneration)
+        append(drafts)
+    }
+    catch (cause) {
+      if (generation === fileGeneration)
+        error(`附件读取失败：${toErrorMessage(cause)}`)
+    }
+    finally {
+      if (generation === fileGeneration)
+        readingFiles.value = false
+    }
   }
 
   function toggleExisting(id: string) {
@@ -95,6 +127,9 @@ export function useOwnerDocumentFormAttachments(options: { defaultCategory?: () 
     pendingAttachments: readonly(pendingAttachments),
     pendingRemoveIds: readonly(pendingRemoveIds),
     pendingRestoreIds: readonly(pendingRestoreIds),
+    readingFiles: readonly(readingFiles),
+    capture,
+    acknowledge,
     dirty,
     reset,
     clearPending,

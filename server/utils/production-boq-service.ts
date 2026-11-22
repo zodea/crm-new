@@ -14,6 +14,7 @@ import { assertProductionBoq, boqDigest, boqFail, productionBoqAttachmentId, pro
 import { parseProductionBoqCommand } from './production-boq-request'
 import { validateProductionBoqState } from './production-boq-validation'
 import { readProductionConstructionContractFacts } from './production-construction-contract-sources'
+import { assertProductionOwnerDocumentCommandNamespace } from './production-owner-document-record'
 import { quantityCanonical } from './production-quantity-record'
 
 type Session = () => BusinessSession
@@ -123,6 +124,12 @@ export function createProductionBoqService(storage: ProductionStorage) {
     }
     const promise = (async () => {
       await run(session, true, async (tx) => {
+        if (command.action.kind === 'owner-change')
+          await assertProductionOwnerDocumentCommandNamespace(tx, actor, command.action.command.commandId, 'owner_change', { boqCommandId: command.commandId })
+        if (command.action.kind === 'owner-change'
+          && (await tx.select('SELECT command_id FROM owner_document_command_resolutions WHERE workspace_id=? AND actor_id=? AND command_id=?', [command.workspaceId, command.actorId, command.action.command.commandId])).length) {
+          return boqFail('conflict', '原商务签证编号已封存未应用，不能通过清单入口迟到重建')
+        }
         const parent = await productionBoqContractReference(tx, actor, command.contractId)
         if (parent.projectId !== command.projectId)
           return boqFail('relationship-mismatch', '真实主合同与项目不同')
@@ -150,6 +157,12 @@ export function createProductionBoqService(storage: ProductionStorage) {
         await tx.execute('INSERT INTO boq_command_intents VALUES (?,?,?,?,?,?,?,?)', [...keyOf(command), command.projectId, command.contractId, fingerprint, quantityCanonical(requestSummary(command, originalRef, attachmentRefs)), new Date().toISOString()])
       })
       return run(session, true, async (tx) => {
+        if (command.action.kind === 'owner-change')
+          await assertProductionOwnerDocumentCommandNamespace(tx, actor, command.action.command.commandId, 'owner_change', { boqCommandId: command.commandId })
+        if (command.action.kind === 'owner-change'
+          && (await tx.select('SELECT command_id FROM owner_document_command_resolutions WHERE workspace_id=? AND actor_id=? AND command_id=?', [command.workspaceId, command.actorId, command.action.command.commandId])).length) {
+          return boqFail('conflict', '原商务签证编号已明确未应用，不能迟到重建')
+        }
         const [sealed] = await tx.select('SELECT command_id FROM boq_resolutions WHERE workspace_id=? AND actor_id=? AND command_id=?', keyOf(command))
         if (sealed)
           return boqFail('conflict', '原清单编号已明确未应用，不能迟到重建')
@@ -284,7 +297,7 @@ export function createProductionBoqService(storage: ProductionStorage) {
             await tx.execute('INSERT INTO boq_lines VALUES (?,?,?,?,?,?,?,?,?,NULL)', [record.id, null, record.changeId, command.projectId, command.contractId, null, quantityCanonical(record), now, now])
             await history(tx, command, 'boq_lines', record.id, null, record)
           }
-          result = { ...result, id: saved.id, changeId: saved.id, ...(inner.action === 'delete' ? { deleted: true } : {}) }
+          result = { ...result, id: saved.id, changeId: saved.id, ownerResult: saved, ...(inner.action === 'delete' ? { deleted: true } : {}) }
         }
         else if (command.action.kind === 'reject-change') {
           const action = command.action

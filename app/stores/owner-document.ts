@@ -1,27 +1,27 @@
 import type { FileRefChanges } from '~/lib/forms/file-refs'
-import type { OwnerCommercialDocumentCommandRequestDTO } from '~/lib/owner-document/central-command-contract'
+import type { OwnerCommercialDocumentCommandRequestDTO, OwnerCommercialDocumentFormReadDTO } from '~/lib/owner-document/central-command-contract'
 import type {
   OwnerAcceptanceViewVariant,
   OwnerCommercialDocumentKind,
   OwnerCommercialDocumentListQueryDTO,
   OwnerCommercialDocumentListSummaryDTO,
 } from '~/lib/owner-document/central-repository'
+import type { OwnerDocumentCommandSession } from '~/lib/owner-document/command-intent'
 import type {
   AcceptanceLifecycleTarget,
   OwnerDocumentDraft,
   OwnerDocumentKind,
   OwnerDocumentListRecord,
   OwnerDocumentSaveAction,
+  OwnerDocumentSaveResult,
   OwnerReportAuditDraft,
 } from '~/lib/owner-document/forms'
 import type { QuantityBasis } from '~/lib/quantity/basis'
 import { defineStore } from 'pinia'
 import { readonly, shallowRef } from 'vue'
-import { SUBCONTRACT_CHANGE_WRITE_CAPABILITY } from '~/lib/owner-document/central-command-contract'
 import { ownerCommercialDocumentProblemFromUnknown } from '~/lib/owner-document/central-repository'
 import {
-  completeOwnerDocumentCommandIntent,
-  ownerDocumentCommandId,
+  createOwnerDocumentCommandSession,
 } from '~/lib/owner-document/command-intent'
 import {
   advanceOwnerDocumentFormVersion,
@@ -74,24 +74,96 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
     return centralRepositories().ownerCommercialDocumentCommands.loadForm(kind, id)
   }
 
+  const commandSessions = new Map<string, OwnerDocumentCommandSession>()
+  const lookupVersions = new Map<string, { id: string, version: string }>()
+  function rememberLookupVersions(field: string, options: Array<{ id: string, version?: string }>) {
+    for (const option of options) {
+      const key = `${field}:${option.id}`
+      if (option.version)
+        lookupVersions.set(key, { id: option.id, version: option.version })
+      else
+        lookupVersions.delete(key)
+    }
+  }
+  function lookupVersion(field: string, id: string) {
+    return lookupVersions.get(`${field}:${id}`) ?? null
+  }
+  const commandSessionVersion = shallowRef(0)
+  const commandSessionKey = (kind: OwnerCommercialDocumentKind, id: string | null) => `${kind}:${id ?? 'new'}`
+  function commandSessionFor(kind: OwnerCommercialDocumentKind, id: string | null) {
+    const key = commandSessionKey(kind, id)
+    let entry = commandSessions.get(key)
+    if (!entry) {
+      entry = createOwnerDocumentCommandSession(kind, () => centralRepositories().ownerCommercialDocumentCommands)
+      commandSessions.set(key, entry)
+      commandSessionVersion.value++
+    }
+    return entry
+  }
+  function pendingCommand(kind: OwnerDocumentKind, id: string | null) {
+    void commandSessionVersion.value
+    return usesCentralBrowser && isCentralKind(kind) ? commandSessions.get(commandSessionKey(kind, id))?.session.pending ?? null : null
+  }
+  async function hydrateCommand(kind: OwnerDocumentKind, id: string | null) {
+    if (!usesCentralBrowser || !isCentralKind(kind))
+      return null
+    const entry = commandSessionFor(kind, id)
+    if (entry.session.pending) {
+      const result = await entry.actions.recover(entry.session)
+      return { ...result, recovered: true, recoveryOutcome: result.outcome }
+    }
+    if (entry.session.authority && entry.session.targetId === id)
+      return { ...await entry.actions.revalidate(entry.session), recovered: false, recoveryOutcome: null }
+    return entry.actions.hydrate(entry.session, id)
+  }
+  async function recoverCommand(kind: OwnerDocumentKind, id: string | null) {
+    if (!usesCentralBrowser || !isCentralKind(kind))
+      throw new Error('当前适配不支持中央原命令恢复')
+    const entry = commandSessionFor(kind, id)
+    const result = await entry.actions.recover(entry.session)
+    if (result.outcome === 'applied')
+      commandSessions.set(commandSessionKey(kind, result.result.id), entry)
+    return result
+  }
+  async function refreshRelationshipVersions(kind: OwnerDocumentKind, draft: OwnerDocumentDraft) {
+    if (!usesCentralBrowser || !isCentralKind(kind))
+      return draft.relationshipVersionsJson
+    const entry = commandSessionFor(kind, draft.id ?? null)
+    const { context } = await entry.actions.revalidate(entry.session)
+    const sources = { projectId: context.projects, contractId: context.contracts, customerId: context.customers, supplierId: context.suppliers, crewId: context.crews ?? [] }
+    const versions: Record<string, { id: string, version: string }> = {}
+    for (const [field, options] of Object.entries(sources)) {
+      const id = draft[field]
+      if (typeof id !== 'string' || !id)
+        continue
+      const selected = options.find(row => row.id === id)
+      if (!selected?.version)
+        throw new Error('原关系不再是可核验的同源候选，请保留输入重新选择')
+      versions[field] = { id, version: selected.version }
+    }
+    return JSON.stringify(versions)
+  }
+
   async function centralCommand(
     kind: OwnerCommercialDocumentKind,
     id: string | null,
     baseVersion: string | null,
     values: Record<string, unknown>,
-    commandId = `owner-document-${crypto.randomUUID()}`,
+    draft: OwnerDocumentDraft = typeof values.draft === 'object' ? values.draft as OwnerDocumentDraft : { ...(id ? { id } : {}) },
   ) {
-    const context = await centralContext(kind)
-    return centralRepositories().ownerCommercialDocumentCommands.execute({
-      workspaceId: context.workspaceId,
-      actorId: context.actorId,
-      requiredCapability: (kind === 'sub_change' || kind === 'sub_settlement' || kind === 'project_penalty') ? SUBCONTRACT_CHANGE_WRITE_CAPABILITY : 'owner-document:write',
-      commandId,
-      kind,
-      id,
-      baseVersion,
-      ...values,
-    } as OwnerCommercialDocumentCommandRequestDTO)
+    const entry = commandSessionFor(kind, id)
+    if (entry.session.pending)
+      throw new Error(entry.session.pending.result ? '记录已保存待刷新，请只重新读取原单据' : '原提交结果未知，请先核对原编号')
+    if (!entry.session.context) {
+      const hydrated = await hydrateCommand(kind, id)
+      if (hydrated?.recovered)
+        throw new Error('已核对原提交，请先读取原结果再继续编辑')
+    }
+    entry.session.baseVersion = baseVersion
+    const attachments = values.attachments as FileRefChanges | undefined
+    const result = await entry.actions.saveForm(entry.session, draft, values.action as OwnerCommercialDocumentCommandRequestDTO['action'], attachments ?? {}, values)
+    commandSessions.set(commandSessionKey(kind, result.id), entry)
+    return result
   }
 
   const records = shallowRef<Partial<Record<OwnerDocumentKind, OwnerDocumentListRecord[]>>>({})
@@ -130,6 +202,9 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
       listErrors.value = { ...listErrors.value, [kind]: problem.message }
     }
     centralQueryScopes.clear()
+    lookupVersions.clear()
+    for (const entry of new Set(commandSessions.values()))
+      entry.actions.invalidate(entry.session)
   })
 
   function hasListSnapshot(kind: OwnerDocumentKind, variant?: OwnerAcceptanceViewVariant | null) {
@@ -298,9 +373,10 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
       const context = await centralContext(isCentralKind(documentKind) ? documentKind : 'owner_change')
       const search = keyword.trim().toLocaleLowerCase('zh-CN')
       const options = kind === 'project' ? context.projects : kind === 'crew' ? context.crews ?? [] : context.suppliers
+      rememberLookupVersions(`${kind}Id`, options)
       return options
         .filter(option => !search || option.label.toLocaleLowerCase('zh-CN').includes(search))
-        .map(option => ({ id: option.id, label: option.label }))
+        .map(option => ({ id: option.id, label: option.label, version: option.version }))
     }
     return listOwnerDocumentBasicOptions(kind, keyword)
   }
@@ -313,6 +389,7 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
   ) {
     if (usesCentralBrowser) {
       const context = await centralContext(side === 'owner' ? 'owner_change' : 'sub_change')
+      rememberLookupVersions('contractId', context.contracts)
       const search = keyword.trim().toLocaleLowerCase('zh-CN')
       return context.contracts
         .filter(option => option.projectId === projectId)
@@ -320,7 +397,7 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
           ? option.kind === 'construction'
           : option.kind === 'subcontract' && option.supplierId === supplierId)
         .filter(option => !search || [option.label, option.hint ?? ''].some(value => value.toLocaleLowerCase('zh-CN').includes(search)))
-        .map(option => ({ id: option.id, label: option.label, hint: option.hint }))
+        .map(option => ({ id: option.id, label: option.label, hint: option.hint, version: option.version }))
     }
     return listOwnerDocumentContractOptions(projectId, side, supplierId, keyword)
   }
@@ -330,7 +407,7 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
     draft: OwnerDocumentDraft,
     action: OwnerDocumentSaveAction,
     attachments: FileRefChanges = {},
-  ) {
+  ): Promise<OwnerDocumentSaveResult & { form?: OwnerCommercialDocumentFormReadDTO, retainedInput?: boolean }> {
     loading.value = true
     try {
       const result = usesCentralBrowser && isCentralKind(kind)
@@ -342,15 +419,13 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
               draft,
               attachments,
             }
-            const commandId = ownerDocumentCommandId(draft, { kind, id: currentId, baseVersion, ...values })
-            const command = await centralCommand(kind, currentId, baseVersion, values, commandId)
+            const command = await centralCommand(kind, currentId, baseVersion, values, draft)
             draft.id = command.id
             if (currentId)
               advanceOwnerDocumentFormVersion(draft, command.version)
             else
               initializeOwnerDocumentFormVersion(draft, command.version)
-            completeOwnerDocumentCommandIntent(draft, commandId)
-            return { id: command.id, logIds: [command.commandId] }
+            return { id: command.id, logIds: [command.commandId], form: command.form, retainedInput: command.retainedInput }
           })()
         : await saveOwnerDocumentForm(kind, draft, action, attachments)
       await refreshAfterMutation(kind)
@@ -369,10 +444,8 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
           throw new Error('签证页版本已丢失，请重新读取后再操作')
         const baseVersion = centralBaseVersion(draft)
         const values = { action: 'approve', approvedAt }
-        const commandId = ownerDocumentCommandId(draft, { kind: 'owner_change', id, baseVersion, ...values })
-        const result = await centralCommand('owner_change', id, baseVersion, values, commandId)
+        const result = await centralCommand('owner_change', id, baseVersion, values, draft)
         advanceOwnerDocumentFormVersion(draft, result.version)
-        completeOwnerDocumentCommandIntent(draft, commandId)
       }
       else {
         await approveOwnerChange(id, approvedAt)
@@ -392,10 +465,8 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
           throw new Error('审定页版本已丢失，请重新读取后再操作')
         const baseVersion = centralBaseVersion(formDraft)
         const values = { action: 'audit', audit: { lines: auditDraft.lines } }
-        const commandId = ownerDocumentCommandId(formDraft, { kind: 'owner_report', id, baseVersion, ...values })
-        const result = await centralCommand('owner_report', id, baseVersion, values, commandId)
+        const result = await centralCommand('owner_report', id, baseVersion, values, formDraft)
         advanceOwnerDocumentFormVersion(formDraft, result.version)
-        completeOwnerDocumentCommandIntent(formDraft, commandId)
       }
       else {
         await auditOwnerReport(id, auditDraft)
@@ -437,10 +508,8 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
           },
           attachments,
         }
-        const commandId = ownerDocumentCommandId(draft, { kind: 'acceptance', id, baseVersion, ...values })
-        const result = await centralCommand('acceptance', id, baseVersion, values, commandId)
+        const result = await centralCommand('acceptance', id, baseVersion, values, draft)
         advanceOwnerDocumentFormVersion(draft, result.version)
-        completeOwnerDocumentCommandIntent(draft, commandId)
       }
       else {
         await transitionAcceptance(id, target, draft, attachments)
@@ -452,8 +521,9 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
     }
   }
 
-  async function executePenaltyAction(request: Extract<OwnerCommercialDocumentCommandRequestDTO, { action: 'deduct-penalty' | 'rectify-penalty' }>) {
-    const result = await centralRepositories().ownerCommercialDocumentCommands.execute(request)
+  async function executePenaltyAction(request: Omit<Extract<OwnerCommercialDocumentCommandRequestDTO, { action: 'deduct-penalty' }>, 'commandId'> | Omit<Extract<OwnerCommercialDocumentCommandRequestDTO, { action: 'rectify-penalty' }>, 'commandId'>) {
+    const form = await centralForm('project_penalty', request.id)
+    const result = await centralCommand('project_penalty', request.id, request.baseVersion, { ...request }, form.draft)
     await refreshAfterMutation('project_penalty')
     return result
   }
@@ -496,10 +566,8 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
           action: 'attachments',
           attachments: changes,
         }
-        const commandId = ownerDocumentCommandId(draft, { kind, id, baseVersion, ...values })
-        const result = await centralCommand(kind, id, baseVersion, values, commandId)
+        const result = await centralCommand(kind, id, baseVersion, values, draft)
         advanceOwnerDocumentFormVersion(draft, result.version)
-        completeOwnerDocumentCommandIntent(draft, commandId)
         return result.attachmentIds
       }
       return await updateOwnerDocumentAttachments(kind, id, changes)
@@ -510,6 +578,11 @@ export const useOwnerDocumentStore = defineStore('owner-document', () => {
   }
 
   return {
+    refreshRelationshipVersions,
+    lookupVersion,
+    pendingCommand,
+    hydrateCommand,
+    recoverCommand,
     executePenaltyAction,
     records: readonly(records),
     listLoading: readonly(listLoading),
