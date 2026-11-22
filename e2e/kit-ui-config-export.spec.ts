@@ -14,13 +14,15 @@ interface ConfigExportTestState {
   stepStates: Record<string, string>[]
 }
 
-type ConfigExportTestWindow = Window & {
-  __configExportTest: ConfigExportTestState
+declare global {
+  interface Window {
+    __configExportTest: ConfigExportTestState
+  }
 }
 
 async function installDirectoryPicker(page: Page, failWrites = 0) {
   await page.addInitScript(({ initialFailWrites }) => {
-    const testWindow = window as ConfigExportTestWindow
+    const testWindow = window
     testWindow.__configExportTest = {
       writes: [],
       pickerCalls: 0,
@@ -90,7 +92,7 @@ async function installDirectoryPicker(page: Page, failWrites = 0) {
 
 async function observeStepper(page: Page) {
   await page.evaluate(() => {
-    const testWindow = window as ConfigExportTestWindow
+    const testWindow = window
     const capture = () => {
       const states = Object.fromEntries([...document.querySelectorAll<HTMLElement>('[aria-label="处理步骤"] [data-state]')]
         .map(element => [element.textContent?.includes('读数据') ? '读数据' : element.textContent?.includes('写盘') ? '写盘' : '生成', element.dataset.state ?? '']))
@@ -151,7 +153,7 @@ for (const input of [
     await expect(tabs.getByRole('button', { name: /^关闭 / })).toHaveCount(initialTabs)
     await expect(page.getByRole('navigation', { name: '已打开页面' }).getByRole('button', { name: '导出配置 · 分供方采购合同', exact: true })).toHaveCount(0)
 
-    const state = await page.evaluate(() => (window as ConfigExportTestWindow).__configExportTest)
+    const state = await page.evaluate(() => window.__configExportTest)
     expect(state.pickerCalls).toBe(1)
     expect(state.writes.map(write => write.path)).toEqual(input.paths)
     expect(state.writes.every(write => write.closed)).toBe(true)
@@ -194,7 +196,7 @@ test('配置导出：写盘失败保留页签并从失败步骤重试', async ({
   await expect(page).toHaveURL(/\/dev\/kit-ui$/)
   await expect(tabs.getByRole('button', { name: /^关闭 / })).toHaveCount(initialTabs)
 
-  const state = await page.evaluate(() => (window as ConfigExportTestWindow).__configExportTest)
+  const state = await page.evaluate(() => window.__configExportTest)
   expect(state.pickerCalls).toBe(2)
   expect(state.writes).toHaveLength(2)
   expect(pageErrors, '失败与重试旅程不应产生客户端运行错误').toEqual([])

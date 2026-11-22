@@ -18,7 +18,8 @@
 | 跨页面流程 | Playwright：`pnpm test:e2e`；精确文件用 `pnpm exec playwright test <files...>` | [E2E 配置](../../playwright.config.ts)，排除专用视觉矩阵；其他 E2E 仍可含截图断言 |
 | 专用视觉矩阵 | Playwright：`pnpm test:visual` | [视觉配置](../../playwright.visual.config.ts)，固定 Windows/Chromium 与隔离演示服务 |
 | 桌面 Rust | `cargo test --manifest-path src-tauri/Cargo.toml --locked` | 需要 Rust／Tauri 本机构建环境 |
-| 应用类型 | `pnpm typecheck` | Nuxt 项目类型；不覆盖普通测试、E2E 和测试配置的整体类型检查 |
+| 应用与 E2E 类型 | `pnpm typecheck` | Nuxt 项目类型；随后检查 Playwright 测试、配置及其引用的模块 |
+| 单跑 E2E 类型 | `pnpm typecheck:e2e` | [专用配置](../../tsconfig.e2e.json)继承 Nuxt 别名；首次运行需已生成 `.nuxt` 类型 |
 | 已纳入的工资测试类型 | `pnpm exec vue-tsc --noEmit -p tests/payroll/tsconfig.json` | 仅[配置](../../tests/payroll/tsconfig.json)显式纳入的文件及依赖 |
 
 `pnpm test` 不包含浏览器组件、E2E、视觉矩阵或 Rust。浏览器组件与工资测试类型检查目前也未接入推送钩子和 CI，涉及这些文件时须单独选择对应本地入口。钩子实际执行范围见 [Git 工作流](../agents/git-workflow.md)，远端套件见 [CI 使用规则](../agents/ci-usage.md)。

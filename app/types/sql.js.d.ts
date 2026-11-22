@@ -1,5 +1,5 @@
 // sql.js 官方包不带类型声明，这里只声明本项目用到的最小 API 面
-// （app/lib/db/connection.ts 与 tests/helpers/memory-db.ts）。
+// （包括应用数据库连接、测试内存库和浏览器测试夹具）。
 declare module 'sql.js' {
   export interface Statement {
     bind: (params?: unknown[]) => boolean
@@ -10,6 +10,10 @@ declare module 'sql.js' {
 
   export interface Database {
     run: (sql: string, params?: unknown[]) => Database
+    exec: (sql: string, params?: unknown[] | Record<string, unknown>) => Array<{
+      columns: string[]
+      values: Array<Array<string | number | null | Uint8Array>>
+    }>
     prepare: (sql: string) => Statement
     export: () => Uint8Array
     close: () => void

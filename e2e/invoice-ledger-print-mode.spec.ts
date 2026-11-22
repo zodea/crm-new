@@ -15,8 +15,7 @@ for (const input of [
         value: 0,
       })
       window.print = () => {
-        const target = window as Window & { __invoiceLedgerPrintCalls: number }
-        target.__invoiceLedgerPrintCalls += 1
+        window.__invoiceLedgerPrintCalls += 1
       }
     })
 
@@ -40,7 +39,7 @@ for (const input of [
     await expect(page.getByTestId('invoice-print-summary')).toContainText(`已勾 ${input.numbers.length} 张`)
 
     await page.getByRole('button', { name: '打印选中', exact: true }).click()
-    expect(await page.evaluate(() => (window as Window & { __invoiceLedgerPrintCalls: number }).__invoiceLedgerPrintCalls)).toBe(1)
+    expect(await page.evaluate(() => window.__invoiceLedgerPrintCalls)).toBe(1)
     const confirmation = page.getByRole('dialog', { name: '确认打印结果' })
     await expect(confirmation).toBeVisible()
     await expect(page.getByRole('button', { name: '返回台账', exact: true })).toBeHidden()
@@ -51,4 +50,10 @@ for (const input of [
     await expect(page.getByRole('button', { name: '打印 PDF', exact: true })).toBeVisible()
     expect(pageErrors, '台账打印入口不应产生客户端运行错误').toEqual([])
   })
+}
+
+declare global {
+  interface Window {
+    __invoiceLedgerPrintCalls: number
+  }
 }

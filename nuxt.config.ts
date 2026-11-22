@@ -5,9 +5,17 @@ export default defineNuxtConfig({
   ssr: false,
   devtools: { enabled: process.env.NUXT_DEVTOOLS !== 'false' },
 
+  $development: {
+    nitro: { sourceMap: process.env.CRM_DEV_NITRO_SOURCEMAP === '1' },
+  },
+
   nitro: {
     // sql.js 按运行时路径加载 WASM；显式携带现有依赖，构建后无需手工补文件。
-    externals: { traceInclude: ['sql.js/dist/sql-wasm.wasm'] },
+    externals: {
+      traceInclude: ['sql.js/dist/sql-wasm.wasm'],
+      // Windows 开发态的 Nitro 外置 xlsx 时会生成无法导入的裸盘符路径。
+      inline: [/[\\/]xlsx[\\/]/],
+    },
   },
 
   runtimeConfig: {

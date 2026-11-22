@@ -4,7 +4,7 @@ import { expect, test } from '@playwright/test'
 import { createVerifiedSignatory, selectVerifiedSignatory } from './helpers/contract-signatory'
 import { expectLocalHorizontalScroll, expectNoPageOverflow } from './helpers/responsive'
 
-const money = (value: number | string) => `¥${Number(value).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const money = (value: number | string | null) => value === null ? '待核实' : `¥${Number(value).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 test.describe('Issue #422 材料采购合同列表', () => {
   test.beforeEach(async ({ page }, testInfo) => {

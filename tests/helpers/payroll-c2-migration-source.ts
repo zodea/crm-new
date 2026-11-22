@@ -19,7 +19,7 @@ export async function seedPayrollC2MigrationSource(db: TestDb) {
   const configId = await upsertC2SubjectConfig(db, { projectId: 'c2-project', crewId: 'c2-crew', leaderWorkerId: 'c2-leader', unitRate: 350.125, ruleText: '' })
   const dayworkIds: string[] = []
   for (const [startTime, endTime, status] of [['08:00', '12:00', 'confirmed'], ['12:00', '16:00', 'draft']] as const) {
-    dayworkIds.push(await saveSignedDayworkRecord(db, { projectId: 'c2-project', crewId: 'c2-crew', workerId: 'c2-worker', workDate: '2026-08-02', workContent: '原始半工内容', startTime, endTime, laborUnits: 0.5, witness: status === 'confirmed' ? '证明人' : null, confirmedOn: status === 'confirmed' ? '2026-08-05' : null, status, note: '原备注' }))
+    dayworkIds.push(await saveSignedDayworkRecord(db, { projectId: 'c2-project', crewId: 'c2-crew', workerId: 'c2-worker', workDate: '2026-08-02', workContent: '原始半工内容', startTime, endTime, laborUnits: 0.5, witness: status === 'confirmed' ? '证明人' : undefined, confirmedOn: status === 'confirmed' ? '2026-08-05' : null, status, note: '原备注' }))
   }
   return { configId, dayworkIds, source: await readQuantityCoreSource(db) }
 }
