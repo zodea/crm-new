@@ -16,6 +16,7 @@ import { correctionBaselineIdentity, readInvoiceCorrectionStart } from '../../se
 import { createProductionInvoiceMigration } from '../../server/utils/production-invoice-migration'
 import { createProductionInvoiceService } from '../../server/utils/production-invoice-service'
 import { createProductionStorage } from '../../server/utils/production-storage'
+import { PRODUCTION_STORAGE_VERSION } from '../../server/utils/production-storage-schema'
 import { createProductionSupplierService } from '../../server/utils/production-supplier-service'
 import { runColdProcess } from '../helpers/cold-process'
 import { createMigratedMemoryDb } from '../helpers/memory-db'
@@ -242,7 +243,7 @@ it('明确提交更正单原子更新原票和双重回执，原件、历史及�
     const restored = await restoreBackupIsolated(backupDirectory, backup.id, restoreDirectory, 'correction-restore')
     const recovered = createProductionStorage({ ...f.options, directory: restored.directory })
     try {
-      expect((await recovered.status()).schemaVersion).toBe(33)
+      expect((await recovered.status()).schemaVersion).toBe(PRODUCTION_STORAGE_VERSION)
       const recoveredInvoice = createProductionInvoiceService(recovered)
       const recoveredCorrections = createProductionInvoiceCorrectionService(recovered, { invoice: recoveredInvoice.correctionPort })
       expect(await recoveredCorrections.get(draft.correctionId, f.session)).toEqual(correction)

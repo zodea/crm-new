@@ -218,7 +218,7 @@ export function createDomainRepositories(repositoryFetch: RepositoryFetch, repos
     materialContractRead: deferredRepository(async () => (await loadContracts()).materialContractRead, ['prices', 'fileContent', 'list', 'get']),
     materialContractCommands: deferredRepository(async () => (await loadContracts()).materialContractCommands, ['context', 'loadForm', 'execute', 'resolve']),
     ownerCommercialDocumentRead: deferredRepository(async () => (await loadCommercialDocuments()).ownerCommercialDocumentRead, ['list', 'get']),
-    ownerCommercialDocumentCommands: deferredRepository(async () => (await loadCommercialDocuments()).ownerCommercialDocumentCommands, ['context', 'loadForm', 'boqLines', 'execute']),
+    ownerCommercialDocumentCommands: deferredRepository(async () => (await loadCommercialDocuments()).ownerCommercialDocumentCommands, ['context', 'loadForm', 'boqLines', 'execute', 'resolve']),
   }
   return repositories
 }

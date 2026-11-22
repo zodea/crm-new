@@ -21,7 +21,7 @@ import { createProductionMaterialContractService } from '../../server/utils/prod
 import { createProductionOurSignatoryService } from '../../server/utils/production-our-signatory-service'
 import { createProductionProjectService } from '../../server/utils/production-project-service'
 import { createProductionStorage } from '../../server/utils/production-storage'
-import { PRODUCTION_STORAGE_SCHEMA, PRODUCTION_STORAGE_UPGRADES } from '../../server/utils/production-storage-schema'
+import { PRODUCTION_STORAGE_SCHEMA, PRODUCTION_STORAGE_UPGRADES, PRODUCTION_STORAGE_VERSION } from '../../server/utils/production-storage-schema'
 import { createProductionSupplierService } from '../../server/utils/production-supplier-service'
 import { expectFinanceCoverageMissingRejected, expectFinanceEvidenceDamageRejected } from '../helpers/finance-evidence-corruption'
 import { testTempRoot } from '../helpers/test-temp-root'
@@ -169,7 +169,7 @@ it('有合同需票付款在确认前核对真实发票并冻结证据，草稿�
     expect(await finance.execute(failedPayment, session)).toEqual(retriedPayment)
     await storage.close()
     storage = createProductionStorage({ directory, workspaceId: actor.workspaceId, ownerId: actor.actorId, purpose: 'verification' })
-    expect((await storage.status()).schemaVersion).toBe(33)
+    expect((await storage.status()).schemaVersion).toBe(PRODUCTION_STORAGE_VERSION)
     finance = createProductionFinanceService(storage, { references: productionFinanceOwners })
     expect(await finance.resolve('payment_record', payment.commandId, session)).toEqual({ outcome: 'applied', result: confirmed })
     await expect(validateFinanceJournal(storage, actor)).resolves.toBeDefined()
