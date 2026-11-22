@@ -475,8 +475,8 @@ test.describe('最终结算', () => {
       await expect(page.getByTestId('owner-final-settlement-detail')).toBeVisible({ timeout: 20_000 })
       await expect(page.getByRole('group', { name: '报审金额' })).toContainText('¥1,280,000.00')
       await expect(page.getByRole('group', { name: '审定金额' })).toContainText('未记录')
-      // 当前中央主合同 960,000 + 已确认补充协议 80,000；历史结算报审额保留 1,280,000。
-      await expect(page.getByRole('group', { name: '变更后合同额' })).toContainText('¥1,040,000.00')
+      // 中央主合同 960,000 + 已确认补充协议 80,000 + 已签证变洽签 12,800。
+      await expect(page.getByRole('group', { name: '变更后合同额' })).toContainText('¥1,052,800.00')
       await expect(page.getByRole('group', { name: '累计收款' })).toContainText('¥900,000.00')
       await expect(page.getByRole('group', { name: '结算收款差额' })).toContainText('¥380,000.00')
       await expect(page.getByText('甲方最终结算书.pdf')).toBeVisible()
@@ -488,6 +488,7 @@ test.describe('最终结算', () => {
       await expect(page).toHaveURL(/\/owner\/final-settlement\/final-settlement-real-325\?origin=real/)
 
       const sources = page.getByRole('region', { name: '最终结算来源单据，可横向滚动查看完整列' })
+      await expect(sources.getByRole('row', { name: /QZ-2026-323/ })).toContainText('¥12,800.00')
       await sources.getByRole('row', { name: /BC-2026-325/ }).getByRole('link', { name: '既有中央施工合同' }).click()
       await expect(page).toHaveURL(/\/contract\/construction-contract-existing-320\?.*tab=supplements.*focus=supplement-real-325.*returnTo=/)
       await expect(page.getByText('结算范围补充协议')).toBeVisible()
@@ -513,7 +514,7 @@ test.describe('最终结算', () => {
         await page.getByTestId('owner-document-name').fill('E2E 甲方最终结算')
         await chooseLookup(page, '检索项目', '中央正式施工项目')
         await chooseLookup(page, '检索施工合同', '既有中央施工合同')
-        await expect(page.getByTestId('owner-document-changedContractAmount')).toContainText('1,040,000.00')
+        await expect(page.getByTestId('owner-document-changedContractAmount')).toContainText('1,052,800.00')
         await expect(page.getByTestId('owner-document-receivedAmount')).toContainText('900,000.00')
         await page.getByTestId('owner-document-settlementAmount').fill('1000000')
         await page.getByTestId('owner-document-submissionDate').fill(input.date)

@@ -128,6 +128,11 @@ function ownerPage(total = 0) {
   }
 }
 
+function ownerJourneys(total = 0, subcontract = true): NonNullable<ProjectDetailReadDTO['ownerJourneys']> {
+  const pages = Object.fromEntries(['change', 'report', 'acceptance', 'warranty', 'finalSettlement', 'penalty', ...(subcontract ? ['subChange', 'subSettlement', 'projectPenalty'] : [])].map(key => [key, ownerPage(total)]))
+  return { pages, issues: subcontract ? [] : ['无分包商务单据读取权限'] } as NonNullable<ProjectDetailReadDTO['ownerJourneys']>
+}
+
 const NuxtLinkStub = defineComponent({
   props: { to: { type: [String, Object], required: true } },
   setup(props, { slots }) {
@@ -380,30 +385,30 @@ describe('项目详情中央来源边界', () => {
     expect(link.getAttribute('href')).toBe('/project/form/project-1?origin=real')
   })
 
-  it('快速切换项目时忽略较晚返回的旧项目甲方商务聚合', async () => {
+  it('快速切换项目时忽略旧项目的同次商务聚合，不另发九次商务读取', async () => {
     const detailFor = (id: string): ProjectDetailReadDTO => ({
       ...detail,
+      ownerJourneys: ownerJourneys(id === 'project-1' ? 9 : 2),
       item: {
         ...detail.item,
         dataOrigin: 'real',
         project: { ...detail.item.project, id, label: id },
       },
     })
-    get.mockImplementation(({ id }: { id: string }) => Promise.resolve(detailFor(id)))
-    const pending: Array<{ projectId: string, resolve: (value: ReturnType<typeof ownerPage>) => void }> = []
-    ownerList.mockImplementation(({ projectId }: { projectId: string }) => new Promise((resolve) => {
-      pending.push({ projectId, resolve })
+    const pending: Array<{ projectId: string, resolve: (value: ProjectDetailReadDTO) => void }> = []
+    get.mockImplementation(({ id }: { id: string }) => new Promise((resolve) => {
+      pending.push({ projectId: id, resolve })
     }))
     const rendered = renderDetail({ originHint: 'real', includeDemo: false })
-    await screen.findByRole('heading', { name: 'project-1' })
+    await vi.waitFor(() => expect(pending).toHaveLength(1))
     await rendered.rerender({ projectId: 'project-2', originHint: 'real', includeDemo: false })
-    await screen.findByRole('heading', { name: 'project-2' })
+    await vi.waitFor(() => expect(pending).toHaveLength(2))
 
     for (const request of pending.filter(entry => entry.projectId === 'project-2'))
-      request.resolve(ownerPage(2))
+      request.resolve(detailFor('project-2'))
     await screen.findByRole('link', { name: /分包变洽签.*2/ })
     for (const request of pending.filter(entry => entry.projectId === 'project-1'))
-      request.resolve(ownerPage(9))
+      request.resolve(detailFor('project-1'))
     await Promise.resolve()
 
     expect(screen.queryByText('9')).toBeNull()
@@ -412,14 +417,14 @@ describe('项目详情中央来源边界', () => {
       .toEqual(OWNER_CARD_FIXTURE.map(card => card.label).sort())
     for (const card of cards)
       expect(within(card).getByText('2', { exact: true })).not.toBeNull()
-    expect(ownerList.mock.calls.filter(([query]) => query.projectId === 'project-2').map(([query]) => `${query.kind}:${query.variant ?? ''}`).sort())
-      .toEqual(OWNER_CARD_FIXTURE.map(card => `${card.kind}:${'variant' in card ? card.variant : ''}`).sort())
+    expect(ownerList).not.toHaveBeenCalled()
     expect(screen.getByRole('heading', { name: 'project-2' })).not.toBeNull()
   })
 
   it('正式项目按同一 canonical 来源提供甲方六类单据及分包变洽签、结算入口', async () => {
     get.mockResolvedValue({
       ...detail,
+      ownerJourneys: ownerJourneys(1),
       item: { ...detail.item, dataOrigin: 'real' },
     })
     ownerList.mockResolvedValue(ownerPage(1))
@@ -472,23 +477,24 @@ describe('项目详情中央来源边界', () => {
     expect(subcontractReturnTo).toMatch(/#project-owner-document-card-sub-change$/)
     expect(subcontractChange.getAttribute('id')).toBe('project-owner-document-card-sub-change')
     expect(subcontractChange.textContent).toContain('实际审定价 ¥10.00')
-    expect(ownerList).toHaveBeenCalledWith(expect.objectContaining({ kind: 'sub_change', projectId: 'project-1' }))
+    expect(ownerList).not.toHaveBeenCalled()
   })
 
   it('缺少分包单据权限时仍保留已授权的六张甲方单据卡片', async () => {
     get.mockResolvedValue({
       ...detail,
+      ownerJourneys: ownerJourneys(1, false),
       item: { ...detail.item, dataOrigin: 'real' },
     })
-    ownerList.mockImplementation(({ kind }: { kind: string }) => kind === 'sub_change'
-      ? Promise.reject(new Error('无分包变洽签读取权限'))
-      : Promise.resolve(ownerPage(1)))
 
     renderDetail({ originHint: 'real', includeDemo: false })
 
     expect(await screen.findByRole('link', { name: /甲方变洽签/ })).not.toBeNull()
     expect(screen.getByRole('link', { name: /甲方罚扣/ })).not.toBeNull()
     expect(screen.queryByRole('link', { name: /分包变洽签/ })).toBeNull()
+    expect(screen.queryByRole('link', { name: /分包结算/ })).toBeNull()
+    expect(screen.queryByRole('link', { name: /项目罚扣/ })).toBeNull()
+    expect(ownerList).not.toHaveBeenCalled()
     expect(screen.getByRole('heading', { name: '部分项目商务单据暂不可用' })).not.toBeNull()
   })
 

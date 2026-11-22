@@ -28,6 +28,8 @@ export const COLD_ENTRIES = [
   'production-subcontract-cold',
   'production-supplier-server',
   'production-target-cost-cold',
+  'production-owner-document-cold',
+  'production-owner-document-import-cold',
   'production-wbs-cold',
 ] as const
 export type ColdEntry = typeof COLD_ENTRIES[number]

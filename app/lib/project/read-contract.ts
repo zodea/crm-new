@@ -13,6 +13,7 @@ import type {
   ReadMetaDTO,
 } from '../../types/read-model'
 import type { PayrollHostSection } from '../crew-worker/payroll-read'
+import type { OwnerCommercialDocumentListPageDTO } from '../owner-document/central-repository'
 import type { ProjectConstructionManagementFeeRead } from './construction-management-fee'
 import type { ProjectManagementFeeRead } from './management-fee'
 
@@ -152,7 +153,25 @@ export interface ProjectListSummaryDTO {
 
 export type ProjectListPageDTO = PageDTO<ProjectListItemDTO, ProjectListSummaryDTO> & { meta: ReadMetaDTO, originMeta: Record<DataOriginDTO, ReadMetaDTO> }
 
+export const PROJECT_BUSINESS_DOCUMENT_VIEWS = {
+  change: ['owner_change', null],
+  report: ['owner_report', null],
+  acceptance: ['acceptance', 'acceptance'],
+  warranty: ['acceptance', 'warranty'],
+  finalSettlement: ['final_settlement', null],
+  penalty: ['owner_penalty', null],
+  subChange: ['sub_change', null],
+  subSettlement: ['sub_settlement', null],
+  projectPenalty: ['project_penalty', null],
+} as const
+
+export interface ProjectBusinessDocumentJourneys {
+  pages: Partial<Record<keyof typeof PROJECT_BUSINESS_DOCUMENT_VIEWS, OwnerCommercialDocumentListPageDTO>>
+  issues: string[]
+}
+
 export interface ProjectDetailReadDTO {
+  ownerJourneys?: ProjectBusinessDocumentJourneys
   meta: ReadMetaDTO
   constructionManagementFees: ProjectConstructionManagementFeeRead
   managementFees: ProjectManagementFeeRead

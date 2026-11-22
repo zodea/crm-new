@@ -8,7 +8,7 @@ import { financeFailure } from '../../app/lib/finance/central-contract'
 import { isExpenseClearanceProof } from '../../app/lib/finance/clearance-verification'
 import { readVerifiedOriginalExpense } from '../../app/lib/finance/expense-reference'
 import { verifiedFinanceSum } from '../../app/lib/finance/persistent-rows'
-import { otherSettlementFingerprint, otherSettlementKey } from '../../app/lib/other-settlement/storage'
+import { otherSettlementFingerprint, otherSettlementKey, otherSettlementOwnerPredicate } from '../../app/lib/other-settlement/storage'
 import { decodeOtherSettlementCommand } from '../../app/lib/other-settlement/validation'
 import { declaredMissingClearanceOriginals } from './production-finance-clearance-originals'
 import { financeCanonical, financeCommandFingerprint, parseFinanceCommand } from './production-finance-request'
@@ -91,7 +91,7 @@ export async function readExpenseClearanceSource(tx: Db, actor: BusinessSession,
   const proofs = await readClearanceProofs(tx, original.id)
   const proof = proofs.at(-1) ?? null
   const links = await readClearanceLinks(tx, original.id)
-  const allocations = await tx.select<Row>(`SELECT a.*,h.status,h.project_id,h.payee_supplier_id,h.payee_worker_id,h.payee_name_snapshot FROM expenditure_settlement_expense_allocations a JOIN expenditure_settlements h ON h.id=a.settlement_id WHERE a.original_expense_line_id=? AND h.status IN (${CONFIRMED_SETTLEMENT_SQL_VALUES})`, [original.id])
+  const allocations = await tx.select<Row>(`SELECT a.*,expenditure_settlements.status,expenditure_settlements.project_id,expenditure_settlements.payee_supplier_id,expenditure_settlements.payee_worker_id,expenditure_settlements.payee_name_snapshot FROM expenditure_settlement_expense_allocations a JOIN expenditure_settlements ON expenditure_settlements.id=a.settlement_id WHERE a.original_expense_line_id=? AND expenditure_settlements.status IN (${CONFIRMED_SETTLEMENT_SQL_VALUES}) AND ${await otherSettlementOwnerPredicate(tx)}`, [original.id])
   const recorded = verifiedFinanceSum(graph.clearances.filter(row => row.status === 'confirmed').map(row => row.amount))
   const hasCashRead = actor.capabilities.includes('finance-payment-record:read') && actor.capabilities.includes('finance-payment-application:read')
   let q: ExpenseClearanceQualification = { state: 'not-required', message: '', verificationId: null, recordedHandledAmount: recorded, verifiedHandledAmount: 0, confirmedOtherAdoptedAmount: null, verifiedOverlapAmount: 0, newAdoptableAmount: null, legacyObligationAmount: 0, legacyPaidAmount: null, legacyUnpaidAmount: null }
@@ -247,7 +247,7 @@ export async function appendClearanceLink(tx: TransactionDb, actor: BusinessSess
   if (source.clearanceProofs.at(-1)?.id !== proof.id || source.clearanceSourceHash !== proof.sourceHash)
     return fail('旧清偿核定已失效，不能采用陈旧份额。')
   const item = proof.items.find(item => item.id === input.itemId)
-  const allocation = (await tx.select<Row>('SELECT a.*,h.project_id,h.payee_worker_id,h.payee_supplier_id,h.payee_name_snapshot,h.status,h.version AS settlement_version FROM expenditure_settlement_expense_allocations a JOIN expenditure_settlements h ON h.id=a.settlement_id WHERE a.id=?', [allocationId]))[0]
+  const allocation = (await tx.select<Row>(`SELECT a.*,expenditure_settlements.project_id,expenditure_settlements.payee_worker_id,expenditure_settlements.payee_supplier_id,expenditure_settlements.payee_name_snapshot,expenditure_settlements.status,expenditure_settlements.version AS settlement_version FROM expenditure_settlement_expense_allocations a JOIN expenditure_settlements ON expenditure_settlements.id=a.settlement_id WHERE a.id=? AND ${await otherSettlementOwnerPredicate(tx)}`, [allocationId]))[0]
   if (!item || !allocation || allocation.original_expense_line_id !== source.id || allocation.project_id !== source.projectId || allocation.payee_worker_id !== source.applicantWorkerId || allocation.payee_supplier_id !== source.applicantSupplierId)
     return fail('旧份额必须明确绑定同一原费用、归属与收款人的真实结算采用行。')
   const prior = (await tx.select<Row>('SELECT * FROM expenditure_settlement_clearance_links WHERE expense_allocation_id=? AND recognition_item_id=?', [allocationId, input.itemId]))[0]
@@ -388,7 +388,7 @@ export async function validateExpenseClearanceJournal(tx: Db, identity: { worksp
     const endpoint = frozen.allocationSnapshot
     if (!endpoint || endpoint.id !== allocation.id || endpoint.settlement_id !== allocation.settlement_id || endpoint.original_expense_line_id !== allocation.original_expense_line_id || frozen.settlementId !== allocation.settlement_id)
       return fail('旧份额采用两端稳定身份不一致。')
-    const head = (await tx.select<Row>('SELECT * FROM expenditure_settlements WHERE id=?', [allocation.settlement_id]))[0]
+    const head = (await tx.select<Row>(`SELECT * FROM expenditure_settlements WHERE id=? AND ${await otherSettlementOwnerPredicate(tx)}`, [allocation.settlement_id]))[0]
     if (!head || head.project_id !== endpoint.project_id || head.payee_supplier_id !== endpoint.payee_supplier_id || head.payee_worker_id !== endpoint.payee_worker_id || head.payee_name_snapshot !== endpoint.payee_name_snapshot)
       return fail('旧份额采用冻结收款身份或归属被改换。')
     if (Number(endpoint.settlement_version) > 0) {

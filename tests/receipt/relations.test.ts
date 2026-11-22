@@ -8,9 +8,9 @@ import { CONSTRUCTION_CONTRACT_EXISTING_RECORD, constructionContractCommandTestI
 import { constructionContractReadTestInstance } from '../../server/utils/construction-contract-read-test-instance'
 import { customerCommandTestInstance } from '../../server/utils/customer-command-test-instance'
 import { customerReadTestInstance } from '../../server/utils/customer-read-test-instance'
-import { ownerCommercialDocumentCommandTestInstance } from '../../server/utils/owner-commercial-document-command-test-instance'
+import { createOwnerCommercialDocumentCommandTestInstance, ownerCommercialDocumentCommandTestInstance } from '../../server/utils/owner-commercial-document-command-test-instance'
 import { OWNER_COMMERCIAL_DOCUMENT_READY_RECORDS } from '../../server/utils/owner-commercial-document-fixtures'
-import { ownerCommercialDocumentReadTestInstance } from '../../server/utils/owner-commercial-document-read-test-instance'
+import { createOwnerCommercialDocumentReadTestInstance, ownerCommercialDocumentReadTestInstance } from '../../server/utils/owner-commercial-document-read-test-instance'
 import { projectCommandTestInstance } from '../../server/utils/project-command-test-instance'
 import { projectReadTestInstance } from '../../server/utils/project-read-test-instance'
 import { receiptCommandTestInstance } from '../../server/utils/receipt-command-service'
@@ -63,7 +63,16 @@ describe('普通收款的独立中央关联事实', () => {
     const contractId = 'new-contract-436'
     projectCommandTestInstance.prepareImportedProjects([{ ...CONSTRUCTION_PROJECT_FIXTURE, id: projectId, name: '新中央项目' }], scope).commit()
     constructionContractCommandTestInstance.importExisting([{ ...CONSTRUCTION_CONTRACT_EXISTING_RECORD, id: contractId, draft: { ...CONSTRUCTION_CONTRACT_EXISTING_RECORD.draft, id: contractId, projectId, amount: 1000 } }], scope)
-    const context = ownerCommercialDocumentCommandTestInstance.context(session, scope, 'final_settlement')
+    const commands = createOwnerCommercialDocumentCommandTestInstance({
+      strictSources: true,
+      projectSource: projectCommandTestInstance,
+      customerSource: customerCommandTestInstance,
+      constructionContractSource: constructionContractCommandTestInstance,
+      receiptSource: sessionId => receiptReadTestInstance.facts(sessionId),
+      finalSettlementChanges: (id, sessionId) => id === contractId && sessionId === scope ? [] : null,
+    })
+    const read = createOwnerCommercialDocumentReadTestInstance(() => session.capabilities, commands)
+    const context = commands.context(session, scope, 'final_settlement')
     expect(context.projects).toContainEqual(expect.objectContaining({ id: projectId }))
     expect(context.contracts).toContainEqual(expect.objectContaining({ id: contractId, projectId, changedContractAmount: 1000, receivedAmount: 0 }))
     const first = receiptCommandTestInstance.execute({
@@ -78,10 +87,12 @@ describe('普通收款的独立中央关联事实', () => {
       attachments: {},
     }, session, scope)
     const document = { ...OWNER_COMMERCIAL_DOCUMENT_READY_RECORDS.find(row => row.kind === 'final_settlement')!, id: 'new-final-436', projectId, contractId }
-    ownerCommercialDocumentCommandTestInstance.importExisting([document], scope)
-    const detail = ownerCommercialDocumentReadTestInstance.detail('final_settlement', document.id, query, scope)
+    commands.importExisting([document], scope)
+    const detail = read.detail('final_settlement', document.id, query, scope)
     expect(detail.document.amounts.cumulativeReceipts).toBe('12.35')
     expect(detail.document.amounts.changedContract).toBe('1000.00')
+    expect(commands.rows(scope).find(row => row.id === document.id)?.finalSettlementEvidence?.changes).toEqual([])
+    expect(detail.finalSettlementEvidence?.sourceStates).toEqual({ supplements: 'readable', changes: 'readable', receipts: 'readable' })
     expect(detail.finalSettlementEvidence?.sources?.filter(row => row.kind === 'receipt').map(row => row.id)).toEqual([first.id])
   })
 

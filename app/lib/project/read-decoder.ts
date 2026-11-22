@@ -9,6 +9,8 @@ import type {
 } from './read-contract'
 import { isDataOriginDTO, isEntityKindDTO, isEntityRefDTO, isISODateDTO, isISODateTimeDTO, isUnavailableEntityNavigationDTO } from '../../types/read-model'
 import { decodePayrollHostSection } from '../crew-worker/payroll-read'
+import { decodeOwnerCommercialDocumentListPage } from '../owner-document/central-http-repository'
+import { parseOwnerCommercialDocumentListQuery } from '../owner-document/central-repository'
 import { hasConsistentOriginReadMeta, hasConsistentReadMeta } from '../read-model/meta'
 import { isMetricDTO } from '../read-model/metric'
 import { isPaginationDTO } from '../read-model/pagination'
@@ -16,6 +18,7 @@ import { problemFromHttpFailure } from '../read-model/problem'
 import { isProjectConstructionManagementFeeRead } from './construction-management-fee'
 import { isProjectManagementFeeRead } from './management-fee'
 import {
+  PROJECT_BUSINESS_DOCUMENT_VIEWS,
   PROJECT_PAGE_SIZES,
   projectProblem,
   ProjectRepositoryProblem,
@@ -285,6 +288,21 @@ export function decodeProjectDetailRead(value: unknown): ProjectDetailReadDTO {
     ))
   }
   const detail = value as unknown as ProjectDetailReadDTO
+  if (detail.ownerJourneys !== undefined) {
+    const section = detail.ownerJourneys
+    if (!isObject(section) || !isObject(section.pages) || !Array.isArray(section.issues) || !section.issues.every(issue => typeof issue === 'string'))
+      throw new ProjectRepositoryProblem(projectProblem('internal-error', '项目商务分区格式无效'))
+    for (const [key, page] of Object.entries(section.pages)) {
+      if (!Object.hasOwn(PROJECT_BUSINESS_DOCUMENT_VIEWS, key))
+        throw new ProjectRepositoryProblem(projectProblem('internal-error', '项目商务分区类型无效'))
+      const view = PROJECT_BUSINESS_DOCUMENT_VIEWS[key as keyof typeof PROJECT_BUSINESS_DOCUMENT_VIEWS]
+      const [kind, variant] = view
+      const query = parseOwnerCommercialDocumentListQuery(kind, { projectId: detail.item.project.id, origin: detail.item.dataOrigin, page: 1, pageSize: 10, ...(variant ? { variant } : {}) })
+      const actual = decodeOwnerCommercialDocumentListPage(page, query)
+      if (actual.items.some(row => row.project.state === 'resolved' && row.project.id !== detail.item.project.id) || actual.asOf !== detail.asOf)
+        throw new ProjectRepositoryProblem(projectProblem('internal-error', '项目商务分区稳定归属或读取时点不同'))
+    }
+  }
   const configuration = detail.constructionManagementFees
   const configurationProof = detail.meta.sources.find(source => source.key === 'construction-management-fee-configurations')
   if ((configuration.state === 'complete' && (!detail.capabilities.includes('construction-contract:read') || !configurationProof))

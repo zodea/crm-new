@@ -55,7 +55,6 @@ const props = withDefaults(defineProps<{
 })
 
 const repository = useNuxtApp().$repositories.projectList
-const ownerDocumentRepository = useNuxtApp().$repositories.ownerCommercialDocumentRead
 const commandStore = useProjectCommandStore()
 const productionStore = useProjectProductionStore()
 const projectSupplierCommandStore = useProjectSupplierCommandStore()
@@ -67,7 +66,6 @@ const problem = shallowRef<ProblemDTO | null>(null)
 const titleRef = useTemplateRef<HTMLHeadingElement>('titleRef')
 const materialJourneyContextId = ref(newMaterialContractReturnContextId())
 let latestLoad = 0
-let latestOwnerJourneyLoad = 0
 let hasActivated = false
 type OwnerJourneyKind = 'change' | 'report' | 'acceptance' | 'warranty' | 'final-settlement' | 'penalty' | 'sub-change' | 'sub-settlement' | 'project-penalty'
 type OwnerJourneyPages = Partial<{
@@ -150,7 +148,7 @@ const ownerJourneyCards = computed(() => {
 
 function ownerJourneyAmount(card: OwnerJourneyCard): { label: string, value: string } {
   if (card.kind !== 'sub-change')
-    return { label: '合计', value: yuan(Number(card.page.summary.origins.real.reportedAmount)) }
+    return { label: '合计', value: card.page.summary.origins.real.reportedAmount === null ? `未知${card.page.summary.origins.real.amountCompleteness?.reportedAmount ? `，已知小计 ${yuan(Number(card.page.summary.origins.real.amountCompleteness.reportedAmount.knownValue))}，缺 ${card.page.summary.origins.real.amountCompleteness.reportedAmount.missingCount} 项` : ''}` : yuan(Number(card.page.summary.origins.real.reportedAmount)) }
   const summary = card.page.summary.origins.real.subcontractActualApproved
   if (summary.value == null)
     return { label: '实际审定价', value: '尚未回填' }
@@ -280,60 +278,18 @@ async function restoreProjectAnchorContext(): Promise<boolean> {
 }
 
 async function loadOwnerJourneys() {
-  const request = ++latestOwnerJourneyLoad
-  const projectId = props.projectId
   ownerJourneys.value = null
   ownerJourneysError.value = ''
   if (props.originHint !== 'real')
     return
-  const base = {
-    includeDemo: false,
-    origin: 'real' as const,
-    search: '',
-    projectId,
-    contractId: null,
-    supplierId: null,
-    status: null,
-    documentType: null,
-    page: 1,
-    pageSize: 10 as const,
+  if (detail.value?.ownerJourneys) {
+    const embedded = detail.value.ownerJourneys
+    ownerJourneys.value = Object.keys(embedded.pages).length ? embedded.pages : null
+    ownerJourneysError.value = embedded.issues.join('；')
+    await restoreProjectAnchorContext()
+    return
   }
-  try {
-    const entries = [
-      ['change', ownerDocumentRepository.list({ ...base, kind: 'owner_change' })],
-      ['report', ownerDocumentRepository.list({ ...base, kind: 'owner_report' })],
-      ['acceptance', ownerDocumentRepository.list({ ...base, kind: 'acceptance', variant: 'acceptance' })],
-      ['warranty', ownerDocumentRepository.list({ ...base, kind: 'acceptance', variant: 'warranty' })],
-      ['finalSettlement', ownerDocumentRepository.list({ ...base, kind: 'final_settlement' })],
-      ['penalty', ownerDocumentRepository.list({ ...base, kind: 'owner_penalty' })],
-      ['subChange', ownerDocumentRepository.list({ ...base, kind: 'sub_change' })],
-      ['subSettlement', ownerDocumentRepository.list({ ...base, kind: 'sub_settlement' })],
-      ['projectPenalty', ownerDocumentRepository.list({ ...base, kind: 'project_penalty' })],
-    ] as const
-    const results = await Promise.allSettled(entries.map(([, promise]) => promise))
-    const pages: OwnerJourneyPages = {}
-    const failures: string[] = []
-    results.forEach((result, index) => {
-      const key = entries[index]![0]
-      if (result.status === 'fulfilled')
-        pages[key] = result.value
-      else
-        failures.push(result.reason instanceof Error ? result.reason.message : '读取失败')
-    })
-    if (request === latestOwnerJourneyLoad && projectId === props.projectId) {
-      ownerJourneys.value = Object.keys(pages).length ? pages : null
-      ownerJourneysError.value = failures.length
-        ? ownerJourneys.value
-          ? `部分项目商务单据暂不可用：${[...new Set(failures)].join('；')}`
-          : failures[0] ?? '项目商务单据读取失败'
-        : ''
-      await restoreProjectAnchorContext()
-    }
-  }
-  catch (cause) {
-    if (request === latestOwnerJourneyLoad && projectId === props.projectId)
-      ownerJourneysError.value = cause instanceof Error ? cause.message : '甲方商务单据读取失败'
-  }
+  ownerJourneysError.value = '当前项目响应缺少同次读取的商务单据来源，请重新读取项目。'
 }
 
 useTabTitle(() => item.value?.project.label)
@@ -590,9 +546,9 @@ onActivated(() => {
     </section>
 
     <section class="panel min-w-0 overflow-hidden p-3" aria-labelledby="project-owner-document-title">
-      <SectionHeader id="project-owner-document-title" title="项目商务单据" subtitle="按当前项目稳定 ID 进入收入侧单据与分包变洽签中央正式链，返回时保留项目上下文" />
+      <SectionHeader id="project-owner-document-title" title="项目商务单据" subtitle="合同、变洽签、报量、验收保修、结算和罚扣按原稳定 ID 互相查阅，返回时保留项目上下文" />
       <div v-if="ownerJourneys" class="mt-3">
-        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7">
+        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <NuxtLink
             v-for="card in ownerJourneyCards"
             :id="`project-owner-document-card-${card.kind}`"
@@ -606,9 +562,9 @@ onActivated(() => {
             <span class="mt-1 block text-11px text-ink-soft">{{ ownerJourneyAmount(card).label }} {{ ownerJourneyAmount(card).value }}</span>
           </NuxtLink>
         </div>
-        <StatePanel v-if="ownerJourneysError" class="mt-3" kind="error" title="部分项目商务单据暂不可用" :description="ownerJourneysError" action-label="重新读取" compact @action="loadOwnerJourneys" />
+        <StatePanel v-if="ownerJourneysError" class="mt-3" kind="error" title="部分项目商务单据暂不可用" :description="ownerJourneysError" action-label="重新读取" compact @action="loadProject" />
       </div>
-      <StatePanel v-else-if="ownerJourneysError" class="mt-3" kind="error" title="项目商务单据读取失败" :description="ownerJourneysError" action-label="重新读取" compact @action="loadOwnerJourneys" />
+      <StatePanel v-else-if="ownerJourneysError" class="mt-3" kind="error" title="项目商务单据读取失败" :description="ownerJourneysError" action-label="重新读取" compact @action="loadProject" />
       <StatePanel v-else-if="originHint !== 'real'" class="mt-3" kind="empty" title="演示项目不提供正式项目商务单据" description="切换到正式项目后可查看收入侧单据与分包变洽签主链。" compact />
       <StatePanel v-else class="mt-3" kind="loading" title="正在读取项目商务单据" compact />
     </section>

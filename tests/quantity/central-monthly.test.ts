@@ -1,7 +1,10 @@
 import type { TestDb } from '../helpers/memory-db'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { loadQuantityMonthlyBoqFacts } from '~/lib/quantity/central-monthly'
+import { productionQuantityVersion } from '../../server/utils/production-quantity-record'
 import { createMigratedMemoryDb } from '../helpers/memory-db'
+
+const lines = [{ id: 'boq', contractId: 'contract', contractName: '当前合同', contractNo: 'HT', itemName: '清单', unit: '㎡', qty: 100, unitPrice: 2, approvedDeltaQty: 0, effectiveUnitPrice: 2, building: null, updatedAt: null }]
 
 let db: TestDb
 beforeEach(async () => {
@@ -26,8 +29,30 @@ beforeEach(async () => {
 afterEach(() => db.close())
 
 describe('当前工程量至甲方月报', () => {
+  it('报量消费版本包含所选月份真实完成事实，其他月份修改不覆盖本期依据', async () => {
+    await db.execute('UPDATE unit_stage_completions SET completed_at = ? WHERE id = ?', ['2026-06-16', 'completion-2'])
+    await db.execute('INSERT INTO construction_stages (id, project_id, code, name, trade) VALUES (?, ?, ?, ?, ?)', ['unused-stage', 'project', 'S2', '未采用阶段', '油漆工'])
+    const query = { projectId: 'project', origin: 'real' as const, includeDemo: false, periodNo: '2026-05' }
+    const before = await productionQuantityVersion(db, query.projectId, query, 'monthly')
+    await db.execute('UPDATE unit_stage_completions SET updated_at = ? WHERE id = ?', ['2026-10-07T09:00:00.000Z', 'completion-1'])
+    expect(await productionQuantityVersion(db, query.projectId, query, 'monthly')).toBe(before)
+    await db.execute('UPDATE unit_stage_completions SET status = ? WHERE id = ?', ['draft', 'completion-1'])
+    const changed = await productionQuantityVersion(db, query.projectId, query, 'monthly')
+    expect(changed).not.toBe(before)
+    await db.execute('UPDATE unit_stage_completions SET status = ?, updated_at = ? WHERE id = ?', ['draft', '2026-10-07T10:00:00.000Z', 'completion-2'])
+    expect(await productionQuantityVersion(db, query.projectId, query, 'monthly')).toBe(changed)
+    await db.execute('UPDATE construction_stages SET name = ? WHERE id = ?', ['未采用阶段新名称', 'unused-stage'])
+    expect(await productionQuantityVersion(db, query.projectId, query, 'monthly')).toBe(changed)
+  })
+  it('指定新月份仅对实际已配置报量范围返回真实零，未配置仍拒绝且不借其他月量', async () => {
+    const load = () => loadQuantityMonthlyBoqFacts(db, 'project', lines, 'new-month-version', 'field', '2099-12')
+    expect(await load()).toMatchObject([{ boqLineId: 'boq', periodNo: '2099-12', autoQty: 0, missingQtyCount: 0 }])
+    await db.execute('UPDATE construction_stage_items SET is_reporting_stage = 0')
+    await expect(load()).rejects.toMatchObject({ problem: { code: 'validation-failed' } })
+    await db.execute('UPDATE units SET deleted_at = ?', ['2026-10-07T04:00:00.000Z'])
+    expect(await load()).toEqual([])
+  })
   it('已完成且明确报量的阶段才计量，模板现场量实时生效并保留缺量计数', async () => {
-    const lines = [{ id: 'boq', contractId: 'contract', contractName: '当前合同', contractNo: 'HT', itemName: '清单', unit: '㎡', qty: 100, unitPrice: 2, approvedDeltaQty: 0, effectiveUnitPrice: 2, building: null, updatedAt: null }]
     const load = () => loadQuantityMonthlyBoqFacts(db, 'project', lines, 'current-version')
     const before = await load()
     expect(before).toHaveLength(1)

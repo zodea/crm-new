@@ -48,6 +48,10 @@ export interface OwnerDocumentDraft {
   contractId?: string | null
   supplierId?: string | null
   crewId?: string | null
+  relationshipVersionsJson?: string
+  quantityConsumedVersion?: string
+  quantitySourceVersion?: string | null
+  quantitySourceUpdatedAt?: string | null
   lines?: Array<Record<string, unknown>>
 }
 
@@ -71,7 +75,7 @@ export interface OwnerDocumentListRecord {
   crewName: string
   type: string
   period: string
-  amount: number
+  amount: number | null
   secondaryAmount: number | null
   tertiaryAmount: number | null
   quantity: number | null
@@ -100,6 +104,9 @@ export interface OwnerDocumentListRecord {
 }
 
 export interface OwnerDocumentBoqLine {
+  quantityConsumedVersion?: string
+  quantitySourceVersion?: string
+  quantitySourceUpdatedAt?: string | null
   unitType?: string | null
   floorZone?: string | null
   id: string
@@ -133,6 +140,7 @@ export interface OwnerDocumentLookupOption {
   id: string
   label: string
   hint?: string
+  version?: string
 }
 
 interface ContractRef {

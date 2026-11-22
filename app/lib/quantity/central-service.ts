@@ -213,7 +213,8 @@ export function createQuantityService(options: Options) {
         const source = await currentBoq(project.id, context)
         const facts = await quantityTransaction(options.database, async (db) => {
           await projectMirror(db, project)
-          return loadQuantityMonthlyBoqFacts(db, project.id, source.lines, `${await version(db, project.id, scope, 'monthly')}+${source.sourceVersion}:${scope.basis ?? 'field'}`, scope.basis)
+          const consumedLines = scope.contractId ? source.lines.filter(line => line.contractId === scope.contractId) : source.lines
+          return loadQuantityMonthlyBoqFacts(db, project.id, consumedLines, `${await version(db, project.id, scope, 'monthly')}+${source.sourceVersion}:${scope.basis ?? 'field'}`, scope.basis, scope.periodNo)
         })
         if ((await currentBoq(project.id, context)).sourceVersion !== source.sourceVersion)
           throw quantityProblem('stale-source', '施工合同清单已变化，请重新读取月度工程量')

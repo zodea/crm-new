@@ -73,7 +73,7 @@ watch(() => `${props.fact.settlementId}:${props.fact.id}`, load, { immediate: tr
       <h4>源单附件</h4>
       <ul v-if="document.files.length">
         <li v-for="file in document.files" :key="file.id">
-          {{ file.fileName }} · {{ file.fileSize }} 字节 · {{ file.uploader || '上传人未记录' }} · {{ file.uploadedAt || '时间未记录' }}
+          {{ file.fileName }} · {{ file.fileSize === null ? '大小未知' : `${file.fileSize} 字节` }} · {{ file.uploader || '上传人未记录' }} · {{ file.uploadedAt || '时间未记录' }}
         </li>
       </ul>
       <p v-else class="text-ink-soft">

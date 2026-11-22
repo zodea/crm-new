@@ -1,4 +1,5 @@
 import type { ProblemDTO } from '../../types/read-model'
+import type { CommandRecoveryDescriptor } from '../forms/command-recovery'
 import type {
   OwnerCommercialDocumentCommandContextDTO,
   OwnerCommercialDocumentCommandRepository,
@@ -60,6 +61,10 @@ function nullableString(value: unknown): boolean {
 
 function finite(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value)
+}
+
+function nullableFinite(value: unknown): value is number | null {
+  return value === null || finite(value)
 }
 
 function count(value: unknown, minimum = 0): value is number {
@@ -125,29 +130,29 @@ function amounts(value: unknown): boolean {
   if (!object(value))
     return false
   if (value.kind === 'owner_change') {
-    return money(value.boqChange) && money(value.taxInclusive) && money(value.taxExclusive)
-      && money(value.appliedTaxExclusive)
+    return nullableMoney(value.boqChange) && nullableMoney(value.taxInclusive) && nullableMoney(value.taxExclusive)
+      && nullableMoney(value.appliedTaxExclusive)
   }
   if (value.kind === 'owner_report') {
-    return money(value.reported)
+    return nullableMoney(value.reported)
       && nullableMoney(value.audited) && nullableMoney(value.difference)
   }
   if (value.kind === 'final_settlement') {
-    return money(value.declared) && nullableMoney(value.audited)
+    return nullableMoney(value.declared) && nullableMoney(value.audited)
       && nullableMoney(value.changedContract) && nullableMoney(value.cumulativeReceipts)
       && nullableMoney(value.receiptDifference)
   }
   if (value.kind === 'project_penalty')
-    return money(value.amount) && money(value.deducted) && money(value.remaining)
+    return nullableMoney(value.amount) && money(value.deducted) && nullableMoney(value.remaining)
   if (value.kind === 'owner_penalty')
-    return money(value.amount)
+    return nullableMoney(value.amount)
   if (value.kind === 'sub_settlement')
-    return money(value.total) && ['contractAmount', 'priorSettled', 'cumulativeSettled', 'deductions', 'netSettlement', 'cumulativeApplied', 'remainingApplicable', 'cumulativePaid', 'remainingUnpaid'].every(key => value[key] === null || money(value[key]))
+    return nullableMoney(value.total) && ['contractAmount', 'priorSettled', 'cumulativeSettled', 'deductions', 'netSettlement', 'cumulativeApplied', 'remainingApplicable', 'cumulativePaid', 'remainingUnpaid'].every(key => value[key] === null || money(value[key]))
   if (value.kind === 'sub_change') {
-    return money(value.approved) && nullableQuantity(value.changedArea)
+    return nullableMoney(value.approved) && nullableQuantity(value.changedArea)
       && nullableMoney(value.actualApproved)
   }
-  return value.kind === 'acceptance' && money(value.contractEstimate)
+  return value.kind === 'acceptance' && nullableMoney(value.contractEstimate)
 }
 
 function acceptanceView(value: unknown): boolean {
@@ -189,6 +194,17 @@ function listItem(value: unknown): boolean {
       && ownerPenaltyListFacts(value.ownerPenaltyFacts)
       && (value.kind === 'owner_penalty' ? value.ownerPenaltyFacts !== null : value.ownerPenaltyFacts === null)
       && (value.attachmentCount === undefined || count(value.attachmentCount))
+      && recordedRelations(value.recordedRelations, value)
+}
+
+function recordedRelations(value: unknown, host: Record<string, unknown>): boolean {
+  if (value === undefined)
+    return true
+  const pairs = [['projectName', 'project'], ['customerName', 'customer'], ['supplierName', 'supplier'], ['contractName', 'contract'], ['crewName', 'crew']]
+  return object(value) && Object.keys(value).length === pairs.length && pairs.every(([key, relation]) => {
+    const reference = host[relation!]
+    return typeof value[key!] === 'string' && (!(object(reference) && reference.state === 'forbidden') || value[key!] === '')
+  })
 }
 
 function ownerPenaltyListFacts(value: unknown): boolean {
@@ -214,10 +230,15 @@ function subcontractActualApprovedSummary(value: unknown): boolean {
 }
 
 function originSummary(value: unknown): boolean {
+  const keys = ['reportedAmount', 'auditedAmount', 'taxInclusiveAmount', 'taxExclusiveAmount', 'appliedTaxExclusiveAmount', 'subcontractApprovedAmount', 'differenceAmount']
   return object(value) && count(value.count)
-    && ['reportedAmount', 'auditedAmount', 'taxInclusiveAmount', 'taxExclusiveAmount', 'appliedTaxExclusiveAmount', 'subcontractApprovedAmount']
-      .every(key => money(value[key]))
-      && subcontractActualApprovedSummary(value.subcontractActualApproved)
+    && object(value.amountCompleteness)
+    && keys.every((key) => {
+      const evidence = (value.amountCompleteness as Record<string, unknown>)[key]
+      return object(evidence) && money(evidence.knownValue) && count(evidence.missingCount) && evidence.missingCount <= Number(value.count)
+        && nullableMoney(value[key]) && (evidence.missingCount === 0 ? value[key] === evidence.knownValue : value[key] === null)
+    })
+    && subcontractActualApprovedSummary(value.subcontractActualApproved)
 }
 
 function listSummary(value: unknown): boolean {
@@ -235,12 +256,12 @@ function documentLine(value: unknown): boolean {
     && nullableQuantity(value.autoQty) && nullableQuantity(value.reportedQty)
     && nullableQuantity(value.auditedQty) && nullableQuantity(value.deltaQty)
     && nullableMoney(value.newUnitPrice) && nullableMoney(value.auditedAmount)
-    && money(value.amount) && typeof value.note === 'string'
+    && nullableMoney(value.amount) && typeof value.note === 'string'
 }
 
 function detailFile(value: unknown): boolean {
   return object(value) && typeof value.id === 'string' && typeof value.fileName === 'string'
-    && finite(value.fileSize) && typeof value.mimeType === 'string' && typeof value.category === 'string'
+    && (value.fileSize === null || (finite(value.fileSize) && Number.isSafeInteger(value.fileSize) && Number(value.fileSize) >= 0)) && typeof value.mimeType === 'string' && typeof value.category === 'string'
     && typeof value.uploader === 'string' && nullableDateTime(value.uploadedAt)
 }
 
@@ -276,15 +297,32 @@ function finalSettlementEvidence(value: unknown): boolean {
   if (value === null)
     return true
   return object(value) && typeof value.basis === 'string' && typeof value.differenceNote === 'string'
+    && (value.sourceStates === undefined || (object(value.sourceStates) && ['supplements', 'changes', 'receipts'].every(key => ['readable', 'unavailable', 'forbidden'].includes(String((value.sourceStates as Record<string, unknown>)[key])))))
     && (value.sources === null || (Array.isArray(value.sources) && value.sources.every(source => object(source)
-      && ['contract-supplement', 'receipt'].includes(String(source.kind))
+      && ['contract-supplement', 'owner-change', 'receipt'].includes(String(source.kind))
       && ['id', 'no', 'name', 'status', 'statusLabel'].every(key => typeof source[key] === 'string')
-      && money(source.amount) && nullableDate(source.date) && navigation(source.navigation))))
+      && nullableMoney(source.amount) && nullableDate(source.date) && navigation(source.navigation))))
+}
+
+function subcontractSettlementEvidence(value: unknown): boolean {
+  if (value === undefined)
+    return true
+  return object(value) && nullableMoney(value.originalContractAmount) && nullableMoney(value.effectiveContractAmount)
+    && object(value.sections) && ['supplements', 'changes', 'settlements', 'penalties', 'applications', 'payments'].every((key) => {
+    const rows = (value.sections as Record<string, unknown>)[key]
+    return rows === null || (Array.isArray(rows) && rows.every(row => object(row)
+      && ['id', 'no', 'name', 'status', 'note'].every(field => typeof row[field] === 'string')
+      && nullableDate(row.date) && nullableMoney(row.amount) && nullableMoney(row.allocatedAmount) && nullableMoney(row.approvedAmount)
+      && (row.approvedAmountState === null || ['known', 'not-entered', 'legacy-unknown'].includes(String(row.approvedAmountState)))
+      && (row.approvedAmountState === 'known' ? row.approvedAmount !== null : row.approvedAmount === null)
+      && navigation(row.navigation)))
+  })
 }
 
 function lookup(value: unknown): boolean {
   return object(value) && typeof value.id === 'string' && typeof value.label === 'string'
     && (value.hint === undefined || typeof value.hint === 'string')
+    && (value.version === undefined || (typeof value.version === 'string' && value.version.length > 0))
 }
 
 function contractLookup(value: unknown): boolean {
@@ -296,9 +334,9 @@ function contractLookup(value: unknown): boolean {
 }
 
 function fileRecord(value: unknown, ownerType?: string, ownerId?: string): boolean {
-  return object(value) && ['id', 'ownerType', 'ownerId', 'fileName', 'filePath', 'mimeType', 'category', 'uploader', 'uploadedAt']
+  return object(value) && ['id', 'ownerType', 'ownerId', 'fileName', 'filePath', 'mimeType', 'category', 'uploader']
     .every(key => typeof value[key] === 'string')
-    && finite(value.fileSize) && isISODateTimeDTO(value.uploadedAt)
+    && (value.fileSize === null || (finite(value.fileSize) && Number.isSafeInteger(value.fileSize) && Number(value.fileSize) >= 0)) && nullableDateTime(value.uploadedAt)
     && (value.deletedAt === null || isISODateTimeDTO(value.deletedAt))
     && (ownerType === undefined || value.ownerType === ownerType)
     && (ownerId === undefined || value.ownerId === ownerId)
@@ -308,6 +346,9 @@ function boqLine(value: unknown): boolean {
   return object(value) && typeof value.id === 'string' && typeof value.itemName === 'string'
     && typeof value.unit === 'string' && (value.qty === null || finite(value.qty)) && (value.unitPrice === null || finite(value.unitPrice))
     && finite(value.autoQty) && finite(value.missingQtyCount)
+    && (value.quantityConsumedVersion === undefined || (typeof value.quantityConsumedVersion === 'string' && value.quantityConsumedVersion.length > 0))
+    && (value.quantitySourceVersion === undefined || (typeof value.quantitySourceVersion === 'string' && value.quantitySourceVersion.length > 0))
+    && (value.quantitySourceUpdatedAt === undefined || nullableDateTime(value.quantitySourceUpdatedAt))
 }
 
 function problemPayload(cause: unknown): ProblemDTO | null {
@@ -331,9 +372,15 @@ async function read<T>(request: () => Promise<unknown>, decode: (value: unknown)
   }
 }
 
-function decodeList(value: unknown, expected: OwnerCommercialDocumentListQueryDTO): OwnerCommercialDocumentListPageDTO {
+function ownerDocumentReadSchema(value: unknown): string {
+  if (object(value) && object(value.meta) && ['owner-document-read-v2', 'owner-document-read-v3'].includes(String(value.meta.schemaVersion)))
+    return String(value.meta.schemaVersion)
+  return ''
+}
+
+export function decodeOwnerCommercialDocumentListPage(value: unknown, expected: OwnerCommercialDocumentListQueryDTO): OwnerCommercialDocumentListPageDTO {
   const requiredCapability = (expected.kind === 'sub_change' || expected.kind === 'sub_settlement' || expected.kind === 'project_penalty') ? 'subcontract-document:read' : 'owner-document:read'
-  if (!object(value) || !hasConsistentOriginReadMeta(value, 'owner-document-read-v2') || !Array.isArray(value.items) || !value.items.every(listItem)
+  if (!object(value) || !hasConsistentOriginReadMeta(value, ownerDocumentReadSchema(value)) || !Array.isArray(value.items) || !value.items.every(listItem)
     || !isPaginationDTO(value.pagination, value.items.length)
     || !listSummary(value.summary) || !strings(value.capabilities)
     || !isISODateTimeDTO(value.asOf) || !nullableString(value.sourceVersion)
@@ -362,7 +409,7 @@ function projectPenaltyFacts(value: Record<string, unknown>): boolean {
 
 function decodeDetail(value: unknown, expected: OwnerCommercialDocumentDetailQueryDTO): OwnerCommercialDocumentDetailReadDTO {
   const requiredCapability = (expected.kind === 'sub_change' || expected.kind === 'sub_settlement' || expected.kind === 'project_penalty') ? 'subcontract-document:read' : 'owner-document:read'
-  if (!object(value) || !hasConsistentReadMeta(value, 'owner-document-read-v2', value.dataOrigin) || !isDataOriginDTO(value.dataOrigin) || !detailDocument(value.document)
+  if (!object(value) || !hasConsistentReadMeta(value, ownerDocumentReadSchema(value), value.dataOrigin) || !isDataOriginDTO(value.dataOrigin) || !detailDocument(value.document)
     || !Array.isArray(value.lines) || !value.lines.every(documentLine)
     || !Array.isArray(value.files) || !value.files.every(detailFile)
     || !object(value.document) || !relationNavigation(value.projectNavigation, value.document.project, value.dataOrigin) || !relationNavigation(value.customerNavigation, value.document.customer, value.dataOrigin)
@@ -371,6 +418,8 @@ function decodeDetail(value: unknown, expected: OwnerCommercialDocumentDetailQue
     || !navigation(value.documentNavigation) || !acceptanceView(value.acceptanceView)
     || !Array.isArray(value.lifecycleEvents) || !value.lifecycleEvents.every(lifecycleEvent)
     || !finalSettlementEvidence(value.finalSettlementEvidence)
+    || !subcontractSettlementEvidence(value.subcontractSettlementEvidence)
+    || !recordedRelations(value.recordedRelations, value.document)
     || (expected.kind === 'project_penalty' && !projectPenaltyFacts(value))
     || !ownerPenaltyFacts(value.ownerPenaltyFacts)
     || !object(value.document)
@@ -404,7 +453,7 @@ function decodeContext(value: unknown): OwnerCommercialDocumentCommandContextDTO
 function draftLine(value: unknown, kind: 'owner_change' | 'owner_report'): boolean {
   if (!object(value) || typeof value.id !== 'string' || !nullableString(value.boqLineId)
     || typeof value.itemName !== 'string' || typeof value.unit !== 'string'
-    || typeof value.note !== 'string' || !finite(value.amount)) {
+    || typeof value.note !== 'string' || !nullableFinite(value.amount)) {
     return false
   }
   const numericFields = [
@@ -444,7 +493,7 @@ function formDraft(
   if (kind === 'final_settlement') {
     return typeof value.name === 'string' && typeof value.submissionDate === 'string'
       && (value.submissionDate === '' || isISODateDTO(value.submissionDate))
-      && finite(value.settlementAmount)
+      && nullableFinite(value.settlementAmount)
       && (value.auditedAmount === null || finite(value.auditedAmount))
       && (value.changedContractAmount === null || finite(value.changedContractAmount))
       && (value.receivedAmount === null || finite(value.receivedAmount))
@@ -453,20 +502,20 @@ function formDraft(
       && value.lines.length === 0
   }
   if (kind === 'project_penalty')
-    return finite(value.amount) && typeof value.reason === 'string' && nullableString(value.supplierId) && typeof value.penaltyDate === 'string' && (value.penaltyDate === '' || isISODateDTO(value.penaltyDate)) && typeof value.rectificationNote === 'string' && typeof value.deadline === 'string' && value.lines.length === 0
+    return nullableFinite(value.amount) && typeof value.reason === 'string' && nullableString(value.supplierId) && typeof value.penaltyDate === 'string' && (value.penaltyDate === '' || isISODateDTO(value.penaltyDate)) && typeof value.rectificationNote === 'string' && typeof value.deadline === 'string' && value.lines.length === 0
   if (kind === 'owner_penalty') {
     return typeof value.name === 'string' && typeof value.noticeNo === 'string'
-      && finite(value.amount) && typeof value.penaltyDate === 'string'
+      && nullableFinite(value.amount) && typeof value.penaltyDate === 'string'
       && (value.penaltyDate === '' || isISODateDTO(value.penaltyDate))
       && typeof value.reason === 'string' && typeof value.appealNote === 'string'
       && value.lines.length === 0
   }
   if (kind === 'sub_settlement')
-    return typeof value.name === 'string' && nullableString(value.supplierId) && typeof value.settlementType === 'string' && typeof value.settlementDate === 'string' && (value.settlementDate === '' || isISODateDTO(value.settlementDate)) && finite(value.totalAmount) && typeof value.deductionNote === 'string' && value.lines.length === 0
+    return typeof value.name === 'string' && nullableString(value.supplierId) && typeof value.settlementType === 'string' && typeof value.settlementDate === 'string' && (value.settlementDate === '' || isISODateDTO(value.settlementDate)) && nullableFinite(value.totalAmount) && typeof value.deductionNote === 'string' && value.lines.length === 0
   if (kind === 'sub_change') {
     return nullableString(value.supplierId) && typeof value.changeType === 'string'
       && typeof value.changeDate === 'string' && (value.changeDate === '' || isISODateDTO(value.changeDate))
-      && finite(value.approvedAmount)
+      && nullableFinite(value.approvedAmount)
       && (value.changedArea === null || finite(value.changedArea))
       && (value.actualApprovedPrice === null || finite(value.actualApprovedPrice))
       && typeof value.reason === 'string' && value.lines.length === 0
@@ -478,11 +527,11 @@ function formDraft(
   if (kind === 'owner_change') {
     return typeof value.name === 'string' && typeof value.documentType === 'string'
       && nullableDate(value.approvalDate) && typeof value.reason === 'string'
-      && finite(value.approvedTaxInclusiveAmount) && finite(value.approvedTaxExclusiveAmount)
-      && finite(value.appliedTaxExclusiveAmount) && finite(value.totalAmount)
+      && nullableFinite(value.approvedTaxInclusiveAmount) && nullableFinite(value.approvedTaxExclusiveAmount)
+      && nullableFinite(value.appliedTaxExclusiveAmount) && nullableFinite(value.totalAmount)
   }
   if (kind === 'acceptance') {
-    return typeof value.name === 'string' && finite(value.contractEstimate)
+    return typeof value.name === 'string' && nullableFinite(value.contractEstimate)
       && typeof value.acceptanceOrganization === 'string'
       && typeof value.acceptancePerson === 'string'
       && nullableDate(value.acceptanceDate)
@@ -498,7 +547,7 @@ function formDraft(
     && (value.periodNo === '' || /^\d{4}-(?:0[1-9]|1[0-2])$/.test(value.periodNo))
     && typeof value.operatorName === 'string' && nullableString(value.quantityBasis)
     && nullableString(value.quantitySourceVersion) && nullableDateTime(value.quantitySourceUpdatedAt)
-    && nullableDateTime(value.submittedAt) && finite(value.reportedAmount)
+    && nullableDateTime(value.submittedAt) && nullableFinite(value.reportedAmount)
     && (value.auditedAmount === null || finite(value.auditedAmount))
     && (value.auditDifference === null || finite(value.auditDifference))
 }
@@ -507,6 +556,7 @@ function decodeForm(
   value: unknown,
   expectedKind: 'owner_change' | 'owner_report' | 'acceptance' | 'final_settlement' | 'owner_penalty' | 'sub_change' | 'sub_settlement' | 'project_penalty',
   expectedId: string,
+  includeDeleted = false,
 ): OwnerCommercialDocumentFormReadDTO {
   const expectedOwnerType = expectedKind === 'project_penalty'
     ? 'penalty_record'
@@ -527,6 +577,12 @@ function decodeForm(
     || !formDraft(value.draft, expectedKind, expectedId)
     || !Array.isArray(value.attachments)
     || !value.attachments.every(file => fileRecord(file, expectedOwnerType, expectedId))
+    || (includeDeleted
+      ? value.readOnly !== true || !object(value.deletionVerification)
+      || typeof value.deletionVerification.commandId !== 'string' || !/^[a-z0-9][\w-]{2,79}$/i.test(value.deletionVerification.commandId)
+      || !isISODateTimeDTO(value.deletionVerification.deletedAt)
+      : value.readOnly === true || value.deletionVerification !== undefined)
+    || (value.readOnly !== undefined && typeof value.readOnly !== 'boolean')
     || typeof value.version !== 'string' || !isISODateTimeDTO(value.updatedAt)) {
     return malformed('甲方商务单据表单')
   }
@@ -554,7 +610,7 @@ export function createHttpOwnerCommercialDocumentReadRepository(
   return {
     list: query => read(
       () => options.fetcher(`/api/read/owner-documents/${encodeURIComponent(query.kind)}`, { query: { ...query, status: serializeEnumSelection(query.status) || null, documentType: serializeEnumSelection(query.documentType) || null } }),
-      value => decodeList(value, query),
+      value => decodeOwnerCommercialDocumentListPage(value, query),
     ),
     get: query => read(
       () => options.fetcher(`/api/read/owner-documents/${encodeURIComponent(query.kind)}/${encodeURIComponent(query.id)}`, { query: { ...query } }),
@@ -571,9 +627,9 @@ export function createHttpOwnerCommercialDocumentCommandRepository(
       () => options.fetcher('/api/commands/owner-documents/context', { query: kind ? { kind } : {} }),
       decodeContext,
     ),
-    loadForm: (kind, id) => read(
-      () => options.fetcher(`/api/commands/owner-documents/${encodeURIComponent(kind)}/${encodeURIComponent(id)}/form`),
-      value => decodeForm(value, kind, id),
+    loadForm: (kind, id, includeDeleted) => read(
+      () => options.fetcher(`/api/commands/owner-documents/${encodeURIComponent(kind)}/${encodeURIComponent(id)}/form`, includeDeleted ? { query: { includeDeleted: true } } : undefined),
+      value => decodeForm(value, kind, id, includeDeleted === true),
     ),
     boqLines: (projectId, contractId, periodNo = '', quantityBasis) => read(
       () => options.fetcher('/api/commands/owner-documents/boq-lines', { query: { projectId, contractId, periodNo, ...(quantityBasis ? { quantityBasis } : {}) } }),
@@ -582,6 +638,21 @@ export function createHttpOwnerCommercialDocumentCommandRepository(
     execute: (request: OwnerCommercialDocumentCommandRequestDTO) => read(
       () => options.fetcher('/api/commands/owner-documents', { method: 'POST', body: request }),
       decodeResult,
+    ),
+    resolve: (kind, descriptor: CommandRecoveryDescriptor) => read(
+      () => options.fetcher('/api/commands/owner-documents/resolve', { method: 'POST', body: { kind, descriptor } }),
+      (value) => {
+        if (!object(value))
+          return malformed('商务单据原命令')
+        if (value.outcome === 'not-applied' && value.commandId === descriptor.commandId)
+          return { outcome: 'not-applied' as const, commandId: descriptor.commandId }
+        if (value.outcome === 'applied') {
+          const result = decodeResult(value.result)
+          if (result.commandId === descriptor.commandId && (descriptor.targetId === null || result.id === descriptor.targetId))
+            return { outcome: 'applied' as const, result }
+        }
+        return malformed('商务单据原命令')
+      },
     ),
   }
 }

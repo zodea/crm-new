@@ -269,7 +269,7 @@ it.each(['construction', 'subcontract'] as const)('%s 真实HTTP提交、原件�
     owner = domain === 'construction' ? createProductionConstructionContractService(storage) : (await import('../../server/utils/production-subcontract-contract-service')).createProductionSubcontractContractService(storage)
     expect((await (await fetch(`${origin}${filePath}`)).json()).payloadBase64).toBe(original.payloadBase64)
     expect((await owner.form(saved.id, () => httpActor)).version).toBe('3')
-    expect((await fetch(`${origin}/api/read/owner-documents/owner_report?origin=real`)).status).toBe(503)
+    expect((await fetch(`${origin}/api/read/owner-documents/owner_report?origin=real`)).status).toBe(domain === 'construction' ? 403 : 503)
     expect(devRead).not.toHaveBeenCalled()
     unavailable = true
     expect((await fetch(`${origin}${filePath}`)).status).toBe(503)

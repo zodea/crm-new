@@ -73,6 +73,14 @@ const facts: SubcontractContractFactSources = {
 }
 
 describe('分包合同中央 Repository 契约', () => {
+  it('结算分区保留草稿与已提交事实，合同累计只取真实已确认结算', () => {
+    const input = { contracts: [contract], facts: { ...facts, settlements: [...facts.settlements, { ...facts.settlements[0]!, id: 'settlement-submitted', status: 'submitted', amount: 9999 }, { ...facts.settlements[1]!, id: 'settlement-draft', status: 'draft', amount: 8888 }] }, asOf: '2026-08-25T00:00:00.000Z', sourceVersion: 'confirmed-settlements', capabilities: ['subcontract-contract:read', 'subcontract-document:read'] }
+    const detail = buildSubcontractContractDetail({ ...input, query: parseSubcontractContractDetailQuery(contract.id, { origin: 'real' }) })
+    expect(detail.contract.amounts).toMatchObject({ settled: '900.00', completionSettlement: '200.00' })
+    expect(detail.sections.settlements.progress.map(row => row.id)).toContain('settlement-submitted')
+    expect(detail.sections.settlements.completion.map(row => row.id)).toContain('settlement-draft')
+    expect(buildSubcontractContractDetail({ ...input, facts: { ...input.facts, penalties: [{ ...facts.settlements[0]!, id: 'penalty-focus', status: 'submitted' }] }, query: parseSubcontractContractDetailQuery(contract.id, { origin: 'real', focusId: 'penalty-focus' }) }).sections.penalties[0]?.navigation).toMatchObject({ subject: { id: 'penalty-focus' }, variant: 'penalty' })
+  })
   it('受限关联清空身份；列表和详情拒绝隐藏定位及失配导航，独立金额仍可读', () => {
     const restricted = { ...contract, projectPermission: 'forbidden' as const, supplierPermission: 'forbidden' as const }
     const input = { contracts: [restricted], facts, asOf: '2026-08-25T00:00:00.000Z', sourceVersion: 'privacy-v1', capabilities: ['subcontract-contract:read'] }

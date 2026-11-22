@@ -77,6 +77,24 @@ v31→v32 将发票参与者升级为 `invoices:3`，新增更正单修订、草
 
 v32→v33 将发票参与者升级为 `invoices:4`。追加不可变的 `invoice_original_verifications` 保存候选与确认，按原命令编号、发票版本、原件和候选父键关联；`invoice_print_lines.verification_id` 保存实际采用的核验依据，既有打印行保持原证据。归档票面及初次审计继续从原票和原归档证据读取。新证据纳入备份和独立恢复核验，命令契约见 [已归档发票原件核验](./COMMANDS.md#archived-invoice-original-verification)。
 
+<a id="pg-11-business-storage"></a>
+
+### PG-11 商务单据持久参与者
+
+v33→v34 登记 `owner-documents:1`；v34→v35 将其升至版本 2，原 `expenditure_settlements` 追加不可变 `document_owner`，既有记录保持 `other`，新商务结算使用 `business`，Other 参与者同步为版本 2；v35→v36 仅为有完整原批次恢复证据的商务结算放行受控归档，将商务参与者升至版本 3。已应用升级及旧版本备份清单保持原定义；owner 分流的已答决定只见 [Q-PG11-01](./ARCHITECTURE.md#pg-11-settlement-owner-decision)。
+
+| 同库参与事实 | 实际归属与保全 |
+| --- | --- |
+| `monthly_statements / project_acceptances / owner_final_settlements / owner_penalties / subcontract_change_orders / penalty_records` | 单据稳定 ID、真实父关系、完整 `record_json`、版本及软删除；月报冻结行、验收生命周期和未知扩展随原正文保留。正式月报行存于原头 JSON；旧 Native 明细表作为完整迁入证据保留，不复制完成量 |
+| `expenditure_settlements` | 商务与 Other 共用唯一头；各自正文、历史和原件按实际 owner 校验，不将历史 Other 归属改为商务 |
+| `penalty_settlement_deductions / penalty_rectification_events` | 独立追加的抵扣及整改事实；不改结算原额，不保存第二份罚扣已扣金额；归档原头后仍保完整历史 |
+| `owner_document_revision / owner_document_history` | 持久修订及逐单连续前后文、操作者、原命令和时点；每个原头须与原意图/回执或真实采用基线、历史尾互证，合法 JSON 本身不构成证明 |
+| `owner_document_command_intents / receipts / resolutions` | 固定原提交、实际原件引用、原结果及未应用封存；商务入口与 BOQ 委托原 journal 共同守护原编号 |
+| `owner_document_files` 与共享 `file_refs / file_payloads` | 唯一原件正文、不可变原元数据、owner、正文状态、真实大小和摘要；已暂存原件由固定原意图证明，不成为已应用单据 |
+| `owner_document_imports / bindings / restores / import_intents / import_commands / import_resolutions` | 完整来源 SHA、原 SQL 表/列/类型/精确值、未知扩展、原 JSON、明确映射、安装基线及整批采用/恢复的原意图、回执和封存 |
+
+甲方变洽签直接复用既有 `boq_change_records`、BOQ 原历史、原件及命令/回执，不进入上述另一份头。当前商务 Native 迁入只读核验实际完整 v47–v60 字节，保原编号、软删除、冻结、审计及来源原命令证据；已采用 BOQ 变化和历史月报清单必须有同一来源 SHA 的稳定映射。Native 月报 `adjusted / exported` 在当前投影等价为 `reported / audited`，原状态列仍完整保留。迁入的 Other 抵扣只引用显式核验的原 Other 结算，不复制头或扩展新抵扣候选。完整来源文件及历史 NULL 编码见[来源核验](#native-domain-snapshot)，恢复保护唯一见 [COMMANDS](./COMMANDS.md#owner-document-production-commands)。全部上述表、BOQ 原事实和共享 BLOB 加入同一完整备份清单；登记及独立进程恢复不代表首次正式写入门禁或整机上线已经放行。
+
 ## PG-04 本机分供方持久参与者（#453）
 
 `supplier:1` 加入上述同一磁盘库和事务协调器；领域规则从开发实例抽出为事务内纯状态服务，`Map` 只承载本次从磁盘加载的候选，不能成为另一个正式数据源。
@@ -484,7 +502,7 @@ CREATE TABLE contract_supplements (
 );
 ```
 
-补充协议 PK 为 `id`，父键唯一指向 canonical `contracts.id`；施工与支出共用此表。**2026-10-02 已确认业务方向：补充协议只增加金额，不用补充协议减少金额。**`amount` 表示本次增额，不是变更后合同总额；有效合同金额=`contracts.amount + Σ有效 contract_supplements.amount`，草稿、软删除及失效记录不进入正式合计。现有 `amount >= 0` 不允许负额，与不减方向一致，但仍允许零额，不证明正式增额及补充明细校验已经接通；不据此宣称零额协议可正式提交。§4.1 的项目收入另按已确认变洽签纳入。旧目标快照默认“有效”已由 F2 草稿创建规则取代，保留 `external_ref` 供幂等/来源核对。父键索引见 §6。
+补充协议 PK 为 `id`，父键唯一指向 canonical `contracts.id`；施工与支出共用此表。**2026-10-02 已确认业务方向：补充协议只增加金额，不用补充协议减少金额。**`amount` 表示本次增额，不是变更后合同总额；有效补充增额只取非草稿、未软删且未失效的协议。支出合同将该增额合入原额；施工经营与最终结算还沿[已确认金额组成](#owner-final-settlement-amounts)纳入已签证变洽签，不能用只有协议的公式替代。现有 `amount >= 0` 不允许负额，与不减方向一致，但仍允许零额，不证明正式增额及补充明细校验已经接通；不据此宣称零额协议可正式提交。旧目标快照默认“有效”已由 F2 草稿创建规则取代，保留 `external_ref` 供幂等/来源核对。父键索引见 §6。
 
 补充协议的项目及交易对方沿同来源原合同读取：施工取 `customer_id`，支出取 `supplier_id`，不按公司名称猜补关系。清单中单列协议属于读取展示，仍须保留协议自己的 ID 与父合同 ID，不能变成第二份主合同或重复累计金额。当前分供方合同读面将有效协议金额合入主合同行，不能写成已逐份单列；页面范围见[分供方详情](./pages/base-supplier.md#浏览器中央详情6-个页签)。
 
@@ -872,9 +890,8 @@ subcontract_change_orders(
 
 验收生命周期 `draft → submitted → accepted → warranty → expired`：同一 `project_acceptances.id` 支撑验收/保修两个投影，状态仅由相应 command 单向推进，每步追加事件，不伪造历史日期或事件。附件 owner 为 `project_acceptance`，分类 `acceptance-report / warranty-confirmation`，不复制单据。
 
-最终结算只读口径不读 `contracts.changed/paid`：变更后合同金额取
-`contracts.amount + Σ非草稿 contract_supplements.amount`，累计收款取同合同的活跃
-`receipt_registrations.amount`，两者均为查询时聚合、不回写最终结算头。结算申报金额取 `settlement_amount`；审定金额/日期只取 `audited_amount` / `audited_date`，任一未记录都返回 `null`，不用申报值、状态或 `0` 代填。
+<a id="owner-final-settlement-amounts"></a>
+最终结算只读口径沿 A02 的已确认施工金额组成：变更后合同金额为原合同金额、有效补充协议本次增额、已签证甲方变洽签金额之和；变洽签沿原稳定 ID 只计一次，不能再加其自动台账副本。草稿、已删除及未生效记录不计入；来源未接或有效记录金额未知时完整合计为 `null`。累计收款仅聚合同合同的真实活跃收款；正式普通收款 owner 尚未接入时明确保留缺口，不使用旧累计列或开发收款填零。这些均为查询聚合，不回写最终结算头，也不读 `contracts.changed/paid`。申报金额取 `settlement_amount`；审定金额/日期只取 `audited_amount / audited_date`，未记录保持 `null`，不用申报值、状态或零代填。
 
 甲方罚扣只读口径直接读取 `owner_penalties` 的金额、日期、事由、联系单号、申诉说明、状态和备注；附件只读取 `owner_type='owner_penalty'` 且 `owner_id` 匹配的有效 `file_refs`。罚扣金额以负向业务含义展示，但存储保持正数金额；申诉说明只是事实字段，不派生“申诉中/已确认”等未定义审批状态。
 
@@ -926,6 +943,8 @@ subcontract_change_orders(
 统一结算事实由 ADR 0015 定义，各种类继续沿同一 `expenditure_settlements` 逻辑身份。以下 SQL 是 v21/v47 的来源结构证据，含旧非空默认及合同门槛，不用于初始化现行库；当前其他支出结算的字段与无合同原费用例外见下节，实际结构由[现行领域定义](../../app/lib/other-settlement/schema.ts)和 [Native 同表升级](../../app/lib/other-settlement/schema-upgrade.ts)核验。
 
 Issue #328 将分包 `expenditure_settlements` 作为逻辑 `owner_documents` 迁移节点的 `sub_settlement` kind 接管，正式 ID 由中央分配，不新增分包结算主表；兼容旧 `biz_type=分包` 及专业分包/合同劳务分类。项目、分供方与 canonical 分包合同必须唯一映射且一致。附件继续使用 `owner_type=expenditure_settlement`。金额与扣款说明来自原结算；确认状态只有 `draft → confirmed`。累计金额只在查询时派生，项目分供方终态 `settlements` 和材料冲销不在本票范围。
+
+当前正式商务与 Other 的唯一头及版本边界见 [PG-11 存储](#pg-11-business-storage)。下方 SQL 是历史 Native 结构说明；Native v60 和当前正式适配允许未知金额为 `NULL`，不沿旧非空默认制造零金额。
 
 ```sql
 -- 支出结算统一源单：承接分包、材料采购和其他支出结算，供付款申请真实选择。
@@ -1652,14 +1671,14 @@ penalty_settlement_deductions(
 
 ### AX03 中央项目罚扣与独立抵扣事实
 
-`project_penalty` 接管 `penalty_records.source='project'`；现有巡检/验收等其他来源不改归属。浏览器正式头事实、整改及抵扣由同一中央 command 权威管理，旧 SQLite 只用于受控备份/迁移；不增加平行罚扣主表。中央实例部署边界见 ADR 0020。
+`project_penalty` 接管 `penalty_records.source='project'` 及明确采用的历史 Other 抵扣罚扣；现有巡检/验收等其他来源不改归属。正式头、整改和抵扣由同一商务 owner 管理，实际存储见 [PG-11](#pg-11-business-storage)；旧 SQLite 只用于受控来源核验，不增加平行罚扣主表。
 
 - 罚扣头保留项目、可空分供方/分包合同/班组、日期、金额、事由、扣除方式、最新整改期限/说明、状态及附件身份。迁移保留草稿、待抵扣、整改中、自行/委托整改完成和已抵扣状态；缺失历史不伪造。
 - 中央抵扣是独立追加事实：`id, penaltyId, settlementId, amount, actorId, occurredAt, commandId, note`。同一罚扣可向同一结算分次追加；旧 SQLite 活跃关系对唯一约束仅为历史表约束，不限制中央审计。旧 ID、时间与金额按原事实映射；经办或命令未记录保持空值。
 - 中央整改事件独立保存 `id, penaltyId, actorId, occurredAt, deadline, note`，读面只投影当前罚扣的历史。
 - 候选必须是已确认真实分包结算，项目 ID 相同，罚扣已填写的合同和分供方 ID 都必须相同。罚扣至少具备合同或分供方证据；仅项目、班组、名称、金额均不能猜接。合同已填时仍验证合同所属项目和分供方。
 - 罚扣已抵扣额为独立关系金额合计，剩余为罚扣额减已抵扣额；结算抵扣同样按 `settlementId` 聚合。金额正数且最多两位小数，同时不能超过双方余额，不回写罚扣已扣金额副本，也不改结算原金额。写入以双方版本和幂等命令保护。
-- 受控迁移先映射真实结算 ID，再接管抵扣事实；缺失、歧义、归属不符、金额超额或状态矛盾阻断确认。中央读回复用同一事实；回滚按迁移边界撤销接管。甲方罚扣不进入此链。
+- 受控迁移先映射真实结算 ID，再接管抵扣事实；缺失、歧义、归属不符、金额超额或状态矛盾阻断确认。历史 Other 目标有显式原关系证明才只读采用，不进入新抵扣候选；读回复用同一事实，受保护整批恢复见 [COMMANDS](./COMMANDS.md#owner-document-production-commands)。甲方罚扣不进入此链。
 
 ### 工人私密资料与工资名册（#449）
 
@@ -2722,7 +2741,7 @@ flowchart TD
 | 量差金额 | 量差 × 合同单价（`boq_lines.unit_price`，调价变更取已签证新单价） |
 | 产值 | Σ完成量 × 合同单价，含已签证变更（CONTEXT.md「单价双轨」：合同单价轨） |
 | 分项毛利 | 历史参考式为 `(合同单价 − 班组分项单价) × 量`（现场量未核定时按暂估量预估）；当前没有独立班组项目分项单价表，未证明价格身份、范围与单位时保持未知，不以工人工资单价或 E 类维修价代填 |
-| 月度报量草稿行 | 按本单 `quantity_basis` 及报量阶段映射筛当月完成事实，只读取所选基准自己的数量列 → `monthly_statement_lines.auto_qty`，金额另按有效合同单价派生；缺量阻断，不跨基准回退，同一分项映射多阶段不得重复计量。逐单取数与冻结规则见[BOQ / 月度报量定义](#canonical-合同与补充协议) |
+| 月度报量草稿行 | 按所选合同、月份、本单 `quantity_basis` 和唯一报量阶段读完成事实，保已知小计及缺量数；缺量/缺价可保待核草稿，不跨基准回退、不预填零。金额按当前有效价派生，原手工量保留；提交校验与冻结只见 [COMMANDS](./COMMANDS.md#version-and-dependency-checks)，正式行保存见 [PG-11](#pg-11-business-storage) |
 
 <a id="104-动态成本与合同付款"></a>
 
@@ -3110,6 +3129,8 @@ Native 导出使用现有注册连接池上的 `VACUUM INTO`，与本应用事�
 完整来源文件由用户保留在导出位置；正式库只保存该领域的原始图、来源摘要、明确映射与确认依据，并沿共享文件机制保全该领域原件，不重复保存包含其他领域私密资料的整库字节。原工作区、人员、命令编号、回执、审计及冻结快照保持原值；映射后的当前关系是另有证据的采用投影，不能改写原始历史。来源原命令身份、重复提交及结果未知的处理直接遵守 [COMMANDS](./COMMANDS.md#idempotency-and-recovery)。
 
 历史原件上传时间为 SQL NULL 时，原列、原元数据和领域记录保留未知，读取 DTO 返回 `null`。共享 `file_refs.uploaded_at` 的既有非空文本列仅以空字符串编码该历史缺失；必须与完整来源的 NULL 列和不可变原元数据互证，不能用于掩盖新上传或错误日期。SQLite 无时区时间按其 UTC 语义作读取投影，不用合同创建时间补上传事实，也不重写已采用的原版本与源 JSON。
+
+商务历史缺件的原 `file_size` 为 SQL NULL 时，领域记录及 DTO 同样为 `null`。共享既有非空大小列只在完整原 SQL NULL 证明下以 `0` 编码该元数据缺口；这不是正文存在或真实零字节的证明。实际空原件有明确大小 `0`、`embedded` 状态和可核验的空 BLOB/摘要，继续可读；metadata-only 仍明确缺正文，不能以空 BLOB 替代。
 
 Native v58 建立独立报价来源，v59 在既有付款头追加互斥的工人／分供方身份与采用姓名保护，v60 在原 `expenditure_settlements` 同表保全旧字段、零值和历史，并允许新结算未知金额及稳定原费用采用；旧文本保持原文，不按同名补身份。各正式领域的实际参与者、迁入范围和仍未接通的来源按 §2 对应实体说明。结构核验从真实编号升级脚本生成预期表、索引及触发器，冷启动和备份同时拒绝缺失或被替换的历史保护；结构看似完整不能替代事实图及原件核验。
 

@@ -23,6 +23,7 @@ import { constructionContractCommandTestInstance } from './construction-contract
 import { customerCommandTestInstance } from './customer-command-test-instance'
 import { demoWorkspaceTestInstance } from './demo-workspace-test-instance'
 import { materialContractReadTestInstance } from './material-contract-read-test-instance'
+import { ownerCommercialDocumentReadTestInstance } from './owner-commercial-document-read-test-instance'
 import { projectCommandTestInstance } from './project-command-test-instance'
 import { projectSupplierReadTestInstance } from './project-supplier-read-test-instance'
 import { createReadMeta, readQueryScope, readSourceVersion, withOriginReadMeta, withReadMeta } from './read-meta'
@@ -165,6 +166,7 @@ export function createProjectReadTestInstance(
     = async rows => ({ rows }),
   resolvePayrollActual: (scope: PayrollHostScope, sessionId: string | null | undefined, asOf: string) => Promise<PayrollHostSection | { payrollActual: PayrollHostSection, managementFees: ProjectManagementFeeRead } | undefined>
     = async () => undefined,
+  resolveOwnerJourneys?: typeof ownerCommercialDocumentReadTestInstance.projectJourneys,
 ) {
   const scenarios = new Map<string, ProjectReadTestScenario>()
   const keyFor = (sessionId?: string | null) => sessionId || 'default'
@@ -335,11 +337,14 @@ export function createProjectReadTestInstance(
         throw repositoryProblem('unavailable', '读取期间项目档案或权限已变化，请重新读取', true)
       if (!latest.rows.some(row => row.id === query.id && row.dataOrigin === query.origin))
         throw repositoryProblem('unavailable', '原项目已变化，请重新读取', true)
+      const commercial = resolveOwnerJourneys?.(query.id, context.asOf, sessionId)
+      if (commercial)
+        extra.push(commercial.source)
       extra.push(payrollActual ? { key: 'payroll', state: payrollActual.status === 'forbidden' ? 'forbidden' : payrollActual.status === 'unavailable' ? 'unavailable' : 'readable', sourceVersion: ['forbidden', 'unavailable'].includes(payrollActual.status) ? null : payrollActual.sourceVersion, asOf: ['forbidden', 'unavailable'].includes(payrollActual.status) ? null : new Date().toISOString() } : { key: 'payroll', state: 'not-requested', sourceVersion: null, asOf: null })
       extra.push({ key: 'construction-management-fee-configurations', state: constructionManagementFees.state === 'complete' ? 'readable' : constructionManagementFees.state, sourceVersion: constructionManagementFees.sourceVersion, asOf: constructionManagementFees.asOf })
       extra.push(...managementFees.sources.map(source => ({ key: source.key, state: source.state === 'complete' || source.state === 'partial' ? 'readable' as const : source.state, sourceVersion: source.sourceVersion, asOf: source.asOf })))
       const evidence = meta(context, query.origin, 'project:detail', { query, testSession: sessionId ?? null }, extra)
-      return withReadMeta({ ...detail, constructionManagementFees, managementFees, ...(payrollActual ? { payrollActual } : {}) }, evidence)
+      return withReadMeta({ ...detail, constructionManagementFees, managementFees, ...(payrollActual ? { payrollActual } : {}), ...(commercial ? { ownerJourneys: commercial.journeys } : {}) }, evidence)
     },
   }
 }
@@ -361,4 +366,5 @@ export const projectReadTestInstance = createProjectReadTestInstance(
   async (rows, sessionId) => (await import('./project-import-customers')).resolveProjectCustomerReferences(rows, sessionId),
   async (rows, sessionId) => (await import('./project-receipt-income')).projectReceiptIncome(rows, sessionId),
   async (scope, sessionId, asOf) => (await import('./project-management-fee')).readProjectPayrollEvidence(scope.id, sessionId, asOf),
+  ownerCommercialDocumentReadTestInstance.projectJourneys,
 )

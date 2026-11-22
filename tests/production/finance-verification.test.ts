@@ -42,7 +42,9 @@ function historicalFixtureSchema(db: DatabaseSync, version: 12 | 13) {
     const rows = db.prepare(`SELECT * FROM ${table}`).all()
     expect(rows).toEqual(table === 'finance_contract_upgrade_anchor'
       ? [{ singleton: 1, legacy_history_count: 0 }]
-      : untouchedRevisionTables.has(table) ? [{ singleton: 1, revision: 0 }] : [])
+      : table === 'owner_document_revision'
+        ? [{ singleton: 1, revision: 1, metadata_json: '{"migrationKeys":[],"migrationSnapshotFingerprint":null}' }]
+        : untouchedRevisionTables.has(table) ? [{ singleton: 1, revision: 0 }] : [])
   }
   db.exec('PRAGMA foreign_keys=OFF; BEGIN')
   try {
@@ -62,6 +64,18 @@ function historicalFixtureSchema(db: DatabaseSync, version: 12 | 13) {
     // v32 installs attachment guards on the older shared tables; remove only those synthetic later-version guards before dropping their empty owner tables.
     for (const trigger of ['invoice_correction_file_metadata', 'invoice_correction_file_no_delete', 'invoice_correction_payload_no_update', 'invoice_correction_payload_no_delete'])
       db.exec(`DROP TRIGGER ${trigger}`)
+    if (currentVersion >= 34) {
+      for (const trigger of ['production_owner_document_bytes_update', 'production_owner_document_bytes_delete', 'production_owner_document_file_metadata', 'production_owner_document_file_no_delete'])
+        db.exec(`DROP TRIGGER ${trigger}`)
+    }
+    // Reverse only the v35 routing structure in this isolated empty-business fixture.
+    if (currentVersion >= 35) {
+      expect(db.prepare('SELECT id FROM expenditure_settlements WHERE document_owner<>\'other\'').all()).toEqual([])
+      for (const trigger of ['expenditure_settlement_owner_immutable', 'business_settlement_confirmed_lock', 'other_settlement_confirmed_lock', 'expenditure_settlement_expense_allocations_other_owner', 'other_settlement_history_other_owner', 'other_settlement_commands_other_owner', 'other_settlement_files_other_owner'])
+        db.exec(`DROP TRIGGER ${trigger}`)
+      db.exec('DROP INDEX expenditure_settlement_owner; ALTER TABLE expenditure_settlements DROP COLUMN document_owner')
+      db.exec('CREATE TRIGGER other_settlement_confirmed_lock BEFORE UPDATE ON expenditure_settlements WHEN OLD.status IN (\'confirmed\',\'已确认\') BEGIN SELECT RAISE(ABORT,\'confirmed expenditure settlement is immutable\'); END')
+    }
     for (const table of added.reverse()) db.exec(`DROP TABLE ${table}`)
     expect(db.prepare('SELECT id FROM payment_applications WHERE contract_domain IS NOT NULL OR contract_version IS NOT NULL').all()).toEqual([])
     db.exec('ALTER TABLE payment_applications DROP COLUMN contract_version')

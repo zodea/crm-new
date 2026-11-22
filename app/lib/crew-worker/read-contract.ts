@@ -129,7 +129,7 @@ export interface CrewWorkerPenaltySourceRow {
   source: string
   location: string
   reason: string
-  amount: number
+  amount: number | null
   penaltyDate: ISODateDTO | null
   status: string
 }
@@ -280,7 +280,7 @@ export interface CrewPenaltyDTO {
   source: string
   location: string
   reason: string
-  amount: string
+  amount: string | null
   penaltyDate: ISODateDTO | null
   status: string
 }
@@ -377,7 +377,7 @@ export interface WorkerPenaltyDTO {
   source: string
   location: string
   reason: string
-  amount: string
+  amount: string | null
   penaltyDate: ISODateDTO | null
   status: string
 }

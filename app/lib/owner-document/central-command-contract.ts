@@ -1,3 +1,4 @@
+import type { CommandRecoveryDescriptor, CommandResolution } from '../forms/command-recovery'
 import type { FileRefChanges, FileRefRecord } from '../forms/file-refs'
 import type { QuantityBasis } from '../quantity/basis'
 import type { OwnerCommercialDocumentKind } from './central-repository'
@@ -17,7 +18,7 @@ export interface OwnerCommercialDocumentCommandContextDTO {
   workspaceId: string
   actorId: string
   capabilities: string[]
-  projects: Array<{ id: string, label: string, customerId: string | null }>
+  projects: Array<{ id: string, label: string, customerId: string | null, version?: string }>
   customers: OwnerDocumentLookupOption[]
   suppliers: OwnerDocumentLookupOption[]
   crews?: OwnerDocumentLookupOption[]
@@ -131,18 +132,28 @@ export interface OwnerCommercialDocumentCommandResultDTO {
   deleted: boolean
 }
 
+/** Imported metadata can prove an unknown size or upload date without inventing either fact. */
+export interface OwnerDocumentAttachmentRecord extends Omit<FileRefRecord, 'fileSize' | 'uploadedAt'> {
+  fileSize: number | null
+  uploadedAt: string | null
+}
+
 export interface OwnerCommercialDocumentFormReadDTO {
   kind: OwnerCommercialDocumentKind
   id: string
   draft: OwnerDocumentDraft & { id: string }
-  attachments: FileRefRecord[]
+  attachments: OwnerDocumentAttachmentRecord[]
   version: string
   updatedAt: string
+  /** Only an authorized original delete recovery can return this archived read proof. */
+  readOnly?: boolean
+  deletionVerification?: { commandId: string, deletedAt: string }
 }
 
 export interface OwnerCommercialDocumentCommandRepository {
   context: (kind?: OwnerCommercialDocumentKind) => Promise<OwnerCommercialDocumentCommandContextDTO>
-  loadForm: (kind: OwnerCommercialDocumentKind, id: string) => Promise<OwnerCommercialDocumentFormReadDTO>
+  loadForm: (kind: OwnerCommercialDocumentKind, id: string, includeDeleted?: boolean) => Promise<OwnerCommercialDocumentFormReadDTO>
   boqLines: (projectId: string, contractId: string, periodNo?: string, quantityBasis?: QuantityBasis) => Promise<OwnerDocumentBoqLine[]>
   execute: (request: OwnerCommercialDocumentCommandRequestDTO) => Promise<OwnerCommercialDocumentCommandResultDTO>
+  resolve: (kind: OwnerCommercialDocumentKind, descriptor: CommandRecoveryDescriptor) => Promise<CommandResolution<OwnerCommercialDocumentCommandResultDTO>>
 }

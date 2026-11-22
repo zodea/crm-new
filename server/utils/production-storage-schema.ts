@@ -18,6 +18,8 @@ import { PRODUCTION_MATERIAL_CONTRACT_SCHEMA, PRODUCTION_MATERIAL_CONTRACT_TABLE
 import { PRODUCTION_MATERIAL_QUOTATION_SCHEMA, PRODUCTION_MATERIAL_QUOTATION_TABLES } from './production-material-quotation-schema'
 import { PRODUCTION_NOTIFICATION_SCHEMA, PRODUCTION_NOTIFICATION_TABLES } from './production-notification-schema'
 import { PRODUCTION_OTHER_SETTLEMENT_SCHEMA, PRODUCTION_OTHER_SETTLEMENT_TABLES } from './production-other-settlement-schema'
+import { PRODUCTION_OWNER_DOCUMENT_SCHEMA, PRODUCTION_OWNER_DOCUMENT_TABLES } from './production-owner-document-schema'
+import { PRODUCTION_OWNER_SETTLEMENT_RESTORE_UPGRADE, PRODUCTION_OWNER_SETTLEMENT_UPGRADE } from './production-owner-settlement-schema'
 import { PRODUCTION_PAYROLL_SCHEMA, PRODUCTION_PAYROLL_TABLES } from './production-payroll-schema'
 import { PRODUCTION_PROCESS_LIBRARY_SCHEMA, PRODUCTION_PROCESS_LIBRARY_TABLES } from './production-process-library-schema'
 import { PRODUCTION_PROJECT_SCHEMA, PRODUCTION_PROJECT_TABLES } from './production-project-schema'
@@ -28,7 +30,7 @@ import { PRODUCTION_SUPPLIER_SCHEMA, PRODUCTION_SUPPLIER_TABLES } from './produc
 import { PRODUCTION_TARGET_COST_SCHEMA, PRODUCTION_TARGET_COST_TABLES } from './production-target-cost-schema'
 import { PRODUCTION_WBS_SCHEMA, PRODUCTION_WBS_TABLES } from './production-wbs-schema'
 
-export const PRODUCTION_STORAGE_VERSION = 33
+export const PRODUCTION_STORAGE_VERSION = 36
 /** Append a new numbered upgrade when a domain lands; never rewrite an applied step. */
 export const PRODUCTION_STORAGE_UPGRADES = [
   { from: 1, to: 2, sql: PRODUCTION_PROCESS_LIBRARY_SCHEMA, participants: { 'process-library': { schemaVersion: 1, tables: PRODUCTION_PROCESS_LIBRARY_TABLES } } },
@@ -86,6 +88,9 @@ export const PRODUCTION_STORAGE_UPGRADES = [
   { from: 30, to: 31, sql: PRODUCTION_FINANCE_CONTRACT_UPGRADE, participants: { finance: { schemaVersion: 2, tables: [...PRODUCTION_FINANCE_TABLES, ...PRODUCTION_FINANCE_VERIFICATION_TABLES, ...PRODUCTION_FINANCE_CLEARANCE_TABLES, ...PRODUCTION_FINANCE_CONTRACT_TABLES] } } },
   { from: 31, to: 32, sql: `${PRODUCTION_INVOICE_CORRECTION_SCHEMA}\nUPDATE production_participants SET schema_version=3 WHERE domain='invoices' AND schema_version=2;`, participants: { invoices: { schemaVersion: 3, tables: [...PRODUCTION_INVOICE_TABLES, ...PRODUCTION_INVOICE_CORRECTION_TABLES] } } },
   { from: 32, to: 33, sql: `${INVOICE_ORIGINAL_VERIFICATION_SCHEMA}\nUPDATE production_participants SET schema_version=4 WHERE domain='invoices' AND schema_version=3;`, participants: { invoices: { schemaVersion: 4, tables: [...PRODUCTION_INVOICE_TABLES, ...PRODUCTION_INVOICE_CORRECTION_TABLES, ...INVOICE_ORIGINAL_VERIFICATION_TABLES] } } },
+  { from: 33, to: 34, sql: PRODUCTION_OWNER_DOCUMENT_SCHEMA, participants: { 'owner-documents': { schemaVersion: 1, tables: PRODUCTION_OWNER_DOCUMENT_TABLES } } },
+  { from: 34, to: 35, sql: `${PRODUCTION_OWNER_SETTLEMENT_UPGRADE}\nUPDATE production_participants SET schema_version=2 WHERE domain IN ('owner-documents','other-settlements');`, participants: { 'owner-documents': { schemaVersion: 2, tables: [...PRODUCTION_OWNER_DOCUMENT_TABLES, 'expenditure_settlements'] }, 'other-settlements': { schemaVersion: 2, tables: [...PRODUCTION_OTHER_SETTLEMENT_TABLES, ...PRODUCTION_OTHER_CLEARANCE_TABLES] } } },
+  { from: 35, to: 36, sql: `${PRODUCTION_OWNER_SETTLEMENT_RESTORE_UPGRADE}\nUPDATE production_participants SET schema_version=3 WHERE domain='owner-documents';`, participants: { 'owner-documents': { schemaVersion: 3, tables: [...PRODUCTION_OWNER_DOCUMENT_TABLES, 'expenditure_settlements'] } } },
 ] as const
 
 export function productionStorageManifest(version = PRODUCTION_STORAGE_VERSION) {

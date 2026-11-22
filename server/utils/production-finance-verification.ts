@@ -8,6 +8,7 @@ import { approvalPaymentCap } from '../../app/lib/finance/approval-amount'
 import { financeFailure as fail, financeProblemFromUnknown } from '../../app/lib/finance/central-contract'
 import { isPaymentVerificationProof, requiresPaymentVerification } from '../../app/lib/finance/payment-verification'
 import { verifiedFinanceSum } from '../../app/lib/finance/persistent-rows'
+import { otherSettlementOwnerPredicate } from '../../app/lib/other-settlement/storage'
 import { validateFinanceContractHistory } from './production-finance-contract-history'
 import { readOriginalExpenseReference } from './production-finance-expense-references'
 import { financeCanonical, financeCommandFingerprint } from './production-finance-request'
@@ -38,11 +39,13 @@ async function originalExpenseSnapshot(tx: Pick<TransactionDb, 'select'>, header
   return snapshot
 }
 async function confirmedSettlementSnapshot(tx: Pick<TransactionDb, 'select'>, id: string, version: string) {
-  const head = (await tx.select<Row>('SELECT * FROM expenditure_settlements WHERE id=?', [id]))[0]
+  const head = (await tx.select<Row>(`SELECT * FROM expenditure_settlements WHERE id=? AND ${await otherSettlementOwnerPredicate(tx)}`, [id]))[0]
   if (!head || String(head.version) !== version || !isConfirmedExpenditureSettlement(String(head.status)))
     fail('unavailable', '真实已确认结算版本缺失，不能以仅含摘要的外来证据替代。')
   // This owner freezes confirmed heads and adopted lines. Cash and unrelated owner revisions never edit this graph.
-  return { head, allocations: await tx.select<Row>('SELECT * FROM expenditure_settlement_expense_allocations WHERE settlement_id=? ORDER BY id', [id]) }
+  // The v30 owner discriminator is technical routing, not a change to an existing PAY-08 frozen source.
+  const { document_owner: _routing, ...originalHead } = head
+  return { head: originalHead, allocations: await tx.select<Row>('SELECT * FROM expenditure_settlement_expense_allocations WHERE settlement_id=? ORDER BY id', [id]) }
 }
 async function validateFrozenSource(tx: Pick<TransactionDb, 'select'>, frozen: PaymentVerificationSource) {
   const evidence = JSON.parse(frozen.evidenceJson)
@@ -113,6 +116,7 @@ async function verifiedSources(tx: FinanceDomainTx, actor: BusinessSession, appl
       fail('unavailable', '申请采用金额超过真实结算净额，不能生成可付结论。')
     const evidence: Row = { ...settlement, allocatedAmount: amount, ownerSnapshotSha256: financeCommandFingerprint(await confirmedSettlementSnapshot(tx, String(settlement.id), settlement.version)) }
     delete evidence.source_revision
+    delete evidence.document_owner
     sources.push(source('other-settlements', String(settlement.id), settlement.version, `other-settlement-record-${settlement.version}`, evidence))
     for (const originalId of settlement.original_expense_line_ids) {
       if (typeof originalId !== 'string')

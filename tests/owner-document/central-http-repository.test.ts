@@ -66,8 +66,8 @@ function validListPage(itemOverrides: Record<string, unknown> = {}) {
       statuses: [],
       documentTypes: [],
       origins: {
-        real: { count: 1, reportedAmount: '0.00', auditedAmount: '0.00', taxInclusiveAmount: '323.00', taxExclusiveAmount: '300.00', appliedTaxExclusiveAmount: '301.00', subcontractApprovedAmount: '0.00', subcontractActualApproved: { value: null, status: 'missing' } },
-        demo: { count: 0, reportedAmount: '0.00', auditedAmount: '0.00', taxInclusiveAmount: '0.00', taxExclusiveAmount: '0.00', appliedTaxExclusiveAmount: '0.00', subcontractApprovedAmount: '0.00', subcontractActualApproved: { value: null, status: 'missing' } },
+        real: { count: 1, reportedAmount: '0.00', auditedAmount: '0.00', taxInclusiveAmount: '323.00', taxExclusiveAmount: '300.00', appliedTaxExclusiveAmount: '301.00', subcontractApprovedAmount: '0.00', differenceAmount: '0.00', amountCompleteness: summaryAmounts({ taxInclusiveAmount: '323.00', taxExclusiveAmount: '300.00', appliedTaxExclusiveAmount: '301.00' }), subcontractActualApproved: { value: null, status: 'missing' } },
+        demo: { count: 0, reportedAmount: '0.00', auditedAmount: '0.00', taxInclusiveAmount: '0.00', taxExclusiveAmount: '0.00', appliedTaxExclusiveAmount: '0.00', subcontractApprovedAmount: '0.00', differenceAmount: '0.00', amountCompleteness: summaryAmounts(), subcontractActualApproved: { value: null, status: 'missing' } },
       },
     },
     empty: null,
@@ -75,6 +75,10 @@ function validListPage(itemOverrides: Record<string, unknown> = {}) {
     sourceVersion: 'v1',
     capabilities: ['owner-document:read'],
   }, { real: publicReadMeta({ ...evidence, dataOrigin: 'real' }), demo: publicReadMeta({ ...evidence, dataOrigin: 'demo', requested: false }) })
+}
+
+function summaryAmounts(values: Record<string, string> = {}) {
+  return Object.fromEntries(['reportedAmount', 'auditedAmount', 'taxInclusiveAmount', 'taxExclusiveAmount', 'appliedTaxExclusiveAmount', 'subcontractApprovedAmount', 'differenceAmount'].map(key => [key, { knownValue: values[key] ?? '0.00', missingCount: 0 }]))
 }
 
 function validForm(overrides: Record<string, unknown> = {}) {
@@ -310,6 +314,28 @@ function validSubcontractChangeForm() {
 }
 
 describe('甲方商务单据中央 HTTP Repository', () => {
+  it('接受已支持v3正式读取证据，未知协议与混合代次仍拒绝', async () => {
+    const page = validListPage()
+    page.meta.schemaVersion = 'owner-document-read-v3'
+    page.originMeta.real.schemaVersion = 'owner-document-read-v3'
+    page.originMeta.demo.schemaVersion = 'owner-document-read-v3'
+    const detail = validPenaltyDetail()
+    detail.meta.schemaVersion = 'owner-document-read-v3'
+    const listQuery = parseOwnerCommercialDocumentListQuery('owner_change', { origin: 'real' })
+    const detailQuery = parseOwnerCommercialDocumentDetailQuery('owner_penalty', 'owner-penalty-326', { origin: 'real' })
+    await expect(createHttpOwnerCommercialDocumentReadRepository({ fetcher: async () => page }).list(listQuery)).resolves.toMatchObject({ meta: { schemaVersion: 'owner-document-read-v3' } })
+    await expect(createHttpOwnerCommercialDocumentReadRepository({ fetcher: async () => detail }).get(detailQuery)).resolves.toMatchObject({ meta: { schemaVersion: 'owner-document-read-v3' } })
+    for (const schemaVersion of ['owner-document-read-v99', 'malformed']) {
+      const badPage = structuredClone(page)
+      badPage.meta.schemaVersion = schemaVersion
+      badPage.originMeta.real.schemaVersion = schemaVersion
+      badPage.originMeta.demo.schemaVersion = schemaVersion
+      await expect(createHttpOwnerCommercialDocumentReadRepository({ fetcher: async () => badPage }).list(listQuery)).rejects.toMatchObject({ problem: { code: 'internal-error' } })
+      await expect(createHttpOwnerCommercialDocumentReadRepository({ fetcher: async () => ({ ...detail, meta: { ...detail.meta, schemaVersion } }) }).get(detailQuery)).rejects.toMatchObject({ problem: { code: 'internal-error' } })
+    }
+    page.originMeta.demo.schemaVersion = 'owner-document-read-v2'
+    await expect(createHttpOwnerCommercialDocumentReadRepository({ fetcher: async () => page }).list(listQuery)).rejects.toMatchObject({ problem: { code: 'internal-error' } })
+  })
   it('解码分包变洽签专属关系、金额和正式编辑表单', async () => {
     const readRepository = createHttpOwnerCommercialDocumentReadRepository({
       fetcher: vi.fn().mockResolvedValue(validSubcontractChangeDetail()),
@@ -547,6 +573,28 @@ describe('甲方商务单据中央 HTTP Repository', () => {
     }
   })
 
+  it.each([null, 0, 323])('附件大小 %s 保留真实零与未知，原上传日期NULL可可靠读取', async (fileSize) => {
+    const form = validForm({ attachments: [{ ...validForm().attachments[0], fileSize, uploadedAt: null }] })
+    const repository = createHttpOwnerCommercialDocumentCommandRepository({ fetcher: vi.fn().mockResolvedValue(form) })
+    expect((await repository.loadForm('owner_change', 'change-323')).attachments[0]).toMatchObject({ fileSize, uploadedAt: null })
+    const detail = validPenaltyDetail()
+    detail.files[0]!.fileSize = fileSize
+    detail.files[0]!.uploadedAt = null
+    const readRepository = createHttpOwnerCommercialDocumentReadRepository({ fetcher: vi.fn().mockResolvedValue(detail) })
+    expect((await readRepository.get(parseOwnerCommercialDocumentDetailQuery('owner_penalty', 'owner-penalty-326', { origin: 'real' }))).files[0]).toMatchObject({ fileSize, uploadedAt: null })
+  })
+
+  it('删除后读必须带只读、稳定原编号及真实日期凭证，普通读取拒绝归档伪装', async () => {
+    const proof = { readOnly: true, deletionVerification: { commandId: 'original-delete-323', deletedAt: '2026-10-08T00:00:00.000Z' } }
+    const repository = createHttpOwnerCommercialDocumentCommandRepository({ fetcher: vi.fn().mockResolvedValue(validForm(proof)) })
+    await expect(repository.loadForm('owner_change', 'change-323', true)).resolves.toMatchObject(proof)
+    await expect(repository.loadForm('owner_change', 'change-323')).rejects.toMatchObject({ problem: { code: 'internal-error' } })
+    for (const invalid of [{}, { ...proof, readOnly: false }, { ...proof, deletionVerification: { ...proof.deletionVerification, commandId: 'wrong/command' } }, { ...proof, deletionVerification: { ...proof.deletionVerification, deletedAt: 'yesterday' } }]) {
+      const broken = createHttpOwnerCommercialDocumentCommandRepository({ fetcher: vi.fn().mockResolvedValue(validForm(invalid)) })
+      await expect(broken.loadForm('owner_change', 'change-323', true)).rejects.toMatchObject({ problem: { code: 'internal-error' } })
+    }
+  })
+
   it.each([
     ['顶层稳定 ID 错误', { id: 'change-other' }],
     ['顶层单据类型错误', { kind: 'owner_report' }],
@@ -554,6 +602,9 @@ describe('甲方商务单据中央 HTTP Repository', () => {
     ['draft 日期非法', { draft: { ...validForm().draft, applicationDate: '2026-02-30' } }],
     ['附件归属错误', { attachments: [{ ...validForm().attachments[0], ownerId: 'change-other' }] }],
     ['附件时间非法', { attachments: [{ ...validForm().attachments[0], uploadedAt: 'yesterday' }] }],
+    ['附件大小负数', { attachments: [{ ...validForm().attachments[0], fileSize: -1 }] }],
+    ['附件大小小数', { attachments: [{ ...validForm().attachments[0], fileSize: 1.5 }] }],
+    ['附件大小缺失', { attachments: [{ ...validForm().attachments[0], fileSize: undefined }] }],
   ])('拒绝%s的表单响应', async (_label, overrides) => {
     const repository = createHttpOwnerCommercialDocumentCommandRepository({
       fetcher: vi.fn().mockResolvedValue(validForm(overrides)),

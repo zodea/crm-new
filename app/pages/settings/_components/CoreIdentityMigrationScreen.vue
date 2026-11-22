@@ -23,6 +23,7 @@ import FinanceMigrationPanel from './FinanceMigrationPanel.vue'
 import MigrationPreflightPanel from './MigrationPreflightPanel.vue'
 import MigrationReconciliationTable from './MigrationReconciliationTable.vue'
 import MigrationSwitchPanel from './MigrationSwitchPanel.vue'
+import OwnerDocumentMigrationPanel from './OwnerDocumentMigrationPanel.vue'
 import PayrollMigrationPanel from './PayrollMigrationPanel.vue'
 import SubcontractMigrationPanel from './SubcontractMigrationPanel.vue'
 import WbsMigrationPanel from './WbsMigrationPanel.vue'
@@ -178,6 +179,7 @@ onMounted(() => run(store.hydrate))
     <BudgetMigrationPanel />
     <ConstructionMigrationPanel />
     <SubcontractMigrationPanel />
+    <OwnerDocumentMigrationPanel />
     <PayrollMigrationPanel />
     <WbsMigrationPanel />
 

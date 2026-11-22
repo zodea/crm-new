@@ -108,22 +108,35 @@ test.describe('AX03 项目罚扣真实结算抵扣', () => {
       await page.getByRole('option', { name: /AX03 真实结算/ }).click()
       await dialog.getByLabel('本次抵扣金额').fill(amount)
       if (amount === '400') {
-        let intercepted = false
+        const writes: string[] = []
+        const resolves: string[] = []
         await page.route('**/api/commands/owner-documents', async (route) => {
-          if (!intercepted && route.request().postDataJSON()?.action === 'deduct-penalty') {
-            intercepted = true
-            await route.fetch()
-            await route.abort('failed')
-          }
-          else {
-            await route.continue()
-          }
+          const body = route.request().postDataJSON()
+          expect(body.action).toBe('deduct-penalty')
+          writes.push(body.commandId)
+          const result = await route.fetch()
+          expect(result.ok(), await result.text()).toBe(true)
+          await route.abort('failed')
+        })
+        await page.route('**/api/commands/owner-documents/resolve', async (route) => {
+          const { descriptor } = route.request().postDataJSON()
+          expect(descriptor).toMatchObject({ action: 'deduct-penalty', targetId: id, scopeId: 'project_penalty' })
+          resolves.push(descriptor.commandId)
+          await route.continue()
         })
         await dialog.getByRole('button', { name: '确认抵扣' }).click()
         await expect(dialog.getByRole('alert')).toBeVisible()
         await expect(dialog.getByLabel('本次抵扣金额')).toHaveValue('400')
+        await dialog.getByRole('button', { name: '核对原提交' }).click()
+        await expect(dialog).toHaveCount(0)
+        expect(writes).toHaveLength(1)
+        expect(resolves).toEqual(writes)
+        await page.unroute('**/api/commands/owner-documents')
+        await page.unroute('**/api/commands/owner-documents/resolve')
       }
-      await dialog.getByRole('button', { name: '确认抵扣' }).click()
+      else {
+        await dialog.getByRole('button', { name: '确认抵扣' }).click()
+      }
       await expect(dialog).toHaveCount(0)
       await page.reload()
       await expect(page.getByRole('group', { name: '剩余可抵扣' })).toContainText(amount === '400' ? '600.00' : '0.00')

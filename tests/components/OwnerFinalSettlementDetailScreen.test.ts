@@ -148,6 +148,27 @@ describe('甲方最终结算专属只读详情', () => {
     })
   })
 
+  it('收款缺源时保留真实协议和已签证变洽签，来源金额未知不会变成零', () => {
+    const data = structuredClone(detail)
+    data.document.amounts.cumulativeReceipts = null as any
+    data.document.amounts.receiptDifference = null as any
+    data.finalSettlementEvidence.sources = [
+      data.finalSettlementEvidence.sources[0]!,
+      { kind: 'owner-change', id: 'signed-change-460', no: 'BG-460', name: '原量价签证', status: 'approved', statusLabel: '已签证', amount: null, date: '2026-08-20', navigation: navigation({ state: 'resolved', entity: 'owner-document', id: 'signed-change-460', label: '原量价签证', no: 'BG-460' }, 'change') } as any,
+    ]
+    Object.assign(data.finalSettlementEvidence, { sourceStates: { supplements: 'readable', changes: 'readable', receipts: 'unavailable' } })
+    mocks.store.detailState = { kind: 'ready', data }
+    render(OwnerFinalSettlementDetailScreen, { props: { documentId: data.document.id, origin: 'real' }, ...common })
+    expect(screen.getByText('正式补充协议')).not.toBeNull()
+    expect(screen.getByText('原量价签证')).not.toBeNull()
+    expect(screen.getByText('收款来源不可用 尚未取得当前可读取的收款事实，相关金额保持未知。')).not.toBeNull()
+    expect(screen.getByText(/累计收款.*未记录/)).not.toBeNull()
+    expect(screen.getByText(/结算收款差额.*未记录/)).not.toBeNull()
+    expect(screen.getByText('原量价签证').closest('tr')?.textContent).toContain('未记录')
+    expect(screen.getByText('原量价签证').closest('tr')?.textContent).not.toContain('0.00')
+    expect(screen.getByText('查看变洽签')).not.toBeNull()
+  })
+
   it('未知来源不伪装为空集合，可重新读取，并区分关系不匹配与普通读取失败', async () => {
     mocks.store.detailState = {
       kind: 'ready',

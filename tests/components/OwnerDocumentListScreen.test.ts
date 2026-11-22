@@ -173,6 +173,55 @@ describe('owner document list screen', () => {
     vi.stubGlobal('watch', watch)
   })
 
+  it('呈现类型化列、具名筛选、来源范围与可局部横滚的宽表', () => {
+    route.query = { projectId: 'project-1' }
+    render(OwnerDocumentListScreen, {
+      props: { kind: 'owner_change' },
+      global,
+    })
+
+    expect(document.querySelector('[data-ui="owner-document-list-toolbar"]')).not.toBeNull()
+    expect(screen.getByRole('combobox', { name: '项目' })).not.toBeNull()
+    expect(screen.getByRole('combobox', { name: '类型' })).not.toBeNull()
+    expect(screen.getByRole('combobox', { name: '状态' })).not.toBeNull()
+    expect(document.querySelector('[data-ui="owner-document-route-context"]')?.textContent)
+      .toContain('项目：合和新城')
+
+    const scroll = screen.getByRole('region', { name: '甲方变洽签列表，可横向滚动查看完整列' })
+    expect(scroll.tabIndex).toBe(0)
+    expect(scroll.classList.contains('overflow-x-auto')).toBe(true)
+    const table = within(scroll).getByRole('region', { name: '业务单据宽表' })
+    const headings = within(table).getAllByRole('columnheader').map(item => item.textContent)
+    expect(headings).toEqual(expect.arrayContaining([
+      '变更编号',
+      '施工合同',
+      '含税审定金额',
+      '无税审定金额',
+      '无税申报金额',
+    ]))
+    expect(Number(table.getAttribute('data-min-width'))).toBeGreaterThan(1200)
+  })
+
+  it('列表完整总额缺失时呈现已知小计和缺项，不把真实零与未知混为一谈', () => {
+    route.query = {}
+    centralSummary = { projects: [], contracts: [], statuses: [], documentTypes: [], origins: { real: {
+      count: 2,
+      taxInclusiveAmount: null,
+      taxExclusiveAmount: '0.00',
+      appliedTaxExclusiveAmount: '0.00',
+      amountCompleteness: {
+        taxInclusiveAmount: { knownValue: '12.00', missingCount: 1 },
+        taxExclusiveAmount: { knownValue: '0.00', missingCount: 0 },
+        appliedTaxExclusiveAmount: { knownValue: '0.00', missingCount: 0 },
+      },
+    } } }
+    render(OwnerDocumentListScreen, { props: { kind: 'owner_change' }, global })
+    const summary = screen.getByRole('status', { name: '甲方变洽签列表汇总' })
+    expect(summary.textContent).toMatch(/含税审定金额总和：\s*未记录/)
+    expect(summary.textContent).toContain('已知小计 ¥12.00，缺 1 项')
+    expect(summary.textContent).toMatch(/无税申报金额总和：\s*¥0.00/)
+  })
+
   it('中央列表把默认状态作为真实查询条件，并以中央总数展示汇总', async () => {
     route.query = {}
     render(OwnerDocumentListScreen, {

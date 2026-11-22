@@ -92,7 +92,7 @@ interface SubcontractChangeFactSource {
     contractId: string | null
     no: string
     name: string
-    amount: number
+    amount: number | null
     applicationDate: string | null
     status: string
     documentType?: string

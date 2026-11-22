@@ -106,7 +106,7 @@ export interface BoqChangeLineView {
   itemName: string
   deltaQty: number | null
   newUnitPrice: number | null
-  amount: number
+  amount: number | null
   note: string
 }
 
@@ -114,10 +114,10 @@ export interface BoqAttachmentView {
   id: string
   orderId: string
   fileName: string
-  fileSize: number
+  fileSize: number | null
   mimeType: string
   category: string
-  uploadedAt: string
+  uploadedAt: string | null
 }
 
 export interface BoqMonthlyStatementSummary {
@@ -243,7 +243,7 @@ interface ChangeDetailRow {
   item_name: string
   delta_qty: number | null
   new_unit_price: number | null
-  amount: number
+  amount: number | null
   note: string
 }
 
@@ -534,7 +534,7 @@ export async function loadBoqWorkspace(
       id: attachment.id,
       orderId: attachment.owner_id,
       fileName: attachment.file_name,
-      fileSize: numberValue(attachment.file_size),
+      fileSize: nullableNumber(attachment.file_size),
       mimeType: attachment.mime_type || 'application/octet-stream',
       category: attachment.category,
       uploadedAt: attachment.uploaded_at,
@@ -553,7 +553,7 @@ export async function loadBoqWorkspace(
         itemName: line.item_name,
         deltaQty: nullableNumber(line.delta_qty),
         newUnitPrice: nullableNumber(line.new_unit_price),
-        amount: numberValue(line.amount),
+        amount: nullableNumber(line.amount),
         note: line.note,
       },
     ])

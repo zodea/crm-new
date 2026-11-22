@@ -2,6 +2,7 @@
 import type { DataOriginDTO, NavigationIntentDTO } from '~/types/read-model'
 import { useSubcontractSettlementDetail } from '~/composables/useSubcontractSettlementDetail'
 import { yuan } from '~/lib/util/money'
+import SubcontractSettlementSources from './SubcontractSettlementSources.vue'
 
 const props = defineProps<{ documentId: string, origin: DataOriginDTO }>()
 const { route, store, detail, loading, problem, shellState, stateTitle, returnContext, backLabel, canEdit, amounts, load, edit } = useSubcontractSettlementDetail(props)
@@ -11,10 +12,12 @@ function relationLabel(intent: NavigationIntentDTO, fallback: string): string {
 }
 
 function money(value: string | null | undefined): string {
-  return value == null ? '未记录' : yuan(Number(value))
+  return value == null ? '未知' : yuan(Number(value))
 }
 
-function fileSize(bytes: number): string {
+function fileSize(bytes: number | null): string {
+  if (bytes === null)
+    return '大小未知'
   if (bytes < 1024)
     return `${bytes} B`
   if (bytes < 1024 * 1024)
@@ -50,11 +53,13 @@ function fileSize(bytes: number): string {
         </button>
       </template>
       <template #summary>
-        <MetricGrid v-if="detail" class="settlement-summary" :cols="4">
+        <MetricGrid v-if="detail" class="settlement-summary" :cols="3">
+          <Metric label="主合同原额" :value="money(detail.subcontractSettlementEvidence ? detail.subcontractSettlementEvidence.originalContractAmount : amounts?.contractAmount)" />
+          <Metric label="补充协议后合同额" :value="money(detail.subcontractSettlementEvidence?.effectiveContractAmount)" />
           <Metric label="含税结算额" :value="money(amounts?.total)" big tone="brand" />
-          <Metric label="累计已确认结算" :value="money(amounts?.cumulativeSettled)" />
+          <Metric label="抵扣后本次净额" :value="money(amounts?.netSettlement)" />
           <Metric label="往期已确认结算" :value="money(amounts?.priorSettled)" />
-          <Metric label="合同金额" :value="money(amounts?.contractAmount)" />
+          <Metric label="累计已确认结算" :value="money(amounts?.cumulativeSettled)" />
         </MetricGrid>
       </template>
 
@@ -135,13 +140,14 @@ function fileSize(bytes: number): string {
               </div>
             </dl>
             <p class="settlement-note">
-              付款或抵扣资料不完整时显示未记录。
+              付款或抵扣来源不完整时金额保持未知；真实零单独显示。
             </p>
           </section>
         </div>
         <p class="px-1 text-12px leading-5 text-ink-soft">
           累计仅包含同一项目、分供方、合同的已确认结算。已确认结算可作为项目罚扣抵扣来源。
         </p>
+        <SubcontractSettlementSources :evidence="detail.subcontractSettlementEvidence" :return-to="route.fullPath" />
         <section class="panel p-4" aria-labelledby="subcontract-settlement-files-title">
           <h3 id="subcontract-settlement-files-title" class="settlement-section-title">
             附件
@@ -161,7 +167,7 @@ function fileSize(bytes: number): string {
 
 <style scoped>
 .subcontract-settlement-detail { container-type: inline-size; }
-.settlement-summary { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+.settlement-summary { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
 @container (max-width: 850px) { .settlement-summary { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }
 @container (max-width: 350px) { .settlement-summary { grid-template-columns: minmax(0, 1fr) !important; } }
 .detail-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 24px; }
