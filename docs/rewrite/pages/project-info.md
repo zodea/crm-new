@@ -36,7 +36,7 @@
 | # | seq | 52px | fixed left |
 | 项目名称 | name | min 160px | fixed left；后台返回语义目标，唯一 Target Registry 生成含来源的详情链接 |
 | 数据来源 | dataOrigin | 88px | `正式数据` / `测试数据`；由后台来源决定，不按字段内容猜测 |
-| 业务阶段 | status | 128px | 列表使用纯文字状态；未知导入值归入“待归一阶段” |
+| 业务阶段 | status | 128px | 使用 [KitStatusTag](../../design/kit-ui-component-specs.md) 展示阶段；未知导入值归入“待归一阶段” |
 | 累计收入合同金额 | income | 150px | 只按正式收款事实汇总；任一项目缺失时总计显示未知与缺失数 |
 | 预算总额 | budget | 130px | 只按当前目标成本基线汇总；任一项目缺失时总计显示未知与缺失数 |
 | 计划竣工 | plannedEnd | 112px | |

@@ -6,9 +6,35 @@ import { installProjectCentralFixture, PROJECT_INPUTS } from './helpers/project-
 async function openSidebarRoute(page: Page, label: string, path: string) {
   const sidebar = page.locator('[data-sidebar="sidebar"]')
   await sidebar.getByRole('searchbox', { name: '搜索菜单' }).fill(label)
-  await sidebar.getByRole('link', { name: label, exact: true }).click()
-  await expect.poll(() => new URL(page.url()).pathname).toBe(path)
+  const link = sidebar.getByRole('link', { name: label, exact: true })
+  await expect(link).toHaveAttribute('href', path)
+  await link.click()
+  await expect.poll(() => new URL(page.url()).pathname, { timeout: 20_000 }).toBe(path)
 }
+
+test('页签菜单可关闭左侧业务页签，也可关闭仅剩的一个业务页签', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('ruihang-sidebar-pinned', 'true'))
+  await page.goto('/')
+  const tabBar = page.getByRole('navigation', { name: '已打开页面' })
+  const home = tabBar.getByRole('button', { name: '首页', exact: true })
+  await expect(home).toHaveAttribute('aria-current', 'page')
+  await openSidebarRoute(page, '项目列表', '/project')
+  await openSidebarRoute(page, '分供方', '/base/supplier')
+  const supplier = tabBar.getByRole('button', { name: '分供方', exact: true })
+  await supplier.press('Shift+F10')
+  const menu = page.getByRole('menu')
+  await menu.getByRole('menuitem', { name: '关闭左侧', exact: true }).click()
+  await expect(tabBar.getByRole('button', { name: '项目列表', exact: true })).toHaveCount(0)
+  await expect(home).toBeVisible()
+  await expect(supplier).toHaveAttribute('aria-current', 'page')
+
+  await supplier.click({ button: 'right' })
+  await expect(menu.getByRole('menuitem', { name: '关闭其他', exact: true })).toBeDisabled()
+  await menu.getByRole('menuitem', { name: '关闭全部', exact: true }).click()
+  await expect(supplier).toHaveCount(0)
+  await expect(home).toHaveAttribute('aria-current', 'page')
+  await expect.poll(() => new URL(page.url()).pathname).toBe('/')
+})
 
 // 上限 15 指可关闭页签；固定首页另行验证，不依赖偶然的初始页签数量。
 for (const input of [
@@ -48,7 +74,7 @@ for (const input of [
     await expect(projectTab).toHaveAttribute('aria-current', 'page')
     await projectTab.click({ button: 'right' })
     const menu = page.getByRole('menu')
-    await expect(menu.getByRole('menuitem')).toHaveText(['关闭当前', '关闭其他', '关闭右侧', '关闭全部'])
+    await expect(menu.getByRole('menuitem')).toHaveText(['关闭当前', '关闭其他', '关闭左侧', '关闭右侧', '关闭全部'])
     await menu.getByRole('menuitem', { name: '关闭当前', exact: true }).click()
     await expect.poll(() => new URL(page.url()).pathname).toBe('/base/supplier')
     await expect(projectTab).toHaveCount(0)

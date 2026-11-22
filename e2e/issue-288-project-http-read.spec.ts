@@ -70,8 +70,8 @@ test.describe('Issue #288：项目列表中央 HTTP 读链', () => {
     await expect(page.getByText('¥0.00', { exact: true }).first()).toBeVisible()
 
     const summary = page.getByLabel('项目列表汇总')
-    await expect(summary).toContainText(/测试数据.*累计收入\s*—.*收入缺失 10 个/)
-    await expect(summary).toContainText(/测试数据.*预算总额\s*—.*预算缺失 10 个/)
+    await expect(summary).toContainText(/测试数据.*累计收入\s*未知（已知小计 ¥25,367,027.00）\s*收入缺失 10 个/)
+    await expect(summary).toContainText(/测试数据.*预算总额\s*未知（已知小计 ¥800,000.00）\s*预算缺失 10 个/)
     await expect(page.getByRole('button', { name: '新增项目' })).toBeEnabled()
     await expect(page.getByRole('button', { name: '导入项目', exact: true })).toBeEnabled()
     await expect(page.getByRole('button', { name: '导入项目', exact: true })).toHaveAttribute('title', '导入项目（映射页签）')
@@ -129,7 +129,7 @@ test.describe('Issue #288：项目列表中央 HTTP 读链', () => {
 
     await expect(page.getByRole('link', { name: '零星维修框架项目', exact: true })).toBeVisible()
     await expect(page.getByLabel('项目来源数量')).toContainText('测试 1 个')
-    await expect(page.getByLabel('项目列表汇总')).toContainText(/测试数据\s*1 个/)
+    await expect(page.getByLabel('项目列表汇总')).toContainText(/测试数据\s*当前筛选范围\s*1 个/)
   })
 
   test('中央实例真实无记录时显示 no-records，而非筛选空态', async ({ page }, testInfo) => {

@@ -1,0 +1,131 @@
+/* 由 pnpm design:sync-manifest 生成。 */
+
+/* 排版令牌 — 瑞航 CRM
+   高密度、可扫读。正文 14px，label 11–12px font-600，标题 font-800。
+   金融数据（发票号/税号/日期/金额）用等宽 + tabular-nums。 */
+:root {
+  /* —— 字族 —— */
+  --font-sans: "Noto Sans SC", "Microsoft YaHei", "PingFang SC", system-ui,
+    -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Courier New",
+    monospace;
+
+  /* —— 字号阶 —— */
+  --text-2xs: 11px;   /* 导航副提示 / 序号 chip */
+  --text-xs: 12px;    /* label / 次级元信息 */
+  --text-sm: 13px;    /* 紧凑正文 / 表格 */
+  --text-base: 14px;  /* 正文基准 */
+  --text-lg: 17px;    /* 模块标题 / 侧栏品牌 */
+  --text-xl: 20px;    /* 空态标题 */
+  --text-2xl: 24px;   /* 统计卡数字 */
+
+  /* —— 字重 —— */
+  --weight-normal: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600; /* label / 按钮 */
+  --weight-bold: 700;     /* 小标题 / 数字强调 */
+  --weight-heavy: 800;    /* 标题 / 导航名 */
+
+  /* —— 行高 —— */
+  --leading-tight: 1.2;
+  --leading-snug: 1.35;
+  --leading-normal: 1.5;  /* 正文 */
+  --leading-loose: 1.8;
+
+  /* —— 字距（label 用小字距营造"label-caps"感，中文不受 uppercase 影响） —— */
+  --tracking-wide: 0.02em;
+
+  /* —— 语义别名 —— */
+  --text-body: var(--text-base);
+  --text-label: var(--text-xs);
+}
+
+/* 形状·间距·阴影令牌 — 瑞航 CRM
+   普通内容面使用小圆角描边且不浮起；阴影只保留给弹层。
+   间距紧凑但不拥挤：panel 内 12–16，元素间 8–12。 */
+:root {
+  /* 形状与普通内容面阴影由 content-v5.css 单一维护。 */
+  --radius: var(--radius-btn);
+
+  /* —— 间距阶（4 基准） —— */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* —— 布局尺度 —— */
+  --sidebar-w: 208px;   /* 桌面固定侧边栏 */
+  --header-h: 40px;     /* 顶栏 */
+  --content-max: 1480px;/* 主内容最大宽 */
+
+  /* —— 阴影 —— */
+  --shadow-pop: 0 10px 15px -3px rgba(16, 24, 40, 0.12), 0 4px 6px -4px rgba(16, 24, 40, 0.1);
+  --shadow: var(--shadow-card); /* 原应用 --shadow */
+
+  /* —— 选中态内描边（侧栏导航签名） —— */
+  --ring-selected: inset 3px 0 0 var(--brand);
+
+  /* —— 动效 —— */
+  --ease-snappy: cubic-bezier(0.2, 0, 0.2, 1); /* @kind other */
+  --dur-fast: 120ms; /* @kind other */
+  --dur-base: 160ms; /* @kind other */
+  --dur-dialog: 220ms; /* @kind other */
+
+  /* —— 断点（参考值） —— */
+  --bp-tablet: 1024px;  /* ≥ 桌面三栏；< 平板顶部横排 */
+  --bp-mobile: 768px;   /* < 手机底部 tab bar */
+}
+
+/*
+ * 瑞航 CRM 内容区视觉令牌（v5）
+ *
+ * 设计稿直接加载本文件。Nuxt 使用由此入口生成的运行时样式；
+ * 间距与动效由 spacing.css 提供。应用外壳专属令牌由 Nuxt 维护。
+ */
+:root {
+  /* ── 基底色：保留效果稿的轻机构灰层次 ── */
+  --bg: #f8f9fb;
+  --panel: #ffffff;
+  --surface-2: #f1f5f9;
+  --surface-3: #f3f4f6;
+  --surface-sink: #e9edf4;
+
+  /* ── 描边与文字 ── */
+  --line: #e3e6ea;
+  --line-strong: #c9ced6;
+  --ink: #1f2329;
+  --ink-soft: #5b6470;
+  --ink-faint: #8b93a1;
+
+  /* ── 品牌色（v5）── */
+  --brand: #3976C6;
+  --brand-deep: #2A5996;
+  --brand-soft: rgb(213 230 248);
+  --brand-ring: rgb(57 118 198 / 22%);
+
+  /* ── 状态色（v5）── */
+  --ok: #169D72;
+  --ok-soft: rgb(207 246 231);
+  --ok-ink: #097251;
+  --warn: #D38A20;
+  --warn-soft: rgb(255 239 191);
+  --warn-ink: #8B590C;
+  --danger: #E04E5C;
+  --danger-soft: rgb(253 219 224);
+  --danger-ink: #9D313E;
+
+  /* ── 形状：与效果稿一致 ── */
+  /* #110：只收敛表面几何；颜色与语义令牌保持不变。 */
+  --radius-card: 4px;
+  --radius-btn: 4px;
+  --radius-control: var(--radius-btn);
+  --radius-sm: 3px;
+  --radius-pill: 999px;
+  --shadow-card: none;
+  /* 浮层仍由 --shadow-pop 提供层次；别名供 Nuxt 与设计稿共用。 */
+  --shadow-float: var(--shadow-pop);
+  --shadow-dialog: var(--shadow-pop);
+}

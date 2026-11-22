@@ -78,6 +78,11 @@ export const useTabsStore = defineStore('tabs', () => {
     return requestChange(index < 0 ? [] : tabs.value.slice(index + 1).filter(tab => tab.closable).map(tab => tab.key))
   }
 
+  function requestCloseToLeft(key: string) {
+    const index = tabs.value.findIndex(tab => tab.key === key)
+    return requestChange(index < 0 ? [] : tabs.value.slice(0, index).filter(tab => tab.closable).map(tab => tab.key))
+  }
+
   function requestCloseEvery() {
     return requestChange(tabs.value.filter(tab => tab.closable).map(tab => tab.key))
   }
@@ -209,6 +214,7 @@ export const useTabsStore = defineStore('tabs', () => {
     registerCloseGuard,
     requestClose,
     requestCloseOther,
+    requestCloseToLeft,
     requestCloseToRight,
     requestCloseEvery,
     requestRefresh,

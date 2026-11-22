@@ -1,3 +1,4 @@
+import type { Locator } from '@playwright/test'
 import { expect, test } from '@playwright/test'
 
 async function expectDocumentDoesNotOverflow(page: import('@playwright/test').Page) {
@@ -6,6 +7,33 @@ async function expectDocumentDoesNotOverflow(page: import('@playwright/test').Pa
     scroll: document.documentElement.scrollWidth,
   }))
   expect(widths.scroll).toBeLessThanOrEqual(widths.client)
+}
+
+async function expectHeaderBodyAlignment(region: Locator, context: string, fixed = false) {
+  await expect(region).toBeVisible()
+  await expect(async () => {
+    const { headers, cells } = await region.evaluate((element, fixed) => {
+      function bounds(column: Element) {
+        const { left, right, width } = column.getBoundingClientRect()
+        return { id: column.getAttribute('colid'), left, right, width }
+      }
+      const row = element.querySelector('.vxe-body--row')
+      return {
+        headers: Array.from(element.querySelectorAll(fixed
+          ? '.vxe-header--column[colid].fixed--visible'
+          : '.vxe-header--column[colid]'), bounds),
+        cells: Array.from(row?.querySelectorAll('.vxe-body--column[colid]') ?? [], bounds),
+      }
+    }, fixed)
+    expect(headers.length, `${context} 应有可测量的列`).toBeGreaterThan(0)
+    expect(cells.map(cell => cell.id), `${context} 表头和首行列应逐一对应`).toEqual(headers.map(header => header.id))
+    for (const [index, header] of headers.entries()) {
+      const cell = cells[index]!
+      expect(header.width, `${context} 第 ${index + 1} 列应有宽度`).toBeGreaterThan(0)
+      expect(Math.abs(header.left - cell.left), `${context} 第 ${index + 1} 列左边缘`).toBeLessThanOrEqual(1)
+      expect(Math.abs(header.right - cell.right), `${context} 第 ${index + 1} 列右边缘`).toBeLessThanOrEqual(1)
+    }
+  }).toPass({ timeout: 5_000 })
 }
 
 test.describe('KitTable 公共表格规格', () => {
@@ -98,7 +126,7 @@ test.describe('KitTable 公共表格规格', () => {
     { width: 1280, height: 900 },
     { width: 1440, height: 1000 },
   ] as const) {
-    test(`${viewport.width}px 宽表只在自身容器横滚`, async ({ page }) => {
+    test(`${viewport.width}px 宽表表头和表体对齐且只在自身容器横滚`, async ({ page }) => {
       await page.setViewportSize(viewport)
       await page.goto('/dev/kit-table')
       await page.waitForLoadState('networkidle')
@@ -113,6 +141,9 @@ test.describe('KitTable 公共表格规格', () => {
       expect(scrollBox!.x).toBeGreaterThanOrEqual(tableBox!.x)
       expect(scrollBox!.x + scrollBox!.width).toBeLessThanOrEqual(tableBox!.x + tableBox!.width + 1)
       await expectDocumentDoesNotOverflow(page)
+      await expectHeaderBodyAlignment(vxeTable.locator('.vxe-table--main-wrapper'), `${viewport.width}px 主表`)
+      await expectHeaderBodyAlignment(vxeTable.locator('.vxe-table--fixed-left-wrapper'), `${viewport.width}px 左固定列`, true)
+      await expectHeaderBodyAlignment(vxeTable.locator('.vxe-table--fixed-right-wrapper'), `${viewport.width}px 右固定列`, true)
     })
   }
 })

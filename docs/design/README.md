@@ -16,6 +16,8 @@
 | 6 | 参考冲突、响应式和可达性裁定 | [ADR 0013](../adr/0013-align-all-ui-to-online-design.md)；整页实体表单继续遵守 [ADR 0014](../adr/0014-full-page-entity-forms.md) |
 | 7 | 组件和交互原语 | [KitUI 组件规格](./kit-ui-component-specs.md)；底座选型见 ADR 0008 / 0009 |
 
+修改共享令牌后执行 `pnpm design:sync-manifest`，同步设计清单和 Nuxt 的运行时样式 `app/assets/css/design-tokens-v5.css`。生成文件随代码交付，令牌在设计源修改。
+
 上表按问题定位来源，不是按行号覆盖规则。ADR 按明确的适用范围与替代关系理解：
 
 ```mermaid

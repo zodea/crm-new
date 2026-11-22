@@ -26,6 +26,7 @@ const DESIGN_STYLES_PATH = join(DESIGN_ROOT, 'styles.css')
 const DESIGN_MANIFEST_PATH = join(DESIGN_ROOT, '_ds_manifest.json')
 const DESIGN_HTML_PATH = join(PROJECT_ROOT, 'DC重构设计源码/app.dc.html')
 const APP_TOKEN_BRIDGE_PATH = join(PROJECT_ROOT, 'app/assets/css/tokens.css')
+const APP_TOKENS_PATH = join(PROJECT_ROOT, 'app/assets/css/design-tokens-v5.css')
 const SOURCE_EXTENSIONS = new Set(['.css', '.ts', '.vue'])
 const RUNTIME_TOKEN_PREFIXES = ['--reka-']
 
@@ -79,13 +80,11 @@ function tokenEntries(file: string) {
 
 describe('design token contract', () => {
   it('defines every product CSS variable consumed by the app', () => {
-    expect(existsSync(DESIGN_TOKEN_PATH)).toBe(true)
+    expect(existsSync(APP_TOKENS_PATH)).toBe(true)
 
-    const designTokenFiles = importedCssFiles(DESIGN_TOKEN_PATH)
     const files = [
       ...sourceFiles(APP_ROOT),
       join(PROJECT_ROOT, 'uno.config.ts'),
-      ...designTokenFiles,
     ]
     const source = files
       .map(file => withoutComments(readFileSync(file, 'utf8')))
@@ -170,7 +169,15 @@ describe('design token contract', () => {
     expect(designStyles).not.toContain('@import "./tokens/typography.css";')
     expect(designHtml.match(/<link rel="stylesheet"/g)).toHaveLength(1)
     expect(designHtml).toContain('crm-e3d87120-cf57-4b83-8a9b-188c305f529d/styles.css')
-    expect(appBridge).toMatch(/^@import ".+\/tokens\/content-v5\.css";/)
+    expect(appBridge).toMatch(/^@import "\.\/design-tokens-v5\.css";/)
+    const derivedSources = importedCssFiles(DESIGN_TOKEN_PATH).map(file =>
+      readFileSync(file, 'utf8')
+        .replace(/@import\s+["'][^"']+\.css["'];/g, '')
+        .replaceAll('\r\n', '\n')
+        .trim(),
+    )
+    const appTokens = readFileSync(APP_TOKENS_PATH, 'utf8').replaceAll('\r\n', '\n')
+    expect(appTokens).toBe(`/* 由 pnpm design:sync-manifest 生成。 */\n\n${derivedSources.join('\n\n')}\n`)
   })
 })
 

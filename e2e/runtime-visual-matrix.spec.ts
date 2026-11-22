@@ -295,6 +295,8 @@ const SAMPLES: VisualSample[] = [
     prepare: async (page) => {
       await expect(page.locator('[data-ui="project-detail-screen"]')).toBeVisible()
       await expect(page.getByRole('status', { name: '测试数据只读详情' })).toBeVisible()
+      await expect(page.getByRole('heading', { name: '项目商务单据', exact: true })).toBeVisible()
+      await expect(page.getByRole('heading', { name: '演示项目不提供正式项目商务单据', exact: true })).toBeVisible()
     },
     sensitive: page => [
       ...stableSensitive(page),

@@ -9,6 +9,9 @@ const designRoot = join(
 )
 const stylesPath = join(designRoot, 'styles.css')
 const manifestPath = join(designRoot, '_ds_manifest.json')
+const contentTokensPath = join(designRoot, 'tokens/content-v5.css')
+const appTokensPath = join(projectRoot, 'app/assets/css/design-tokens-v5.css')
+const localCssImport = /@import\s+["']([^"']+\.css)["'];/g
 
 async function importedCssFiles(entry, visited = new Set()) {
   if (visited.has(entry))
@@ -17,7 +20,7 @@ async function importedCssFiles(entry, visited = new Set()) {
 
   const source = await readFile(entry, 'utf8')
   const imports = Array.from(
-    source.matchAll(/@import\s+["']([^"']+\.css)["'];/g),
+    source.matchAll(localCssImport),
     match => resolve(dirname(entry), match[1]),
   )
   const dependencies = []
@@ -72,3 +75,10 @@ manifest.globalCssPaths = ['styles.css']
 manifest.tokens = tokens
 
 await writeFile(manifestPath, `${JSON.stringify(manifest)}\n`, 'utf8')
+
+const appTokenFiles = await importedCssFiles(contentTokensPath)
+const appTokens = await Promise.all(appTokenFiles.map(async (file) => {
+  const source = await readFile(file, 'utf8')
+  return source.replace(localCssImport, '').replaceAll('\r\n', '\n').trim()
+}))
+await writeFile(appTokensPath, `/* 由 pnpm design:sync-manifest 生成。 */\n\n${appTokens.join('\n\n')}\n`, 'utf8')

@@ -5,6 +5,7 @@
 // ④列头筛选 + 行操作插槽 ⑤13+ 列宽表样例。
 import type { KitTableColumn } from '~/lib/kit/table'
 import { clampPage, deriveFilterOptions, paginate } from '~/lib/kit/table'
+import { PROJECT_STATUSES, projectStatusTone } from '~/lib/project/status'
 
 // —— 样例数据:红圈项目列表口径,57 条(需要分页与横滚的真实体量) ——
 const NAMES = ['合和新城', '锦绣江南', '翡翠湾', '云璟台', '龙湖天街', '滨江壹号', '紫金华府', '中央公园里', '天悦城', '麓山院', '江山赋', '观澜府']
@@ -12,16 +13,6 @@ const CLIENTS = ['广州城投置业', '保利华南', '越秀地产', '珠江�
 const MANAGERS = ['陈志远', '李建国', '王海峰', '赵明轩', '刘德胜']
 const REGIONS = ['广州', '佛山', '东莞', '深圳', '惠州']
 const TYPES = ['自营', '联营']
-const STATUSES = ['筹备中', '施工中', '停工', '已竣工', '已结算']
-
-const STATUS_COLOR: Record<string, string> = {
-  筹备中: 'cell--status-warn',
-  施工中: 'text-brand font-600',
-  停工: 'text-ink-faint font-600',
-  已竣工: 'cell--status-ok',
-  已结算: 'cell--status-ok',
-}
-
 interface DemoProject {
   id: number
   code: string
@@ -55,7 +46,7 @@ const ALL_ROWS: DemoProject[] = Array.from({ length: 57 }, (_, i) => {
     manager: MANAGERS[i % MANAGERS.length]!,
     operationType: TYPES[i % TYPES.length]!,
     region: REGIONS[i % REGIONS.length]!,
-    status: STATUSES[i % STATUSES.length]!,
+    status: PROJECT_STATUSES[i % PROJECT_STATUSES.length]!,
     contractAmount,
     received,
     receivable: round2(contractAmount - received),
@@ -168,7 +159,9 @@ const fewColumns: KitTableColumn[] = [
             </button>
           </template>
           <template #status="{ row }">
-            <span :class="STATUS_COLOR[row.status as string] || ''">{{ row.status }}</span>
+            <KitStatusTag :tone="projectStatusTone(String(row.status))">
+              {{ row.status }}
+            </KitStatusTag>
           </template>
           <template #action="{ row }">
             <div class="flex items-center gap-1">

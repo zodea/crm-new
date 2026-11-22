@@ -1,4 +1,4 @@
-@import "../../../DC重构设计源码/_ds/crm-e3d87120-cf57-4b83-8a9b-188c305f529d/tokens/content-v5.css";
+@import "./design-tokens-v5.css";
 
 /* 设计系统令牌 — 瑞航 CRM
    内容区遵循 ADR 0007，应用外壳遵循 ADR 0013。 */
@@ -159,12 +159,14 @@
   box-shadow: var(--shadow-pop);
 }
 
-/* ── 全局重置 ── */
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-  margin: 0;
+/* 基础重置优先级低于组件和工具类声明。 */
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+    margin: 0;
+  }
 }
 
 html {
