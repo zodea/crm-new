@@ -15,9 +15,8 @@
 | [tests/components/MaterialExcelImportScreen.test.ts](../../../tests/components/MaterialExcelImportScreen.test.ts) | 组件（jsdom） | 关联确认和已有明细冲突阻断 |
 | [tests/browser/MaterialExcelImportScreen.test.ts](../../../tests/browser/MaterialExcelImportScreen.test.ts) | 浏览器组件 | 文件选择、键盘焦点、关联选择和多视口；不替代正式整页旅程 |
 | [e2e/production-material-excel-import.spec.ts](../../../e2e/production-material-excel-import.spec.ts) | 正式隔离 Playwright | 填写实际模板、整批关联、丢响应后重启核对及每份合同原字节 |
-| [e2e/issue-277-material-contract-supplier-zero-chain.spec.ts](../../../e2e/issue-277-material-contract-supplier-zero-chain.spec.ts) | Playwright E2E | Issue #277：项目—材采合同—分供方零值只读样板链 |
-| [e2e/issue-318-material-contract-detail.spec.ts](../../../e2e/issue-318-material-contract-detail.spec.ts) | Playwright E2E | Issue #318：材料采购合同中央只读详情；正式新建、编辑及施工主合同关系回读在生产验收中验证 |
-| [e2e/issue-422-material-contract-list.spec.ts](../../../e2e/issue-422-material-contract-list.spec.ts) | Playwright E2E | Issue #422 材料采购合同列表 |
+| [e2e/project-material-supplier.spec.ts](../../../e2e/project-material-supplier.spec.ts) | Playwright E2E | Issue #277：项目—材采合同—分供方零值只读样板链；关联物资：项目供应商穿透流程 |
+| [e2e/issue-318-material-contract-detail.spec.ts](../../../e2e/issue-318-material-contract-detail.spec.ts) | Playwright E2E | Issue #318：材料采购合同中央只读详情；正式新建、编辑及施工主合同关系回读在生产验收中验证；Issue #422 材料采购合同列表 |
 | [tests/components/MaterialContractDetailScreen.test.ts](../../../tests/components/MaterialContractDetailScreen.test.ts) | 组件（jsdom） | 材料采购合同中央详情 |
 | [tests/components/MaterialContractFactTable.test.ts](../../../tests/components/MaterialContractFactTable.test.ts) | 组件（jsdom） | 材料采购合同来源事实表 |
 | [tests/components/MaterialContractListAmounts.test.ts](../../../tests/components/MaterialContractListAmounts.test.ts) | 组件（jsdom） | 材料合同列表真实金额与关系 |
@@ -37,10 +36,9 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
-| [e2e/issue-321-subcontract-contract-detail.spec.ts](../../../e2e/issue-321-subcontract-contract-detail.spec.ts) | Playwright E2E | Issue #321：分包合同专属中央详情 |
 | [tests/components/SubcontractContractDetailScreen.test.ts](../../../tests/components/SubcontractContractDetailScreen.test.ts) | 组件（jsdom） | 分包合同详情来源返回边界 |
 | [tests/components/SubcontractContractFactTable.test.ts](../../../tests/components/SubcontractContractFactTable.test.ts) | 组件（jsdom） | subcontractContractFactTable |
-| [tests/db/ct04-subcontract-contract-migration.test.ts](../../../tests/db/ct04-subcontract-contract-migration.test.ts) | 单元／服务／状态 | ct04 subcontract contract migration |
+| [tests/db/contract-facts-migrations.test.ts](../../../tests/db/contract-facts-migrations.test.ts) | 单元／服务／状态 | ct04 subcontract contract migration；cT03 施工合同实际竣工事实迁移 |
 | [tests/subcontract-contract/command-contract.test.ts](../../../tests/subcontract-contract/command-contract.test.ts) | 单元／服务／状态 | 分包合同中央 command contract |
 | [tests/subcontract-contract/controlled-migration.test.ts](../../../tests/subcontract-contract/controlled-migration.test.ts) | 单元／服务／状态 | 分包合同受控中央迁移 |
 | [tests/subcontract-contract/http-repository.test.ts](../../../tests/subcontract-contract/http-repository.test.ts) | 单元／服务／状态 | 分包合同中央 HTTP Repository |
@@ -51,14 +49,13 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
-| [e2e/contract-detail.spec.ts](../../../e2e/contract-detail.spec.ts) | Playwright E2E | Issue #195：通用合同详情 |
+| [e2e/contract-detail.spec.ts](../../../e2e/contract-detail.spec.ts) | Playwright E2E | Issue #321：分包合同专属中央详情；Issue #195：通用合同详情；Issue #322：补充协议稳定聚焦与来源恢复；Issue #282：施工与分包合同专属只读详情；Issue #320：施工合同专属中央详情 |
 | [e2e/production-other-settlements.spec.ts](../../../e2e/production-other-settlements.spec.ts) | 实际正式构建与隔离 SQLite | 无合同原费用、结算、申请及实付全链；普通申请与历史未知批复分别验收；E100／缺原纸清偿30替代核定、新70与旧30明确合并、银行现金只计100；整页真实原件、未知原键、版本冲突、冻结历史、Native 迁入及冷开五档 |
 | [e2e/helpers/other-settlement-migration-source.ts](../../../e2e/helpers/other-settlement-migration-source.ts) | 辅助／夹具 | 实际 Native60 原费用及结算图、冻结历史、原回执和原件，逐项显式映射后供正式页面采用 |
 | [e2e/helpers/historical-clearance-migration-source.ts](../../../e2e/helpers/historical-clearance-migration-source.ts) | 辅助／夹具 | 实际 Native60 原费用100与纸单清偿30；原纸从未电子化的缺失状态、独立原费用正文及原审计保全，供真实替代核定流程使用 |
 | [e2e/contract-forms.spec.ts](../../../e2e/contract-forms.spec.ts) | Playwright E2E | F2 canonical 合同与支出结算整页表单 |
 | [e2e/contract-list-toolbar.spec.ts](../../../e2e/contract-list-toolbar.spec.ts) | Playwright E2E | 分包合同工具栏在 ${width}px 保持稳定且仅表格内部横滚 |
 | [e2e/contract-multifilter.spec.ts](../../../e2e/contract-multifilter.spec.ts) | Playwright E2E | ${domain} 合同固定多选贯通中央查询，刷新保留表格与四档滚动边界 |
-| [e2e/issue-322-contract-supplement-focus.spec.ts](../../../e2e/issue-322-contract-supplement-focus.spec.ts) | Playwright E2E | Issue #322：补充协议稳定聚焦与来源恢复 |
 | [tests/components/ContractDetailSections.test.ts](../../../tests/components/ContractDetailSections.test.ts) | 组件（jsdom） | contract detail sections |
 | [tests/components/ContractFormFields.test.ts](../../../tests/components/ContractFormFields.test.ts) | 组件（jsdom） | contractFormFields lookup data flow |
 | [tests/browser/AuxiliaryCompanySupplier.test.ts](../../../tests/browser/AuxiliaryCompanySupplier.test.ts) | 真实组件／模拟来源 | 公司合同手选分供方、旧对方原文及键盘视口 |
@@ -72,6 +69,7 @@
 | [tests/contract/forms.test.ts](../../../tests/contract/forms.test.ts) | 单元／服务／状态 | f2 合同与支出结算领域 action |
 | [tests/contract/native-contract-identities.test.ts](../../../tests/contract/native-contract-identities.test.ts) | 单元／服务／状态 | Native v52→53 真实磁盘重建保全部列/外键/索引/触发器与旧原件、冻结/审计；版本记账前中断冷开重试保零/未知及历史重复占号 |
 | [tests/contract/our-signatory-repository.test.ts](../../../tests/contract/our-signatory-repository.test.ts) | 单元／服务／状态 | 独立主体目录真实 owner/HTTP严格解码、完整核实历史、401/403与原命令回执/墓碑；精确编辑恢复定位不开放写页签正文 |
+| [tests/browser/OurSignatorySettings.test.ts](../../../tests/browser/OurSignatorySettings.test.ts) | 浏览器组件 | 五档视口、主体状态、键盘编辑、只读权限、空态与读取重试 |
 | [tests/db/f2-contract-migrations.test.ts](../../../tests/db/f2-contract-migrations.test.ts) | 单元／服务／状态 | v21 F2 canonical 合同与支出结算迁移 |
 | [tests/stores/contract-list-refresh.test.ts](../../../tests/stores/contract-list-refresh.test.ts) | 单元／服务／状态 | 合同列表刷新快照边界 |
 | [tests/stores/contract.test.ts](../../../tests/stores/contract.test.ts) | 单元／服务／状态 | contract store:唯一写路径 action 闭环 |
@@ -102,8 +100,6 @@
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
 | [tests/construction-contract/management-fee.test.ts](../../../tests/construction-contract/management-fee.test.ts) | 单元／服务／状态 | 总合同配置位置、未知与零、冻结采用版本及 Native 冷恢复 |
-| [e2e/issue-282-construction-subcontract-readonly-details.spec.ts](../../../e2e/issue-282-construction-subcontract-readonly-details.spec.ts) | Playwright E2E | Issue #282：施工与分包合同专属只读详情 |
-| [e2e/issue-320-construction-contract-detail.spec.ts](../../../e2e/issue-320-construction-contract-detail.spec.ts) | Playwright E2E | Issue #320：施工合同专属中央详情 |
 | [tests/components/ConstructionContractFactTable.test.ts](../../../tests/components/ConstructionContractFactTable.test.ts) | 组件（jsdom） | constructionContractFactTable |
 | [tests/components/ConstructionContractListScreen.test.ts](../../../tests/components/ConstructionContractListScreen.test.ts) | 组件（jsdom） | 施工合同列表连续工作面 |
 | [tests/construction-contract/combined-source-version.test.ts](../../../tests/construction-contract/combined-source-version.test.ts) | 单元／服务／状态 | 施工合同聚合读取版本 |
@@ -112,7 +108,6 @@
 | [tests/construction-contract/http-repository.test.ts](../../../tests/construction-contract/http-repository.test.ts) | 单元／服务／状态 | 施工合同中央 HTTP Repository |
 | [tests/construction-contract/repository-contract.test.ts](../../../tests/construction-contract/repository-contract.test.ts) | 单元／服务／状态 | 施工合同中央 Repository contract |
 | [tests/construction-contract/return-context.test.ts](../../../tests/construction-contract/return-context.test.ts) | 单元／服务／状态 | 施工合同详情返回上下文 |
-| [tests/db/ct03-construction-contract-migration.test.ts](../../../tests/db/ct03-construction-contract-migration.test.ts) | 单元／服务／状态 | cT03 施工合同实际竣工事实迁移 |
 
 ## 辅助合同
 
@@ -120,8 +115,8 @@
 | --- | --- | --- |
 | [tests/browser/NativeContractAuxUnknown.test.ts](../../../tests/browser/NativeContractAuxUnknown.test.ts) | 浏览器组件 | Native 公司合同实际 Vxe 表格与筛选合计保持未知/真实零；五档视口、局部横滚及键盘焦点 |
 | [e2e/auxiliary-list-refresh.spec.ts](../../../e2e/auxiliary-list-refresh.spec.ts) | Playwright E2E | ${path} 同来源筛选和刷新保留表格，失败可重试，拒绝权限时清空 |
-| [e2e/contract-aux-list.spec.ts](../../../e2e/contract-aux-list.spec.ts) | Playwright E2E | Issue #196：辅助合同与结算列表 |
-| [e2e/issue-330-auxiliary-contracts.spec.ts](../../../e2e/issue-330-auxiliary-contracts.spec.ts) | Playwright E2E | AX04 辅助合同只读与编辑 |
+| [e2e/issue-330-auxiliary-contracts.spec.ts](../../../e2e/issue-330-auxiliary-contracts.spec.ts) | Playwright E2E | Issue #196：辅助合同与结算列表；AX04 辅助合同只读与编辑 |
+| [e2e/production-auxiliary-contracts.spec.ts](../../../e2e/production-auxiliary-contracts.spec.ts) | 生产验收 | 辅助合同正式保存、恢复及迁入 |
 | [tests/auxiliary-contract/central.test.ts](../../../tests/auxiliary-contract/central.test.ts) | 单元／服务／状态 | 辅助合同中央事实 |
 | [tests/auxiliary-contract/http.test.ts](../../../tests/auxiliary-contract/http.test.ts) | 单元／服务／状态 | 辅助合同 HTTP Repository |
 | [tests/auxiliary-contract/migration.test.ts](../../../tests/auxiliary-contract/migration.test.ts) | 单元／服务／状态 | aX04 受控迁移 |

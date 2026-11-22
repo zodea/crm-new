@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import ContractAttachmentSection from '~/components/contract/ContractAttachmentSection.vue'
+import OtherSettlementFormFields from '~/components/other-settlement/OtherSettlementFormFields.vue'
 import OtherSettlementClearanceBindingSection from './OtherSettlementClearanceBindingSection.vue'
 
 const { draft, context, title, files, loading, loadError, saveError, errors, loadingAction, closeAfterSave, dirty, ordinaryDirty, bindingInput, expenseAllocations, saveClearanceLink, selectedContract, fetchProjects, fetchContracts, patch, initialize, leave, save, expenses, expenseError, reloadExpenses, session, recover, canSave, frozen, latestConflict, adoptLatest } = useOtherSettlementForm()

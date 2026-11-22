@@ -68,7 +68,7 @@ export async function createOtherSettlementPay08Source(directory: string) {
 }
 
 /** Historical E only: complete genuine Native bytes, no current creation shortcut or extra cash/settlement. */
-export async function adoptHistoricalExpenseFixture(storage: ProductionStorage, actor: BusinessSession, options: { directory: string, serviceId: string, payeeId: string, serviceName: string, payeeName: string, prefix?: string, original?: boolean }) {
+export async function adoptHistoricalExpenseFixture(storage: ProductionStorage, actor: BusinessSession & { capabilities: string[] }, options: { directory: string, serviceId: string, payeeId: string, serviceName: string, payeeName: string, prefix?: string, original?: boolean }) {
   const prefix = options.prefix ?? 'historical-expense'
   const sameParty = options.serviceId === options.payeeId
   const ids = { service: `${prefix}-service`, payee: sameParty ? `${prefix}-service` : `${prefix}-payee`, expense: `${prefix}-head`, line: `${prefix}-line`, file: `${prefix}-file` }

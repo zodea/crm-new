@@ -1,5 +1,5 @@
 // WorkerPrivateScreen — 工人私密资料与照片整页（路由 workerPrivate，对应实现 /base/worker/private/:id?origin=real）。
-// 依据：app/components/worker/WorkerPrivateProfileScreen.vue、app/composables/useWorkerPrivateProfile.ts、
+// 依据：app/pages/base/worker/private/_components/WorkerPrivateProfileScreen.vue、app/composables/useWorkerPrivateProfile.ts、
 //       app/lib/worker-roster/contract.ts、docs/rewrite/pages/base-worker.md（#449）、ADR 0014。
 // 规则摘要：
 //   · 进入需 worker:sensitive:read，维护还需 worker:write；普通列表 / 详情继续脱敏，工资权限不隐含私密权限。

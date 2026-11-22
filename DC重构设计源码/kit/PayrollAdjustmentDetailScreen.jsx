@@ -1,5 +1,5 @@
 // PayrollAdjustmentDetailScreen — 工资更正详情（/subcontract/payroll/adjustments/:id；#412 P4）。
-// 对应 app/components/payroll/PayrollAdjustmentDetailScreen.vue：
+// 对应 app/pages/subcontract/payroll/adjustments/_components/PayrollAdjustmentDetailScreen.vue：
 //   原签名工资事实 → 本次已确认核算更正（原因/依据/前后核算/差额/确认人，可展开前后完整依据）或草稿 →
 //   原更正链当前余额（确认差额 / 已处理 / 待处理）与后续动作 → 逐次处理历史 → 独立确认记录。
 // 口径：确认核减只代表“待退或待抵扣”，未真实退款或后续工资处理前原实际支出不变；再纠错走“追加有依据的纠错”。

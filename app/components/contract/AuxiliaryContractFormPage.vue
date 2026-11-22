@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import type { AuxiliaryContractKind } from '~/lib/auxiliary-contract/contract'
+import AuxiliaryContractFormFields from '~/components/contract/AuxiliaryContractFormFields.vue'
+import ContractAttachmentSection from '~/components/contract/ContractAttachmentSection.vue'
 
 const props = defineProps<{ kind: AuxiliaryContractKind }>()
 const { draft, title, files, errors, loading, loadError, saveError, loadingAction, closeAfterSave, dirty, initialize, save, leave, patch, pending, pendingCommandId, recover, constructionMain, selectMain, fetchMains, fetchSignatories, selectSignatory, selectSupplier, fetchProjects, fetchSuppliers } = useAuxiliaryContractForm(() => props.kind)

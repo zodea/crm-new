@@ -268,7 +268,8 @@ test.describe('F2 canonical 合同与支出结算整页表单', () => {
   test('保存并新建会在同一页可靠重置为空表单', async ({ page }) => {
     await page.goto('/contract/company-expense/form')
     await page.getByLabel('合同名称 *', { exact: true }).fill('E2E保存并新建')
-    await page.getByLabel('对方单位 *').fill('E2E服务商')
+    await page.getByRole('combobox', { name: '搜索已有分供方' }).fill(MASTER_INPUTS.supplier)
+    await page.getByRole('option', { name: new RegExp(MASTER_INPUTS.supplier) }).click()
     await page.getByLabel('签订日期 *').fill('2026-07-25')
     await page.getByLabel('合同金额 *', { exact: true }).fill('100')
     await page.getByRole('button', { name: '保存并新建' }).click()

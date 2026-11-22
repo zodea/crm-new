@@ -2,8 +2,8 @@ import { expect, it } from 'vitest'
 import { render } from 'vitest-browser-vue'
 import { page } from 'vitest/browser'
 import { defineComponent, h, shallowRef } from 'vue'
-import InvoiceOriginalPanel from '~/components/invoice/InvoiceOriginalPanel.vue'
 import InvoiceRegionViewer from '~/components/invoice/InvoiceRegionViewer.vue'
+import InvoiceOriginalPanel from '~/pages/finance/invoice/_components/InvoiceOriginalPanel.vue'
 
 it('旧工作台原件面板使用浏览器真实图片解码后定位，失败和重试不保留失效框', async () => {
   const canvas = document.createElement('canvas')

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import FinanceFormPage from '~/components/finance/FinanceFormPage.vue'
+
 definePageMeta({ name: 'payApplyFormEdit' })
 
 const route = useRoute()

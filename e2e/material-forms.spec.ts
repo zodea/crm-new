@@ -110,11 +110,10 @@ test.describe('F4 物资领域整页表单', () => {
     await page.clock.install({ time: new Date('2026-08-06T04:00:00.000Z') })
   })
 
-  test('九条物资表单与材料结算均可保存不完整草稿并进入真实编辑路由', async ({ page }) => {
-    test.setTimeout(180_000)
-    await page.setViewportSize({ width: 390, height: 844 })
-
-    for (const [index, form] of MATERIAL_FORM_ROUTES.entries()) {
+  for (const [index, form] of MATERIAL_FORM_ROUTES.entries()) {
+    test(`${form.title}可保存不完整草稿并进入真实编辑路由`, async ({ page }) => {
+      test.setTimeout(180_000)
+      await page.setViewportSize({ width: 390, height: 844 })
       const no = `E2E-F4-DRAFT-${index}`
       await page.goto(form.path)
       await expect(page.getByRole('heading', { name: form.title })).toBeVisible({
@@ -131,8 +130,12 @@ test.describe('F4 物资领域整页表单', () => {
       await expect(page.getByTestId('material-no')).toHaveValue(no)
       await expect(page.getByRole('button', { name: '保存草稿' })).toBeDisabled()
       await expectNoPageOverflow(page, form.path)
-    }
+    })
+  }
 
+  test('材料结算可保存不完整草稿并进入真实编辑路由', async ({ page }) => {
+    test.setTimeout(180_000)
+    await page.setViewportSize({ width: 390, height: 844 })
     const settlementName = 'E2E-F4-材料结算草稿'
     await page.goto('/material/settlement/form')
     await expect(page.getByRole('heading', { name: '新建 · 材料采购结算' })).toBeVisible()
@@ -297,21 +300,23 @@ test.describe('F4 物资领域整页表单', () => {
       .toBeVisible()
   })
 
-  test('十二条整页表单在各宽度无页面级横向溢出', async ({ page }) => {
-    test.setTimeout(90_000)
-    const fixture = fixtures.get(page)!
-    for (const route of responsiveRoutes(fixture)) {
-      await page.goto(route.path)
-      await expect(page.getByRole('heading', { name: route.title })).toBeVisible({
-        timeout: 20_000,
-      })
-      await expect(page.getByRole('group', { name: '表单操作', exact: true })).toBeVisible()
-      for (const width of RESPONSIVE_WIDTHS) {
-        await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
-        await expectNoPageOverflow(page, `${route.path} @ ${width}px`)
+  for (const group of [0, 1, 2, 3]) {
+    test(`整页表单在各宽度无页面级横向溢出：第 ${group + 1} 组`, async ({ page }) => {
+      test.setTimeout(90_000)
+      const fixture = fixtures.get(page)!
+      for (const route of responsiveRoutes(fixture).slice(group * 3, group * 3 + 3)) {
+        await page.goto(route.path)
+        await expect(page.getByRole('heading', { name: route.title })).toBeVisible({
+          timeout: 20_000,
+        })
+        await expect(page.getByRole('group', { name: '表单操作', exact: true })).toBeVisible()
+        for (const width of RESPONSIVE_WIDTHS) {
+          await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
+          await expectNoPageOverflow(page, `${route.path} @ ${width}px`)
+        }
       }
-    }
-    await page.goto('/material/arrival/new')
-    await expect(page.getByRole('heading', { name: '新建 · 材料到货' })).toBeVisible()
-  })
+      await page.goto('/material/arrival/new')
+      await expect(page.getByRole('heading', { name: '新建 · 材料到货' })).toBeVisible()
+    })
+  }
 })

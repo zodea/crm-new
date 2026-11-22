@@ -10,13 +10,15 @@
 | --- | --- | --- |
 | [e2e/helpers/responsive.ts](../../../e2e/helpers/responsive.ts) | 辅助／夹具 | 供测试导入的夹具／辅助代码；按所属业务就近查阅 |
 | [e2e/helpers/visual-environment.ts](../../../e2e/helpers/visual-environment.ts) | 辅助／夹具 | 供测试导入的夹具／辅助代码；按所属业务就近查阅 |
+| [e2e/helpers/visual-font.ts](../../../e2e/helpers/visual-font.ts) | 辅助／夹具 | 安装并验证固定的视觉测试字体 |
+| [tests/fixtures/visual-font/NotoSansSC-variable.ttf](../../../tests/fixtures/visual-font/NotoSansSC-variable.ttf) | 视觉测试字体 | 固定字体版本及许可见[测试入口](../README.md) |
 | [tests/browser/setup.ts](../../../tests/browser/setup.ts) | 测试环境初始化 | 真实浏览器组件测试初始化 |
 | [tests/components/setup.ts](../../../tests/components/setup.ts) | 测试环境初始化 | jsdom 测试清理与浏览器 API 替身 |
 | [tests/global-setup.ts](../../../tests/global-setup.ts) | 测试环境初始化 | unit 全局准备：冷进程入口预打包、迁移后内存库快照；共享旧缓存不自动删除 |
 | [tests/helpers/fixture-cache.ts](../../../tests/helpers/fixture-cache.ts) | 辅助／夹具（非独立测试） | 缓存独立发布、摘要校验及同键冲突拒绝 |
 | [tests/tooling/fixture-cache.test.ts](../../../tests/tooling/fixture-cache.test.ts) | 工程工具测试 | 并发缓存、旧文件保留、篡改与同键冲突 |
 | [scripts/e2e-isolation.ts](../../../scripts/e2e-isolation.ts) | 辅助／夹具（非独立测试） | 独立构建路径与正式验收服务入口约束 |
-| [tests/server/e2e-isolation.test.ts](../../../tests/server/e2e-isolation.test.ts) | 工程工具测试 | 拒绝复用、越界及链接路径，隔离正式服务配置 |
+| [tests/server/e2e-isolation.test.ts](../../../tests/server/e2e-isolation.test.ts) | 工程工具测试 | global demo workspace capability boundary；拒绝复用、越界及链接路径，隔离正式服务配置 |
 | [tests/helpers/cold-process.ts](../../../tests/helpers/cold-process.ts) | 辅助／夹具（非独立测试） | 以独立 Node 进程启动预打包的冷恢复与服务入口 |
 | [tests/helpers/test-temp-root.ts](../../../tests/helpers/test-temp-root.ts) | 辅助／夹具（非独立测试） | 每个测试文件的合成数据隔离与保留 |
 | [tests/tooling/test-temp-root.test.ts](../../../tests/tooling/test-temp-root.test.ts) | 工程工具测试 | 临时目录隔离、进程运行或退出时保留数据 |

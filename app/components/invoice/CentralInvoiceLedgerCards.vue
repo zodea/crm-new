@@ -65,9 +65,13 @@ const emit = defineEmits<{ selection: [id: string, selected: boolean], open: [id
           <dt class="text-ink-soft">
             {{ '打印' }}
           </dt><dd>{{ record.printCount ? `已打印 ${record.printCount} 次` : '未打印' }}</dd>
+          <dd v-if="record.sourceKind === 'excel'" class="text-ink-soft">{{ record.originalVerificationId ? '原件已核验' : '原件待核验' }}</dd>
         </div>
       </dl>
-      <div class="mt-3 flex gap-3">
+      <div class="mt-3 flex flex-wrap gap-3">
+        <NuxtLink v-if="!busy && record.sourceKind === 'excel'" :to="{ path: '/finance/invoice/manual-new', query: { invoice: record.id } }" :aria-label="`核验原件 ${record.fields.invoiceNumber || record.id}`" class="text-brand underline">
+          核验原件
+        </NuxtLink>
         <NuxtLink v-if="!busy" :to="`/finance/invoice/correction/${encodeURIComponent(record.id)}`" :aria-label="`更正发票 ${record.fields.invoiceNumber || record.id}`" class="text-brand underline">
           {{ '更正' }}
         </NuxtLink>

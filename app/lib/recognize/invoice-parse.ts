@@ -1,4 +1,5 @@
 import { round2 } from '~/lib/util/number'
+import { extractInvoiceDate, extractInvoiceNumber, normalizeInvoiceLabels } from './assistant-invoice-text'
 
 export interface ParsedInvoiceItem {
   name: string
@@ -39,7 +40,11 @@ export interface ParsedInvoice {
 
 export interface ParsedInvoiceCandidate extends Omit<ParsedInvoice, 'items'> {
   items: ParsedInvoiceCandidateItem[]
+  /** 勾稽建议仅用于校对，不是 OCR 读到的票面值。 */
+  calculatedAmounts?: Partial<Record<InvoiceAmountField, number>>
 }
+
+type InvoiceAmountField = 'amount' | 'taxAmount' | 'totalAmount'
 
 const RADICAL_FIX: Record<string, string> = {
   '⻨': '麦',
@@ -83,7 +88,7 @@ function normalizeText(rawText: string): string {
     .replace(/<\/tr\s*>/gi, '\n')
     .replace(/<\/t[dh]\s*>/gi, '\t')
     .replace(/<[^>]+>/g, ' ')
-  return applyCharacterFixes(decodeEntities(withTableBreaks))
+  return normalizeInvoiceLabels(applyCharacterFixes(decodeEntities(withTableBreaks)))
     .replace(/\r/g, '')
     .split('\n')
     .map(line => line.replace(/[ \t]+/g, ' ').trim())
@@ -115,45 +120,6 @@ function parseNumber(value: unknown): number | null {
     return null
   const result = Number(normalized)
   return Number.isFinite(result) ? round2(result) : null
-}
-
-function pad2(value: number): string {
-  return String(value).padStart(2, '0')
-}
-
-function extractInvoiceNumber(text: string): string {
-  const labelled = text.match(/发\s*票\s*号\s*码\s*(?:[:：][^\xA0\S\n]*)?(\d(?:[ \t]*\d){7,24})/)
-    || text.match(/票\s*据\s*号\s*码\s*(?:[:：][^\xA0\S\n]*)?(\d(?:[ \t]*\d){7,24})/)
-  const labelledValue = labelled?.[1]
-  if (labelledValue) {
-    const value = digitsOnly(labelledValue)
-    if (value.length >= 8 && value.length <= 25)
-      return value
-  }
-
-  const compactLines = text.split('\n').map(line => line.replace(/[ \t]/g, ''))
-  for (const line of compactLines) {
-    const bare = line.match(/(?<!\d)(\d{20})(?!\d)/)
-    if (bare)
-      return bare[1] ?? ''
-  }
-  return ''
-}
-
-function extractInvoiceDate(text: string): string {
-  const match = text.match(/(\d(?:[ \t]*\d){3})\s*年\s*(\d(?:[ \t]*\d)?)\s*月\s*(\d(?:[ \t]*\d)?)\s*日/)
-    || text.match(/(20\d{2})\s*[-/.]\s*(\d{1,2})\s*[-/.]\s*(\d{1,2})/)
-  if (!match)
-    return ''
-  const [yearText, monthText, dayText] = match.slice(1, 4)
-  if (!yearText || !monthText || !dayText)
-    return ''
-  const year = Number(digitsOnly(yearText))
-  const month = Number(digitsOnly(monthText))
-  const day = Number(digitsOnly(dayText))
-  if (year < 2000 || year > 2100 || month < 1 || month > 12 || day < 1 || day > 31)
-    return ''
-  return `${year}-${pad2(month)}-${pad2(day)}`
 }
 
 function cleanCompanyName(value: string): string {
@@ -261,8 +227,8 @@ function labelledTaxAmount(text: string): number | null {
   return match ? parseNumber(match[1]) : null
 }
 
-function extractMoneyFields(text: string, items: ParsedInvoiceCandidateItem[]): Pick<ParsedInvoice, 'amount' | 'taxAmount' | 'totalAmount' | 'balanced'> {
-  let totalAmount = totalFromText(text)
+function extractMoneyFields(text: string, items: ParsedInvoiceCandidateItem[]): Pick<ParsedInvoiceCandidate, InvoiceAmountField | 'balanced' | 'calculatedAmounts'> {
+  const totalAmount = totalFromText(text)
   let amount: number | null = null
   let taxAmount: number | null = null
   let independentAmount = false
@@ -296,20 +262,23 @@ function extractMoneyFields(text: string, items: ParsedInvoiceCandidateItem[]): 
   }
 
   taxAmount ??= labelledTaxAmount(text)
+  const calculatedAmounts: Partial<Record<InvoiceAmountField, number>> = {}
   if (totalAmount == null && amount != null && taxAmount != null)
-    totalAmount = round2(amount + taxAmount)
+    calculatedAmounts.totalAmount = round2(amount + taxAmount)
   if (amount == null && totalAmount != null && taxAmount != null)
-    amount = round2(totalAmount - taxAmount)
+    calculatedAmounts.amount = round2(totalAmount - taxAmount)
   if (taxAmount == null && totalAmount != null && amount != null)
-    taxAmount = round2(totalAmount - amount)
+    calculatedAmounts.taxAmount = round2(totalAmount - amount)
 
+  const checkedTax = taxAmount ?? calculatedAmounts.taxAmount
+  const checkedTotal = totalAmount ?? calculatedAmounts.totalAmount
   const balanced = independentAmount
     && !moneySourceConflict
     && amount != null
-    && taxAmount != null
-    && totalAmount != null
-    && Math.abs(round2(amount + taxAmount) - totalAmount) <= MONEY_RECONCILIATION_TOLERANCE
-  return { amount, taxAmount, totalAmount, balanced }
+    && checkedTax != null
+    && checkedTotal != null
+    && Math.abs(round2(amount + checkedTax) - checkedTotal) <= MONEY_RECONCILIATION_TOLERANCE
+  return { amount, taxAmount, totalAmount, balanced, ...(Object.keys(calculatedAmounts).length ? { calculatedAmounts } : {}) }
 }
 
 function extractTaxRate(text: string, items: ParsedInvoiceCandidateItem[]): string {
@@ -519,21 +488,22 @@ export function parseInvoiceTextPreservingUnknowns(rawText: string): ParsedInvoi
     buyerTaxNo: taxIds[0] || '',
     seller: companies[1] || '',
     sellerTaxNo: taxIds[1] || '',
-    amount: money.amount,
-    taxAmount: money.taxAmount,
-    totalAmount: money.totalAmount,
+    ...money,
     taxRate,
     remark: extractRemark(text),
     projectHint: extractProjectHint(text),
     items,
-    balanced: money.balanced,
   }
 }
 
 /** 旧浏览器工作区保留既有明细结构；中央持久化候选必须使用保留未知值的接口。 */
 export function parseInvoiceText(rawText: string): ParsedInvoice {
-  const parsed = parseInvoiceTextPreservingUnknowns(rawText)
-  return { ...parsed, items: parsed.items.map(item => ({ ...item, quantity: item.quantity ?? 0, unitPrice: item.unitPrice ?? 0, amount: item.amount ?? 0, taxAmount: item.taxAmount ?? 0 })) }
+  const { calculatedAmounts, ...parsed } = parseInvoiceTextPreservingUnknowns(rawText)
+  return {
+    ...parsed,
+    ...calculatedAmounts,
+    items: parsed.items.map(item => ({ ...item, quantity: item.quantity ?? 0, unitPrice: item.unitPrice ?? 0, amount: item.amount ?? 0, taxAmount: item.taxAmount ?? 0 })),
+  }
 }
 
 export function buildInvoiceFieldConfidence(parsed: ParsedInvoice): Record<string, number> {

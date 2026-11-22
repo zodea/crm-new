@@ -2,7 +2,7 @@ import type { BoqLineView } from '~/lib/boq/read-model'
 import { render, screen } from '@testing-library/vue'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { computed, defineComponent, h } from 'vue'
-import BoqLinesTable from '~/components/boq/BoqLinesTable.vue'
+import BoqLinesTable from '~/pages/contract/boq/_components/BoqLinesTable.vue'
 
 const line: BoqLineView = {
   id: 'line-1',

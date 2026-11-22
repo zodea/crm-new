@@ -4,9 +4,9 @@ import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { defineComponent, h, KeepAlive, ref, shallowRef } from 'vue'
 import CrewWorkerCentralDetailScreen from '~/components/crew-worker/CrewWorkerCentralDetailScreen.vue'
-import PayrollDayworkConfirmDialog from '~/components/payroll/PayrollDayworkConfirmDialog.vue'
 import { usePayrollC2Statement } from '~/composables/usePayrollC2Statement'
 import { usePayrollDayworkForm } from '~/composables/usePayrollDayworkForm'
+import PayrollDayworkConfirmDialog from '~/pages/subcontract/daywork/_components/PayrollDayworkConfirmDialog.vue'
 import { c2Form, c2Frozen, dayworkForm } from '../helpers/payroll-c2-ui'
 
 const load = vi.fn()
@@ -189,7 +189,7 @@ it('独立规格回归：C1 工资来源进入工人详情，只显示 C1 原工
   vi.stubGlobal('useTabTitle', vi.fn())
   const shell = defineComponent({ setup: (_, { slots }) => () => h('main', slots.summary?.()) })
   const tag = (format: string) => defineComponent({ setup: () => () => h('p', { 'data-return': format }, `${format} 原工资返回`) })
-  const view = mount(CrewWorkerCentralDetailScreen, { props: { kind: 'worker', id: 'w', origin: 'real', includeDemo: false }, global: { components: { EntityDetailShell: shell, PayrollC1SourceReturn: tag('C1'), PayrollC2SourceReturn: tag('C2'), PayrollASourceReturn: tag('A') }, stubs: { MetricGrid: true, Metric: true, NuxtLink: true, SectionHeader: true, CrewMemberSection: true, EntityLink: true } } })
+  const view = mount(CrewWorkerCentralDetailScreen, { props: { kind: 'worker', id: 'w', origin: 'real', includeDemo: false }, global: { stubs: { EntityDetailShell: shell, PayrollC1SourceReturn: tag('C1'), PayrollC2SourceReturn: tag('C2'), PayrollASourceReturn: tag('A'), MetricGrid: true, Metric: true, NuxtLink: true, SectionHeader: true, CrewMemberSection: true, EntityLink: true } } })
   try {
     await flushPromises()
     expect(view.find('[data-return=C1]').exists()).toBe(true)

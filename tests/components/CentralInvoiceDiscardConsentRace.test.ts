@@ -23,6 +23,7 @@ function deferred<T>() {
 
 function fixture(workspaceId = 'synthetic-workspace', additional: CentralInvoiceRecord[] = []) {
   const identity = { workspaceId, actorId: 'synthetic-actor' }
+  const capabilities = ['finance-invoice:read', 'finance-invoice:write']
   let current: CentralInvoiceRecord = {
     id: 'synthetic-invoice',
     version: '1',
@@ -58,7 +59,7 @@ function fixture(workspaceId = 'synthetic-workspace', additional: CentralInvoice
   let contextHook: () => Promise<void> = async () => {}
   const context = vi.fn(async () => {
     await contextHook()
-    return { ...identity, capabilities: ['finance-invoice:read', 'finance-invoice:write'] }
+    return { ...identity, capabilities: [...capabilities] }
   })
   const execute = vi.fn(async (command: CentralInvoiceCommand) => {
     if (command.action !== 'discard' || command.invoiceId !== current.id || command.baseVersion !== current.version)
@@ -66,8 +67,8 @@ function fixture(workspaceId = 'synthetic-workspace', additional: CentralInvoice
     current = { ...current, deletedAt: '2026-01-02T00:00:00.000Z', updatedAt: '2026-01-02T00:00:00.000Z', version: '2' }
     return { invoiceId: current.id, commandId: command.commandId, version: current.version, updatedAt: current.updatedAt, originalId: null }
   })
-  const get = vi.fn(async () => ({ record: structuredClone(current), sourceVersion: 'invoices:2', meta: { sources: [{ key: 'invoices', sourceVersion: 'invoices:2' }] } }))
-  const list = vi.fn(async () => ({ items: structuredClone([current, ...additional]), pagination: { total: 1 + additional.length }, sourceVersion: 'invoices:1', meta: { sources: [{ key: 'invoices', sourceVersion: 'invoices:1' }] } }))
+  const get = vi.fn(async () => ({ record: structuredClone(current), sourceVersion: 'invoices:2', capabilities: [...capabilities], meta: { sources: [{ key: 'invoices', sourceVersion: 'invoices:2' }] } }))
+  const list = vi.fn(async () => ({ items: structuredClone([current, ...additional]), pagination: { total: 1 + additional.length }, sourceVersion: 'invoices:1', capabilities: [...capabilities], meta: { sources: [{ key: 'invoices', sourceVersion: 'invoices:1' }] } }))
   const workspace = createCentralInvoiceWorkspace({ identity, context, client: { list, execute, get } as never, recognizeLocal: vi.fn() as never, storage: () => storage, commandId: () => 'synthetic-command-001' })
   return {
     workspace,

@@ -2,9 +2,9 @@ import type { ProjectDetailReadDTO } from '~/lib/project/repository'
 import { fireEvent, render, screen, within } from '@testing-library/vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h } from 'vue'
-import ProjectDetailScreen from '~/components/project/ProjectDetailScreen.vue'
 import { managementFeeSource, projectManagementFees } from '~/lib/project/management-fee'
 import { projectProblem, ProjectRepositoryProblem } from '~/lib/project/repository'
+import ProjectDetailScreen from '~/pages/project/_components/ProjectDetailScreen.vue'
 
 const detail: ProjectDetailReadDTO = {
   constructionManagementFees: { projectId: 'project-1', dataOrigin: 'demo', state: 'unavailable', sourceVersion: null, asOf: null, reason: '总合同来源未接入', contracts: [] },
@@ -94,6 +94,10 @@ const detail: ProjectDetailReadDTO = {
 
 const get = vi.fn()
 const ownerList = vi.fn()
+const projectProduction = vi.hoisted(() => ({ recover: vi.fn(), lifecycle: vi.fn(), change: vi.fn() }))
+const confirm = vi.fn()
+const success = vi.fn()
+vi.mock('~/stores/project-production', () => ({ useProjectProductionStore: () => projectProduction }))
 
 // 独立列出当前已接管商务种类；新增／丢失卡片必须重新核对领域职责。
 const OWNER_CARD_FIXTURE = [
@@ -145,6 +149,10 @@ function renderDetail(props: Record<string, unknown>) {
     global: {
       components: {
         NuxtLink: NuxtLinkStub,
+        StatePanel: StatePanelStub,
+      },
+      stubs: {
+        AuxiliaryContractJourney: true,
         ProjectDetailTab: defineComponent({
           props: ['project'],
           template: '<section aria-label="中央详情字段">{{ project.name }}</section>',
@@ -153,7 +161,6 @@ function renderDetail(props: Record<string, unknown>) {
           props: ['relationships'],
           template: '<aside aria-label="中央项目分供方">{{ relationships.length }} 家</aside>',
         }),
-        StatePanel: StatePanelStub,
       },
     },
   })
@@ -168,12 +175,42 @@ vi.stubGlobal('useNuxtApp', () => ({
 vi.stubGlobal('useProjectCommandStore', () => ({ latestWrite: null }))
 vi.stubGlobal('useProjectSupplierCommandStore', () => ({ latestWrite: null }))
 vi.stubGlobal('useTabTitle', () => {})
+vi.stubGlobal('useKitUI', () => ({ confirm, success }))
 
 describe('项目详情中央来源边界', () => {
   beforeEach(() => {
     get.mockReset()
     ownerList.mockReset()
     ownerList.mockResolvedValue(ownerPage())
+    projectProduction.recover.mockReset()
+    projectProduction.lifecycle.mockReset()
+    projectProduction.change.mockReset()
+    confirm.mockReset()
+    success.mockReset()
+  })
+
+  it('项目详情通过版本记录核对原操作结果，使用原项目状态事件', async () => {
+    const current = { id: 'project-1', name: '合和新城', version: 'project-v2', deletedAt: null }
+    get.mockResolvedValue({ ...detail, item: { ...detail.item, dataOrigin: 'real' }, capabilities: ['project:list:read', 'project:write', 'project:lifecycle:write'] })
+    projectProduction.recover.mockResolvedValue(null)
+    projectProduction.lifecycle.mockResolvedValue(current)
+    projectProduction.change.mockResolvedValue({ current: { ...current, version: 'project-v3', deletedAt: '2026-09-22' }, recovered: true })
+    confirm.mockResolvedValue(true)
+    renderDetail({ originHint: 'real' })
+
+    const remove = await screen.findByRole('button', { name: '删除项目' })
+    await vi.waitFor(() => expect(remove.hasAttribute('disabled')).toBe(false))
+    expect(projectProduction.recover).toHaveBeenCalledWith(current.id)
+    expect(projectProduction.lifecycle).toHaveBeenCalledWith(current.id)
+    expect(projectProduction.recover).toHaveBeenCalledBefore(projectProduction.lifecycle)
+    get.mockClear()
+
+    await fireEvent.click(remove)
+    await screen.findByRole('button', { name: '恢复项目' })
+    expect(confirm).toHaveBeenCalledWith({ title: '删除项目', message: `将“${current.name}”移出项目列表。原件保留，之后可以恢复。`, confirmLabel: '删除项目' })
+    expect(projectProduction.change).toHaveBeenCalledExactlyOnceWith(current)
+    expect(success).toHaveBeenCalledWith('已核对上次操作，请确认当前状态后继续。')
+    expect(get).not.toHaveBeenCalled()
   })
 
   it('总合同配置单独展示真实零与原依据，配置历史和稳定下钻不改实际管理费未知状态', async () => {

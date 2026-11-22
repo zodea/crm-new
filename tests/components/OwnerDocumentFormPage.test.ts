@@ -1,4 +1,3 @@
-import type { Component } from 'vue'
 import { fireEvent, render, screen, waitFor } from '@testing-library/vue'
 import { flushPromises } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -158,12 +157,16 @@ const FileRefAttachmentSectionStub = defineComponent({
   },
 })
 
-const globalComponents: Record<string, Component> = {
-  EntityFormShell: EntityFormShellStub,
-  OwnerDocumentFormFields: OwnerDocumentFormFieldsStub,
-  OwnerDocumentLineGrid: OwnerDocumentLineGridStub,
-  FileRefAttachmentSection: FileRefAttachmentSectionStub,
-  FormFooter: FormFooterStub,
+const global = {
+  components: {
+    EntityFormShell: EntityFormShellStub,
+    FileRefAttachmentSection: FileRefAttachmentSectionStub,
+    FormFooter: FormFooterStub,
+  },
+  stubs: {
+    OwnerDocumentFormFields: OwnerDocumentFormFieldsStub,
+    OwnerDocumentLineGrid: OwnerDocumentLineGridStub,
+  },
 }
 
 describe('甲方与分包单据整页表单状态', () => {
@@ -192,6 +195,7 @@ describe('甲方与分包单据整页表单状态', () => {
     vi.stubGlobal('ref', ref)
     vi.stubGlobal('shallowRef', shallowRef)
     vi.stubGlobal('useRoute', () => route)
+    vi.stubGlobal('useRouter', () => ({ push: vi.fn().mockResolvedValue(undefined) }))
     vi.stubGlobal('navigateTo', vi.fn())
     vi.stubGlobal('useTabTitle', vi.fn())
     vi.stubGlobal('useTabsStore', () => ({ registerCloseGuard: () => () => {}, tabs: [], close: vi.fn(), open: vi.fn() }))
@@ -287,7 +291,7 @@ describe('甲方与分包单据整页表单状态', () => {
 
   it.each(SETTLEMENT_CASES)('$kind 切换合同后拒绝迟到旧摘要，不混入另一合同金额', async (input) => {
     prepareSettlement(input)
-    render(OwnerDocumentFormPage, { props: { kind: input.kind }, global: { components: globalComponents } })
+    render(OwnerDocumentFormPage, { props: { kind: input.kind }, global })
     await flushPromises()
     let completeOld!: (summary: typeof OLD_SUMMARY) => void
     loadContractSummary.mockImplementationOnce(() => new Promise((resolve) => {
@@ -305,7 +309,7 @@ describe('甲方与分包单据整页表单状态', () => {
 
   it.each(SETTLEMENT_CASES)('$kind 清空项目后拒绝迟到摘要，派生金额保持未记录', async (input) => {
     prepareSettlement(input)
-    render(OwnerDocumentFormPage, { props: { kind: input.kind }, global: { components: globalComponents } })
+    render(OwnerDocumentFormPage, { props: { kind: input.kind }, global })
     await flushPromises()
     let completeOld!: (summary: typeof OLD_SUMMARY) => void
     loadContractSummary.mockImplementationOnce(() => new Promise((resolve) => {
@@ -323,7 +327,7 @@ describe('甲方与分包单据整页表单状态', () => {
     const visible = ref(true)
     render(defineComponent({
       setup: () => () => h(KeepAlive, () => visible.value ? h(OwnerDocumentFormPage, { kind: input.kind }) : null),
-    }), { global: { components: globalComponents } })
+    }), { global })
     await flushPromises()
     let completeOld!: (summary: typeof OLD_SUMMARY) => void
     loadContractSummary.mockImplementationOnce(() => new Promise((resolve) => {
@@ -348,7 +352,7 @@ describe('甲方与分包单据整页表单状态', () => {
     const visible = ref(true)
     render(defineComponent({
       setup: () => () => h(KeepAlive, () => visible.value ? h(OwnerDocumentFormPage, { kind: 'owner_report' }) : null),
-    }), { global: { components: globalComponents } })
+    }), { global })
     await flushPromises()
     let completeOld!: (rows: unknown[]) => void
     loadBoqLines.mockImplementationOnce(() => new Promise((resolve) => {
@@ -373,7 +377,7 @@ describe('甲方与分包单据整页表单状态', () => {
 
   it('更换报量基准取消保留手工稿，确认后重新生成全部明细并保留明确零', async () => {
     prepareReport()
-    render(OwnerDocumentFormPage, { props: { kind: 'owner_report' }, global: { components: globalComponents } })
+    render(OwnerDocumentFormPage, { props: { kind: 'owner_report' }, global })
     await flushPromises()
     confirm.mockResolvedValueOnce(false)
     await fireEvent.click(screen.getByRole('button', { name: '切换合同量' }))
@@ -394,7 +398,7 @@ describe('甲方与分包单据整页表单状态', () => {
 
   it('基准确认等待期间草稿已变化时不覆盖新编辑，已生效单据拒绝更换', async () => {
     prepareReport()
-    const view = render(OwnerDocumentFormPage, { props: { kind: 'owner_report' }, global: { components: globalComponents } })
+    const view = render(OwnerDocumentFormPage, { props: { kind: 'owner_report' }, global })
     await flushPromises()
     let release!: (value: boolean) => void
     confirm.mockReturnValueOnce(new Promise<boolean>((resolve) => {
@@ -408,7 +412,7 @@ describe('甲方与分包单据整页表单状态', () => {
     view.unmount()
     prepareReport('reported')
     confirm.mockClear()
-    render(OwnerDocumentFormPage, { props: { kind: 'owner_report' }, global: { components: globalComponents } })
+    render(OwnerDocumentFormPage, { props: { kind: 'owner_report' }, global })
     await flushPromises()
     await fireEvent.click(screen.getByRole('button', { name: '切换合同量' }))
     await flushPromises()
@@ -419,7 +423,7 @@ describe('甲方与分包单据整页表单状态', () => {
   it('uses the dynamic title, return label and sections from the document kind', async () => {
     render(OwnerDocumentFormPage, {
       props: { kind: 'owner_change' },
-      global: { components: globalComponents },
+      global,
     })
     await flushPromises()
 
@@ -433,7 +437,7 @@ describe('甲方与分包单据整页表单状态', () => {
     route.fullPath = '/owner/acceptance/form/current'
     route.params = { id: 'current' }
     loadOne.mockResolvedValue({ id: 'current', name: '验收', status: 'accepted', warrantyStartDate: null })
-    render(OwnerDocumentFormPage, { props: { kind: 'acceptance' }, global: { components: globalComponents } })
+    render(OwnerDocumentFormPage, { props: { kind: 'acceptance' }, global })
     await flushPromises()
     await fireEvent.click(screen.getByRole('button', { name: '填写保修日期' }))
     expect(JSON.parse(screen.getByTestId('acceptance-draft').textContent!).warrantyStartDate).toBe('2026-09-11')
@@ -454,7 +458,7 @@ describe('甲方与分包单据整页表单状态', () => {
 
     render(OwnerDocumentFormPage, {
       props: { kind: 'owner_change' },
-      global: { components: globalComponents },
+      global,
     })
     await flushPromises()
 
@@ -487,7 +491,7 @@ describe('甲方与分包单据整页表单状态', () => {
 
     render(OwnerDocumentFormPage, {
       props: { kind: 'owner_change' },
-      global: { components: globalComponents },
+      global,
     })
     await flushPromises()
 
@@ -508,7 +512,7 @@ describe('甲方与分包单据整页表单状态', () => {
 
     render(OwnerDocumentFormPage, {
       props: { kind: 'owner_change' },
-      global: { components: globalComponents },
+      global,
     })
     await flushPromises()
 
@@ -540,7 +544,7 @@ describe('甲方与分包单据整页表单状态', () => {
 
     render(OwnerDocumentFormPage, {
       props: { kind: 'owner_change' },
-      global: { components: globalComponents },
+      global,
     })
     await flushPromises()
     await fireEvent.click(screen.getByRole('button', { name: '保存并提交' }))
@@ -575,7 +579,7 @@ describe('甲方与分包单据整页表单状态', () => {
 
     render(OwnerDocumentFormPage, {
       props: { kind: 'owner_change' },
-      global: { components: globalComponents },
+      global,
     })
     await flushPromises()
     await fireEvent.click(screen.getByRole('button', { name: '保存并提交' }))
@@ -617,7 +621,7 @@ describe('甲方与分包单据整页表单状态', () => {
 
     render(OwnerDocumentFormPage, {
       props: { kind: 'owner_change' },
-      global: { components: globalComponents },
+      global,
     })
     await flushPromises()
     await fireEvent.click(screen.getByRole('button', { name: '保存并提交' }))
@@ -664,7 +668,7 @@ describe('甲方与分包单据整页表单状态', () => {
 
     render(OwnerDocumentFormPage, {
       props: { kind: 'owner_report' },
-      global: { components: globalComponents },
+      global,
     })
     await flushPromises()
     expect(screen.getByRole('button', { name: '选择附件' })).not.toBeNull()
@@ -694,7 +698,7 @@ describe('甲方与分包单据整页表单状态', () => {
 
     render(OwnerDocumentFormPage, {
       props: { kind: 'acceptance' },
-      global: { components: globalComponents },
+      global,
     })
     await flushPromises()
 

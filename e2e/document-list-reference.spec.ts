@@ -14,12 +14,12 @@ const lists = [
 ]
 
 // 五类正式财务列表的等价工具、筛选和窄屏验收使用 production-finance-storage 中的隔离合成来源。
-test('Issue #419：材料和收款列表保留紧凑工具与真实可操作表头', async ({ page }) => {
-  test.setTimeout(180_000)
-  await page.setViewportSize({ width: 1440, height: 900 })
-  const errors: string[] = []
-  page.on('pageerror', error => errors.push(error.message))
-  for (const list of lists) {
+for (const list of lists) {
+  test(`Issue #419：${list.label}列表保留紧凑工具与真实可操作表头`, async ({ page }) => {
+    test.setTimeout(180_000)
+    await page.setViewportSize({ width: 1440, height: 900 })
+    const errors: string[] = []
+    page.on('pageerror', error => errors.push(error.message))
     await page.goto(list.path)
     if (list.path === '/finance/receipt') {
       await expect(page.getByRole('heading', { name: list.label, exact: true }).last()).toBeVisible({ timeout: 30_000 })
@@ -33,7 +33,8 @@ test('Issue #419：材料和收款列表保留紧凑工具与真实可操作表�
       await page.keyboard.press('Escape')
       await expect(status).toBeFocused()
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1440)
-      continue
+      expect(errors).toEqual([])
+      return
     }
     const toolbar = page.getByLabel('单据列表工具栏')
     await expect(toolbar.getByRole('heading', { name: list.label, exact: true })).toBeVisible({ timeout: 30_000 })
@@ -50,9 +51,9 @@ test('Issue #419：材料和收款列表保留紧凑工具与真实可操作表�
     await expect(page.getByRole('group', { name: '状态', exact: true })).toBeVisible()
     await page.keyboard.press('Escape')
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1440)
-  }
-  expect(errors).toEqual([])
-})
+    expect(errors).toEqual([])
+  })
+}
 
 test('Issue #419：材料列表在390、768、1024px保留局部滚动与筛选焦点', async ({ page }) => {
   test.setTimeout(120_000)

@@ -141,7 +141,7 @@ const SectionHeaderStub = defineComponent({
   setup: props => () => h('h2', props.title),
 })
 
-const globalComponents: Record<string, Component> = {
+const stubs: Record<string, Component> = {
   CentralTargetCostFormScreen: EmptyStub,
   EntityFormShell: EntityFormShellStub,
   MasterDataFormFields: ProjectFieldsStub,
@@ -235,7 +235,7 @@ describe('项目整页表单', () => {
   it('新建态消费统一整页壳且不为短表单保留左侧分区栏', async () => {
     render(MasterDataFormPage, {
       props: { kind: 'project', hideSections: true, returnToDetail: true },
-      global: { components: globalComponents },
+      global: { stubs },
     })
     await flushPromises()
 
@@ -268,7 +268,7 @@ describe('项目整页表单', () => {
 
     render(MasterDataFormPage, {
       props: { kind: 'project', hideSections: true, returnToDetail: true },
-      global: { components: globalComponents },
+      global: { stubs },
     })
     await flushPromises()
 
@@ -298,7 +298,7 @@ describe('项目整页表单', () => {
   it('新建保存进入新项目详情，并保留统一必填校验与保存语义', async () => {
     render(MasterDataFormPage, {
       props: { kind: 'project', hideSections: true, returnToDetail: true },
-      global: { components: globalComponents },
+      global: { stubs },
     })
     await flushPromises()
 
@@ -324,7 +324,7 @@ describe('项目整页表单', () => {
   it('保存并新建在每次成功后重置中央命令意图并原地重开空表单', async () => {
     render(MasterDataFormPage, {
       props: { kind: 'project', hideSections: true, returnToDetail: true },
-      global: { components: globalComponents },
+      global: { stubs },
     })
     await flushPromises()
 
@@ -362,7 +362,7 @@ describe('项目整页表单', () => {
 
     render(MasterDataFormPage, {
       props: { kind: 'project', hideSections: true, returnToDetail: true },
-      global: { components: globalComponents },
+      global: { stubs },
     })
     await flushPromises()
     await fireEvent.click(screen.getByRole('button', { name: '取消' }))
@@ -404,7 +404,7 @@ describe('项目整页表单', () => {
 
     render(MasterDataFormPage, {
       props: { kind: 'project', hideSections: true, returnToDetail: true },
-      global: { components: globalComponents },
+      global: { stubs },
     })
     await flushPromises()
     await fireEvent.click(screen.getByRole('button', { name: '保存' }))
@@ -430,7 +430,7 @@ describe('项目整页表单', () => {
     }))
     render(MasterDataFormPage, {
       props: { kind: 'project', hideSections: true, returnToDetail: true },
-      global: { components: globalComponents },
+      global: { stubs },
     })
     await flushPromises()
     await fireEvent.update(screen.getByRole('textbox', { name: '项目名称' }), '断网项目')
@@ -482,7 +482,7 @@ describe('项目整页表单', () => {
   it('正式项目可靠回执后读取失败保留输入和原编号，不关闭；只读核对后仍保留后来输入', async () => {
     const { repository, resolve, session } = formalFixture()
     repository.loadForm.mockRejectedValueOnce(new Error('read failed'))
-    render(MasterDataFormPage, { props: { kind: 'project', hideSections: true, returnToDetail: true }, global: { components: globalComponents } })
+    render(MasterDataFormPage, { props: { kind: 'project', hideSections: true, returnToDetail: true }, global: { stubs } })
     await flushPromises()
     await fireEvent.update(screen.getByRole('textbox', { name: '项目名称' }), '已发出项目')
     await fireEvent.update(screen.getByRole('textbox', { name: '项目经理' }), '发出经理')
@@ -517,7 +517,7 @@ describe('项目整页表单', () => {
       })
       return execute(request)
     })
-    render(MasterDataFormPage, { props: { kind: 'project', hideSections: true }, global: { components: globalComponents } })
+    render(MasterDataFormPage, { props: { kind: 'project', hideSections: true }, global: { stubs } })
     await flushPromises()
     await fireEvent.update(screen.getByRole('textbox', { name: '项目名称' }), '本次提交')
     await fireEvent.update(screen.getByRole('textbox', { name: '项目经理' }), '合成经理')
@@ -540,7 +540,7 @@ describe('项目整页表单', () => {
     hydrateCommandForm.mockImplementationOnce(() => new Promise(resolve => releaseRead = resolve)).mockImplementation(async (_session, id) => central(id))
     route.fullPath = route.path = '/project/form/project-a'
     route.params = { id: 'project-a' }
-    render(MasterDataFormPage, { props: { kind: 'project' }, global: { components: globalComponents } })
+    render(MasterDataFormPage, { props: { kind: 'project' }, global: { stubs } })
     await flushPromises()
     route.fullPath = route.path = '/project/form/project-b'
     route.params = { id: 'project-b' }
@@ -572,7 +572,7 @@ describe('项目整页表单', () => {
     const AttachmentStub = defineComponent({ emits: ['download'], setup: (_props, { emit }) => () => h('button', { onClick: () => emit('download', file) }, '下载原件') })
     const createObjectURL = vi.fn(() => 'blob:synthetic-original')
     vi.stubGlobal('URL', class extends URL { static createObjectURL = createObjectURL })
-    const view = render(MasterDataFormPage, { props: { kind: 'project' }, global: { components: { ...globalComponents, MasterDataAttachmentSection: AttachmentStub } } })
+    const view = render(MasterDataFormPage, { props: { kind: 'project' }, global: { stubs: { ...stubs, MasterDataAttachmentSection: AttachmentStub } } })
     await flushPromises()
     await fireEvent.click(screen.getByRole('button', { name: '下载原件' }))
     expect(downloadOriginal).toHaveBeenCalledWith('project-a', 'original-a')
@@ -586,7 +586,7 @@ describe('项目整页表单', () => {
     Object.assign(route, { fullPath: '/project/form/project-1?origin=real', path: '/project/form/project-1', params: { id: 'project-1' }, query: { origin: 'real' } })
     const active = ref(true)
     const host = defineComponent({ setup: () => () => h(KeepAlive, null, { default: () => active.value ? h(MasterDataFormPage, { kind: 'project' }) : null }) })
-    render(host, { global: { components: globalComponents } })
+    render(host, { global: { stubs } })
     await waitFor(() => expect((screen.getByRole('textbox', { name: '项目名称' }) as HTMLInputElement).value).toBe('已保存名称'))
     const input = screen.getByRole('textbox', { name: '项目名称' })
     await fireEvent.update(input, '本页未保存名称')

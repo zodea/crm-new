@@ -39,13 +39,13 @@ it('关闭后重开同路径，旧末行完成不能提示成功或关闭新实�
   const Empty = defineComponent({ template: '<div />' })
   const KitButton = defineComponent({ props: ['disabled', 'loading'], emits: ['click'], template: '<button :disabled="disabled || loading" @click="$emit(\'click\')"><slot/></button>' })
   const components = { ImportUploadStep: Upload, ImportMappingStep: Empty, ImportPreviewStep: Empty, ProcessStepper: Empty, ProgressBar: Empty, KitButton, MaterialExcelImportScreen: Empty, ProjectImportScreen: Empty, InvoiceWorkbookUploadStep: Empty, SupplierImportReview: Empty, CrewExcelReview: Empty, WorkerExcelReview: Empty }
-  const oldView = mount(ImportMappingPage, { global: { components } })
+  const oldView = mount(ImportMappingPage, { global: { stubs: components } })
   await oldView.findAll('button').find(button => button.text().includes('载入合成行'))!.trigger('click')
   await oldView.findAll('button').find(button => button.text().includes('下一步'))!.trigger('click')
   await oldView.findAll('button').find(button => button.text().includes('开始导入'))!.trigger('click')
   await started.promise
   oldView.unmount()
-  const newView = mount(ImportMappingPage, { global: { components } })
+  const newView = mount(ImportMappingPage, { global: { stubs: components } })
   expect(newView.text()).toContain('导入映射')
   gate.resolve()
   await flushPromises()
@@ -75,13 +75,13 @@ it('卸载后执行器迟到返回 completed，页面自身阻止提示和关闭
   const Empty = defineComponent({ template: '<div />' })
   const KitButton = defineComponent({ props: ['disabled', 'loading'], emits: ['click'], template: '<button :disabled="disabled || loading" @click="$emit(\'click\')"><slot/></button>' })
   const components = { ImportUploadStep: Upload, ImportMappingStep: Empty, ImportPreviewStep: Empty, ProcessStepper: Empty, ProgressBar: Empty, KitButton, MaterialExcelImportScreen: Empty, ProjectImportScreen: Empty, InvoiceWorkbookUploadStep: Empty, SupplierImportReview: Empty, CrewExcelReview: Empty, WorkerExcelReview: Empty }
-  const oldView = mount(ImportMappingPage, { global: { components } })
+  const oldView = mount(ImportMappingPage, { global: { stubs: components } })
   await oldView.findAll('button').find(button => button.text().includes('载入合成行'))!.trigger('click')
   await oldView.findAll('button').find(button => button.text().includes('下一步'))!.trigger('click')
   await oldView.findAll('button').find(button => button.text().includes('开始导入'))!.trigger('click')
   await started.promise
   oldView.unmount()
-  const newView = mount(ImportMappingPage, { global: { components } })
+  const newView = mount(ImportMappingPage, { global: { stubs: components } })
   gate.resolve()
   await flushPromises()
   expect({ success: success.mock.calls, warning: warning.mock.calls, close: close.mock.calls, replace: replace.mock.calls }).toEqual({ success: [], warning: [], close: [], replace: [] })
@@ -104,7 +104,7 @@ it('预览期间卸载，迟到的恢复结果不再读取目录或继续预览'
   const Empty = defineComponent({ template: '<div />' })
   const KitButton = defineComponent({ props: ['disabled', 'loading'], emits: ['click'], template: '<button :disabled="disabled || loading" @click="$emit(\'click\')"><slot/></button>' })
   const components = { ImportUploadStep: Upload, ImportMappingStep: Empty, ImportPreviewStep: Empty, ProcessStepper: Empty, ProgressBar: Empty, KitButton, MaterialExcelImportScreen: Empty, ProjectImportScreen: Empty, InvoiceWorkbookUploadStep: Empty, SupplierImportReview: Empty, CrewExcelReview: Empty, WorkerExcelReview: Empty }
-  const view = mount(ImportMappingPage, { global: { components } })
+  const view = mount(ImportMappingPage, { global: { stubs: components } })
   await view.findAll('button').find(button => button.text().includes('载入合成行'))!.trigger('click')
   await view.findAll('button').find(button => button.text().includes('下一步'))!.trigger('click')
   await started.promise

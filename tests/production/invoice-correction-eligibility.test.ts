@@ -1,10 +1,9 @@
 import { Buffer } from 'node:buffer'
-import { execFileSync } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
-import { mkdir, mkdtemp } from 'node:fs/promises'
+import { constants } from 'node:fs'
+import { copyFile, mkdir, mkdtemp, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import process from 'node:process'
-import { afterAll, expect, it } from 'vitest'
+import { afterAll, beforeAll, expect, it } from 'vitest'
 import { INVOICE_READ_CAPABILITY, INVOICE_WRITE_CAPABILITY } from '../../app/lib/invoice/central-contract'
 import { createProductionAuxiliaryContractService } from '../../server/utils/production-auxiliary-contract-service'
 import { createLocalBackup, restoreBackupIsolated } from '../../server/utils/production-backup-package'
@@ -18,7 +17,9 @@ import { createProductionInvoiceMigration } from '../../server/utils/production-
 import { createProductionInvoiceService } from '../../server/utils/production-invoice-service'
 import { createProductionStorage } from '../../server/utils/production-storage'
 import { createProductionSupplierService } from '../../server/utils/production-supplier-service'
+import { runColdProcess } from '../helpers/cold-process'
 import { createMigratedMemoryDb } from '../helpers/memory-db'
+import { verifyProductionSeed } from '../helpers/production-storage-seed'
 import { createSubcontractFixture } from '../helpers/production-subcontract-fixture'
 import { cleanupTestTempRoot, testTempRoot } from '../helpers/test-temp-root'
 
@@ -37,7 +38,7 @@ function pdf() {
   return Buffer.from(text)
 }
 
-async function fixture() {
+async function buildFixture() {
   const f = await createSubcontractFixture()
   f.setActor({ ...f.session(), capabilities: [...f.session().capabilities, INVOICE_READ_CAPABILITY, INVOICE_WRITE_CAPABILITY, 'finance-payment-application:read', 'finance-payment-application:write', 'finance-payment-record:read', 'auxiliary-contract:read', 'auxiliary-contract:write'] })
   const supplierDraft = JSON.parse((await f.storage.select<{ draft_json: string }>('SELECT draft_json FROM suppliers WHERE id=?', [f.supplier.id]))[0]!.draft_json)
@@ -52,6 +53,51 @@ async function fixture() {
   const reviewed = await service.execute({ ...common, action: 'review', commandId: 'correction-review', invoiceId: uploaded.invoiceId, baseVersion: recognized.version, manualCompletion: false }, f.session)
   const archived = await service.execute({ ...common, action: 'archive', commandId: 'correction-archive', invoiceId: uploaded.invoiceId, baseVersion: reviewed.version, ownerKind: 'project', projectId: f.project.id, supplierId: supplier.id, taxNumbersConfirmed: true, taxVerification: { buyerId: f.signatory.id, buyerVersion: f.signatory.version, supplierVersion: supplier.version } }, f.session)
   return { ...f, service, actor, common, archived, supplier }
+}
+
+async function makeBaseline() {
+  const f = await buildFixture()
+  let path: string
+  try {
+    const root = testTempRoot('invoice-correction-baseline')
+    await mkdir(root, { recursive: true })
+    const directory = await mkdtemp(join(root, 'baseline-'))
+    path = join(directory, 'ruihang.sqlite')
+    await f.storage.backupTo(path)
+  }
+  finally { await f.storage.close() }
+  verifyProductionSeed(path, f.options)
+  const digest = createHash('sha256').update(await readFile(path)).digest('hex')
+  return { path, digest, options: f.options, actor: f.actor, common: f.common, archived: f.archived, supplier: f.supplier, project: f.project, signatory: f.signatory, main: f.main }
+}
+
+let baseline: Awaited<ReturnType<typeof makeBaseline>>
+beforeAll(async () => {
+  baseline = await makeBaseline()
+})
+
+async function fixture() {
+  const root = testTempRoot('invoice-correction-clones')
+  await mkdir(root, { recursive: true })
+  const directory = await mkdtemp(join(root, 'clone-'))
+  const path = join(directory, 'ruihang.sqlite')
+  await copyFile(baseline.path, path, constants.COPYFILE_EXCL)
+  if (createHash('sha256').update(await readFile(path)).digest('hex') !== baseline.digest)
+    throw new Error('发票更正测试快照复制后摘要不一致')
+  const options = { ...baseline.options, directory }
+  verifyProductionSeed(path, options)
+  const storage = createProductionStorage(options)
+  try {
+    await storage.status()
+    const actor = structuredClone(baseline.actor)
+    const session = () => structuredClone(actor)
+    const service = createProductionInvoiceService(storage)
+    return { ...structuredClone({ actor, common: baseline.common, archived: baseline.archived, supplier: baseline.supplier, project: baseline.project, signatory: baseline.signatory, main: baseline.main }), options, storage, session, service }
+  }
+  catch (cause) {
+    await storage.close()
+    throw cause
+  }
 }
 
 it('归档基准、权限和已打印历史均在真实日志与同事务来源下核对', async () => {
@@ -196,7 +242,7 @@ it('明确提交更正单原子更新原票和双重回执，原件、历史及�
     const restored = await restoreBackupIsolated(backupDirectory, backup.id, restoreDirectory, 'correction-restore')
     const recovered = createProductionStorage({ ...f.options, directory: restored.directory })
     try {
-      expect((await recovered.status()).schemaVersion).toBe(32)
+      expect((await recovered.status()).schemaVersion).toBe(33)
       const recoveredInvoice = createProductionInvoiceService(recovered)
       const recoveredCorrections = createProductionInvoiceCorrectionService(recovered, { invoice: recoveredInvoice.correctionPort })
       expect(await recoveredCorrections.get(draft.correctionId, f.session)).toEqual(correction)
@@ -204,8 +250,8 @@ it('明确提交更正单原子更新原票和双重回执，原件、历史及�
       expect((await recovered.select<{ content: Uint8Array }>('SELECT content FROM file_payloads WHERE file_ref_id=?', [correction.attachments[0]!.id]))[0]!.content).toEqual(new Uint8Array(Buffer.from('abc')))
     }
     finally { await recovered.close() }
-    const script = `const {registerHooks}=require('node:module'),{pathToFileURL}=require('node:url'),path=require('node:path');registerHooks({resolve(s,c,n){if(s.startsWith('~/'))s=pathToFileURL(path.resolve('app',s.slice(2))).href;try{return n(s,c)}catch(e){if((s.startsWith('.')||s.startsWith('file:'))&&e.code==='ERR_MODULE_NOT_FOUND')return n(s+'.ts',c);throw e}}});(async()=>{const {createProductionStorage}=await import('./server/utils/production-storage.ts');const {createProductionInvoiceService}=await import('./server/utils/production-invoice-service.ts');const {createProductionInvoiceCorrectionService}=await import('./server/utils/production-invoice-correction-service.ts');const [directory,correctionId,actorJson]=process.argv.slice(1);const actor=JSON.parse(actorJson);const storage=createProductionStorage({directory,workspaceId:actor.workspaceId,ownerId:actor.actorId,purpose:'verification'});const invoices=createProductionInvoiceService(storage);const service=createProductionInvoiceCorrectionService(storage,{invoice:invoices.correctionPort});const correction=await service.get(correctionId,()=>actor);const invoice=await invoices.get(correction.invoiceId,()=>actor);process.stdout.write(JSON.stringify({correction,invoice}));await storage.close()})().catch(e=>{process.stderr.write(String(e));process.exitCode=1})`
-    const cold = JSON.parse(execFileSync(process.execPath, ['--experimental-transform-types', '-e', script, restored.directory, draft.correctionId, JSON.stringify(f.actor)], { cwd: process.cwd(), encoding: 'utf8' }))
+    const { stdout } = await runColdProcess('production-invoice-correction-cold', [restored.directory, draft.correctionId, JSON.stringify(f.actor)])
+    const cold = JSON.parse(stdout)
     expect(cold.correction).toEqual(correction)
     expect(cold.invoice).toEqual(current)
     expect(restored.directory.startsWith(join(base, 'restore-'))).toBe(true)

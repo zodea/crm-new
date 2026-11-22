@@ -34,8 +34,7 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
-| [tests/components/CrewExcelReview.test.ts](../../../tests/components/CrewExcelReview.test.ts) | 组件（jsdom） | 重复班组分页对比与显式选择 |
-| [tests/components/WorkerExcelReview.test.ts](../../../tests/components/WorkerExcelReview.test.ts) | 组件（jsdom） | 工人重复分页及班组、项目候选选择 |
+| [tests/components/CrewExcelReview.test.ts](../../../tests/components/CrewExcelReview.test.ts) | 组件（jsdom） | 重复班组分页对比与显式选择；工人重复分页及班组、项目候选选择 |
 | [tests/components/CrewWorkerCentralListScreen.test.ts](../../../tests/components/CrewWorkerCentralListScreen.test.ts) | 组件（jsdom） | 全局目录合法旧快照及不可用反馈 |
 | [tests/components/CrewWorkerMigrationPanel.test.ts](../../../tests/components/CrewWorkerMigrationPanel.test.ts) | 组件（jsdom） | 完整来源选择、明示映射、原键恢复及身份失效隔离 |
 | [tests/components/CrewFormFields.test.ts](../../../tests/components/CrewFormFields.test.ts) | 组件（jsdom） | 班组表单领域字段 |

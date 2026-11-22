@@ -2,7 +2,7 @@ import { expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-vue'
 import { page, userEvent } from 'vitest/browser'
 import { computed, defineComponent, h, ref, useTemplateRef, watch } from 'vue'
-import OtherSettlementInfo from '~/components/other-settlement/OtherSettlementInfo.vue'
+import OtherSettlementInfo from '~/pages/contract/other-settlement/_components/OtherSettlementInfo.vue'
 
 it('冻结版本选择与来源缺口在实际视口中可操作', async ({ task }) => {
   const width = Number(task.file.projectName?.replace('chromium-', ''))
@@ -28,7 +28,7 @@ it('冻结版本选择与来源缺口在实际视口中可操作', async ({ task
     },
   })
   try {
-    await render(Root, { global: { components: { SectionHeader, OtherSettlementOriginalFiles, NuxtLink } } })
+    await render(Root, { global: { components: { SectionHeader, NuxtLink }, stubs: { OtherSettlementOriginalFiles } } })
     const select = page.getByLabelText('查看冻结版本').element() as HTMLSelectElement
     select.focus()
     expect(document.activeElement).toBe(select)

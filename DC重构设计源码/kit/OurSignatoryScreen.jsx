@@ -1,5 +1,5 @@
 // OurSignatoryScreen — 设置 · 我方签约主体目录（路由 ourSignatory，对应实现 /settings/our-signatories）。
-// 依据：app/components/settings/OurSignatorySettingsScreen.vue、app/lib/our-signatory/contract.ts、
+// 依据：app/pages/settings/our-signatories/_components/OurSignatorySettingsScreen.vue、app/lib/our-signatory/contract.ts、
 //       docs/rewrite/NAVIGATION.md（our-signatory:read 才展示目录；our-signatory:write 才可新增/编辑）。
 // 构图：头部 Panel（标题 + 职责说明 + 「新增主体」）→ 目录表（签约名称 / 纳税识别号 / 状态 / 版本 / 操作）。
 // 规则：停用保留稳定身份不删除；合同保留签约时采用的主体快照，主体更名不回写旧合同；

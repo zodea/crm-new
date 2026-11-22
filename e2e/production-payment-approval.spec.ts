@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer'
 import { join } from 'node:path'
 import process from 'node:process'
 import { DatabaseSync } from 'node:sqlite'
@@ -10,7 +11,7 @@ test.use({ actionTimeout: 15_000 })
 
 test('正式付款批复的空值、明确零和清空保存后保持不同语义', async ({ page }, info) => {
   test.setTimeout(120_000)
-  const fixture = await createCrewWorkerProductionFixture(page, info)
+  const fixture = await createCrewWorkerProductionFixture(page, info, { serverEntry: process.env.CRM_E2E_SERVER_ENTRY })
   try {
     await fixture.start()
     await fixture.login()
@@ -79,7 +80,7 @@ test('正式历史零保留未核验和已付事实，取消编辑及五档视�
   test.setTimeout(150_000)
   const errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
-  const fixture = await createCrewWorkerProductionFixture(page, info)
+  const fixture = await createCrewWorkerProductionFixture(page, info, { serverEntry: process.env.CRM_E2E_SERVER_ENTRY })
   try {
     await fixture.start()
     await fixture.stop()
@@ -141,6 +142,139 @@ test('正式历史零保留未核验和已付事实，取消编辑及五档视�
     await expect(page.getByRole('group', { name: '批复金额', exact: true })).toContainText('合计不完整')
     await expect(page.getByRole('group', { name: '应付余额', exact: true })).toContainText('合计不完整')
     expect(errors).toEqual([])
+  }
+  finally {
+    await fixture.cleanup()
+  }
+})
+
+test('正式申请批复后登记部分支付并撤回，冷读重算余额且保留 15 份附件', async ({ page }, info) => {
+  test.setTimeout(150_000)
+  const fixture = await createCrewWorkerProductionFixture(page, info, { serverEntry: process.env.CRM_E2E_SERVER_ENTRY })
+  const applicationName = '合成付款确认与撤回'
+  const supplierName = '合成部分付款收款方'
+  const paymentWrite = (kind: string, action: string) => page.waitForResponse((response) => {
+    const request = response.request()
+    if (request.method() !== 'POST' || new URL(response.url()).pathname !== '/api/commands/finance')
+      return false
+    const body = request.postDataJSON()
+    return body.kind === kind && body.action === action
+  })
+
+  try {
+    await fixture.start()
+    await fixture.login()
+    const identity = await (await fixture.request('/api/read/business-session')).json()
+    const supplier = await fixture.request('/api/commands/suppliers', { method: 'POST', data: {
+      workspaceId: identity.workspaceId,
+      actorId: identity.actorId,
+      requiredCapability: 'supplier:write',
+      commandId: 'synthetic-partial-payment-payee',
+      baseVersion: null,
+      action: 'save',
+      attachments: {},
+      draft: { name: supplierName, supplierCategory: '其他', contact: '合成人' },
+    } })
+    expect(supplier.ok(), await supplier.text()).toBe(true)
+    await page.goto(`${fixture.origin}/finance/payment/new`)
+    await page.getByRole('button', { name: '公司付款', exact: true }).click()
+    await page.getByTestId('finance-name').fill(applicationName)
+    await page.getByRole('combobox', { name: '检索分供方', exact: true }).fill(supplierName)
+    await page.getByRole('option').filter({ hasText: supplierName }).click()
+    await page.getByTestId('finance-amount').fill('100')
+    await page.getByTestId('finance-date').fill('2026-09-11')
+    await page.getByRole('textbox', { name: '申请人 *', exact: true }).fill('合成申请人')
+    await page.getByRole('combobox', { name: '回票类型', exact: true }).click()
+    await page.getByRole('option', { name: '无需发票', exact: true }).click()
+    await page.getByRole('spinbutton', { name: '本期批复金额', exact: true }).fill('80')
+
+    const names = Array.from({ length: 16 }, (_, index) => `合成付款附件-${String(index + 1).padStart(2, '0')}.txt`)
+    await page.getByTestId('finance-attachment-input').setInputFiles(names.map(name => ({ name, mimeType: 'text/plain', buffer: Buffer.from(name) })))
+    await expect(page.getByText('最多保留 15 份附件，本次只加入前 15 份', { exact: true })).toBeVisible()
+    const submitted = paymentWrite('payment_application', 'submit')
+    await page.getByRole('button', { name: '保存并提交', exact: true }).click()
+    const applicationResponse = await submitted
+    expect(applicationResponse.ok(), await applicationResponse.text()).toBe(true)
+    const application = await applicationResponse.json() as { id: string, version: string }
+    const savedForm = await fixture.request(`/api/read/finance/payment_application/form/${application.id}`)
+    expect(savedForm.ok(), await savedForm.text()).toBe(true)
+    const saved = await savedForm.json()
+    expect(saved.draft).toMatchObject({ approvedAmount: 80, status: 'submitted' })
+    expect(saved.attachments.map((row: { fileName: string }) => row.fileName).sort()).toEqual(names.slice(0, 15))
+
+    // 付款管理只接收已批复的申请。以既有正式命令记录合成批复。
+    const approved = await fixture.request('/api/commands/finance', { method: 'POST', data: {
+      workspaceId: identity.workspaceId,
+      actorId: identity.actorId,
+      requiredCapability: 'finance-payment-application:write',
+      commandId: 'synthetic-partial-payment-approval',
+      id: application.id,
+      baseVersion: application.version,
+      kind: 'payment_application',
+      action: 'save',
+      draft: { ...saved.draft, status: 'approved' },
+      attachments: {},
+    } })
+    expect(approved.ok(), await approved.text()).toBe(true)
+    expect(await approved.json()).toMatchObject({ id: application.id })
+
+    const management = `${fixture.origin}/finance/payment-management?origin=real`
+    const detail = `${fixture.origin}/finance/payment/${application.id}/detail?origin=real`
+    const managementTable = page.getByTestId('payment-management-table')
+    const managementRow = managementTable.getByRole('row').filter({ has: page.getByRole('cell', { name: supplierName, exact: true }) })
+    await page.goto(management)
+    await managementTable.getByRole('button', { name: `${applicationName}付款操作`, exact: true }).click()
+    await page.getByRole('menuitem', { name: '登记支付记录', exact: true }).click()
+    await expect(page).toHaveURL(new RegExp(`paymentApplicationId=${application.id}`))
+    await expect(page.getByTestId('finance-amount')).toHaveValue('80')
+    await page.getByTestId('finance-amount').fill('30')
+    await page.getByRole('spinbutton', { name: '本次支付分摊金额', exact: true }).fill('30')
+    await page.getByTestId('finance-date').fill('2026-09-12')
+    await page.getByRole('textbox', { name: '付款凭证号 *', exact: true }).fill('SYN-PARTIAL-VOUCHER')
+    await page.getByTestId('payment-bank-serial').fill('SYN-PARTIAL-BANK')
+    await page.getByTestId('payment-confirmed-by').fill('合成确认人')
+    const confirmed = paymentWrite('payment_record', 'confirm')
+    await page.getByTestId('confirm-payment').click()
+    await page.getByRole('dialog', { name: '人工确认支付', exact: true }).getByRole('button', { name: '确认支付', exact: true }).click()
+    const paymentResponse = await confirmed
+    expect(paymentResponse.ok(), await paymentResponse.text()).toBe(true)
+    const payment = await paymentResponse.json() as { id: string }
+    await expect(page.getByTestId('unconfirm-payment')).toBeVisible()
+
+    await page.goto(management)
+    await expect(managementRow).toContainText('部分支付')
+    await expect(managementRow.getByRole('cell', { name: '¥30.00', exact: true })).toBeVisible()
+    await expect(managementRow.getByRole('cell', { name: '¥50.00', exact: true })).toBeVisible()
+    await page.goto(detail)
+    await expect(page.getByRole('group', { name: '已确认支付', exact: true })).toContainText('¥30.00')
+    await expect(page.getByRole('group', { name: '待支付', exact: true })).toContainText('¥50.00')
+
+    await page.goto(`${fixture.origin}/finance/records/${payment.id}?origin=real`)
+    const withdrawn = paymentWrite('payment_record', 'unconfirm')
+    await page.getByTestId('unconfirm-payment').click()
+    await page.getByRole('dialog', { name: '撤回支付确认' }).getByRole('button', { name: '撤回确认', exact: true }).click()
+    const withdrawal = await withdrawn
+    expect(withdrawal.ok(), await withdrawal.text()).toBe(true)
+    expect(await withdrawal.json()).toMatchObject({ id: payment.id })
+
+    await fixture.stop()
+    await fixture.start()
+    await fixture.login()
+    await page.goto(detail)
+    await expect(page.getByRole('group', { name: '已确认支付', exact: true })).toContainText('¥0.00')
+    await expect(page.getByRole('group', { name: '待支付', exact: true })).toContainText('¥80.00')
+    const coldApplication = await fixture.request(`/api/read/finance/payment_application/form/${application.id}`)
+    expect(coldApplication.ok(), await coldApplication.text()).toBe(true)
+    const coldForm = await coldApplication.json()
+    expect(coldForm.draft).toMatchObject({ approvedAmount: 80, status: 'approved' })
+    expect(coldForm.attachments.map((row: { fileName: string }) => row.fileName).sort()).toEqual(names.slice(0, 15))
+    const coldRecord = await fixture.request(`/api/read/finance/payment_record/form/${payment.id}`)
+    expect(coldRecord.ok(), await coldRecord.text()).toBe(true)
+    expect((await coldRecord.json()).draft).toMatchObject({ confirmationStatus: 'needs_review', amount: 30, applicationAllocations: [{ paymentApplicationId: application.id, allocatedAmount: 30 }] })
+    await page.goto(management)
+    await expect(managementRow.getByRole('cell', { name: '待支付', exact: true })).toBeVisible()
+    await expect(managementRow.getByRole('cell', { name: '¥0.00', exact: true })).toBeVisible()
+    await expect(managementRow.getByRole('cell', { name: '¥80.00', exact: true })).toHaveCount(2)
   }
   finally {
     await fixture.cleanup()

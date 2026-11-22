@@ -2,6 +2,7 @@
 import type { PayrollC1FrozenDocument } from '~/lib/payroll/central-c1-contract'
 import type { PayrollOfficialIssue } from '~/lib/payroll/central-numbering-contract'
 import { computed } from 'vue'
+import PayrollOfficialIdentity from '~/components/payroll/PayrollOfficialIdentity.vue'
 import { c1FrozenAttendanceRows } from '~/lib/payroll/c1-export'
 import { c1MonthDays, c1Number } from '~/lib/payroll/c1-presentation'
 import { payrollAmount } from '~/lib/payroll/read-presentation'

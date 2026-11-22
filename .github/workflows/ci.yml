@@ -40,7 +40,7 @@ jobs:
     name: quality
     if: ${{ inputs.run_quality }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
 
     steps:
       - name: Checkout
@@ -99,13 +99,20 @@ jobs:
         run: pnpm test
 
       - name: Generate static frontend
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
         run: pnpm generate
 
   e2e:
-    name: e2e
+    name: e2e (${{ matrix.project }}, ${{ matrix.shard }}/8)
     if: ${{ inputs.run_e2e }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [chromium, chromium-b]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
 
     steps:
       - name: Checkout
@@ -138,20 +145,25 @@ jobs:
         shell: bash
         env:
           E2E_TARGETS: ${{ inputs.e2e_targets }}
+          E2E_SHARD: ${{ matrix.shard }}
+          E2E_PROJECT: ${{ matrix.project }}
+          NODE_OPTIONS: --max-old-space-size=4096
         run: |
-          if [[ -z "$E2E_TARGETS" ]]; then
-            pnpm exec playwright test --project=chromium --project=chromium-b
-            exit 0
+          targets=()
+          if [[ -n "$E2E_TARGETS" ]]; then
+            read -r -a targets <<< "$E2E_TARGETS"
           fi
 
-          read -r -a targets <<< "$E2E_TARGETS"
-          pnpm exec playwright test --project=chromium --project=chromium-b "${targets[@]}"
+          # Reject an empty overall selection before allowing an empty individual group.
+          pnpm exec playwright test --list --reporter=list --project=chromium --project=chromium-b "${targets[@]}"
+          PLAYWRIGHT_JSON_OUTPUT_NAME="test-results/e2e-$E2E_PROJECT-report.json" \
+            pnpm exec playwright test --project="$E2E_PROJECT" --shard="$E2E_SHARD/8" --pass-with-no-tests --reporter=list,github,json --output="test-results/e2e-$E2E_PROJECT" "${targets[@]}"
 
       - name: Upload Playwright diagnostics
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
-          name: playwright-test-results
+          name: playwright-test-results-${{ matrix.project }}-${{ matrix.shard }}
           path: test-results/
           if-no-files-found: ignore
           retention-days: 7
@@ -180,18 +192,17 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Install Chromium
         run: pnpm exec playwright install --with-deps chromium
-      - name: Build production application
-        run: pnpm build
-      - name: Run production acceptance
+      - name: Run complete production acceptance
         env:
-          CRM_PRODUCTION_ACCEPTANCE: '1'
-        run: pnpm exec playwright test --project=production --forbid-only '--reporter=list,github'
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: pnpm test:production
       - name: Upload diagnostics
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: production-acceptance-results
-          path: test-results/
+          path: .tmp/production-acceptance-run-*/
+          include-hidden-files: true
           if-no-files-found: ignore
           retention-days: 7
 
@@ -226,6 +237,8 @@ jobs:
         run: pnpm exec playwright install chromium
 
       - name: Visual and interaction regression
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
         run: pnpm test:visual
 
       - name: Upload visual diagnostics

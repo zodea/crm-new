@@ -1,15 +1,18 @@
 import { expect, test } from '@playwright/test'
 import { installQuantityProductionFixture } from './helpers/quantity-production-fixture'
+import { installVisualFont, visualFontLoaded } from './helpers/visual-font'
 
 test.describe('Issue #169：责任配置弹窗视觉与模态边界', () => {
   test('1740×974 下无原生外框、空网格列或背景双滚动', async ({ page }) => {
     await page.setViewportSize({ width: 1740, height: 974 })
+    await installVisualFont(page)
     await installQuantityProductionFixture(page)
     await page.getByRole('button', { name: '责任配置', exact: true }).click()
 
     const editor = page.getByRole('dialog', { name: '户 × 工种责任配置' })
 
     await expect(editor).toBeVisible()
+    expect(await visualFontLoaded(page), '视觉测试必须加载固定的中文测试字体').toBe(true)
     await expect(editor.getByText('责任只写户 × 工种；不会在这里登记完成状态或完成日期。')).toBeVisible()
     await expect(editor.getByText('按当前楼栋分组选择；格内始终显示所选工种的当前责任。')).toBeVisible()
     await expect(editor.getByRole('button', { name: '保存责任', exact: true })).toBeVisible()
@@ -39,14 +42,7 @@ test.describe('Issue #169：责任配置弹窗视觉与模态边界', () => {
       floorItems: 2,
       workspaceOverflow: 'hidden',
     })
-    // Windows 中 Noto Sans SC 同名字体的静态版和可变版渲染字形不同；
-    // 两份基线均保持原像素断言，不能用较大的差异阈值掩盖布局变化。
-    try {
-      await expect(editor).toHaveScreenshot('responsibility-dialog-1740x974.png', { animations: 'disabled', timeout: 5_000 })
-    }
-    catch {
-      await expect(editor).toHaveScreenshot('responsibility-dialog-1740x974-noto-static.png', { animations: 'disabled' })
-    }
+    await expect(editor).toHaveScreenshot('responsibility-dialog-1740x974.png', { animations: 'disabled' })
   })
 
   test('代表视口保持内容与操作可达且不撑宽页面', async ({ page }) => {

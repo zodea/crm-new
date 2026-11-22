@@ -2,10 +2,10 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-vue'
 import { page } from 'vitest/browser'
 import * as Vue from 'vue'
-import DeliveryDocumentFields from '~/components/delivery/DeliveryDocumentFields.vue'
-import DeliveryItemsEditor from '~/components/delivery/DeliveryItemsEditor.vue'
-import DeliveryReviewPanel from '~/components/delivery/DeliveryReviewPanel.vue'
 import { deliveryReviewIssueDetails, editDeliveryAmountLine, summarizeDeliveryAmounts } from '~/lib/delivery/review'
+import DeliveryDocumentFields from '~/pages/material/delivery/_components/DeliveryDocumentFields.vue'
+import DeliveryItemsEditor from '~/pages/material/delivery/_components/DeliveryItemsEditor.vue'
+import DeliveryReviewPanel from '~/pages/material/delivery/_components/DeliveryReviewPanel.vue'
 
 afterEach(() => vi.unstubAllGlobals())
 

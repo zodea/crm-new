@@ -64,7 +64,6 @@
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
 | [e2e/issue-169-responsibility-dialog.spec.ts-snapshots/responsibility-dialog-1740x974-chromium-win32.png](../../../e2e/issue-169-responsibility-dialog.spec.ts-snapshots/responsibility-dialog-1740x974-chromium-win32.png) | 视觉基线 | 责任配置弹窗截图 |
-| [e2e/issue-169-responsibility-dialog.spec.ts-snapshots/responsibility-dialog-1740x974-noto-static-chromium-win32.png](../../../e2e/issue-169-responsibility-dialog.spec.ts-snapshots/responsibility-dialog-1740x974-noto-static-chromium-win32.png) | 视觉基线 | Windows 同名 Noto 静态字体渲染的责任配置弹窗截图 |
 
 ## 组件（jsdom）
 
@@ -75,13 +74,11 @@
 | [tests/components/QuantityCompletionPhotoRace.test.ts](../../../tests/components/QuantityCompletionPhotoRace.test.ts) | 组件（jsdom） | 照片仍在读取时切换阶段，旧文件迟到不会加入新阶段草稿 |
 | [tests/components/QuantityFieldFormulaCell.test.ts](../../../tests/components/QuantityFieldFormulaCell.test.ts) | 组件（jsdom） | quantity field formula cell |
 | [tests/components/QuantityHollowFormState.test.ts](../../../tests/components/QuantityHollowFormState.test.ts) | 组件（jsdom） | 未知保存完整字段冷恢复，核对原提交后才进入真实记录详情 |
-| [tests/components/QuantityHollowHistory.test.ts](../../../tests/components/QuantityHollowHistory.test.ts) | 组件（jsdom） | 当前19减4显示15，原检查与整改的日期处数分别可读 |
+| [tests/components/QuantityHollowHistory.test.ts](../../../tests/components/QuantityHollowHistory.test.ts) | 组件（jsdom） | 当前19减4显示15，原检查与整改的日期处数分别可读；户深链挂载中央空鼓页面并由原页读取权限 |
 | [tests/components/QuantityHollowRectification.test.ts](../../../tests/components/QuantityHollowRectification.test.ts) | 组件（jsdom） | 真实公开来源 19 处取消小确认保输入，确认整改 4 处后仍保原检查且余 15 |
-| [tests/components/QuantityHollowRuntime.test.ts](../../../tests/components/QuantityHollowRuntime.test.ts) | 组件（jsdom） | 户深链挂载中央空鼓页面并由原页读取权限 |
 | [tests/components/QuantityScreenCentral.test.ts](../../../tests/components/QuantityScreenCentral.test.ts) | 组件（jsdom） | 正式工程量矩阵来源与入口 |
-| [tests/components/QuantityStageFields.test.ts](../../../tests/components/QuantityStageFields.test.ts) | 组件（jsdom） | 阶段整页字段 |
 | [tests/components/QuantityStageFormPage.test.ts](../../../tests/components/QuantityStageFormPage.test.ts) | 组件（jsdom） | 施工阶段配置整页 |
-| [tests/components/QuantityStageReporting.test.ts](../../../tests/components/QuantityStageReporting.test.ts) | 组件（jsdom） | 显式报量阶段选择 |
+| [tests/components/QuantityStageReporting.test.ts](../../../tests/components/QuantityStageReporting.test.ts) | 组件（jsdom） | 阶段整页字段；显式报量阶段选择 |
 | [tests/components/QuantityTemplateCentral.test.ts](../../../tests/components/QuantityTemplateCentral.test.ts) | 组件（jsdom） | 中央模板整页与缓存 |
 | [tests/components/QuantityTemplateLinesSection.test.ts](../../../tests/components/QuantityTemplateLinesSection.test.ts) | 组件（jsdom） | quantity template lines section |
 | [tests/components/QuantityUnitTotals.test.ts](../../../tests/components/QuantityUnitTotals.test.ts) | 组件（jsdom） | 户详情工程量合计 |
@@ -91,7 +88,7 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
-| [e2e/issue-169-responsibility-dialog.spec.ts](../../../e2e/issue-169-responsibility-dialog.spec.ts) | Playwright E2E | Issue #169：责任配置弹窗视觉与模态边界 |
+| [e2e/issue-169-responsibility-dialog.spec.ts](../../../e2e/issue-169-responsibility-dialog.spec.ts) | Playwright 视觉 | Issue #169：责任配置弹窗视觉与模态边界 |
 | [e2e/quantity-archive-export.spec.ts](../../../e2e/quantity-archive-export.spec.ts) | Playwright E2E | 中央矩阵归档取消、确认及解除回读一致，分类导出保留目录和施工记录原值 |
 | [e2e/quantity-assignment.spec.ts](../../../e2e/quantity-assignment.spec.ts) | Playwright E2E | Issue #103 Slice 4：户×工种责任配置 |
 | [e2e/quantity-central-api.spec.ts](../../../e2e/quantity-central-api.spec.ts) | Playwright E2E | 工程量真实 HTTP 从中央新项目保存区域与模板，重读并拒绝身份、版本和来源错配 |
@@ -100,7 +97,7 @@
 | [e2e/quantity-import.spec.ts](../../../e2e/quantity-import.spec.ts) | Playwright E2E | 三类实际 CSV 经中央导入：零与未知、唯一责任、缺照拒绝和草稿反馈 |
 | [e2e/quantity-matrix.spec.ts](../../../e2e/quantity-matrix.spec.ts) | Playwright E2E | Issue #103 Slice 2：只读工程量矩阵 |
 | [e2e/quantity-migration.spec.ts](../../../e2e/quantity-migration.spec.ts) | Playwright E2E | 工程量真实SQLite十五表经HTTP迁移，更正与独立新增保留，回滚撤下原批次事实 |
-| [e2e/quantity-owner-monthly.spec.ts](../../../e2e/quantity-owner-monthly.spec.ts) | Playwright E2E | 当前清单、中央完工与甲方月报经真实 HTTP 联通，三量不回退且已提交快照不漂移 |
+| [e2e/quantity-owner-monthly.spec.ts](../../../e2e/quantity-owner-monthly.spec.ts) | Playwright E2E | 当前清单、中央完工与甲方月报经真实 HTTP 联通；月报申报冻结并逐行审定，列表与详情回读同一单据的结果 |
 | [e2e/quantity-stages.spec.ts](../../../e2e/quantity-stages.spec.ts) | Playwright E2E | 中央新项目建立两个阶段，显式报量逐项保存不丢草稿，五档可操作且取消归档修改保留输入 |
 | [e2e/quantity-template.spec.ts](../../../e2e/quantity-template.spec.ts) | Playwright E2E | Issue #103 Slice 3：户型模板活链接与三量 |
 | [e2e/quantity-totals.spec.ts](../../../e2e/quantity-totals.spec.ts) | Playwright E2E | Issue #440 工程量三量合计与真实导出 |

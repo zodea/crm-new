@@ -7,9 +7,9 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { render } from 'vitest-browser-vue'
 import { page, userEvent } from 'vitest/browser'
 import { defineComponent, h, nextTick } from 'vue'
-import FinanceMigrationPanel from '~/components/migration/FinanceMigrationPanel.vue'
 import { migrations, runMigrations } from '~/lib/db/migrations'
 import { openBrowserSqlite } from '~/lib/db/sqljs'
+import FinanceMigrationPanel from '~/pages/settings/_components/FinanceMigrationPanel.vue'
 import { useProductionAccessStore } from '~/stores/production-access'
 
 // The browser reads actual SQLite bytes; Native export is outside this component path.

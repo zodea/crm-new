@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module'
 import { resolve } from 'node:path'
 import process from 'node:process'
 import { isolatedFreshBuildPaths } from './scripts/e2e-isolation'
@@ -14,6 +15,10 @@ export default defineNuxtConfig({
   ...(buildDir ? { buildDir: isolatedPaths?.build ?? buildDir } : {}),
   devtools: { enabled: process.env.NUXT_DEVTOOLS !== 'false' },
 
+  $development: {
+    nitro: { sourceMap: process.env.CRM_DEV_NITRO_SOURCEMAP === '1' },
+  },
+
   nitro: {
     ...(isolatedPaths ? { output: { dir: isolatedPaths.output } } : {}),
     // PDF.js 读取中文文字型 PDF 时按需加载内置字符映射；打包与开发环境使用同一来源。
@@ -28,7 +33,7 @@ export default defineNuxtConfig({
     ],
     // sql.js 按运行时路径加载 WASM；显式携带现有依赖，构建后无需手工补文件。
     // xlsx 整包内联：外置时 Windows 开发态会把 dist/cpexcel.js 写成裸盘符路径，ESM 加载失败。
-    externals: { traceInclude: ['sql.js/dist/sql-wasm.wasm'], inline: [/[\\/]xlsx[\\/]/] },
+    externals: { traceInclude: [createRequire(resolve('package.json')).resolve('sql.js/dist/sql-wasm.wasm')], inline: [/[\\/]xlsx[\\/]/] },
   },
 
   runtimeConfig: {
@@ -58,9 +63,17 @@ export default defineNuxtConfig({
     },
   },
 
+  pages: {
+    // 单个路由 glob 同时用于初始扫描与文件新增时的匹配。
+    // *(*/) 允许任意深度的 _components 目录，私有组件仍由 Vite 监听。
+    pattern: '!(*(*/)_components/**).{js,jsx,mjs,ts,tsx,vue}',
+  },
+
   components: {
     dirs: [
-      { path: '~/components', pathPrefix: false, extensions: ['vue'] },
+      { path: '~/components/ui', pathPrefix: false, extensions: ['vue'] },
+      { path: '~/components/shared', pathPrefix: false, extensions: ['vue'] },
+      { path: '~/components/layout', pathPrefix: false, extensions: ['vue'] },
     ],
   },
 

@@ -9,17 +9,17 @@ function sessionId(info: TestInfo) {
   return `issue421-supplier-${Buffer.from(info.testId).toString('base64url')}`
 }
 
-async function reset(page: Page, info: TestInfo) {
+async function reset(page: Page, info: TestInfo, sensitiveRead = false) {
   const response = await page.context().request.post('/api/testing/suppliers/reset', {
     headers: { 'x-ruihang-test-reset': '1', 'x-ruihang-test-session': sessionId(info) },
-    data: { scenario: 'ready' },
+    data: { scenario: 'ready', sensitiveRead },
   })
   expect(response.ok()).toBe(true)
 }
 
 test.beforeEach(async ({ page }, info) => {
   await page.setExtraHTTPHeaders({ 'x-ruihang-test-session': sessionId(info) })
-  await reset(page, info)
+  await reset(page, info, info.title.startsWith('中央导入：信用代码'))
 })
 
 test.afterEach(async ({ page }, info) => {

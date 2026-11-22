@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import QuantityStageFormPage from '~/pages/subcontract/quantity/_components/QuantityStageFormPage.vue'
 import { isDataOriginDTO } from '~/types/read-model'
 
 const route = useRoute()

@@ -2,7 +2,7 @@
 import type { CentralInvoiceRecord } from '~/lib/invoice/central-contract'
 import type { createCentralInvoiceWorkspace } from '~/lib/invoice/central-workspace'
 import type { InvoiceLedgerExportRow, InvoiceXlsxStyleConfig } from '~/lib/invoice/excel'
-import { computed, nextTick, onBeforeUnmount, onMounted, shallowRef, useTemplateRef, watch } from 'vue'
+import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, shallowRef, useTemplateRef, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import { useCentralInvoicePrint } from '~/composables/useCentralInvoicePrint'
 import { useKitUI } from '~/composables/useKitUI'
@@ -175,6 +175,16 @@ async function load() {
 onMounted(async () => {
   await load()
   refreshPending()
+})
+onActivated(() => {
+  active = true
+  if (props.workspace.readState.value === 'ready' && !printMode.value)
+    void load()
+})
+onDeactivated(() => {
+  active = false
+  authorityGeneration++
+  clearConfirmationFocus()
 })
 function prepareExport(rows: CentralInvoiceRecord[]) {
   if (busy.value || !rows.length || props.workspace.readState.value !== 'ready')

@@ -2,11 +2,11 @@ import { fireEvent, render } from '@testing-library/vue'
 import { flushPromises } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, defineComponent, h, nextTick, onMounted, onScopeDispose, ref, shallowRef, useTemplateRef, watch } from 'vue'
-import InvoiceQueuePanel from '~/components/invoice/InvoiceQueuePanel.vue'
 import InvoiceRecognitionChanges from '~/components/invoice/InvoiceRecognitionChanges.vue'
 import InvoiceRecognitionFieldMark from '~/components/invoice/InvoiceRecognitionFieldMark.vue'
-import InvoiceReviewForm from '~/components/invoice/InvoiceReviewForm.vue'
-import InvoiceWorkspaceScreen from '~/components/invoice/InvoiceWorkspaceScreen.vue'
+import InvoiceQueuePanel from '~/pages/finance/invoice/_components/InvoiceQueuePanel.vue'
+import InvoiceReviewForm from '~/pages/finance/invoice/_components/InvoiceReviewForm.vue'
+import InvoiceWorkspaceScreen from '~/pages/finance/invoice/_components/InvoiceWorkspaceScreen.vue'
 
 const routeGuard = vi.hoisted(() => ({ current: null as null | (() => boolean | Promise<boolean>) }))
 vi.mock('vue-router', () => ({ onBeforeRouteLeave: (guard: () => boolean | Promise<boolean>) => {

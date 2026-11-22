@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test'
 import { Buffer } from 'node:buffer'
+import { randomUUID } from 'node:crypto'
 import { expect as baseExpect, test } from '@playwright/test'
 
 import { installContractEngineeringFixture, selectContractEngineeringFixture } from './helpers/contract-engineering-fixture'
@@ -14,7 +15,7 @@ async function chooseLookup(page: Page, label: string, option: string) {
 }
 
 async function createSubcontract(page: Page, name: string): Promise<string> {
-  const ownName = '此流程已核实我方签约主体'
+  const ownName = `此流程已核实我方签约主体-${randomUUID()}`
   const ownId = await createVerifiedSignatory(page, ownName)
   await installContractEngineeringFixture(page, 'subcontract', '中央正式施工项目')
   await page.goto('/contract/subcontract/form')
@@ -34,7 +35,7 @@ async function createSubcontract(page: Page, name: string): Promise<string> {
 
 test.describe('AX03 项目罚扣真实结算抵扣', () => {
   test.beforeEach(async ({ page }, info) => {
-    const sessionId = Buffer.from(info.testId).toString('base64url')
+    const sessionId = Buffer.from(`${info.testId}-${info.retry}`).toString('base64url')
     await page.context().setExtraHTTPHeaders({ 'x-ruihang-test-session': sessionId })
     for (const domain of ['projects', 'subcontract-contracts', 'owner-documents', 'crew-workers']) {
       const response = await page.request.post(`/api/testing/${domain}/reset`, {
@@ -57,8 +58,7 @@ test.describe('AX03 项目罚扣真实结算抵扣', () => {
     await expect(page.getByRole('button', { name: '记录整改' })).toHaveCount(0)
   })
 
-  test('从新建到两次抵扣，刷新余额、整改与来源返回', async ({ page }) => {
-    test.setTimeout(180_000)
+  async function createDeductedPenalty(page: Page) {
     const crewResponse = await page.request.post('/api/commands/crews', { data: {
       workspaceId: 'workspace-default',
       actorId: 'actor-default',
@@ -135,16 +135,34 @@ test.describe('AX03 项目罚扣真实结算抵扣', () => {
     await expect(page.getByRole('dialog')).toHaveCount(0)
     await page.reload()
     await expect(page.getByTestId('penalty-rectification-history')).toContainText('复查合格')
+    return { id, contractId }
+  }
+
+  test('从新建到两次抵扣，刷新余额、整改与来源返回', async ({ page }) => {
+    test.setTimeout(180_000)
+    const { id, contractId } = await createDeductedPenalty(page)
     await page.getByRole('link', { name: '返回项目罚扣列表' }).click()
     await expect(page.getByRole('searchbox', { name: '搜索罚扣编号 / 事由 / 责任对象' })).toHaveValue('AX03-FK')
     await page.goto(`/project/penalty/${id}?origin=real`)
     await page.getByText('责任班组', { exact: true }).locator('..').getByRole('link').click()
-    await page.getByRole('link', { name: '返回项目罚扣' }).click()
-    await expect(page.getByTestId('project-penalty-detail')).toBeVisible()
+    await expect(page).toHaveURL(url => url.pathname.startsWith('/base/crew/'))
+    await page.getByRole('link', { name: '返回项目罚扣', exact: true }).click()
+    await expect(page).toHaveURL(url => url.pathname === `/project/penalty/${id}`)
+    await expect(page.getByRole('button', { name: '记录整改' })).toBeVisible()
     await page.getByText('来源合同', { exact: true }).locator('..').getByRole('link').click()
     await expect(page).toHaveURL(new RegExp(contractId))
-    await page.getByRole('link', { name: '返回来源详情' }).click()
-    await expect(page.getByTestId('project-penalty-detail')).toBeVisible()
+    await page.getByRole('link', { name: '返回来源详情', exact: true }).click()
+    await expect(page).toHaveURL(url => url.pathname === `/project/penalty/${id}`)
+    await page.getByRole('table', { name: '抵扣历史' }).getByRole('link', { name: 'AX03 真实结算' }).first().click()
+    await expect(page.getByRole('group', { name: '奖罚抵扣' })).toContainText('1,000.00')
+    await page.getByRole('link', { name: '返回来源详情', exact: true }).click()
+    await expect(page).toHaveURL(url => url.pathname === `/project/penalty/${id}`)
+    await expect(page.getByRole('group', { name: '剩余可抵扣' })).toContainText('0.00')
+  })
+
+  test('罚扣列表、表单、详情和整改浮层适配各视口', async ({ page }) => {
+    test.setTimeout(180_000)
+    const { id } = await createDeductedPenalty(page)
     for (const width of RESPONSIVE_WIDTHS) {
       await page.setViewportSize({ width, height: 1000 })
       await page.goto('/project/penalty?search=AX03-FK&status=done')
@@ -172,9 +190,5 @@ test.describe('AX03 项目罚扣真实结算抵扣', () => {
       await expect(dialog).toHaveCount(0)
       await expect(trigger).toBeFocused()
     }
-    await page.getByRole('table', { name: '抵扣历史' }).getByRole('link', { name: 'AX03 真实结算' }).first().click()
-    await expect(page.getByRole('group', { name: '奖罚抵扣' })).toContainText('1,000.00')
-    await page.getByRole('link', { name: '返回来源详情' }).click()
-    await expect(page.getByTestId('project-penalty-detail')).toBeVisible()
   })
 })

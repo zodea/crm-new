@@ -2,8 +2,8 @@ import type { SupplierContractDTO, SupplierSettlementDTO } from '~/lib/supplier/
 import { render, screen } from '@testing-library/vue'
 import { describe, expect, it } from 'vitest'
 import { defineComponent } from 'vue'
-import SupplierFactTable from '~/components/supplier/SupplierFactTable.vue'
-import SupplierRelationLink from '~/components/supplier/SupplierRelationLink.vue'
+import SupplierFactTable from '~/pages/base/supplier/_components/SupplierFactTable.vue'
+import SupplierRelationLink from '~/pages/base/supplier/_components/SupplierRelationLink.vue'
 
 describe('分供方合同事实类别', () => {
   it('当前Other实际结算进入现有原单；无来源的旧目标保持不可点击', () => {

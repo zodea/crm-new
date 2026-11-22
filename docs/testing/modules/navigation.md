@@ -38,7 +38,7 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
-| [e2e/issue-188-shell.spec.ts](../../../e2e/issue-188-shell.spec.ts) | Playwright E2E | Issue #188：导航搜索与页签溢出均可由键盘可达控件操作 |
+| [e2e/issue-188-shell.spec.ts](../../../e2e/issue-188-shell.spec.ts) | Playwright E2E | Issue #188：导航搜索与页签溢出均可由键盘可达控件操作；Issue #186：统一实体详情壳；Issue #187：统一整页表单壳 |
 | [e2e/issue-398-audit-form-tabs.spec.ts](../../../e2e/issue-398-audit-form-tabs.spec.ts) | Playwright E2E | 关联项目：草稿页签关闭／刷新保护 |
 | [e2e/shell-visual.spec.ts](../../../e2e/shell-visual.spec.ts) | Playwright E2E | Issue #419：外壳保持深色侧栏与清晰可读的全站导航尺寸 |
 | [e2e/sidebar-accordion.spec.ts](../../../e2e/sidebar-accordion.spec.ts) | Playwright E2E | 侧栏一级目录单开模式 |

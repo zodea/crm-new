@@ -15,20 +15,17 @@
 | [tests/production/process-library-boundaries.test.ts](../../../tests/production/process-library-boundaries.test.ts) | 单元／服务／状态 | 工序库提交期间撤权完整回滚，已存原件证据损坏后明确拒绝读取和再保存 |
 | [tests/production/process-library-http.test.ts](../../../tests/production/process-library-http.test.ts) | 单元／服务／状态 | 正式公开工序库保存完整版本且同键重复不升号，旧版本仍按稳定身份读取 |
 | [tests/production/process-library-restart.test.ts](../../../tests/production/process-library-restart.test.ts) | 单元／服务／状态 | 独立服务进程公开保存后丢弃响应并重启，原键恢复原图且并开旧版仍按原身份解析 |
-| [tests/schedule/binding-navigation.test.ts](../../../tests/schedule/binding-navigation.test.ts) | 单元／服务／状态 | 绑定与清单证据更正往返 |
 | [tests/schedule/central-binding.test.ts](../../../tests/schedule/central-binding.test.ts) | 单元／服务／状态 | 中央暂估绑定冻结比较与原子确认 |
-| [tests/schedule/central-date.test.ts](../../../tests/schedule/central-date.test.ts) | 单元／服务／状态 | 拒绝不存在的月日，不能将日期溢出静默滚到下月 |
 | [tests/schedule/central-repository.test.ts](../../../tests/schedule/central-repository.test.ts) | 单元／服务／状态 | 中央 WBS HTTP Repository |
 | [tests/schedule/central-request.test.ts](../../../tests/schedule/central-request.test.ts) | 单元／服务／状态 | 中央 WBS 请求边界 |
 | [tests/schedule/central-service.test.ts](../../../tests/schedule/central-service.test.ts) | 单元／服务／状态 | 中央 WBS 原子命令与真实数量来源 |
 | [tests/schedule/central-usage.test.ts](../../../tests/schedule/central-usage.test.ts) | 单元／服务／状态 | 中央排程目录与工序库引用共用当前可见范围 |
 | [tests/schedule/contract-binding.test.ts](../../../tests/schedule/contract-binding.test.ts) | 单元／服务／状态 | 内部暂估排程绑定施工合同 |
-| [tests/schedule/navigation.test.ts](../../../tests/schedule/navigation.test.ts) | 单元／服务／状态 | 排程下钻导航 |
-| [tests/schedule/planning.test.ts](../../../tests/schedule/planning.test.ts) | 单元／服务／状态 | 施工进度纯领域规则 |
+| [tests/schedule/navigation.test.ts](../../../tests/schedule/navigation.test.ts) | 单元／服务／状态 | 绑定与清单证据更正往返；排程下钻导航；工序库建组返回上下文 |
+| [tests/schedule/planning.test.ts](../../../tests/schedule/planning.test.ts) | 单元／服务／状态 | 拒绝不存在的月日，不能将日期溢出静默滚到下月；施工进度纯领域规则 |
 | [tests/schedule/process-library-central.test.ts](../../../tests/schedule/process-library-central.test.ts) | 单元／服务／状态 | 工序库中央不可变版本 |
 | [tests/schedule/process-library-core-integration.test.ts](../../../tests/schedule/process-library-core-integration.test.ts) | 单元／服务／状态 | 工序库与中央迁移协调器完整接缝 |
 | [tests/schedule/process-library-migration.test.ts](../../../tests/schedule/process-library-migration.test.ts) | 单元／服务／状态 | 工序库迁入候选与恢复 |
-| [tests/schedule/process-library-navigation.test.ts](../../../tests/schedule/process-library-navigation.test.ts) | 单元／服务／状态 | 工序库建组返回上下文 |
 | [tests/schedule/process-library-repository.test.ts](../../../tests/schedule/process-library-repository.test.ts) | 单元／服务／状态 | 工序库公开 HTTP Repository |
 | [tests/schedule/process-library-request.test.ts](../../../tests/schedule/process-library-request.test.ts) | 单元／服务／状态 | 工序库公开命令解析 |
 | [tests/schedule/process-library-test-reset.test.ts](../../../tests/schedule/process-library-test-reset.test.ts) | 单元／服务／状态 | 工序库测试重置端点 |

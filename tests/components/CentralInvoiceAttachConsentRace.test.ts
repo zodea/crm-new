@@ -32,6 +32,7 @@ function syntheticFile(read?: Promise<ArrayBuffer>) {
 
 function fixture(workspaceId: string, invoiceNumber: string, additional: CentralInvoiceRecord[] = []) {
   const identity = { workspaceId, actorId: 'synthetic-actor' }
+  const capabilities = ['finance-invoice:read', 'finance-invoice:write']
   let current: CentralInvoiceRecord = {
     id: 'same-invoice',
     version: '1',
@@ -82,18 +83,18 @@ function fixture(workspaceId: string, invoiceNumber: string, additional: Central
       throw new Error('合成响应丢失')
     return receipt
   })
-  const get = vi.fn(async () => ({ record: structuredClone(current), sourceVersion: 'invoices:2', meta: { sources: [{ key: 'invoices', sourceVersion: 'invoices:2' }] } }))
+  const get = vi.fn(async () => ({ record: structuredClone(current), sourceVersion: 'invoices:2', capabilities: [...capabilities], meta: { sources: [{ key: 'invoices', sourceVersion: 'invoices:2' }] } }))
   const resolve = vi.fn(async (commandId: string) => {
     if (!receipt || commandId !== receipt.commandId)
       throw new Error('合成原编号不存在')
     return { outcome: 'applied' as const, result: receipt }
   })
-  const list = vi.fn(async () => ({ items: structuredClone([current, ...additional]), pagination: { total: 1 + additional.length }, sourceVersion: 'invoices:1', meta: { sources: [{ key: 'invoices', sourceVersion: 'invoices:1' }] } }))
+  const list = vi.fn(async () => ({ items: structuredClone([current, ...additional]), pagination: { total: 1 + additional.length }, sourceVersion: 'invoices:1', capabilities: [...capabilities], meta: { sources: [{ key: 'invoices', sourceVersion: 'invoices:1' }] } }))
   const workspace = createCentralInvoiceWorkspace({
     identity,
     context: async () => {
       await contextHook()
-      return { ...identity, capabilities: ['finance-invoice:read', 'finance-invoice:write'] }
+      return { ...identity, capabilities: [...capabilities] }
     },
     client: { list, execute, get, resolve, original: async () => new Blob([originalBytes], { type: 'image/png' }) } as never,
     recognizeLocal: vi.fn() as never,

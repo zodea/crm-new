@@ -2,10 +2,10 @@ import type { SupplierCredentialCommand, SupplierCredentialRecognition, Supplier
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { reactive } from 'vue'
-import SupplierCredentialOcrWorkflow from '~/components/supplier/SupplierCredentialOcrWorkflow.vue'
 import { credentialProblem, SupplierCredentialNotAppliedProblem } from '~/lib/supplier/credential-contract'
 import { parseCredentialOcr } from '~/lib/supplier/credential-ocr'
 import { createSupplierCredentialState } from '~/lib/supplier/credential-state'
+import SupplierCredentialOcrWorkflow from '~/pages/base/supplier/credential/_components/SupplierCredentialOcrWorkflow.vue'
 import { credentialRecord, credentialSnapshot } from '../supplier/credential-ui-fixtures'
 
 const settings = vi.hoisted(() => ({ load: vi.fn(), recognitionOptions: { useDocUnwarping: true } }))

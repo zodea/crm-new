@@ -73,7 +73,7 @@ export interface OwnerDocumentListRecord {
   period: string
   amount: number
   secondaryAmount: number | null
-  tertiaryAmount: number
+  tertiaryAmount: number | null
   quantity: number | null
   date: string
   status: string

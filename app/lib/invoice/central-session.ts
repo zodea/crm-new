@@ -2,7 +2,7 @@ import type { RecoveryStorage } from '../forms/command-recovery'
 import type { CentralInvoiceCommand, CentralInvoiceCommandResult, CentralInvoicePrintCommand, CentralInvoicePrintResult } from './central-contract'
 import type { InvoiceDetailRead, InvoicePrintResolution, InvoiceResolution } from './central-http'
 import { commandRecoveryKey, commandVersionAtLeast, createCommandRecoveryStorage } from '../forms/command-recovery'
-import { CentralInvoiceProblem, INVOICE_READ_CAPABILITY, INVOICE_WRITE_CAPABILITY } from './central-contract'
+import { CentralInvoiceProblem, CONFIRM_ORIGINAL_VERIFICATION, INVOICE_READ_CAPABILITY, INVOICE_WRITE_CAPABILITY, RECORD_ORIGINAL_VERIFICATION } from './central-contract'
 
 interface Identity { workspaceId: string, actorId: string }
 type Context = Identity & { capabilities: readonly string[] }
@@ -18,7 +18,7 @@ export function sameInvoiceCapabilities(left: readonly string[], right: readonly
     && left.every(value => typeof value === 'string' && value.trim().length > 0 && right.includes(value))
 }
 const createActions = ['upload', 'manual', 'import']
-const invoiceActions = ['import-replace', 'attach-original', 'link-contract', 'confirm-legacy', 'recognize', 'rerecognize', 'edit', 'review', 'archive', 'edit-archived', 'discard', 'restore']
+const invoiceActions = ['import-replace', 'attach-original', 'link-contract', 'confirm-legacy', 'recognize', 'rerecognize', 'edit', 'review', 'archive', 'edit-archived', 'discard', 'restore', RECORD_ORIGINAL_VERIFICATION, CONFIRM_ORIGINAL_VERIFICATION]
 function validInvoicePending(value: { action: string, targetId: string | null, scopeId?: string }) {
   if (value.scopeId !== undefined)
     return value.targetId !== null && ['save-draft', 'submit'].includes(value.action)
@@ -93,8 +93,11 @@ export function createCentralInvoiceSession(options: {
     const finalCapabilities = await authorize()
     if (!sameInvoiceCapabilities(initialCapabilities, finalCapabilities) || !sameInvoiceCapabilities(read.capabilities, finalCapabilities))
       throw new CentralInvoiceReadInconsistentError()
+    const pendingAction = recovery.read(key)?.action
     if (read.record.id !== result.invoiceId || !commandVersionAtLeast(read.record.version, result.version)
-      || (result.originalId !== null && read.record.original?.id !== result.originalId)) {
+      || (result.originalId !== null && read.record.original?.id !== result.originalId)
+      || (read.record.version === result.version && ((pendingAction === RECORD_ORIGINAL_VERIFICATION && read.verification?.candidateId !== commandId)
+        || (pendingAction === CONFIRM_ORIGINAL_VERIFICATION && read.record.originalVerificationId !== commandId)))) {
       throw new CentralInvoiceReadInconsistentError('发票已保存，但尚未可靠回读，请只重试读取。')
     }
     options.beforeClear?.([read])

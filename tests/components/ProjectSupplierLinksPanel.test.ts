@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/vue'
 import { describe, expect, it } from 'vitest'
 import { defineComponent, h } from 'vue'
-import ProjectSupplierLinksPanel from '~/components/project/ProjectSupplierLinksPanel.vue'
+import ProjectSupplierLinksPanel from '~/pages/project/_components/ProjectSupplierLinksPanel.vue'
 
 const NuxtLinkStub = defineComponent({
   props: { to: { type: String, required: true } },

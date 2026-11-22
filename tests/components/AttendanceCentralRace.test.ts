@@ -2,8 +2,8 @@ import type { PayrollAttendanceCommandResult, PayrollAttendanceMatrixRead } from
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, reactive } from 'vue'
-import CentralAttendanceScreen from '~/components/payroll/CentralAttendanceScreen.vue'
 import { useCentralAttendance } from '~/composables/useCentralAttendance'
+import CentralAttendanceScreen from '~/pages/subcontract/_components/CentralAttendanceScreen.vue'
 import { c1Matrix } from '../helpers/payroll-c1-ui'
 
 beforeEach(() => {

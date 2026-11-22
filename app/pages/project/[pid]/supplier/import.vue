@@ -4,6 +4,7 @@ import type { ProjectSupplierImportItem } from '~/lib/supplier/import'
 import { computed, shallowRef } from 'vue'
 import { fileRefDraftFromFile } from '~/lib/forms/file-refs'
 import { toErrorMessage } from '~/lib/util/error'
+import ProjectSupplierImportWizard from '~/pages/project/[pid]/supplier/_components/ProjectSupplierImportWizard.vue'
 
 const route = useRoute()
 const router = useRouter()

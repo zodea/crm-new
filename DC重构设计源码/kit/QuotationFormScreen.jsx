@@ -1,5 +1,5 @@
 // QuotationFormScreen — 材料报价整页表单（route quotationForm ↔ 实现 /material/quotations/form/:id?，
-// 对应 app/components/material/quotation/QuotationFormPage.vue；ADR 0014 整页表单）。
+// 对应 app/pages/material/quotations/form/_components/QuotationFormPage.vue；ADR 0014 整页表单）。
 // 不走 kit/forms 的 registerForm：KitFormPage 写 window.APP 集合，报价属独立 material-quotations owner
 // （本稿 window.QUOTATION_DEMO），且材料明细是逐行卡片（13 个原文字段）；因此本屏未复用 FormPage 的左侧分区锚点
 // （实现端 EntityFormShell 有 报价资料/材料明细/原件与备注 三分区锚点），以分区卡片顺序呈现。

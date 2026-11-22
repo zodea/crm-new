@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import CrewWorkerRelationFactDetailScreen from '~/components/crew-worker/CrewWorkerRelationFactDetailScreen.vue'
 import { validateCrewWorkerReturnTo } from '~/lib/crew-worker/return-context'
+import PayrollStatementDetailScreen from '~/pages/subcontract/payroll/_components/PayrollStatementDetailScreen.vue'
 import { isDataOriginDTO } from '~/types/read-model'
 
 const route = useRoute()

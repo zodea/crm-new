@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import type { ScheduleProjectView } from '~/lib/schedule/read-model'
+import HomeDashboardSurface from '~/components/home/HomeDashboardSurface.vue'
+import ProjectSwitcher from '~/components/project/ProjectSwitcher.vue'
 import {
   summarizeHomeScheduleCoverage,
 } from '~/lib/home/dashboard'

@@ -89,6 +89,7 @@ const minHeight = computed(() => effectiveRowHeight.value * (minRows + 1))
 const rootStyle = computed(() => ({
   '--kit-table-row-height': `${effectiveRowHeight.value}px`,
 }))
+const headerCellConfig = computed(() => ({ height: effectiveRowHeight.value }))
 const rowConfig = computed(() => ({
   isHover: true,
   keyField: rowKey,
@@ -258,6 +259,7 @@ defineExpose({ clearCheckbox, clearFilter })
       :min-height="minHeight"
       :empty-text="emptyState.title"
       show-overflow="title"
+      :header-cell-config="headerCellConfig"
       :row-config="rowConfig"
       :column-config="columnConfig"
       :resizable-config="effectiveResizeConfig"
@@ -363,9 +365,8 @@ defineExpose({ clearCheckbox, clearFilter })
   max-width: 100%;
 }
 
-.kit-table :deep(.vxe-header--column),
-.kit-table :deep(.vxe-body--column) {
-  height: var(--kit-table-row-height);
+.kit-table :deep(.vxe-header--column .vxe-cell) {
+  padding-block: 0;
 }
 
 /* 参考站的列宽手柄只属于当前列右缘，避免“拖左列还是右列”的含混。 */

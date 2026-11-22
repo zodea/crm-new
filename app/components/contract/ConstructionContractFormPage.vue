@@ -3,6 +3,8 @@ import type { F2SaveAction, ProjectContractFormDraft } from '~/lib/contract/form
 import type { LookupOption } from '~/lib/kit/lookup'
 import type { FormFooterAction } from '~/lib/master-data/page'
 import { onActivated, onDeactivated, onScopeDispose } from 'vue'
+import ContractAttachmentSection from '~/components/contract/ContractAttachmentSection.vue'
+import ContractFormFields from '~/components/contract/ContractFormFields.vue'
 import CommandRecoveryPanel from '~/components/shared/CommandRecoveryPanel.vue'
 import { useContractFormNavigation } from '~/composables/useContractFormNavigation'
 import { useTabCloseGuard } from '~/composables/useTabCloseGuard'

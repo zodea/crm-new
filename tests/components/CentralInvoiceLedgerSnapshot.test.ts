@@ -55,6 +55,7 @@ function setup(initial: CentralInvoiceRecord[], projectOptions?: {
     client: { list: async ({ page, pageSize }: { page: number, pageSize: number }) => ({
       items: backend.slice((page - 1) * pageSize, page * pageSize),
       pagination: { total: backend.length },
+      capabilities: [...actor.capabilities],
       sourceVersion: projectOptions?.missingVersion ? null : `read-${revision}`,
       meta: { sources: [{ key: 'invoices', sourceVersion: `invoices:${revision}` }] },
     }) } as never,

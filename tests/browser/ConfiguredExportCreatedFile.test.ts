@@ -3,13 +3,13 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-vue'
 import { page, userEvent } from 'vitest/browser'
 import { computed, defineComponent, h, onUnmounted, shallowRef } from 'vue'
-import ExportConfigForm from '~/components/export/ExportConfigForm.vue'
 import ToastHost from '~/components/shared/ToastHost.vue'
 import KitButton from '~/components/ui/KitButton.vue'
 import ProcessStepper from '~/components/ui/ProcessStepper.vue'
 import { useConfiguredExportRunner } from '~/composables/useConfiguredExportRunner'
 import { useToast } from '~/composables/useToast'
 import ExportConfigPage from '~/pages/export/config/[jobId].vue'
+import ExportConfigForm from '~/pages/export/config/_components/ExportConfigForm.vue'
 
 afterEach(() => vi.unstubAllGlobals())
 

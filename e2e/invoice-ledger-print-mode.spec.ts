@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { updateProductionSnapshot } from './helpers/browser-production-snapshot'
+import { expectNoPageOverflow } from './helpers/responsive'
 
 for (const input of [
   { label: '单张归档票', numbers: ['26442000000000000501'], amounts: [113] },
@@ -34,6 +35,20 @@ for (const input of [
     await page.reload()
     await expect(page.getByRole('button', { name: '打印 PDF', exact: true })).toBeVisible()
     await expect(page.getByRole('main')).toContainText(`共 ${input.numbers.length} 张`)
+    const ledger = page.getByTestId('invoice-ledger-list')
+    await expect(ledger).toHaveClass(/list-shell--continuous/)
+    await expect(ledger.locator('[data-ui="status-tag"][data-tone="warn"]').first()).toHaveText('未打印')
+    for (const width of [390, 768, 1024, 1280, 1440]) {
+      await page.setViewportSize({ width, height: 900 })
+      await expectNoPageOverflow(page, `发票台账 ${width}px`)
+    }
+    const card = ledger.getByRole('button', { name: '卡片', exact: true })
+    await card.press('Enter')
+    await expect(card).toHaveAttribute('aria-pressed', 'true')
+    await expect(ledger.locator('[data-ui="kit-table"]')).toHaveCount(0)
+    const table = ledger.getByRole('button', { name: '表格', exact: true })
+    await table.press('Enter')
+    await expect(ledger.locator('[data-ui="kit-table"]')).toBeVisible()
     await page.getByRole('button', { name: '打印 PDF', exact: true }).click()
 
     await expect(page.getByRole('button', { name: '返回台账', exact: true })).toBeVisible()
@@ -73,12 +88,22 @@ test('发票台账打印：Excel 导入的发票没有原件不进入打印，�
   await page.reload()
   // 台账勾选只用于合计，Excel 行同样可勾（#499）；打印面板仍单独拦截
   await page.locator('.vxe-table--header .vxe-cell--checkbox').first().click()
-  await expect(page.locator('span', { hasText: '已选' })).toHaveText(/已选\s*2\s*张 · 合计\s*¥?226\.00/)
+  const summary = page.getByRole('status', { name: '列表汇总', exact: true })
+  await expect(summary.locator('span', { hasText: '已选' })).toHaveText(/已选\s*2\s*张 · 合计\s*¥?226\.00/)
   await page.getByRole('button', { name: '打印 PDF', exact: true }).click()
 
   const list = page.getByRole('complementary', { name: '待打印发票列表' })
   await expect(list.getByRole('checkbox', { name: '勾选发票 26442000000000000602' })).toBeDisabled()
   await expect(list).toContainText('Excel 导入的发票没有原件，不能打印')
+  const all = page.getByRole('checkbox', { name: '全选发票' })
+  await expect(all).toBeChecked()
+  await all.press('Space')
+  await expect(all).not.toBeChecked()
+  await expect(page.getByRole('button', { name: '打印选中', exact: true })).toBeDisabled()
+  const scan = list.getByRole('checkbox', { name: '勾选发票 26442000000000000601' })
+  await scan.press('Space')
+  await expect(scan).toBeChecked()
+  await expect(all).toBeChecked()
   await expect(page.getByTestId('invoice-print-summary')).toContainText('已勾 1 张')
   await expect(page.getByTestId('invoice-print-skipped')).toContainText('1 张发票不会打印')
   await expect(page.getByTestId('invoice-print-skipped')).toContainText('26442000000000000602：Excel 导入的发票没有原件，不能打印')

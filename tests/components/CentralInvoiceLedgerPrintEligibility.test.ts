@@ -81,7 +81,7 @@ it('混选时逐票说明不可打印原因，核验原件后仅登记合格扫�
     ['缺原件', '发票未关联原件'],
     ['缺金额', '价税合计未填写'],
     ['零金额', '价税合计不是有效正数'],
-    ['已关联Excel', '当前票据来源不支持打印'],
+    ['已关联Excel', 'Excel 发票须先确认原件核验'],
   ] as const) {
     expect((within(excluded).getByRole('checkbox', { name: `勾选发票 ${id}` }) as HTMLInputElement).disabled).toBe(true)
     expect(within(excluded).getByText(new RegExp(`${id}：${reason}`))).toBeTruthy()

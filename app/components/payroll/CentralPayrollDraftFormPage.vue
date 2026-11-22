@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import type { PayrollADraft } from '~/lib/payroll/central-a-contract'
 import { computed } from 'vue'
+import PayrollACommandState from '~/components/payroll/PayrollACommandState.vue'
+import PayrollAFeesReview from '~/components/payroll/PayrollAFeesReview.vue'
+import PayrollAFormFields from '~/components/payroll/PayrollAFormFields.vue'
+import PayrollAItemRatioFields from '~/components/payroll/PayrollAItemRatioFields.vue'
+import PayrollANegativeLinesSection from '~/components/payroll/PayrollANegativeLinesSection.vue'
+import PayrollASourceReview from '~/components/payroll/PayrollASourceReview.vue'
 import { usePayrollAForm } from '~/composables/usePayrollAForm'
 import { hasPayrollAFeesForm } from '~/lib/payroll/central-a-fees-contract'
 import PayrollHollowReview from './PayrollHollowReview.vue'

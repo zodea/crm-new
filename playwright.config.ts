@@ -3,17 +3,18 @@ import process from 'node:process'
 import { defineConfig, devices } from '@playwright/test'
 
 const externalBaseURL = process.env.PLAYWRIGHT_BASE_URL
-const VISUAL_SPEC = /runtime-visual-matrix\.spec\.ts/
+const VISUAL_SPEC = /(?:runtime-visual-matrix|issue-169-responsibility-dialog)\.spec\.ts/
 const PRODUCTION_SPEC = /[\\/]production-[^\\/]+\.spec\.ts$/
 
 // 中央 spec 按文件名排序后交替分入两组，各连一个独立 dev server（独立进程内存、构建与 Vite 缓存目录）。
 // 每组内仍只有一个 worker：迁入验收会重置该组 dev server 的默认中央仓库，每案独占重置、接管和回读旅程。
 const centralSpecs = readdirSync('e2e').filter(name => name.endsWith('.spec.ts') && !name.startsWith('production-') && !VISUAL_SPEC.test(name)).sort()
 const centralGroups = [0, 1].map(group => centralSpecs.filter((_, index) => index % 2 === group).map(name => `**/e2e/${name}`))
-const centralServers = [
+const centralServerOptions: { port: number, env: Record<string, string> }[] = [
   { port: Number(process.env.PLAYWRIGHT_PORT ?? 3100), env: {} },
   { port: Number(process.env.PLAYWRIGHT_PORT_B ?? 3102), env: { NUXT_BUILD_DIR: process.env.PLAYWRIGHT_NUXT_BUILD_DIR_B ?? '.tmp/e2e-nuxt-b' } },
-].map(server => ({ ...server, url: `http://127.0.0.1:${server.port}` }))
+]
+const centralServers = centralServerOptions.map(server => ({ ...server, url: `http://127.0.0.1:${server.port}` }))
 
 // 只选 production 项目时不启动 dev server：这些 spec 各自启动 .output 构建产物与隔离数据目录。
 // 与 Playwright CLI 一致：`--project a b` 连续取值到下一个选项为止，`--project=a` 取单值。
@@ -37,6 +38,9 @@ export default defineConfig({
   testIgnore: VISUAL_SPEC,
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
+  // CI 的开发服务器在 HTML 可响应时，客户端模块仍可能在首次按需编译。
+  // 先用隔离浏览器确认外壳就绪，不改变任何业务测试的断言或超时。
+  globalSetup: process.env.CI && process.env.E2E_PROJECT ? './e2e/helpers/warm-dev-server.ts' : undefined,
   retries: process.env.CI ? 2 : 0,
   // 本机冷启动的模块加载可能超过默认 5 秒；仍需等到相同的可观察结果。
   expect: { timeout: 15_000 },
@@ -45,7 +49,8 @@ export default defineConfig({
   reporter: process.env.CI ? 'github' : 'list',
   use: {
     screenshot: 'only-on-failure',
-    trace: 'on-first-retry',
+    // 首次失败也保留追踪，重试通过时仍可定位间歇性的导航和加载问题。
+    trace: 'retain-on-failure',
     video: 'retain-on-failure',
   },
   projects: [

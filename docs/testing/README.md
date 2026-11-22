@@ -8,19 +8,24 @@
 
 | 用途 | 工具与入口 | 范围 |
 | --- | --- | --- |
-| 单元、服务、状态及静态契约 | Vitest：`pnpm test:unit` | [unit 与 unit-heavy 项目](../../vitest.config.ts)，排除组件与浏览器目录；冷进程、整库迁入与正式库读写等重夹具文件归 unit-heavy，在其余项目之后以半数逻辑核并发运行 |
+| 日常单元、服务与状态 | Vitest：`pnpm test:unit` | [unit 与 unit-heavy 项目](../../vitest.config.ts)；冷进程、数据库启动与升级、正式库等重夹具用例在其余项目之后运行，最多并发 3 个 |
 | jsdom 组件 | Vitest、Vue Test Utils、Testing Library：`pnpm test:components` | [component 项目](../../vitest.config.ts)；部分用例使用 `vitest-axe` 检查无障碍规则 |
-| 单元与 jsdom 组件合并 | `pnpm test` | 仅以上 unit、unit-heavy、component 三个项目 |
+| 本地 PR 回归 | `pnpm test:pr` | 日常单元、服务、状态、jsdom 组件和未标记 `@migration` 的中央 E2E |
+| 文档、源码与工程契约 | `pnpm test:contracts` | [contracts 项目](../../vitest.config.ts)，含静态界面契约、Markdown 链接、Git 钩子和提交说明工具 |
+| 历史数据受控迁入 | `pnpm test:migration` | [migration 项目](../../vitest.config.ts)、`@migration` 中央 E2E 和独立构建的发票迁入 E2E |
+| 完整 Vitest 回归 | `pnpm test` | unit、unit-heavy、component、contracts、migration 五个项目。推送钩子与按需 CI quality 使用此入口 |
 | 真实浏览器组件行为 | Vitest Browser、Playwright provider、`vitest-browser-vue`：`pnpm test:browser` | [独立配置](../../vitest.browser.config.ts)，Chromium 多视口 |
 | 跨页面流程 | Playwright：`pnpm test:e2e`；精确文件用 `pnpm exec playwright test <files...>` | [E2E 配置](../../playwright.config.ts)，排除专用视觉矩阵；默认 E2E 不写存档截图 |
 | 专用视觉矩阵 | Playwright：`pnpm test:visual` | [视觉配置](../../playwright.visual.config.ts)，固定 Windows/Chromium 与隔离演示服务 |
-| 应用类型 | `pnpm typecheck` | Nuxt 项目类型；不覆盖普通测试、E2E 和测试配置的整体类型检查 |
+| 应用及 E2E 类型 | `pnpm typecheck` | 依次检查 Nuxt 应用、`e2e/**/*.ts` 和 Playwright 配置。单独检查 E2E 可运行 `pnpm typecheck:e2e` |
 | 已纳入的工资测试类型 | `pnpm exec vue-tsc --noEmit -p tests/payroll/tsconfig.json` | 仅[配置](../../tests/payroll/tsconfig.json)显式纳入的文件及依赖 |
 | 循环依赖 | dpdm：`pnpm check:cycles` | [配置](../../dpdm.config.ts)覆盖的应用与服务端 TS 模块；调整模块边界或抽取共享逻辑后运行 |
 | 依赖重复版本 | node-modules-inspector：`pnpm check:deps` | [配置](../../node-modules-inspector.config.ts)；新增、升级依赖后运行 |
 | Markdown 相对链接 | `pnpm check:links` | 全仓已跟踪 Markdown；提交钩子只拦截本次引入的断链 |
 
 `pnpm test` 不包含浏览器组件、E2E 或视觉矩阵。浏览器组件、工资测试类型、循环依赖与依赖重复检查目前也未接入推送钩子和 CI，涉及这些文件时须单独选择对应本地入口。钩子实际执行范围见 [Git 工作流](../agents/git-workflow.md)，远端套件见 [CI 使用规则](../agents/ci-usage.md)。
+
+视觉矩阵只在测试页面加载 [Noto Sans SC 测试字体](../../tests/fixtures/visual-font/NotoSansSC-variable.ttf)，不修改产品字体。该文件来自 [Google Fonts 官方仓库](https://github.com/google/fonts/tree/main/ofl/notosanssc)，上游版本 2.004（`notofonts/noto-cjk` 提交 `523d033d6cb47f4a80c58a35753646f5c3608a78`），Google Fonts 文件的 Git blob 为 `fb0637bafbcd804fe32152370a1225990745b4bc`，SHA-256 为 `a3041811a78c361b1de50f953c805e0244951c21c5bd412f7232ef0d899af0da`；许可见同目录 [OFL.txt](../../tests/fixtures/visual-font/OFL.txt)。测试显式确认常用字重加载成功，加载失败时不得以系统字体替代生成基线。基线调整须逐项复核差异，保留布局、焦点和交互断言。
 
 ### Vitest 本地缓存
 
@@ -42,11 +47,15 @@ E2E 分三个项目（[E2E 配置](../../playwright.config.ts)）：
 | 项目 | 范围 | 服务与并发 |
 | --- | --- | --- |
 | `chromium`、`chromium-b` | 中央 spec 按文件名排序后交替分组 | 各连一个独立 dev server（默认端口 3100、3102，可用 `PLAYWRIGHT_PORT`、`PLAYWRIGHT_PORT_B` 改；第二个用 `.tmp/e2e-nuxt-b` 作构建与 Vite 缓存目录），组内 1 个 worker |
-| `production` | `production-*.spec.ts` | 各 spec 自启 `.output/server/index.mjs`、空闲端口与 mkdtemp 数据目录，3 个 worker；须先 `pnpm build` 并设 `CRM_PRODUCTION_ACCEPTANCE=1`，否则跳过；只选本项目时不启动 dev server |
+| `production` | `production-*.spec.ts` | 用 `pnpm test:production` 构建并启用全部专项；各 spec 自启生产入口、空闲端口与独立合成数据目录，3 个 worker；单项调试须满足对应显式启用条件；只选本项目时不启动 dev server |
 
-本机生产验收先运行 `pnpm build`，再在 PowerShell 中执行 `$env:CRM_PRODUCTION_ACCEPTANCE='1'; pnpm exec playwright test --project=production`；结束后移除该环境变量。逐项查看报告中的通过、失败和跳过，跳过不计为验收通过。测试使用独立合成目录；目录不会由现有 Playwright 夹具自动清理，须在服务进程退出后按项目临时文件规则核对本次新建目录再清理。手动 CI 的 `production-acceptance` 为独立选择项，普通 `e2e` 只运行两个开发服务项目。
+完整生产验收使用 `pnpm test:production`（[执行入口](../../scripts/run-production-acceptance.mjs)）：先构建默认生产产物，再构建带发票验收层的独立产物，显式启用普通生产、发票、更正和公司付款专项，并创建独立下载目录。全部 production 用例运行后，报告中出现跳过、失败、重试或没有实际执行项均视为未通过。本地与 CI 使用同一入口；单项调试仍保留各 spec 的显式启用及隔离入口校验。合成数据库与原件均位于项目临时目录，不连接用户数据；运行结束后的清理遵循项目临时文件规则。
+
+受控迁入专项覆盖旧源验证、预检、接管、重复提交与危险恢复。维护 [Vitest 项目](../../vitest.config.ts)和 Playwright `@migration` 标签时按用例职责选择。数据库启动与升级、日常写入和命令恢复保留在本地 PR 回归。`pnpm test:migration` 中的发票生产 E2E 使用同一[生产验收入口](../../scripts/run-production-acceptance.mjs)，仅构建带发票验收层的隔离产物，沿用完整生产验收的报告判定。`pnpm test:pr` 和 `pnpm test:migration` 的中央 E2E 均启动本地双组服务。连接外部测试服务时，使用 `pnpm test:e2e --project=chromium` 并按需加 `--grep=@migration` 或 `--grep-invert=@migration`。
 
 迁入验收会重置所在 dev server 的默认中央仓库，每案独占重置、接管和回读旅程，因此中央组内只用一个 worker；两组的中央仓库在各自进程内存中，互不可见；截图基线两组共用 `chromium` 文件名。普通页面夹具按测试会话隔离；并行批次须避开迁入仓库。只选一个中央项目时只启动该组服务；大型本地回归应分文件批次重启服务，避免长期运行的开发服务耗尽内存。设置 `PLAYWRIGHT_BASE_URL` 连接外部服务时只保留单个中央项目、1 个 worker。命令行选项目时用 `--project=<名称>`：`--project <名称>` 会把后面的文件路径也当作项目名。
+
+浏览器交互与 `page.request` 共同造数或回读时，在浏览器 context 上设置同一个具名测试会话头；仅在 page 上设置不会自动应用到 API 请求。敏感资料用例显式申请具名测试会话的最小权限并在重置时撤销，同时保留未授权拒绝的验证。需要正式构建及独立存储的验收写在 `production-*.spec.ts`，不要混入仅启动开发服务的普通 E2E；像素基线放入 Windows 视觉配置并加载已固定的测试字体。
 
 ## 模块入口
 

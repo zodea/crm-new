@@ -2,7 +2,7 @@ import type { ScheduleBindingPreview } from '~/lib/schedule/central-binding-cont
 import { fireEvent, render, screen } from '@testing-library/vue'
 import { describe, expect, it } from 'vitest'
 import { defineComponent, h } from 'vue'
-import ScheduleBindingReview from '~/components/schedule/ScheduleBindingReview.vue'
+import ScheduleBindingReview from '~/pages/schedule/[pid]/bind/_components/ScheduleBindingReview.vue'
 
 const Table = defineComponent({ props: ['data', 'columns', 'rowKey'], setup(props, { slots }) {
   return () => h('table', (props.data ?? []).map((row: Record<string, unknown>) => h('tr', { 'key': String(row[props.rowKey]), 'data-testid': 'quantity-row' }, props.columns.map((column: { field: string, slot?: string }) => h('td', slots[column.slot ?? '']?.({ row }) ?? String(row[column.field]))))))

@@ -3,9 +3,9 @@ import type { ProjectSupplierFileDTO } from '~/lib/project-supplier/read-contrac
 import { fireEvent, render, screen, waitFor } from '@testing-library/vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h } from 'vue'
-import ProjectSupplierFileAccess from '~/components/project-supplier/ProjectSupplierFileAccess.vue'
-import ProjectSupplierFilePanel from '~/components/project-supplier/ProjectSupplierFilePanel.vue'
 import { exportFile as runExportFile } from '~/lib/kit/export'
+import ProjectSupplierFileAccess from '~/pages/project/[pid]/supplier/_components/ProjectSupplierFileAccess.vue'
+import ProjectSupplierFilePanel from '~/pages/project/[pid]/supplier/_components/ProjectSupplierFilePanel.vue'
 
 const getContent = vi.fn()
 const exportFile = vi.fn()

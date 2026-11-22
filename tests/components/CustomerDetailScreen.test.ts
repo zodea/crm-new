@@ -1,23 +1,26 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, reactive } from 'vue'
-import CustomerDetailRelations from '~/components/master-data/CustomerDetailRelations.vue'
-import CustomerDetailScreen from '~/components/master-data/CustomerDetailScreen.vue'
 import StatePanel from '~/components/ui/StatePanel.vue'
+import CustomerDetailScreen from '~/pages/base/customer/_components/CustomerDetailScreen.vue'
 
 const customerStoreMock = vi.hoisted(() => ({
   detailState: { kind: 'idle' } as any,
   loadDetail: vi.fn().mockResolvedValue(undefined),
 }))
+const customerProduction = vi.hoisted(() => ({ recover: vi.fn(), lifecycle: vi.fn(), change: vi.fn() }))
 
 vi.mock('~/stores/customer-read', () => ({
   useCustomerReadStore: () => customerStoreMock,
 }))
+vi.mock('~/stores/customer-production', () => ({ useCustomerProductionStore: () => customerProduction }))
 
 const route = reactive({
   query: {} as Record<string, string>,
 })
 const routerReplace = vi.fn()
+const confirm = vi.fn()
+const success = vi.fn()
 
 const detail = {
   dataOrigin: 'real' as const,
@@ -88,6 +91,7 @@ const SegTabStub = defineComponent({
 vi.stubGlobal('useRoute', () => route)
 vi.stubGlobal('useRouter', () => ({ replace: routerReplace }))
 vi.stubGlobal('useTabTitle', () => {})
+vi.stubGlobal('useKitUI', () => ({ confirm, success }))
 
 describe('客户详情业务页签', () => {
   it('其他客户刷新共享状态时，不把其姓名写入当前详情或页签', () => {
@@ -108,6 +112,38 @@ describe('客户详情业务页签', () => {
     routerReplace.mockReset()
     customerStoreMock.detailState = { kind: 'ready', data: detail }
     customerStoreMock.loadDetail.mockClear()
+    customerProduction.recover.mockReset()
+    customerProduction.lifecycle.mockReset()
+    customerProduction.change.mockReset()
+    confirm.mockReset()
+    success.mockReset()
+  })
+
+  it('从原回执恢复客户状态，确认后才按当前版本发起恢复并重读客户详情', async () => {
+    customerStoreMock.detailState = { kind: 'ready', data: { ...detail, capabilities: [...detail.capabilities, 'customer:lifecycle:write'] } }
+    const deleted = { id: 'customer-1', name: detail.customer.name, version: 'customer-v2', deletedAt: '2026-09-22' }
+    customerProduction.recover.mockResolvedValue({ current: deleted, applied: true })
+    customerProduction.change.mockResolvedValue({ current: { ...deleted, version: 'customer-v3', deletedAt: null }, recovered: false })
+    confirm.mockResolvedValueOnce(false).mockResolvedValueOnce(true)
+    render(CustomerDetailScreen, {
+      props: { customerId: deleted.id, origin: 'real', includeDemo: false },
+      global: { components: { EntityDetailShell: EntityDetailShellStub, SegTab: SegTabStub }, stubs: ['CustomerDetailOverview', 'CustomerDetailRelations', 'MetricGrid', 'Metric', 'NuxtLink'] },
+    })
+
+    const restore = await screen.findByRole('button', { name: '恢复客户' })
+    expect(customerProduction.recover).toHaveBeenCalledWith(deleted.id)
+    expect(customerProduction.lifecycle).not.toHaveBeenCalled()
+    expect(screen.getByRole('status').textContent).toContain('上次操作已保存，现已核对当前状态。')
+    customerStoreMock.loadDetail.mockClear()
+    await fireEvent.click(restore)
+    expect(customerProduction.change).not.toHaveBeenCalled()
+
+    await fireEvent.click(restore)
+    await screen.findByRole('button', { name: '删除客户' })
+    expect(confirm).toHaveBeenLastCalledWith({ title: '恢复客户', message: `恢复“${deleted.name}”及其原有附件可见性？`, confirmLabel: '恢复客户' })
+    expect(customerProduction.change).toHaveBeenCalledExactlyOnceWith(deleted)
+    expect(customerStoreMock.loadDetail).toHaveBeenCalledWith({ id: deleted.id, origin: 'real', includeDemo: false })
+    expect(success).toHaveBeenCalledWith('客户已恢复')
   })
 
   it.each(['forbidden', 'unavailable'] as const)('项目源 %s 时数量未知、不渲染假空列表，仅失败可重试', async (code) => {
@@ -123,12 +159,11 @@ describe('客户详情业务页签', () => {
     render(CustomerDetailScreen, {
       props: { customerId: 'customer-1', origin: 'real', includeDemo: false },
       global: {
+        stubs: { CustomerDetailOverview: defineComponent({ template: '<section />' }) },
         components: {
           EntityDetailShell: EntityDetailShellStub,
           SegTab: SegTabStub,
           StatePanel,
-          CustomerDetailRelations,
-          CustomerDetailOverview: defineComponent({ template: '<section />' }),
           KitTable: defineComponent({ template: '<section data-testid="project-table">暂无名下项目</section>' }),
           MetricGrid: defineComponent({ template: '<div><slot /></div>' }),
           Metric: defineComponent({ props: ['label', 'value'], template: '<span>{{ label }}：{{ value }}</span>' }),
@@ -163,12 +198,10 @@ describe('客户详情业务页签', () => {
     }
     render(CustomerDetailScreen, {
       props: { customerId: 'customer-1', origin: 'real', includeDemo: false },
-      global: { components: {
+      global: { stubs: { CustomerDetailOverview: defineComponent({ template: '<section />' }) }, components: {
         EntityDetailShell: EntityDetailShellStub,
         SegTab: SegTabStub,
         StatePanel,
-        CustomerDetailRelations,
-        CustomerDetailOverview: defineComponent({ template: '<section />' }),
         KitTable: defineComponent({ template: '<section data-testid="contract-table">暂无施工合同</section>' }),
         MetricGrid: defineComponent({ template: '<div><slot /></div>' }),
         Metric: defineComponent({ props: ['label', 'value'], template: '<span>{{ label }}：{{ value }}</span>' }),
@@ -203,12 +236,10 @@ describe('客户详情业务页签', () => {
     }
     render(CustomerDetailScreen, {
       props: { customerId: 'customer-1', origin: 'real', includeDemo: false },
-      global: { components: {
+      global: { stubs: { CustomerDetailOverview: defineComponent({ template: '<section />' }) }, components: {
         EntityDetailShell: EntityDetailShellStub,
         SegTab: SegTabStub,
         StatePanel,
-        CustomerDetailRelations,
-        CustomerDetailOverview: defineComponent({ template: '<section />' }),
         KitTable: defineComponent({ template: '<section data-testid="receipt-table">暂无收款记录</section>' }),
         MetricGrid: defineComponent({ template: '<div><slot /></div>' }),
         Metric: defineComponent({ props: ['label', 'value'], template: '<span>{{ label }}：{{ value }}</span>' }),
@@ -235,14 +266,16 @@ describe('客户详情业务页签', () => {
     render(CustomerDetailScreen, {
       props: { customerId: 'customer-1', origin: 'real', includeDemo: false },
       global: {
-        components: {
-          EntityDetailShell: EntityDetailShellStub,
-          SegTab: SegTabStub,
+        stubs: {
           CustomerDetailOverview: defineComponent({ template: '<section>客户概览</section>' }),
           CustomerDetailRelations: defineComponent({
             props: ['tab'],
             template: '<section data-testid="active-relation">{{ tab }}</section>',
           }),
+        },
+        components: {
+          EntityDetailShell: EntityDetailShellStub,
+          SegTab: SegTabStub,
           MetricGrid: defineComponent({ template: '<div><slot /></div>' }),
           Metric: defineComponent({ template: '<span />' }),
           NuxtLink: defineComponent({ template: '<a><slot /></a>' }),
@@ -272,14 +305,16 @@ describe('客户详情业务页签', () => {
     render(CustomerDetailScreen, {
       props: { customerId: 'customer-1', origin: 'real', includeDemo: false },
       global: {
-        components: {
-          EntityDetailShell: EntityDetailShellStub,
-          SegTab: SegTabStub,
+        stubs: {
           CustomerDetailOverview: defineComponent({ template: '<section />' }),
           CustomerDetailRelations: defineComponent({
             props: ['tab'],
             template: '<section data-testid="active-relation">{{ tab }}</section>',
           }),
+        },
+        components: {
+          EntityDetailShell: EntityDetailShellStub,
+          SegTab: SegTabStub,
           MetricGrid: defineComponent({ template: '<div><slot /></div>' }),
           Metric: defineComponent({ template: '<span />' }),
           NuxtLink: defineComponent({ template: '<a><slot /></a>' }),
@@ -299,6 +334,10 @@ describe('客户详情业务页签', () => {
     render(CustomerDetailScreen, {
       props: { customerId: 'customer-1', origin: 'real', includeDemo: false },
       global: {
+        stubs: {
+          CustomerDetailOverview: defineComponent({ template: '<section>客户概览仍可见</section>' }),
+          CustomerDetailRelations: defineComponent({ template: '<section />' }),
+        },
         components: {
           EntityDetailShell: EntityDetailShellStub,
           SegTab: SegTabStub,
@@ -306,8 +345,6 @@ describe('客户详情业务页签', () => {
             props: ['title', 'description'],
             template: '<div role="alert">{{ title }}：{{ description }}</div>',
           }),
-          CustomerDetailOverview: defineComponent({ template: '<section>客户概览仍可见</section>' }),
-          CustomerDetailRelations: defineComponent({ template: '<section />' }),
           MetricGrid: defineComponent({ template: '<div><slot /></div>' }),
           Metric: defineComponent({ template: '<span />' }),
           NuxtLink: defineComponent({ template: '<a><slot /></a>' }),

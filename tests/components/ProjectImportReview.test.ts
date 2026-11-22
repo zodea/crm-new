@@ -1,7 +1,7 @@
 import { render, screen, within } from '@testing-library/vue'
 import { describe, expect, it } from 'vitest'
-import ProjectImportReview from '~/components/project/ProjectImportReview.vue'
 import { annotateProjectImportRows } from '~/lib/project/import'
+import ProjectImportReview from '~/pages/import/mapping/_components/ProjectImportReview.vue'
 
 describe('项目导入人工核对', () => {
   it('显示解析后的稳定关系、归一阶段和原 Sheet 行号，失败行不伪装成可导入', () => {

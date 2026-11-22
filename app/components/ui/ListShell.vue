@@ -11,6 +11,7 @@ const props = defineProps<{
   tree?: TreeNode[]
   views?: ListView[]
   summary?: Record<string, number | string>
+  summaryLabel?: string
   continuous?: boolean
 }>()
 
@@ -118,7 +119,7 @@ const formattedSummary = computed(() =>
       <div
         v-if="hasSummary || $slots.summary"
         role="status"
-        aria-label="列表汇总"
+        :aria-label="summaryLabel || '列表汇总'"
         class="sticky bottom-0 z-1 flex min-h-9 flex-wrap items-center gap-x-5 gap-y-1 border-line bg-surface-2 px-3 py-2 text-[12px] text-ink-soft"
         :class="continuous ? 'border-t' : 'mt-[-1px] border shadow-[0_-4px_12px_rgba(15,23,42,0.04)]'"
         data-list-shell-summary

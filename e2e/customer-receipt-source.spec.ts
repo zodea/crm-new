@@ -3,7 +3,8 @@ import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import { expectNoPageOverflow } from './helpers/responsive'
 
-test.use({ screenshot: 'off', video: 'off', trace: 'off' })
+// 失败时保留截图和追踪，才能区分来源错误、空态和页面未加载。
+test.use({ video: 'off' })
 test.setTimeout(120_000)
 
 const RECEIPT_INPUT = { customerId: 'customer-real-320', customerName: '中央正式甲方客户', projectId: 'project-real-320', contractId: 'construction-contract-existing-320', no: 'SK-CUSTOMER-426', amount: '900000.00', expectedAmount: '¥900,000.00', date: '2026-09-11', referenceTime: '2026-09-15T04:00:00.000Z' }
@@ -70,6 +71,7 @@ test('中央收款按当前会话读取，源撤回后客户与收款详情都�
   await expect(page.getByRole('status', { name: '详情不存在或已删除', exact: true })).toBeVisible()
   await expect(page.getByRole('group', { name: '登记金额', exact: true })).toHaveCount(0)
   await page.goto(customerPath)
+  await expect(page.getByRole('heading', { name: RECEIPT_INPUT.customerName, exact: true })).toBeVisible()
   await expect(page.getByText('暂无收款记录', { exact: true }).filter({ visible: true }).first()).toBeVisible()
   await expect(page.getByRole('group', { name: '有效收款', exact: true })).toContainText('¥0.00')
 })

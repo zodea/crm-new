@@ -75,6 +75,8 @@ v30→v31 将财务参与者升级为 `finance:2`，为付款申请增加合同�
 
 v31→v32 将发票参与者升级为 `invoices:3`，新增更正单修订、草稿与已提交状态、不可变版本、原命令回执及未应用编号封存；更正附件以稳定文件身份和 SHA-256 关联到共享原件正文并纳入备份核验。明确提交时，更正单版本、原票新版本、归档依据和审计在同一事务写入，保留原票身份与既有历史；原有发票、回执和冻结证据不因升级重写。更正单的字段、资格及交互见[发票页面规格](./pages/finance-invoice.md#重复与更正)。以上为已注册并经隔离验证的代码，运行中的局域网服务尚未更新。
 
+v32→v33 将发票参与者升级为 `invoices:4`。追加不可变的 `invoice_original_verifications` 保存候选与确认，按原命令编号、发票版本、原件和候选父键关联；`invoice_print_lines.verification_id` 保存实际采用的核验依据，既有打印行保持原证据。归档票面及初次审计继续从原票和原归档证据读取。新证据纳入备份和独立恢复核验，命令契约见 [已归档发票原件核验](./COMMANDS.md#archived-invoice-original-verification)。
+
 ## PG-04 本机分供方持久参与者（#453）
 
 `supplier:1` 加入上述同一磁盘库和事务协调器；领域规则从开发实例抽出为事务内纯状态服务，`Map` 只承载本次从磁盘加载的候选，不能成为另一个正式数据源。
@@ -2566,7 +2568,7 @@ flowchart TD
   V --> P["实际收付单独看<br/>原现金只计一次"]
 ```
 
-图为来源分工。[当前项目详情](../../app/components/project/ProjectDetailScreen.vue)已展示 managementFees；中央开发验证从同 owner、同次事务读取 P5 管理簿与 P4 有效实际净额，保留可证小计、来源状态和原明细。合同/仓储未接，完整实际成本仍为 null；正式和 Native 来源不借中央验证事实补值。付款申请 biz_type 为管理费不证明成本或实付，本轮不复制成本/支付表。
+图为来源分工。[当前项目详情](../../app/pages/project/_components/ProjectDetailScreen.vue)已展示 managementFees；中央开发验证从同 owner、同次事务读取 P5 管理簿与 P4 有效实际净额，保留可证小计、来源状态和原明细。合同/仓储未接，完整实际成本仍为 null；正式和 Native 来源不借中央验证事实补值。付款申请 biz_type 为管理费不证明成本或实付，本轮不复制成本/支付表。
 
 <a id="42-票据信息"></a>
 
@@ -2581,7 +2583,7 @@ flowchart TD
 | 增值税 | 销项税额 − 进项税额 |
 | 税负率 | 增值税 / 销项票额；销项票额为 0 时不可计算，界面显示 `—` 而不是 `0%` |
 
-本节“票额”的 `invoice_applications.amount` / `invoices.amount` 为不含税基数；现行[归档发票汇总](../../app/lib/project/detail-aggregate.ts)仍沿 `invoices.amount / tax_amount` 逐行核验，未知及红字金额见[独立回归](../../tests/project/detail-aggregate.test.ts)。开票价税合计另为 `amount + tax_amount`。B05 的含税收票额读取 `invoices.total_amount`，不能将两项指标的字段互换。上表保留历史算法证据，**不再作为真实应纳税额及真实税负的目标公式**：非草稿开票申请不等于实际开票，已归档进项票不证明抵扣资格及属期，项目差额不等于公司实际应纳税额。[当前项目详情](../../app/components/project/ProjectDetailScreen.vue)将真实税额及税负显示为待核实，不以历史票面差额推导真实税额或提供无依据下钻；真实计税链尚未接通。
+本节“票额”的 `invoice_applications.amount` / `invoices.amount` 为不含税基数；现行[归档发票汇总](../../app/lib/project/detail-aggregate.ts)仍沿 `invoices.amount / tax_amount` 逐行核验，未知及红字金额见[独立回归](../../tests/project/detail-aggregate.test.ts)。开票价税合计另为 `amount + tax_amount`。B05 的含税收票额读取 `invoices.total_amount`，不能将两项指标的字段互换。上表保留历史算法证据，**不再作为真实应纳税额及真实税负的目标公式**：非草稿开票申请不等于实际开票，已归档进项票不证明抵扣资格及属期，项目差额不等于公司实际应纳税额。[当前项目详情](../../app/pages/project/_components/ProjectDetailScreen.vue)将真实税额及税负显示为待核实，不以历史票面差额推导真实税额或提供无依据下钻；真实计税链尚未接通。
 
 <a id="actual-tax-sources"></a>
 

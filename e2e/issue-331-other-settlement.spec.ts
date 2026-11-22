@@ -1,6 +1,4 @@
 import { Buffer } from 'node:buffer'
-import { mkdir } from 'node:fs/promises'
-import process from 'node:process'
 import { expect, test } from '@playwright/test'
 import { expectEscapeReturnsFocus, expectLocalHorizontalScroll, expectNoPageOverflow, expectOverlayAboveShell, RESPONSIVE_WIDTHS } from './helpers/responsive'
 
@@ -77,12 +75,16 @@ test.describe('AX05 其他支出结算中央往返', () => {
     const created = await page.request.post('/api/commands/other-settlements', { data: { ...context, commandId: 'viewport-fixture', requiredCapability: 'other-settlement:write', baseVersion: null, action: 'save', draft: { name: '视口合成结算', no: 'JS-VIEW-331', projectId: contract.draft.projectId, contractId: contract.id, totalAmount: 0, settlementDate: '2026-09-06' }, attachments: {} } })
     expect(created.ok(), await created.text()).toBe(true)
     const { id } = await created.json()
-    if (process.env.AX05_EVIDENCE)
-      await mkdir('docs/design/evidence/issue-331', { recursive: true })
     for (const width of RESPONSIVE_WIDTHS) {
       await page.setViewportSize({ width, height: 900 })
       await page.goto('/contract/other-settlement')
+      const list = page.getByTestId('other-settlement-list')
       await expect(page.getByRole('link', { name: '视口合成结算', exact: true })).toBeVisible()
+      await expect(list.locator('[data-list-shell].list-shell--continuous [data-ui="kit-table"]')).toBeVisible()
+      await expect(list.locator('[data-ui="status-tag"][data-tone="neutral"]').filter({ hasText: /^草稿$/ })).toBeVisible()
+      await expect(list.getByRole('status', { name: '列表汇总' })).toContainText('¥0.00')
+      if (width >= 1024)
+        await expect(list.getByRole('complementary', { name: '业务类型' })).toBeVisible()
       await expect(page.getByText('JS-VIEW-331', { exact: true }).first()).toBeVisible()
       await expectNoPageOverflow(page, `结算列表 ${width}`)
       await expectLocalHorizontalScroll(page.locator('.vxe-table--scroll-x-handle').first(), `结算列表 ${width}`)
@@ -107,17 +109,42 @@ test.describe('AX05 其他支出结算中央往返', () => {
     test.setTimeout(90_000)
     const session = Buffer.from(info.testId).toString('base64url')
     const reset = (scenario: string) => page.request.post('/api/testing/other-settlements/reset', { headers: { 'x-ruihang-test-reset': '1', 'x-ruihang-test-session': session }, data: { scenario } })
-    await page.goto('/contract/other-settlement')
+    const listEndpoint = /\/api\/read\/other-settlements(?:\?|$)/
+    let release!: () => void
+    const holdRead = new Promise<void>(resolve => release = resolve)
+    await page.route(listEndpoint, async (route) => {
+      await holdRead
+      await route.continue()
+    })
+    const requestStarted = page.waitForRequest(listEndpoint)
+    const list = page.getByTestId('other-settlement-list')
+    const summary = list.getByRole('status', { name: '列表汇总' })
+    try {
+      await page.goto('/contract/other-settlement')
+      await requestStarted
+      await expect(list.locator('[data-ui="kit-table-loading"]')).toBeVisible()
+      await expect(list.getByText(/^当前筛选 · .*含税结算合计/)).toHaveCount(0)
+    }
+    finally {
+      release()
+    }
     await expect(page.locator('[data-ui="kit-table-empty"]:visible').getByText('暂无其他支出结算', { exact: true })).toBeVisible()
+    await expect(summary).toContainText('0 份')
+    await page.unroute(listEndpoint)
     await reset('unavailable')
+    await list.getByRole('button', { name: '刷新结算列表' }).click()
+    await expect(list.getByRole('alert')).toContainText('当前保留上一次成功读取的列表')
+    await expect(summary).toContainText('0 份')
     await page.reload()
     await expect(page.getByText('其他支出结算读取失败，请重试', { exact: true })).toBeVisible({ timeout: 30_000 })
+    await expect(summary).toHaveCount(0)
     await reset('ready')
     await page.getByRole('button', { name: '重新加载' }).click()
     await expect(page.locator('[data-ui="kit-table-empty"]:visible').getByText('暂无其他支出结算', { exact: true })).toBeVisible()
     await reset('forbidden')
     await page.reload()
     await expect(page.getByText('无权访问其他支出结算', { exact: true })).toBeVisible()
+    await expect(summary).toHaveCount(0)
     await reset('ready')
     await page.goto('/contract/other-settlement/missing?origin=real')
     await expect(page.getByText('其他支出结算不存在或已删除', { exact: true })).toBeVisible({ timeout: 20_000 })

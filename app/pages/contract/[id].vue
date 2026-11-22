@@ -12,6 +12,13 @@ import {
 } from '~/lib/contract/status'
 import { yuan } from '~/lib/util/money'
 import { maskPhone } from '~/lib/util/privacy'
+import ConstructionContractDetailScreen from '~/pages/contract/_components/ConstructionContractDetailScreen.vue'
+import ContractDetailDocuments from '~/pages/contract/_components/ContractDetailDocuments.vue'
+import ContractDetailFiles from '~/pages/contract/_components/ContractDetailFiles.vue'
+import ContractDetailLineItems from '~/pages/contract/_components/ContractDetailLineItems.vue'
+import ContractLifecycle from '~/pages/contract/_components/ContractLifecycle.vue'
+import MaterialContractDetailScreen from '~/pages/contract/_components/MaterialContractDetailScreen.vue'
+import SubcontractContractDetailScreen from '~/pages/contract/_components/SubcontractContractDetailScreen.vue'
 import { isDataOriginDTO } from '~/types/read-model'
 
 const route = useRoute()

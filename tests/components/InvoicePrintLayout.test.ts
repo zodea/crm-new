@@ -1,5 +1,5 @@
 import type { Invoice } from '~/stores/invoice'
-import { fireEvent, render, screen } from '@testing-library/vue'
+import { fireEvent, render, screen, within } from '@testing-library/vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, shallowRef, useTemplateRef, watch } from 'vue'
 import InvoicePrintLayout from '~/components/invoice/InvoicePrintLayout.vue'
@@ -76,5 +76,32 @@ describe('发票打印面板的未打印提醒', () => {
     render(InvoicePrintLayout, { props: { invoices: [invoice('a'), invoice('b', { filePath: '' })], printConfirmation: null, fullPage: true, selectedId: 'a' } })
     expect(screen.getByTestId('invoice-print-summary').textContent).toContain('已勾 2 张')
     expect(screen.queryByTestId('invoice-print-skipped')).toBeNull()
+  })
+
+  it('取消全选后逐张勾回可打印票，全选状态、排除清单和打印范围一致', async () => {
+    const invoices = [invoice('a'), invoice('b'), invoice('excel', { source: 'excel', filePath: '' })]
+    const view = render(InvoicePrintLayout, { props: { invoices, printConfirmation: null, fullPage: true, selectedId: 'a' } })
+    const all = screen.getByRole<HTMLInputElement>('checkbox', { name: '全选发票' })
+    const list = within(screen.getByRole('complementary', { name: '待打印发票列表' }))
+    const first = list.getByRole('checkbox', { name: '勾选发票 No-a' })
+    const second = list.getByRole('checkbox', { name: '勾选发票 No-b' })
+    expect(all.checked).toBe(true)
+    await fireEvent.click(all)
+    expect(all.checked).toBe(false)
+    await fireEvent.click(first)
+    expect(all.checked).toBe(false)
+    await fireEvent.click(second)
+    expect(all.checked).toBe(true)
+    expect(screen.getByTestId('invoice-print-skipped').textContent).toContain('No-excel：Excel 导入的发票没有原件，不能打印')
+    await fireEvent.click(screen.getByRole('button', { name: '打印选中' }))
+    expect(view.emitted().print?.[0]?.[0]).toMatchObject({ ids: ['a', 'b'], totalAmount: 226 })
+  })
+
+  it('只有不可打印票时，全选框未选中且不可操作', () => {
+    render(InvoicePrintLayout, { props: { invoices: [invoice('excel', { source: 'excel', filePath: '' })], printConfirmation: null, fullPage: true, selectedId: 'excel' } })
+    const all = screen.getByRole<HTMLInputElement>('checkbox', { name: '全选发票' })
+    expect(all.checked).toBe(false)
+    expect(all.disabled).toBe(true)
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: '打印选中' }).disabled).toBe(true)
   })
 })

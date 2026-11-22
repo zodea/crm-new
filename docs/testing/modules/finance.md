@@ -10,7 +10,7 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
-| [tests/finance/payment-contract.test.ts](../../../tests/finance/payment-contract.test.ts) | 单元／服务／状态 | 付款合同领域、身份与版本 |
+| [tests/finance/payment-contract.test.ts](../../../tests/finance/payment-contract.test.ts) | 单元／服务／状态 | 付款合同领域、身份与版本；历史核验输入和只读证明的严格解码、真实零与未知、原件身份及客户端资格伪造拒绝 |
 | [tests/production/finance-application-actions.test.ts](../../../tests/production/finance-application-actions.test.ts) | 隔离 SQLite／服务 | 付款申请新增、编辑、重复删除和原回执 |
 | [tests/production/finance-contract-upgrade.test.ts](../../../tests/production/finance-contract-upgrade.test.ts) | 隔离 SQLite／升级 | 旧合同身份未知、历史冻结与升级回滚 |
 | [tests/production/finance-invoice-adoption.test.ts](../../../tests/production/finance-invoice-adoption.test.ts) | 隔离 SQLite／真实来源 | 发票采用版本冻结与合同变更后的历史 |
@@ -32,7 +32,6 @@
 | [tests/finance/party-references.test.ts](../../../tests/finance/party-references.test.ts) | 单元／服务／状态 | v56 工人／分供方稳定引用迁移、真实磁盘冷重跑、原文原件和审计保全 |
 | [tests/finance/payment-approval-source.test.ts](../../../tests/finance/payment-approval-source.test.ts) | 单元／服务／状态 | 付款源单迁移批复来源 |
 | [tests/finance/payment-approval.test.ts](../../../tests/finance/payment-approval.test.ts) | 单元／服务／状态 | 付款批复输入意图 |
-| [tests/finance/payment-verification.test.ts](../../../tests/finance/payment-verification.test.ts) | 单元／服务／状态 | 历史核验输入和只读证明的严格解码、真实零与未知、原件身份及客户端资格伪造拒绝 |
 | [tests/finance/payment-boundary.test.ts](../../../tests/finance/payment-boundary.test.ts) | 单元／服务／状态 | 付款申请付款对象边界 |
 | [tests/finance/payment-detail.test.ts](../../../tests/finance/payment-detail.test.ts) | 单元／服务／状态 | 付款申请真实关联与洞察；三类回票义务、损坏原类型及真实零保留差额与已确认现金 |
 | [tests/finance/status.test.ts](../../../tests/finance/status.test.ts) | 单元／服务／状态 | 财务状态展示 |
@@ -59,7 +58,7 @@
 | [tests/components/FinanceMigrationDeclarations.test.ts](../../../tests/components/FinanceMigrationDeclarations.test.ts) | 组件（jsdom；隔离 inspector／HTTP） | 精确旧清偿声明控件、原大小未知、理由必填、最小原键及已知回执后读失败只 GET；不证明真实 Native 图或正式迁入持久化 |
 | [tests/components/FinanceIncomingFormFields.test.ts](../../../tests/components/FinanceIncomingFormFields.test.ts) | 组件（jsdom） | financeIncomingFormFields 收款登记 |
 | [tests/components/FinanceListScreen.test.ts](../../../tests/components/FinanceListScreen.test.ts) | 组件（jsdom） | 原收款来源、工具栏及分页筛选，未知合计与只读重读 |
-| [tests/components/PaymentApplicationInsightPanel.test.ts](../../../tests/components/PaymentApplicationInsightPanel.test.ts) | 组件（jsdom） | 付款申请洞察说明 |
+| [tests/components/PaymentApplicationInsightPanel.test.ts](../../../tests/components/PaymentApplicationInsightPanel.test.ts) | 组件（jsdom） | 付款申请洞察说明；关联工资：付款页中的工资区块 |
 | [tests/components/PaymentApprovalReturn.test.ts](../../../tests/components/PaymentApprovalReturn.test.ts) | 组件（jsdom） | 编辑保存后返回同 ID 缓存详情，批复和余额读取最新值；对应回票指标、真实零及未知显示 |
 | [tests/components/PaymentManagementToolbar.test.ts](../../../tests/components/PaymentManagementToolbar.test.ts) | 组件（jsdom） | payment management toolbar |
 | [tests/components/ReceiptDetailScreen.test.ts](../../../tests/components/ReceiptDetailScreen.test.ts) | 组件（jsdom） | 收款只读详情的当前来源 |
@@ -84,7 +83,7 @@
 | [e2e/finance-forms.spec.ts](../../../e2e/finance-forms.spec.ts) | Playwright E2E | 中央收款、中央未配置及演示来源的 F3 输入保留／禁写／零写请求与五档布局；显式合成 Native 旧库的完整字节、12 表、原件和审计对账。Native 保存、真实分摊与人工确认由 FinanceNativeFlows 独立验证 |
 | [e2e/production-company-payment-contract.spec.ts](../../../e2e/production-company-payment-contract.spec.ts) | 实际正式构建与隔离 SQLite | 公司合同手选分供方，项目和公司付款选择合同领域、ID 与版本；版本变化后刷新、原编号恢复、五视口及重启冷读。页面验证真实会话注销，付款采用发票时单项读取权限撤销由 [finance-storage.test.ts](../../../tests/production/finance-storage.test.ts) 的服务级合成旅程验证。运行时显式设置 `CRM_COMPANY_PAYMENT_ACCEPTANCE=1` 与 `CRM_COMPANY_PAYMENT_E2E_ENTRY` 为项目内全新隔离构建的 `server/index.mjs`，并通过 `--output` 指定新的项目临时目录 |
 | [e2e/production-finance-storage.spec.ts](../../../e2e/production-finance-storage.spec.ts) | 实际正式构建与隔离 SQLite | F3 整页未知提交冷重启后原键恢复，已保存后读失败只重读；实际工作台、列表失败重读、付款申请 context/list/form/detail JSON 与同域范围、详情编辑及正式登记预填、三类回票义务与真实零、五档交互、原件、后来输入与真实零/未填写批复 |
-| [e2e/production-payment-approval.spec.ts](../../../e2e/production-payment-approval.spec.ts) | 生产 Playwright E2E | Issue #439 批复空值、明确零和历史核验；使用隔离合成正式来源 |
+| [e2e/production-payment-approval.spec.ts](../../../e2e/production-payment-approval.spec.ts) | 生产 Playwright E2E | 隔离合成正式来源验证 #439 批复空值、明确零和历史核验，以及提交申请、部分支付确认与撤回、进程重启回读余额、附件上限 |
 | [e2e/payment-management.spec.ts](../../../e2e/payment-management.spec.ts) | Playwright E2E · 测试数据只读 | 付款管理四档布局、筛选/键盘、表格局部横滚，以及测试来源禁止正式详情/编辑/登记；原正式导航与金额预填保护由上方真实生产链承接 |
 | [e2e/receipt-migration.spec.ts](../../../e2e/receipt-migration.spec.ts) | Playwright E2E | Issue #436 真实 SQLite 迁移、更正后拒绝危险回滚并保全原件 |
 | [e2e/receipt-registration.spec.ts](../../../e2e/receipt-registration.spec.ts) | Playwright E2E | Issue #436 普通收款中央全链 |

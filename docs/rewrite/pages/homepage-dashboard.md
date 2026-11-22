@@ -58,6 +58,7 @@
 - 只有目标项目读取成功后才确认选择并同步 `?project=&origin=`；没有来源的历史项目链接只有在目录内身份唯一时才可归一化，找不到或来源不匹配时显示问题，不回落首个项目。
 - 切换失败时恢复上一个已确认项目、上一个可用快照和 URL；页面内显示可重试错误，系统泳道同时提示结果。
 - 并发切换只接受最后一次请求结果，较早响应不得覆盖当前选择。
+- 用户正在离开首页时，迟到的项目读取不能以地址同步取消这次导航；离开被拒绝时再同步仍有效的项目选择。
 - 路由查询变化和页签重新激活都重新核对项目事实，不能只依赖首次挂载。
 
 ### 甘特
@@ -80,8 +81,7 @@
 - 纯规则：`tests/home/dashboard.test.ts`
 - 状态面：`tests/components/HomeDashboardSurface.test.ts`
 - 中央项目来源与跨页回读：`tests/home/project-source.test.ts`、`tests/components/HomeProjectSourceNavigation.test.ts`
-- 中央新建到首页与来源返回：`e2e/issue-434-home-project-source.spec.ts`
-- 首页流程：`e2e/issue-189-home-dashboard.spec.ts`
+- 首页流程、中央新建到首页与来源返回见 [`e2e/home.spec.ts`](../../../e2e/home.spec.ts)。
 - 原施工进度闭环：`e2e/home-schedule.spec.ts`
 - 五种状态四档视觉：`e2e/runtime-visual-matrix.spec.ts`
 - 稳定状态预览（仅开发验证，不计生产路由）：`/dev/home-dashboard?state=loading|schedule-empty|partial|error`

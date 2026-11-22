@@ -378,7 +378,7 @@ test('真实原费用→结算→申请→实付，整页原键恢复、版本�
 
 test('真实Native历史未知申请经原费用及原件核验，原键冷恢复后新增实付并保全原批复与旧现金', async ({ page }, info) => {
   test.setTimeout(180000)
-  const f = await createCrewWorkerProductionFixture(page, info)
+  const f = await createCrewWorkerProductionFixture(page, info, { serverEntry: process.env.CRM_E2E_SERVER_ENTRY })
   const errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
   try {
@@ -546,7 +546,7 @@ test('真实Native历史未知申请经原费用及原件核验，原键冷恢�
 
 test('Native原纸缺失E100/C30经整页替代核定，合并新70及旧30义务后确认唯一现金100并冷恢复五档', async ({ page }, info) => {
   test.setTimeout(180000)
-  const f = await createCrewWorkerProductionFixture(page, info)
+  const f = await createCrewWorkerProductionFixture(page, info, { serverEntry: process.env.CRM_E2E_SERVER_ENTRY })
   const errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
   const bankEvidence = Buffer.from('合成银行对账说明：核对完整旧费用付款范围，纸单处理份额30尚无银行实付；原账及签收明确对应历史运输原费用100。此文件证明交叉核对，不是金额30的已付款回单。', 'utf8')

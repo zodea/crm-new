@@ -2,7 +2,7 @@ import type { OtherSettlementDetail } from '~/lib/other-settlement/contract'
 import { mount } from '@vue/test-utils'
 import { afterEach, expect, it, vi } from 'vitest'
 import { computed, defineComponent, ref, useTemplateRef, watch } from 'vue'
-import OtherSettlementInfo from '~/components/other-settlement/OtherSettlementInfo.vue'
+import OtherSettlementInfo from '~/pages/contract/other-settlement/_components/OtherSettlementInfo.vue'
 
 const audit = (name: string) => ({ createdBy: `创建-${name}`, updatedBy: `修改-${name}`, createdAt: `创建时间-${name}`, updatedAt: `修改时间-${name}`, responsible: `负责-${name}`, department: `部门-${name}` })
 const attachment = (id: string) => ({ id, fileName: `${id}.pdf`, ownerType: 'expenditure_settlement', ownerId: 'synthetic', filePath: '', fileSize: 1, mimeType: 'application/pdf', category: '', uploader: '', uploadedAt: null, deletedAt: null })
@@ -25,7 +25,7 @@ function mountHistory(detail: OtherSettlementDetail) {
   const SectionHeader = defineComponent({ props: ['title'], template: '<h2>{{ title }}</h2>' })
   const OtherSettlementOriginalFiles = defineComponent({ props: ['files', 'version', 'canRead'], template: '<div><span>原件版本 {{ version }}</span><span v-for="file in files" :key="file.id">{{ file.fileName }}</span></div>' })
   const NuxtLink = defineComponent({ props: ['to'], template: '<a :href="to"><slot /></a>' })
-  return mount(OtherSettlementInfo, { props: { detail }, global: { components: { SectionHeader, OtherSettlementOriginalFiles, NuxtLink } } })
+  return mount(OtherSettlementInfo, { props: { detail }, global: { components: { SectionHeader, NuxtLink }, stubs: { OtherSettlementOriginalFiles } } })
 }
 
 afterEach(() => vi.unstubAllGlobals())

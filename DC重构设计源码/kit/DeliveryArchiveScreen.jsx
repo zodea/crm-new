@@ -1,4 +1,4 @@
-// DeliveryArchiveScreen — 送货单归档库（按实现端 app/components/delivery/DeliveryArchiveScreen.vue 校准）
+// DeliveryArchiveScreen — 送货单归档库（按实现端 app/pages/material/delivery/archive/_components/DeliveryArchiveScreen.vue 校准）
 // 左树两级 项目 → 分供方（分供方按材采合同签订日期升序）+ 每项目 ⚠「未区分分供方」兜底节点 + 节点份数角标。
 // 右表标准列表：搜索 / 分页 / 行内 详情·改归属·编辑·删除；底部只报当前筛选份数与金额合计。
 // 归档不是终态：行可拖到左树节点改归属（弹二次确认），行内「改归属」按钮是它的键盘可达等价入口；

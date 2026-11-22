@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import type { DataOriginDTO } from '~/types/read-model'
 import { computed, nextTick, onActivated, shallowRef, watch } from 'vue'
+import CrewMemberSection from '~/components/crew-worker/CrewMemberSection.vue'
+import PayrollHostSection from '~/components/crew-worker/PayrollHostSection.vue'
+import PayrollASourceReturn from '~/components/payroll/PayrollASourceReturn.vue'
+import PayrollC1SourceReturn from '~/components/payroll/PayrollC1SourceReturn.vue'
+import PayrollC2SourceReturn from '~/components/payroll/PayrollC2SourceReturn.vue'
 import { validateCrewWorkerReturnTo } from '~/lib/crew-worker/return-context'
 import { validateOwnerDocumentDetailReturnTo } from '~/lib/owner-document/return-context'
 import { readProblemTitle } from '~/lib/read-model/state'

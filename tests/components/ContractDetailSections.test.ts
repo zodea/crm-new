@@ -2,10 +2,10 @@ import { fireEvent, within } from '@testing-library/vue'
 import { mount } from '@vue/test-utils'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h } from 'vue'
-import ContractDetailDocuments from '~/components/contract/ContractDetailDocuments.vue'
-import ContractDetailFiles from '~/components/contract/ContractDetailFiles.vue'
-import ContractLifecycle from '~/components/contract/ContractLifecycle.vue'
 import { contractStages } from '~/lib/contract/detail'
+import ContractDetailDocuments from '~/pages/contract/_components/ContractDetailDocuments.vue'
+import ContractDetailFiles from '~/pages/contract/_components/ContractDetailFiles.vue'
+import ContractLifecycle from '~/pages/contract/_components/ContractLifecycle.vue'
 
 const preview = vi.fn()
 const download = vi.fn()

@@ -104,30 +104,30 @@ for (const input of CUSTOMER_INPUTS) {
       await expect(link).toBeFocused()
     })
 
-    test('真实 Excel 导入主次客户，同名不同 ID 不误接，五档视口检查局部横滚、键盘与浮层', async ({ page }) => {
-      const a = await save(page, 'customers', { name: named('同名合成客户424'), contact: '主客户联系人' }, 'a')
-      const b = await save(page, 'customers', { name: named('同名合成客户424'), contact: '次客户联系人' }, 'b')
-      const c = await save(page, 'customers', { name: named('同名合成客户424'), contact: '未关联联系人' }, 'c')
-      const book = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([
-        ['项目名称', '客户', '次客户', '项目经理', '业务流程阶段'],
-        [named('Excel关联项目424'), a.id, b.id, named('合成经理424'), '施工中'],
-      ]), '关联项目')
-      await page.goto('/project')
-      await page.getByRole('button', { name: '导入项目', exact: true }).click()
-      await page.getByLabel('选择导入文件').setInputFiles({ name: '关联项目424.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: Buffer.from(XLSX.write(book, { type: 'array', bookType: 'xlsx' })) })
-      await page.getByRole('button', { name: '使用此工作表' }).click()
-      await page.getByRole('button', { name: '下一步', exact: true }).click()
-      await expect(page.getByRole('region', { name: '客户身份与阶段核对表' })).toContainText(b.id)
-      await page.getByRole('button', { name: '开始导入', exact: true }).click()
-      await expect(page).toHaveURL(/\/project$/)
-      const primary = await readCustomer(page, a.id)
-      expect(primary.summary.projectCount).toBe(1)
-      expect(primary.projects[0].relationRole).toBe('主客户')
-      const secondary = await readCustomer(page, b.id)
-      expect(secondary.projects[0]).toMatchObject({ relationRole: '次客户', project: { id: primary.projects[0].project.id } })
-      expect((await readCustomer(page, c.id)).projects).toEqual([])
-      for (const width of [390, 768, 1024, 1280, 1440]) {
+    for (const width of [390, 768, 1024, 1280, 1440]) {
+      test(`真实 Excel 导入主次客户，同名不同 ID 不误接，检查局部横滚、键盘与浮层 @ ${width}px`, async ({ page }) => {
+        const a = await save(page, 'customers', { name: named('同名合成客户424'), contact: '主客户联系人' }, 'a')
+        const b = await save(page, 'customers', { name: named('同名合成客户424'), contact: '次客户联系人' }, 'b')
+        const c = await save(page, 'customers', { name: named('同名合成客户424'), contact: '未关联联系人' }, 'c')
+        const book = XLSX.utils.book_new()
+        XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([
+          ['项目名称', '客户', '次客户', '项目经理', '业务流程阶段'],
+          [named('Excel关联项目424'), a.id, b.id, named('合成经理424'), '施工中'],
+        ]), '关联项目')
+        await page.goto('/project')
+        await page.getByRole('button', { name: '导入项目', exact: true }).click()
+        await page.getByLabel('选择导入文件').setInputFiles({ name: '关联项目424.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: Buffer.from(XLSX.write(book, { type: 'array', bookType: 'xlsx' })) })
+        await page.getByRole('button', { name: '使用此工作表' }).click()
+        await page.getByRole('button', { name: '下一步', exact: true }).click()
+        await expect(page.getByRole('region', { name: '客户身份与阶段核对表' })).toContainText(b.id)
+        await page.getByRole('button', { name: '开始导入', exact: true }).click()
+        await expect(page).toHaveURL(/\/project$/)
+        const primary = await readCustomer(page, a.id)
+        expect(primary.summary.projectCount).toBe(1)
+        expect(primary.projects[0].relationRole).toBe('主客户')
+        const secondary = await readCustomer(page, b.id)
+        expect(secondary.projects[0]).toMatchObject({ relationRole: '次客户', project: { id: primary.projects[0].project.id } })
+        expect((await readCustomer(page, c.id)).projects).toEqual([])
         await page.setViewportSize({ width, height: width === 390 ? 844 : 1024 })
         await page.goto(`/base/customer/${b.id}?origin=real`)
         const link = page.getByRole('link', { name: named('Excel关联项目424'), exact: true })
@@ -170,8 +170,8 @@ for (const input of CUSTOMER_INPUTS) {
         await expectNoPageOverflow(page, `来源确认浮层 @ ${width}`)
         await page.keyboard.press('Escape')
         await expect(dialog).toHaveCount(0)
-      }
-    })
+      })
+    }
 
     test('项目更换客户、客户改名后重新打开和刷新均回读最新稳定关系', async ({ page }) => {
       const a = await save(page, 'customers', { name: named('旧合成客户424'), contact: input.contact }, 'a')

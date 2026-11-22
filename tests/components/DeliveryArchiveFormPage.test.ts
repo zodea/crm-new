@@ -1,12 +1,10 @@
-import type { Component } from 'vue'
 import { fireEvent, render, screen } from '@testing-library/vue'
 import { flushPromises } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, defineComponent, h, KeepAlive, nextTick, reactive, ref, shallowRef, watch } from 'vue'
-import DeliveryArchiveFormPage from '~/components/delivery/DeliveryArchiveFormPage.vue'
-import DeliveryConflictReview from '~/components/delivery/DeliveryConflictReview.vue'
 import KitButton from '~/components/ui/KitButton.vue'
 import { deliveryProblem } from '~/lib/delivery-record/contract'
+import DeliveryArchiveFormPage from '~/pages/material/delivery/archive/form/_components/DeliveryArchiveFormPage.vue'
 
 vi.mock('vue-router', () => ({
   onBeforeRouteLeave: vi.fn(),
@@ -96,21 +94,24 @@ const EmptyStub = defineComponent({
   setup: () => () => h('div'),
 })
 
-const globalComponents: Record<string, Component> = {
-  KitButton,
-  DeliveryConflictReview,
-  KitTable: defineComponent({ props: ['data'], setup: props => () => h('div', JSON.stringify(props.data)) }),
-  DeliveryArchiveLineGrid: DeliveryArchiveLineGridStub,
-  DeliveryRecordSourcePanel: EmptyStub,
-  FormFooter: FormFooterStub,
-  LookupSelect: LookupSelectStub,
-  NuxtLink: EmptyStub,
-  SectionHeader: EmptyStub,
+const global = {
+  components: {
+    KitButton,
+    KitTable: defineComponent({ props: ['data'], setup: props => () => h('div', JSON.stringify(props.data)) }),
+    FormFooter: FormFooterStub,
+    LookupSelect: LookupSelectStub,
+    NuxtLink: EmptyStub,
+    SectionHeader: EmptyStub,
+  },
+  stubs: {
+    DeliveryArchiveLineGrid: DeliveryArchiveLineGridStub,
+    DeliveryRecordSourcePanel: EmptyStub,
+  },
 }
 
 async function prepareDraft(options: { orderNo: string, pendingPrice: boolean }) {
   render(DeliveryArchiveFormPage, {
-    global: { components: globalComponents },
+    global,
   })
   await flushPromises()
   await fireEvent.click(screen.getByRole('button', { name: '选择项目' }))
@@ -228,7 +229,7 @@ describe('送货单手工归档确认门禁', () => {
       finish = resolve
     }))
     const shown = ref(true)
-    render(defineComponent({ setup: () => () => h(KeepAlive, null, { default: () => shown.value ? h(DeliveryArchiveFormPage) : h('div', '其他页面') }) }), { global: { components: globalComponents } })
+    render(defineComponent({ setup: () => () => h(KeepAlive, null, { default: () => shown.value ? h(DeliveryArchiveFormPage) : h('div', '其他页面') }) }), { global })
     expect(screen.getByText('正在载入送货单…')).toBeTruthy()
     shown.value = false
     await nextTick()
@@ -257,7 +258,7 @@ describe('送货单手工归档确认门禁', () => {
   })
 
   it('新归档不默认日期，中央选择器不读取同名本地身份', async () => {
-    render(DeliveryArchiveFormPage, { global: { components: globalComponents } })
+    render(DeliveryArchiveFormPage, { global })
     await flushPromises()
     expect((screen.getByLabelText(/送货日期/) as HTMLInputElement).value).toBe('')
     expect(load).toHaveBeenCalledOnce()
@@ -276,7 +277,7 @@ describe('送货单手工归档确认门禁', () => {
   })
 
   it('未选择分供方时不提交，即使材料与日期均完整', async () => {
-    render(DeliveryArchiveFormPage, { global: { components: globalComponents } })
+    render(DeliveryArchiveFormPage, { global })
     await flushPromises()
     await fireEvent.click(screen.getByRole('button', { name: '选择项目' }))
     await fireEvent.update(screen.getByLabelText(/送货日期/), '2026-09-11')
@@ -301,7 +302,7 @@ describe('送货单手工归档确认门禁', () => {
       lines: [{ id: 'stable-line', materialName: '砂', spec: '', unit: '吨', qty: 1, unitPrice: 10, amount: 10, amountSource: 'manual', note: '' }],
     }
     byId.mockReturnValue(current)
-    render(DeliveryArchiveFormPage, { global: { components: globalComponents } })
+    render(DeliveryArchiveFormPage, { global })
     await flushPromises()
     await fireEvent.click(screen.getByRole('button', { name: '保存送货单' }))
     expect(update).not.toHaveBeenCalled()
@@ -321,7 +322,7 @@ describe('送货单手工归档确认门禁', () => {
 
   it('上下文读取失败时不开放新建保存，也不回落本地选择器', async () => {
     load.mockRejectedValue(new Error('没有送货读取权限'))
-    render(DeliveryArchiveFormPage, { global: { components: globalComponents } })
+    render(DeliveryArchiveFormPage, { global })
     await flushPromises()
     expect(screen.getByRole('alert').textContent).toContain('没有送货读取权限')
     expect(screen.queryByRole('button', { name: '保存送货单' })).toBeNull()
@@ -333,7 +334,7 @@ describe('送货单手工归档确认门禁', () => {
     byId.mockImplementation(() => current)
     update.mockRejectedValue(deliveryProblem('conflict', '记录已更新，请重新核对'))
     confirm.mockResolvedValue(true)
-    render(DeliveryArchiveFormPage, { global: { components: globalComponents } })
+    render(DeliveryArchiveFormPage, { global })
     await flushPromises()
     await fireEvent.update(screen.getByLabelText(/修订原因/), '保留人工修正')
     await fireEvent.update(screen.getByLabelText(/送货日期/), '2026-09-11')
@@ -373,7 +374,7 @@ describe('送货单手工归档确认门禁', () => {
     update.mockRejectedValue(deliveryProblem('conflict', '记录已更新，请重新核对'))
     confirm.mockResolvedValue(true)
     const shown = ref(true)
-    render(defineComponent({ setup: () => () => h(KeepAlive, null, { default: () => shown.value ? h(DeliveryArchiveFormPage) : h('div', '其他页面') }) }), { global: { components: globalComponents } })
+    render(defineComponent({ setup: () => () => h(KeepAlive, null, { default: () => shown.value ? h(DeliveryArchiveFormPage) : h('div', '其他页面') }) }), { global })
     await flushPromises()
     await fireEvent.update(screen.getByLabelText(/修订原因/), '保留人工修正')
     await fireEvent.update(screen.getByLabelText(/送货日期/), '2026-09-11')
@@ -412,7 +413,7 @@ describe('送货单手工归档确认门禁', () => {
     byId.mockImplementation(() => current)
     update.mockRejectedValue(deliveryProblem('conflict', '记录已更新，请重新核对'))
     confirm.mockResolvedValue(true)
-    render(DeliveryArchiveFormPage, { global: { components: globalComponents } })
+    render(DeliveryArchiveFormPage, { global })
     await flushPromises()
     await fireEvent.update(screen.getByLabelText(/修订原因/), '保留人工修正')
     await fireEvent.update(screen.getByLabelText(/送货日期/), '2026-09-11')
@@ -440,7 +441,7 @@ describe('送货单手工归档确认门禁', () => {
     update.mockRejectedValue(new Error('临时保存失败'))
     confirm.mockResolvedValue(true)
     const shown = ref(true)
-    render(defineComponent({ setup: () => () => h(KeepAlive, null, { default: () => shown.value ? h(DeliveryArchiveFormPage) : h('div', '其他页面') }) }), { global: { components: globalComponents } })
+    render(defineComponent({ setup: () => () => h(KeepAlive, null, { default: () => shown.value ? h(DeliveryArchiveFormPage) : h('div', '其他页面') }) }), { global })
     await flushPromises()
     await fireEvent.update(screen.getByLabelText(/修订原因/), '待提交的人工原因')
     await fireEvent.update(screen.getByLabelText(/送货日期/), '2026-09-11')

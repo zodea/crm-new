@@ -1,6 +1,6 @@
 import { fireEvent, render } from '@testing-library/vue'
 import { describe, expect, it, vi } from 'vitest'
-import FactorTaxCalculator from '~/components/finance/invoice/factor/FactorTaxCalculator.vue'
+import FactorTaxCalculator from '~/pages/finance/invoice/_components/FactorTaxCalculator.vue'
 
 describe('共用金额税额栏', () => {
   it.each([

@@ -85,10 +85,9 @@ test.describe('Issue #197：甲方、分包单据与项目罚扣', () => {
     await page.context().setExtraHTTPHeaders({ 'x-ruihang-test-session': `owner-form-${randomUUID()}` })
     await page.clock.install({ time: new Date('2026-09-12T04:00:00.000Z') })
   })
-  test('八类列表和表单使用真实标题，各宽度无页面级横向溢出', async ({ page }) => {
-    test.setTimeout(300_000)
-
-    for (const document of DOCUMENTS) {
+  for (const document of DOCUMENTS) {
+    test(`${document.title}列表和表单使用真实标题，各宽度无页面级横向溢出`, async ({ page }) => {
+      test.setTimeout(300_000)
       await page.goto(document.listPath)
       const toolbar = page.locator('[data-ui="owner-document-list-toolbar"]')
       await expect(toolbar.getByRole('heading', { name: document.title, exact: true }))
@@ -114,8 +113,8 @@ test.describe('Issue #197：甲方、分包单据与项目罚扣', () => {
         await page.setViewportSize({ width, height: VIEWPORT_HEIGHTS[width] })
         await expectNoPageOverflow(page, `${document.newPath} @ ${width}px`)
       }
-    }
-  })
+    })
+  }
 
   test('来源 query 可见且可单独清除，状态筛选和无结果空态可恢复', async ({ page }) => {
     const fixture = await installOwnerBoqFixture(page)

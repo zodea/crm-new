@@ -1,10 +1,10 @@
 import { mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import AttendanceScreen from '~/components/payroll/AttendanceScreen.vue'
-import PayrollDraftFormPage from '~/components/payroll/PayrollDraftFormPage.vue'
-import PayrollScreen from '~/components/payroll/PayrollScreen.vue'
-import PayrollStatementDetailScreen from '~/components/payroll/PayrollStatementDetailScreen.vue'
-import SignedDayworkScreen from '~/components/payroll/SignedDayworkScreen.vue'
+import AttendanceScreen from '~/pages/subcontract/_components/AttendanceScreen.vue'
+import SignedDayworkScreen from '~/pages/subcontract/daywork/_components/SignedDayworkScreen.vue'
+import PayrollDraftFormPage from '~/pages/subcontract/payroll/_components/PayrollDraftFormPage.vue'
+import PayrollScreen from '~/pages/subcontract/payroll/_components/PayrollScreen.vue'
+import PayrollStatementDetailScreen from '~/pages/subcontract/payroll/_components/PayrollStatementDetailScreen.vue'
 
 const runtime = vi.hoisted(() => ({ native: false }))
 const legacy = vi.fn(() => {

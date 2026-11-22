@@ -6,6 +6,7 @@ async function openImportDemo(page: Page) {
   await page.goto('/dev/kit-ui')
   await page.waitForLoadState('networkidle')
   const tabs = page.getByRole('navigation', { name: '已打开页面' })
+  await expect(tabs.locator('[data-tab-key="/dev/kit-ui"] [data-tab-trigger]')).toHaveAttribute('aria-current', 'page')
   const initialTabs = await tabs.getByRole('button', { name: /^关闭 / }).count()
   await page.getByRole('button', { name: '打开导入映射演示' }).click()
   await expect(page).toHaveURL(/\/import\/mapping\/demo-supplier$/)

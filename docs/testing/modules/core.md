@@ -8,6 +8,7 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
+| [tests/tooling/lazy-repositories.test.ts](../../../tests/tooling/lazy-repositories.test.ts) | 单元／服务／状态 | 仓储方法可同步解构和展开，按域首次加载、并发共用、失败重试与 HTTP 工厂方法对照 |
 | [tests/stores/public-read-state.test.ts](../../../tests/stores/public-read-state.test.ts) | 单元／服务／状态 | 权限、来源与会话切换撤下旧私有事实 |
 | [tests/server/related-read-meta.test.ts](../../../tests/server/related-read-meta.test.ts) | 单元／服务／状态 | 相关来源的真实读取证据 |
 | [tests/server/public-read-problems.test.ts](../../../tests/server/public-read-problems.test.ts) | 单元／服务／状态 | 公共HTTP错误与原命令封存证明 |
@@ -29,22 +30,22 @@
 | [tests/db/soft-delete.test.ts](../../../tests/db/soft-delete.test.ts) | 单元／服务／状态 | v2 迁移:全业务表 deleted_at + operation_logs |
 | [tests/kit/money.test.ts](../../../tests/kit/money.test.ts) | 单元／服务／状态 | 金额格式化：formatMoney |
 | [tests/server/business-session.test.ts](../../../tests/server/business-session.test.ts) | 单元／服务／状态 | default business session boundary |
-| [tests/server/demo-workspace-test-instance.test.ts](../../../tests/server/demo-workspace-test-instance.test.ts) | 单元／服务／状态 | global demo workspace capability boundary |
 | [tests/stores/data-visibility.test.ts](../../../tests/stores/data-visibility.test.ts) | 单元／服务／状态 | global data visibility preference |
 | [tests/util/chinese-amount.test.ts](../../../tests/util/chinese-amount.test.ts) | 单元／服务／状态 | moneyToChinese |
-| [tests/util/datetime.test.ts](../../../tests/util/datetime.test.ts) | 单元／服务／状态 | datetime formatting |
+| [tests/util/datetime.test.ts](../../../tests/util/datetime.test.ts) | 单元／服务／状态 | datetime formatting；toLocalDateInputValue |
 | [tests/util/external-url.test.ts](../../../tests/util/external-url.test.ts) | 单元／服务／状态 | external URL platform boundary |
 | [tests/util/file-ref-access.test.ts](../../../tests/util/file-ref-access.test.ts) | 单元／服务／状态 | file reference preview safety |
 | [tests/util/file-refs.test.ts](../../../tests/util/file-refs.test.ts) | 单元／服务／状态 | file reference content access |
 | [tests/util/json.test.ts](../../../tests/util/json.test.ts) | 单元／服务／状态 | parseJsonColumn:JSON 列安全解析(类型守卫) |
-| [tests/util/local-date.test.ts](../../../tests/util/local-date.test.ts) | 单元／服务／状态 | toLocalDateInputValue |
 | [tests/util/privacy.test.ts](../../../tests/util/privacy.test.ts) | 单元／服务／状态 | 敏感信息展示脱敏 |
 
 ## 组件（jsdom）
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
-| [tests/components/FileRefAttachmentSection.test.ts](../../../tests/components/FileRefAttachmentSection.test.ts) | 组件（jsdom） | fileRefAttachmentSection restore flow |
+| [tests/components/FileRefAttachmentSection.test.ts](../../../tests/components/FileRefAttachmentSection.test.ts) | 组件（jsdom） | 浏览器附件选择、只读附件及恢复操作 |
+| [tests/components/AttachmentRows.test.ts](../../../tests/components/AttachmentRows.test.ts) | 组件（jsdom） | 财务、合同和主档附件行的下载、分类、删除与撤销 |
+| [tests/components/OriginalFilePreviewDialog.test.ts](../../../tests/components/OriginalFilePreviewDialog.test.ts) | 组件（jsdom） | 原件加载、预览、Esc 与焦点恢复 |
 | [tests/components/DomainImportRecovery.test.ts](../../../tests/components/DomainImportRecovery.test.ts) | 组件（jsdom） | 报价与其他结算迁入：原命令已应用后读取失败仅重读；权限切换撤下公开结果并保原键，跨代迟到回执隔离 |
 | [tests/components/DomainFormCanonicalRecovery.test.ts](../../../tests/components/DomainFormCanonicalRecovery.test.ts) | 实际 Vue 表单、路由与页签缓存 | 首次保存及原命令恢复保后来字段和原件；留原实例后继续更新已保存的同一 ID，正常离页确认保持 |
 

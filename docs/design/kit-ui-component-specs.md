@@ -600,7 +600,7 @@ const columns: KitTableColumn[] = [{
 
 - 保留 `tree/views/summary` props、`treeKey/viewKey` 受控模型以及原有分类展开/收起能力；不为没有分类的页面强加左树。
 - `heading` 放标题；`toolbar` 可承载已有领域工具条；`actions` 放搜索与现有操作；`filters` 放需要独立次行的筛选；`table` 承载 `KitTable` 及领域状态落点。
-- `summary` 插槽或非空 `summary` 数据才显示汇总条；不生成无业务来源的合计。分页继续交给受控表格和领域页，汇总口径不因换壳改变。
+- `summary` 插槽或非空 `summary` 数据才显示汇总条；不生成无业务来源的合计。可传 `summaryLabel` 沿用领域汇总的可访问名称，默认「列表汇总」。调用方将金额用 `yuan()` 格式化为带货币符号和两位小数的字符串；数量可传数值。分页继续交给受控表格和领域页，汇总口径不因换壳改变。
 - 连续变体统一外边框和表格衔接，内部 `KitTable` 去掉重复左右/底边、圆角和阴影；表头与数据行密度继续遵守第 12 节。
 - 工具与筛选允许有序换行，主内容保持 `min-width:0`；宽表只在表格自身横滚，不能通过隐藏外溢来裁掉必要内容或主操作。
 
@@ -675,7 +675,7 @@ const columns: KitTableColumn[] = [{
 
 菜单保留全部调用方动作及禁用语义，触发器为紧凑无边框省略号，浮层消费瑞航面板、描边、阴影与小圆角令牌，并以小箭头关联触发器。空动作显示“无可用操作”，不能造出业务动作。DC 的有状态内部组件不允许由业务屏直接执行；函数式工厂只返回 React 元素。Vue 继续 SFC / Composition API 与现有 reka-ui，不直接调用组件 setup。
 
-本轮仅联动指标、行菜单、标题及其必要网格接缝。Vue 已有 SearchInput、SegTab、StatePanel 和浮层底座继续复用；其他 #496 缺陷及全量界面对标不因此视为完成。原语五档运行验收入口为 `tests/browser/SharedMetricAndMenu.test.ts` 与 `e2e/kit-shared-primitives-dc.spec.ts`，覆盖函数式条件调用、原值/点击、局部溢出、禁用项、键盘、焦点与视口；领域页面及生产冷恢复仍按各工作单元另验，不能由原语验收代替。
+本轮仅联动指标、行菜单、标题及其必要网格接缝。Vue 已有 SearchInput、SegTab、StatePanel 和浮层底座继续复用；其他 #496 缺陷及全量界面对标不因此视为完成。原语五档运行验收入口为 `tests/browser/SharedMetricAndMenu.test.ts` 与 `e2e/kit-table-responsive.spec.ts`，覆盖函数式条件调用、原值/点击、局部溢出、禁用项、键盘、焦点与视口；领域页面及生产冷恢复仍按各工作单元另验，不能由原语验收代替。
 
 <a id="issue-496-decisions"></a>
 

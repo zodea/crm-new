@@ -182,7 +182,7 @@ it('项目目录版本变化时不导出旧项目名称', async () => {
   expect(mocks.exportFile).toHaveBeenCalledOnce()
 })
 
-it('仅在用户确认已打印后提交原批次，结果未知时核对原任务', async () => {
+it.each(['scan', 'excel'] as const)('%s 具备原件及相应的核对证据后，确认已打印才提交原批次，结果未知时核对原任务', async (sourceKind) => {
   for (const [name, value] of Object.entries({ computed, shallowRef, useTemplateRef, watch }))
     vi.stubGlobal(name, value)
   vi.stubGlobal('useEventListener', vi.fn())
@@ -192,12 +192,12 @@ it('仅在用户确认已打印后提交原批次，结果未知时核对原任�
   const record: CentralInvoiceRecord = {
     id: 'invoice-one',
     version: '3',
-    sourceKind: 'scan',
+    sourceKind,
     fields: { invoiceNumber: '00123', invoiceDate: '2026-01-01', invoiceType: '', buyer: '', buyerTaxNo: '', seller: '合成销售方', sellerTaxNo: '', amount: null, taxAmount: 0, totalAmount: 100, taxRate: '', remark: '' },
     items: [],
     unrecognizedPageIndexes: [],
-    ocrStatus: 'done',
-    completionMethod: 'ocr',
+    ocrStatus: sourceKind === 'excel' ? 'pending' : 'done',
+    completionMethod: sourceKind === 'excel' ? 'manual' : 'ocr',
     reviewStatus: 'reviewed',
     accountStatus: 'archived',
     duplicateStatus: 'normal',
@@ -222,10 +222,26 @@ it('仅在用户确认已打印后提交原批次，结果未知时核对原任�
     pending = false
     return { outcome: 'applied' as const }
   })
-  const workspace = { records: shallowRef([record]), loading: shallowRef(false), readState: shallowRef('ready'), sourceVersion: shallowRef('read-1'), load: vi.fn(async () => {}), pendingPrint: () => pending, verifiedOriginal: vi.fn(async () => new Blob()), recordPrinted, recoverPrint }
+  const verifiedOriginal = vi.fn(async () => new Blob())
+  const workspace = { records: shallowRef([record]), loading: shallowRef(false), readState: shallowRef('ready'), sourceVersion: shallowRef('read-1'), load: vi.fn(async () => {}), pendingPrint: () => pending, recordPrinted, recoverPrint, verifiedOriginal }
   render(CentralInvoiceLedgerScreen, { props: { workspace: workspace as never, projects: [] } })
   await fireEvent.click(await screen.findByLabelText('选择发票 00123'))
+  if (sourceKind === 'excel') {
+    await fireEvent.click(screen.getByRole('button', { name: '打印所选' }))
+    await screen.findByText(/Excel 发票须先确认原件核验/)
+    expect(screen.getByRole('button', { name: /打印选中/ })).toHaveProperty('disabled', true)
+    await fireEvent.click(screen.getByRole('button', { name: '返回台账' }))
+    workspace.records.value = [{ ...record, originalVerificationId: 'confirmed-verification' }]
+    await screen.findByText('原件已核验')
+  }
   await fireEvent.click(screen.getByRole('button', { name: '打印所选' }))
+  if (sourceKind === 'excel') {
+    verifiedOriginal.mockRejectedValueOnce(new Error('原件摘要已变化'))
+    await fireEvent.click(screen.getByRole('button', { name: /打印选中/ }))
+    await screen.findByText('发票 00123 的原件读取或核验失败，不能打印。')
+    expect(printed).not.toHaveBeenCalled()
+    await fireEvent.click(screen.getByRole('button', { name: '重新核验' }))
+  }
   await fireEvent.click(screen.getByRole('button', { name: /打印选中/ }))
   await waitFor(() => expect(printed).toHaveBeenCalledOnce())
   expect(workspace.verifiedOriginal).toHaveBeenCalledWith(expect.objectContaining({ id: 'invoice-one', version: '3' }), true)

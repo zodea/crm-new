@@ -282,7 +282,7 @@ function fieldClass(field: string) {
         kind="settlement"
         :lines="draft.settlementAllocations ?? []"
         :fetch-options="fetchSettlements"
-        :disabled-reason="showsContract && !draft.contractId ? '请先选择关联合同' : undefined"
+        :disabled-reason="showsContract && !isCompanyPayment && !draft.contractId ? '请先选择关联合同' : undefined"
         :total-label="`已关联 ¥ ${financeDraftMoney(settlementTotal)} · 差额 ¥ ${financeDraftMoney(applyAmount - settlementTotal)}`"
         empty="选择已确认的原费用或合同结算；保留真实项目或公司归属"
         @update="updateGrid('settlementAllocations', $event)"

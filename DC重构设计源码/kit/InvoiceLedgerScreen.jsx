@@ -1,4 +1,4 @@
-// InvoiceLedgerScreen — 发票台账页（版式与列按实现端 app/components/invoice/InvoiceLedgerScreen.vue 校准）
+// InvoiceLedgerScreen — 发票台账页（版式与列按实现端 app/pages/finance/_components/InvoiceLedgerScreen.vue 校准）
 // 左树（按归属，只带张数角标）+ 右表 表格/卡片/打印三呈现 + 勾选浮出合计（平时无常驻金额汇总）+ 行软删撤回。
 // 口径：台账 = 已归档；「待归档」= 已校对未归档的过渡态（两态模型下归档必有归属，不存在「已归档但未归项目」）。
 // 打印 / 导出 / 导入是 #70 的待实现能力，实现端尚未落地——设计稿按目标态保留，不跟着实现端删。

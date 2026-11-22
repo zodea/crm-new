@@ -158,24 +158,20 @@ test('Issue #111：通知中心入口保持可用', async ({ page }) => {
   await expect(drawer).toBeHidden()
 })
 
-test('Issue #111：三个业务屏不产生整页横向穿透', async ({ page }) => {
-  const pageErrors: string[] = []
-  page.on('pageerror', error => pageErrors.push(error.message))
-
-  const samples = [
-    { path: '/project', title: '项目列表', screenshot: 'project-list.png' },
-    { path: '/finance/ledger', title: '发票台账', screenshot: 'invoice-ledger.png' },
-    { path: '/material/delivery', title: '送货单识别', screenshot: 'delivery-recognition.png' },
-  ] as const
-
-  for (const sample of samples) {
+for (const sample of [
+  { path: '/project', title: '项目列表' },
+  { path: '/finance/ledger', title: '发票台账' },
+  { path: '/material/delivery', title: '送货单识别' },
+] as const) {
+  test(`Issue #111：${sample.title}不产生整页横向穿透`, async ({ page }) => {
+    const pageErrors: string[] = []
+    page.on('pageerror', error => pageErrors.push(error.message))
     await page.goto(sample.path)
     await page.waitForLoadState('networkidle')
     await expect(page.locator('[data-shell-topbar]').getByRole('heading', { name: sample.title })).toBeVisible()
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
       await page.evaluate(() => window.innerWidth),
     )
-  }
-
-  expect(pageErrors).toEqual([])
-})
+    expect(pageErrors).toEqual([])
+  })
+}

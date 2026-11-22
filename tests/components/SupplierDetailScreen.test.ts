@@ -1,8 +1,8 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, reactive } from 'vue'
-import SupplierDetailScreen from '~/components/supplier/SupplierDetailScreen.vue'
 import ReadOnlySection from '~/components/ui/ReadOnlySection.vue'
+import SupplierDetailScreen from '~/pages/base/supplier/_components/SupplierDetailScreen.vue'
 
 const supplierStoreMock = vi.hoisted(() => ({
   detailState: { kind: 'idle' } as any,
@@ -65,13 +65,14 @@ const metricStub = defineComponent({ props: ['label', 'value'], template: '<span
 function renderContractSourceScope() {
   return render(SupplierDetailScreen, {
     props: { supplierId: 'supplier-1', origin: 'real', includeDemo: false },
-    global: { components: {
-      EntityDetailShell: shell,
-      SegTab: tabs,
-      ReadOnlySection,
+    global: { stubs: {
       SupplierDetailOverview: defineComponent({ template: '<section>主档</section>' }),
       SupplierFactTable: defineComponent({ props: ['tab'], template: '<section data-testid="known-contract-facts">{{ tab }}</section>' }),
       AuxiliaryContractJourney: defineComponent({ props: ['supplierId'], template: '<section data-testid="auxiliary-contract-source">{{ supplierId }}</section>' }),
+    }, components: {
+      EntityDetailShell: shell,
+      SegTab: tabs,
+      ReadOnlySection,
       NuxtLink: defineComponent({ props: ['to'], template: '<a :href="to"><slot/></a>' }),
     } },
   })
@@ -136,12 +137,14 @@ describe('分供方中央详情', () => {
     }
     render(SupplierDetailScreen, {
       props: { supplierId: 'supplier-1', origin: 'real', includeDemo: false },
-      global: { components: {
+      global: { stubs: {
+        AuxiliaryContractJourney: true,
+        SupplierDetailOverview: defineComponent({ template: '<section>主档</section>' }),
+        SupplierFactTable: defineComponent({ template: '<section />' }),
+      }, components: {
         EntityDetailShell: shell,
         SegTab: tabs,
         ReadOnlySection,
-        SupplierDetailOverview: defineComponent({ template: '<section>主档</section>' }),
-        SupplierFactTable: defineComponent({ template: '<section />' }),
         NuxtLink: defineComponent({ props: ['to'], template: '<a :href="to"><slot/></a>' }),
       } },
     })
@@ -157,7 +160,14 @@ describe('分供方中央详情', () => {
     } }
     render(SupplierDetailScreen, {
       props: { supplierId: 'supplier-1', origin: 'real', includeDemo: false },
-      global: { components: { EntityDetailShell: shell, SegTab: tabs, ReadOnlySection, SupplierDetailOverview: defineComponent({ template: '<section>主档</section>' }), SupplierFactTable: defineComponent({ props: ['tab'], template: '<section data-testid="actual-fact-tab">{{ tab }}</section>' }), NuxtLink: defineComponent({ props: ['to'], template: '<a :href="to"><slot/></a>' }) } },
+      global: {
+        stubs: {
+          AuxiliaryContractJourney: true,
+          SupplierDetailOverview: defineComponent({ template: '<section>主档</section>' }),
+          SupplierFactTable: defineComponent({ props: ['tab'], template: '<section data-testid="actual-fact-tab">{{ tab }}</section>' }),
+        },
+        components: { EntityDetailShell: shell, SegTab: tabs, ReadOnlySection, NuxtLink: defineComponent({ props: ['to'], template: '<a :href="to"><slot/></a>' }) },
+      },
     })
     const summary = within(screen.getByTestId('supplier-summary'))
     expect(summary.getByRole('button', { name: '查看累计合同金额明细' }).textContent?.trim()).toBe('—')
@@ -179,13 +189,15 @@ describe('分供方中央详情', () => {
         includeDemo: false,
         returnTo: '/base/supplier?search=%E4%B8%AD%E5%A4%AE#supplier-row-real%3Asupplier-1',
       },
-      global: { components: {
+      global: { stubs: {
+        AuxiliaryContractJourney: true,
+        SupplierDetailOverview: defineComponent({ template: '<section>主档</section>' }),
+        SupplierFactTable: defineComponent({ props: ['tab'], template: '<section data-testid="fact-tab">{{ tab }}</section>' }),
+      }, components: {
         EntityDetailShell: shell,
         SegTab: tabs,
         Metric: metricStub,
         MetricGrid: defineComponent({ template: '<div><slot/></div>' }),
-        SupplierDetailOverview: defineComponent({ template: '<section>主档</section>' }),
-        SupplierFactTable: defineComponent({ props: ['tab'], template: '<section data-testid="fact-tab">{{ tab }}</section>' }),
         NuxtLink: defineComponent({ props: ['to'], template: '<a :href="to"><slot/></a>' }),
       } },
     })
@@ -239,11 +251,13 @@ describe('分供方中央详情', () => {
     }
     render(SupplierDetailScreen, {
       props: { supplierId: 'supplier-1', origin: 'real', includeDemo: false },
-      global: { components: {
-        EntityDetailShell: shell,
-        SegTab: tabs,
+      global: { stubs: {
+        AuxiliaryContractJourney: true,
         SupplierDetailOverview: defineComponent({ template: '<section>主档</section>' }),
         SupplierFactTable: defineComponent({ template: '<section />' }),
+      }, components: {
+        EntityDetailShell: shell,
+        SegTab: tabs,
         NuxtLink: defineComponent({ props: ['to'], template: '<a :href="to"><slot/></a>' }),
       } },
     })
@@ -270,11 +284,13 @@ describe('分供方中央详情', () => {
     }
     render(SupplierDetailScreen, {
       props: { supplierId: 'supplier-1', origin: 'real', includeDemo: false },
-      global: { components: {
-        EntityDetailShell: shell,
-        SegTab: tabs,
+      global: { stubs: {
+        AuxiliaryContractJourney: true,
         SupplierDetailOverview: defineComponent({ template: '<section>主档</section>' }),
         SupplierFactTable: defineComponent({ template: '<section />' }),
+      }, components: {
+        EntityDetailShell: shell,
+        SegTab: tabs,
         NuxtLink: defineComponent({ props: ['to'], template: '<a :href="to"><slot/></a>' }),
       } },
     })
@@ -294,14 +310,16 @@ describe('分供方中央详情', () => {
     }
     render(SupplierDetailScreen, {
       props: { supplierId: 'supplier-1', origin: 'real', includeDemo: false },
-      global: { components: {
+      global: { stubs: {
+        AuxiliaryContractJourney: true,
+        SupplierDetailOverview: defineComponent({ template: '<section>主档仍可见</section>' }),
+        SupplierFactTable: defineComponent({ props: ['tab'], template: '<section data-testid="fact-tab">{{ tab }}</section>' }),
+      }, components: {
         EntityDetailShell: shell,
         SegTab: tabs,
         Metric: metricStub,
         MetricGrid: defineComponent({ template: '<div><slot/></div>' }),
         StatePanel: defineComponent({ props: ['description'], template: '<div role="alert">{{ description }}</div>' }),
-        SupplierDetailOverview: defineComponent({ template: '<section>主档仍可见</section>' }),
-        SupplierFactTable: defineComponent({ props: ['tab'], template: '<section data-testid="fact-tab">{{ tab }}</section>' }),
         NuxtLink: defineComponent({ template: '<a><slot/></a>' }),
       } },
     })
@@ -322,13 +340,15 @@ describe('分供方中央详情', () => {
     }
     render(SupplierDetailScreen, {
       props: { supplierId: 'supplier-1', origin: 'real', includeDemo: false },
-      global: { components: {
+      global: { stubs: {
+        AuxiliaryContractJourney: true,
+        SupplierDetailOverview: defineComponent({ template: '<section>主档</section>' }),
+        SupplierFactTable: defineComponent({ template: '<section />' }),
+      }, components: {
         EntityDetailShell: shell,
         SegTab: tabs,
         Metric: metricStub,
         MetricGrid: defineComponent({ template: '<div><slot/></div>' }),
-        SupplierDetailOverview: defineComponent({ template: '<section>主档</section>' }),
-        SupplierFactTable: defineComponent({ template: '<section />' }),
         NuxtLink: defineComponent({ props: ['to'], template: '<a :href="to"><slot/></a>' }),
       } },
     })
@@ -347,13 +367,15 @@ describe('分供方中央详情', () => {
         includeDemo: false,
         returnTo: contractReturnTo,
       },
-      global: { components: {
+      global: { stubs: {
+        AuxiliaryContractJourney: true,
+        SupplierDetailOverview: defineComponent({ template: '<section>主档</section>' }),
+        SupplierFactTable: defineComponent({ props: ['tab'], template: '<section data-testid="fact-tab">{{ tab }}</section>' }),
+      }, components: {
         EntityDetailShell: shell,
         SegTab: tabs,
         Metric: metricStub,
         MetricGrid: defineComponent({ template: '<div><slot/></div>' }),
-        SupplierDetailOverview: defineComponent({ template: '<section>主档</section>' }),
-        SupplierFactTable: defineComponent({ props: ['tab'], template: '<section data-testid="fact-tab">{{ tab }}</section>' }),
         NuxtLink: defineComponent({ props: ['to'], template: '<a :href="to"><slot/></a>' }),
       } },
     })
@@ -371,13 +393,15 @@ describe('分供方中央详情', () => {
         includeDemo: true,
         returnTo,
       },
-      global: { components: {
+      global: { stubs: {
+        AuxiliaryContractJourney: true,
+        SupplierDetailOverview: defineComponent({ template: '<section>主档</section>' }),
+        SupplierFactTable: defineComponent({ template: '<section />' }),
+      }, components: {
         EntityDetailShell: shell,
         SegTab: tabs,
         Metric: metricStub,
         MetricGrid: defineComponent({ template: '<div><slot/></div>' }),
-        SupplierDetailOverview: defineComponent({ template: '<section>主档</section>' }),
-        SupplierFactTable: defineComponent({ template: '<section />' }),
         NuxtLink: defineComponent({ props: ['to'], template: '<a :href="to"><slot/></a>' }),
       } },
     })
@@ -394,13 +418,15 @@ describe('分供方中央详情', () => {
         includeDemo: false,
         returnTo,
       },
-      global: { components: {
+      global: { stubs: {
+        AuxiliaryContractJourney: true,
+        SupplierDetailOverview: defineComponent({ template: '<section>主档</section>' }),
+        SupplierFactTable: defineComponent({ template: '<section />' }),
+      }, components: {
         EntityDetailShell: shell,
         SegTab: tabs,
         Metric: metricStub,
         MetricGrid: defineComponent({ template: '<div><slot/></div>' }),
-        SupplierDetailOverview: defineComponent({ template: '<section>主档</section>' }),
-        SupplierFactTable: defineComponent({ template: '<section />' }),
         NuxtLink: defineComponent({ props: ['to'], template: '<a :href="to"><slot/></a>' }),
       } },
     })

@@ -754,6 +754,32 @@ describe('parseDeliveryMarkdown', () => {
     expect(result.docs[0]).toMatchObject({ statedTotal: 280, calculatedTotal: 280, balanced: true })
   })
 
+  it('短名称列按实际表格映射，保留同页两个单号及各自明细', () => {
+    const table = (number: string, heading: string, name: string) => [
+      '合成材料有限公司 送货单',
+      `单号：${number}`,
+      `| ${heading} | 单位 | 数量 | 单价 | 金额 |`,
+      '| --- | --- | --- | --- | --- |',
+      `| ${name} | 件 | 2 | 10 | 20 |`,
+    ].join('\n')
+    const result = parseDeliveryMarkdown([`${table('TEST-001', '商品', '合成甲料')}\n\n${table('TEST-002', '货品', '合成乙料')}`])
+
+    expect(result.docs.map(doc => [doc.orderNo, doc.items.map(item => item.name)])).toEqual([
+      ['TEST-001', ['合成甲料']],
+      ['TEST-002', ['合成乙料']],
+    ])
+  })
+
+  it('纯文本粘连单位可预填数量，明确零与缺价格分开', () => {
+    const result = parseDeliveryMarkdown(['合成材料有限公司 送货单\n单号：TEST-001\n合成甲料 ２件 １０.００ ２０.００\n合成乙料 ０件\n合成丙料 2m 铜管 件 3 5 15'])
+
+    expect(result.docs[0]?.items).toMatchObject([
+      { name: '合成甲料', unit: '件', quantity: 2, unitPrice: 10, total: 20 },
+      { name: '合成乙料', unit: '件', quantity: 0, unitPrice: null, total: null },
+      { name: '合成丙料 2m 铜管', unit: '件', quantity: 3, unitPrice: 5, total: 15 },
+    ])
+  })
+
   it('裸“小计”行只作为汇总，不混入材料明细', () => {
     const result = parseDeliveryMarkdown([`
       # 示例材料销售单

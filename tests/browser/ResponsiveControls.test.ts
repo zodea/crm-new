@@ -3,13 +3,15 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-vue'
 import { page, userEvent } from 'vitest/browser'
 import { defineComponent, h } from 'vue'
-import ProjectListToolbar from '~/components/project/ProjectListToolbar.vue'
-import QuantityVarianceDialog from '~/components/quantity/QuantityVarianceDialog.vue'
-import ScheduleProcessLibraryTaskEditor from '~/components/schedule/ScheduleProcessLibraryTaskEditor.vue'
 import ScheduleTemplateGanttEditor from '~/components/schedule/ScheduleTemplateGanttEditor.vue'
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from '~/components/ui/dialog'
 import SearchInput from '~/components/ui/SearchInput.vue'
 import SelectFilter from '~/components/ui/SelectFilter.vue'
+import SupplierListControls from '~/pages/base/supplier/_components/SupplierListControls.vue'
+import ProjectListToolbar from '~/pages/project/_components/ProjectListToolbar.vue'
+import ScheduleProcessLibraryTaskEditor from '~/pages/schedule/process-library/_components/ScheduleProcessLibraryTaskEditor.vue'
+import QuantityVarianceDialog from '~/pages/subcontract/quantity/_components/QuantityVarianceDialog.vue'
+import '~/assets/css/vxe-theme.css'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -67,6 +69,41 @@ describe('共享弹窗关闭按钮的真实浏览器焦点', () => {
 })
 
 describe('响应式控件使用真实浏览器几何', () => {
+  it('分供方紧凑刷新保持原按钮尺寸，加载时拒绝重复触发', async () => {
+    const props = {
+      loading: false,
+      columns: [],
+      categoryOptions: [],
+      credentialOptions: [],
+      taxpayerOptions: [],
+      hasFilters: false,
+      canWrite: false,
+      search: '',
+      category: [],
+      credentialStatus: [],
+      taxpayerType: [],
+      sort: 'updated-desc' as const,
+      hiddenColumns: [],
+      comfortable: false,
+    }
+    const rendered = await render(SupplierListControls, { props, global: { components: { SearchInput }, stubs: { KitToolbarPopover: true } } })
+    const refresh = page.getByRole('button', { name: '刷新', exact: true })
+    await expect.element(refresh).toHaveAttribute('type', 'button')
+    await expect.element(refresh).toHaveAttribute('title', '刷新')
+    const button = refresh.element() as HTMLButtonElement
+    const style = getComputedStyle(button)
+    expect(style.width).toBe('28px')
+    expect(style.height).toBe('28px')
+    await refresh.click()
+    expect(rendered.emitted().refresh).toHaveLength(1)
+
+    await rendered.rerender({ ...props, loading: true })
+    await expect.element(refresh).toBeDisabled()
+    expect(button.querySelector('.animate-spin')).not.toBeNull()
+    button.click()
+    expect(rendered.emitted().refresh).toHaveLength(1)
+  })
+
   it.each([
     { width: 160, containerWidth: 300 },
     { width: 560, containerWidth: 300 },

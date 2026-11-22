@@ -8,6 +8,33 @@ export const CREW_PAYROLL_FEE_FIELDS = [
 ] as const
 export type CrewPayrollFeeValues = Omit<PayrollCrewFeeDefaults, 'crewId' | 'sourceVersion'>
 
+type CrewFeeField = typeof CREW_PAYROLL_FEE_FIELDS[number]['attribute']
+
+const FEE_PRICE_REQUIREMENTS = [
+  { label: '房租补贴', enabled: 'rentSubsidyEnabled', enabledFact: 'rentEnabled', price: 'rentSubsidyPrice', priceFact: 'rentUnitPrice' },
+  { label: '管理提成', enabled: 'mgmtFeeEnabled', enabledFact: 'managementEnabled', price: 'mgmtFeePrice', priceFact: 'managementUnitPrice' },
+] as const
+
+/** 校验班组保存后的配置。局部更新遗漏的字段沿用上次事实。 */
+export function crewFeePriceIssues(draft: Partial<Record<CrewFeeField, unknown>>, previous?: CrewPayrollFeeValues) {
+  function submittedValue(field: CrewFeeField, fact: keyof CrewPayrollFeeValues) {
+    if (Object.hasOwn(draft, field))
+      return draft[field]
+    const prior = previous?.[fact]
+    return prior?.state === 'value' ? prior.value : undefined
+  }
+
+  const issues = []
+  for (const requirement of FEE_PRICE_REQUIREMENTS) {
+    if (submittedValue(requirement.enabled, requirement.enabledFact) !== true)
+      continue
+    const price = submittedValue(requirement.price, requirement.priceFact)
+    if (typeof price !== 'number' || !Number.isFinite(price) || price <= 0)
+      issues.push({ field: requirement.price, message: `启用${requirement.label}时，单价必须大于 0` })
+  }
+  return issues
+}
+
 /** 原 SQL 开关保持 0/1；未存在的列/属性不补 null。 */
 export function crewPayrollFeeAttributes(value: Record<string, unknown>): Record<string, number | null> {
   const result: Record<string, number | null> = {}

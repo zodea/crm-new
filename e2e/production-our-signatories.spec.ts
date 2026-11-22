@@ -142,7 +142,9 @@ test('主体整页维护、实际选择与冻结、原命令恢复、占号和�
     await expect(page.getByRole('button', { name: '退出本机登录' })).toBeVisible()
     await expect(page).toHaveURL(`${origin}/base/customer`)
     await page.goto(`${origin}/settings/our-signatories`)
-    await expect(page.getByText('尚未录入主体。按真实文书核实后新增，再在合同中明确选择。')).toBeVisible()
+    const signatoryList = page.getByRole('region', { name: '签约主体目录', exact: true })
+    const emptyMessage = '尚未录入主体。按真实文书核实后新增，再在合同中明确选择。'
+    await expect(signatoryList.getByRole('strong').filter({ hasText: emptyMessage })).toBeVisible()
     await page.getByRole('link', { name: '新增主体', exact: true }).click()
     await page.getByTestId('our-signatory-name').fill('合成真实签约公司原名')
     await page.getByTestId('our-signatory-taxNo').fill('SYNTHETIC-OWN-TAX')
@@ -158,6 +160,7 @@ test('主体整页维护、实际选择与冻结、原命令恢复、占号和�
     expect((await savedOwn).ok()).toBe(true)
     const own = await (await savedOwn).json()
     await expect(page.getByTestId('our-signatory-settings')).toContainText('合成真实签约公司原名')
+    await expect(signatoryList.getByText('可选择', { exact: true })).toHaveAttribute('data-ui', 'status-tag')
     const customer = await (await command('/api/commands/customers', { ...envelope, requiredCapability: 'customer:write', commandId: 'own-customer', draft: { name: '合成签约客户', contact: '合成人' } })).json()
     const project = await (await command('/api/commands/projects', { ...envelope, requiredCapability: 'project:write', commandId: 'own-project', draft: { name: '合成签约项目', customerId: customer.id, manager: '合成经理' } })).json()
     const supplier = await (await command('/api/commands/suppliers', { ...envelope, requiredCapability: 'supplier:write', commandId: 'own-supplier', draft: { name: '合成签约分供方', supplierCategory: '其他', contact: '合成人' } })).json()

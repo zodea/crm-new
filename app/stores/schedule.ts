@@ -34,7 +34,7 @@ export const useScheduleStore = defineStore('schedule', () => {
   const sourceVersion = computed(() => context.value?.sourceVersion ?? '')
   const sessionKey = computed(() => JSON.stringify([workspaceId.value, actorId.value, origin.value]))
   const scopeKey = computed(() => JSON.stringify([workspaceId.value, actorId.value, origin.value, scopeProjectId.value]))
-  const pending = shallowRef<Record<string, { command: ScheduleCommand, result: ScheduleCommandResult | null }>>({})
+  const pending = shallowRef<Record<string, { command: ScheduleCommand, result: ScheduleCommandResult | null, dependencySuccessorId: string | null }>>({})
   const recovery = createCommandRecoveryStorage()
   const recoveryRevision = shallowRef(0)
   const sending = shallowRef(new Set<string>())
@@ -58,7 +58,8 @@ export const useScheduleStore = defineStore('schedule', () => {
         throw scheduleProblem('conflict', '旧排程原编号与当前编号冲突')
       if (!known)
         recovery.remember(key, descriptor)
-      pending.value = { ...pending.value, [key]: { command, result: null } }
+      const dependencySuccessorId = command.action.kind === 'update-dependency' ? command.action.successorId : null
+      pending.value = { ...pending.value, [key]: { command, result: null, dependencySuccessorId } }
     }
     sessionStorage.removeItem('schedule-central-pending-v1')
     if (sessionStorage.getItem('schedule-central-pending-v1') !== null)
@@ -81,6 +82,15 @@ export const useScheduleStore = defineStore('schedule', () => {
   function beginPlanEdit(taskId: string) {
     if (context.value)
       editingBaselines.set(taskId, structuredClone({ workspaceId: context.value.workspaceId, actorId: context.value.actorId, origin: context.value.origin, capabilities: [...context.value.capabilities], sourceVersion: context.value.sourceVersion }))
+  }
+  function findDependencySuccessorId(action: ScheduleAction) {
+    if (action.kind === 'update-dependency')
+      return action.successorId
+    if (action.kind === 'restore-dependency')
+      return local.snapshot.value?.disabledDependencies.find(row => row.id === action.dependencyId)?.succId ?? null
+    if (action.kind === 'remove-dependency')
+      return local.snapshot.value?.dependencies.find(row => row.id === action.dependencyId)?.succId ?? null
+    return null
   }
   const canWrite = computed(() => origin.value === 'real' && capabilities.value.includes('schedule:write'))
   let today = toLocalDateInputValue()
@@ -289,7 +299,8 @@ export const useScheduleStore = defineStore('schedule', () => {
       throw scheduleProblem('forbidden', '当前来源或身份不能修改排程')
     if (pendingCommand.value)
       throw scheduleProblem('conflict', '上次提交结果尚未确认，请先恢复原提交')
-    const editingId = action.kind === 'reschedule-task' ? null : 'taskId' in action ? action.taskId : action.kind === 'update-dependency' ? action.successorId : null
+    const dependencySuccessorId = findDependencySuccessorId(action)
+    const editingId = action.kind === 'reschedule-task' ? null : 'taskId' in action ? action.taskId : dependencySuccessorId
     if (editingId && editingBaselines.has(editingId))
       baseline = editingBaselines.get(editingId)!
     if (!baseline || baseline.workspaceId !== workspaceId.value || baseline.actorId !== actorId.value || baseline.origin !== origin.value)
@@ -298,7 +309,7 @@ export const useScheduleStore = defineStore('schedule', () => {
     const descriptor = descriptorFor(command)
     const key = commandRecoveryKey(descriptor)
     recovery.remember(key, descriptor)
-    pending.value = { ...pending.value, [key]: { command, result: null } }
+    pending.value = { ...pending.value, [key]: { command, result: null, dependencySuccessorId } }
     recoveryRevision.value++
     return send<T>(command, key)
   }
@@ -315,11 +326,13 @@ export const useScheduleStore = defineStore('schedule', () => {
     const current = scheduleVersionBasis(loaded.sourceVersion)
     if ((result.sourceVersion.startsWith('wbs-v1:') && (!original || !current || current.projectId !== result.projectId || current.revision < original.revision)) || (!result.sourceVersion.startsWith('wbs-v1:') && !loaded.sourceVersion))
       throw scheduleProblem('unavailable', '已保存的WBS版本尚未可靠读取，请只重试读取')
-    const command = pending.value[key]?.command
-    if (command?.action.kind === 'update-dependency' && scopeProjectId.value === descriptor.targetId && workspaceId.value === descriptor.workspaceId && actorId.value === descriptor.actorId && origin.value === 'real' && loaded.sourceVersion === result.sourceVersion) {
-      const baseline = editingBaselines.get(command.action.successorId)
+    const pendingEntry = pending.value[key]
+    const command = pendingEntry?.command
+    const successorId = pendingEntry?.dependencySuccessorId
+    if (command && successorId && scopeProjectId.value === descriptor.targetId && workspaceId.value === descriptor.workspaceId && actorId.value === descriptor.actorId && origin.value === 'real' && loaded.sourceVersion === result.sourceVersion) {
+      const baseline = editingBaselines.get(successorId)
       if (baseline?.sourceVersion === command.sourceVersion && baseline.workspaceId === command.workspaceId && baseline.actorId === command.actorId && baseline.origin === command.origin)
-        editingBaselines.set(command.action.successorId, { ...baseline, sourceVersion: result.sourceVersion })
+        editingBaselines.set(successorId, { ...baseline, sourceVersion: result.sourceVersion })
     }
     if (scopeProjectId.value === descriptor.targetId && workspaceId.value === descriptor.workspaceId && actorId.value === descriptor.actorId && origin.value === 'real')
       apply(loaded)
@@ -334,11 +347,12 @@ export const useScheduleStore = defineStore('schedule', () => {
     if (sending.value.has(command.commandId))
       throw scheduleProblem('conflict', '原WBS提交仍在处理中')
     recovery.verify(key, command.commandId)
+    const dependencySuccessorId = pending.value[key]?.dependencySuccessorId ?? null
     sending.value = new Set([...sending.value, command.commandId])
     local.saving.value = true
     try {
       const result = await repositories().schedule.execute(JSON.parse(JSON.stringify(command)) as ScheduleCommand)
-      pending.value = { ...pending.value, [key]: { command, result } }
+      pending.value = { ...pending.value, [key]: { command, result, dependencySuccessorId } }
       return await afterRead<T>(descriptorFor(command), result)
     }
     catch (cause) {

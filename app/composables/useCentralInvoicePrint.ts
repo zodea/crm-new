@@ -53,6 +53,8 @@ export function useCentralInvoicePrint(options: {
     reviewStatus: record.reviewStatus,
     dupStatus: record.duplicateStatus,
     source: record.sourceKind,
+    original: record.original,
+    originalVerificationId: record.originalVerificationId,
   })))
 
   function refreshPending() {

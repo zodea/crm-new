@@ -16,6 +16,8 @@ export const COLD_ENTRIES = [
   'production-boq-cold',
   'production-construction-cold',
   'production-construction-scope-cold',
+  'production-finance-cold',
+  'production-invoice-correction-cold',
   'production-payroll-a-cold',
   'production-payroll-cold-process',
   'production-payroll-history-cold-process',

@@ -176,6 +176,25 @@ test('正式整页新建编辑工人班组，跨项目复用稳定目录身份�
       projects.push(result.id)
     }
 
+    const invalidFees = await fixture.request('/api/commands/crews', { method: 'POST', data: {
+      workspaceId: 'crew-browser-workspace',
+      actorId: 'crew-browser-owner',
+      commandId: 'cw-invalid-fee-prices',
+      requiredCapability: 'crew:write',
+      action: 'draft',
+      baseVersion: null,
+      draft: { name: '不可保存的合成班组', rentSubsidyEnabled: true, mgmtFeeEnabled: true, mgmtFeePrice: 0 },
+      attachments: {},
+    } })
+    expect(invalidFees.status()).toBe(422)
+    expect(await invalidFees.json()).toMatchObject({ data: {
+      code: 'validation-failed',
+      fieldErrors: {
+        rentSubsidyPrice: ['启用房租补贴时，单价必须大于 0'],
+        mgmtFeePrice: ['启用管理提成时，单价必须大于 0'],
+      },
+    } })
+
     await page.goto(`${fixture.origin}/base/crew`)
     await expect(page.getByRole('heading', { name: '班组资料库', exact: true })).toBeVisible()
     await page.getByRole('link', { name: '新增班组', exact: true }).click()
@@ -185,6 +204,18 @@ test('正式整页新建编辑工人班组，跨项目复用稳定目录身份�
     await page.getByLabel('联系电话 *', { exact: true }).fill('13900139000')
     await page.getByLabel('默认发放比例', { exact: true }).fill('0.8')
     await assertFormViewports()
+    await page.getByRole('checkbox', { name: /^房租补贴/ }).check()
+    await page.getByRole('checkbox', { name: /^管理提成/ }).check()
+    const rentPrice = form.locator('[data-field="rentSubsidyPrice"]')
+    const managementPrice = form.locator('[data-field="mgmtFeePrice"]')
+    await managementPrice.fill('0')
+    await page.getByRole('group', { name: '表单操作' }).getByRole('button', { name: '保存并提交', exact: true }).click()
+    await expect(rentPrice).toBeFocused()
+    await expect(rentPrice).toHaveAccessibleDescription('启用房租补贴时，单价必须大于 0')
+    await expect(managementPrice).toHaveAccessibleDescription('启用管理提成时，单价必须大于 0')
+    expect(writes).toEqual([])
+    await rentPrice.fill('0.005')
+    await managementPrice.fill('2.5')
     const crewCreated = await submit('/api/commands/crews', 'POST', '保存并提交')
     expect(crewCreated.version).toBe('1')
     await expect(page).toHaveURL(url => url.pathname === `/base/crew/${crewCreated.id}` && url.searchParams.get('origin') === 'real')
@@ -287,7 +318,7 @@ test('正式整页新建编辑工人班组，跨项目复用稳定目录身份�
     for (const width of widths)
       await assertViewport(page, crewTable, width)
     expect(await read(`/api/read/workers/${workerCreated.id}/form`)).toMatchObject(expectedWorker)
-    expect(await read(`/api/read/crews/${crewCreated.id}/form`)).toMatchObject({ version: '2', draft: { id: crewCreated.id, defaultPayRatio: 0 } })
+    expect(await read(`/api/read/crews/${crewCreated.id}/form`)).toMatchObject({ version: '2', draft: { id: crewCreated.id, defaultPayRatio: 0, rentSubsidyEnabled: true, rentSubsidyPrice: 0.005, mgmtFeeEnabled: true, mgmtFeePrice: 2.5 } })
     expect(await read('/api/commands/crews/resolve', { commandId: crewCreated.commandId })).toEqual(originalCrewReceipt)
     expect(await read('/api/commands/workers/resolve', { commandId: workerCreated.commandId })).toEqual(originalWorkerReceipt)
     expect(errors).toEqual([])

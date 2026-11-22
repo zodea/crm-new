@@ -2,9 +2,9 @@ import type { QuantityStageWorkspace } from '../../app/lib/quantity/central-stag
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, KeepAlive, reactive, ref } from 'vue'
-import QuantityStageFormPage from '../../app/components/quantity/QuantityStageFormPage.vue'
 import { quantityProblem } from '../../app/lib/quantity/central-contract'
 import { createQuantityStageState } from '../../app/lib/quantity/stage-state'
+import QuantityStageFormPage from '../../app/pages/subcontract/quantity/_components/QuantityStageFormPage.vue'
 
 let state: ReturnType<typeof reactive<ReturnType<typeof createQuantityStageState>>>
 vi.mock('~/stores/quantity-stage', () => ({ useQuantityStageStore: () => state }))
@@ -16,6 +16,7 @@ const read = vi.fn()
 const execute = vi.fn()
 const confirm = vi.fn()
 const context = vi.fn()
+const global = { stubs: { QuantityCommandRecovery: true } }
 function response(data = initial, version = 'v1') {
   return { data, sourceVersion: version, dataOrigin: 'real', asOf: '2026-09-11T00:00:00Z', capabilities: identity.capabilities }
 }
@@ -32,7 +33,7 @@ beforeEach(() => {
 describe('施工阶段配置整页', () => {
   it('缓存草稿返回时权限读取失败可原地重试，恢复后保留输入和编辑版本', async () => {
     const active = ref(true)
-    const wrapper = mount(defineComponent({ setup: () => () => h(KeepAlive, null, { default: () => active.value ? h(QuantityStageFormPage, { projectId: 'p' }) : h('div') }) }))
+    const wrapper = mount(defineComponent({ setup: () => () => h(KeepAlive, null, { default: () => active.value ? h(QuantityStageFormPage, { projectId: 'p' }) : h('div') }) }), { global })
     await flushPromises()
     await wrapper.get('input[aria-label="阶段名称"]').setValue('尚未保存的阶段')
     active.value = false
@@ -51,7 +52,7 @@ describe('施工阶段配置整页', () => {
   })
 
   it('保存失败保留整页输入，重试同一命令；保存已确认但回读失败时只读重试定位已存阶段', async () => {
-    const wrapper = mount(QuantityStageFormPage, { props: { projectId: 'p' } })
+    const wrapper = mount(QuantityStageFormPage, { props: { projectId: 'p' }, global })
     await flushPromises()
     await wrapper.get('input[aria-label="阶段编码"]').setValue('PUTTY-01')
     await wrapper.get('input[aria-label="阶段名称"]').setValue('第一遍腻子')
@@ -77,7 +78,7 @@ describe('施工阶段配置整页', () => {
 
   it('取消归档确认不提交、不丢输入；取消切换阶段同样保留当前草稿', async () => {
     read.mockResolvedValue(response({ ...initial, matrixArchivedAt: '2026-09-11T00:00:00Z' }))
-    const wrapper = mount(QuantityStageFormPage, { props: { projectId: 'p' } })
+    const wrapper = mount(QuantityStageFormPage, { props: { projectId: 'p' }, global })
     await flushPromises()
     await wrapper.get('input[aria-label="阶段编码"]').setValue('A')
     await wrapper.get('input[aria-label="阶段名称"]').setValue('未保存名称')
@@ -93,7 +94,7 @@ describe('施工阶段配置整页', () => {
 
   it('只有读取权限时整页不提供保存动作，阶段字段与报量选择不可写', async () => {
     read.mockResolvedValue({ ...response(), capabilities: ['quantity:read'] })
-    const wrapper = mount(QuantityStageFormPage, { props: { projectId: 'p' } })
+    const wrapper = mount(QuantityStageFormPage, { props: { projectId: 'p' }, global })
     await flushPromises()
     expect(wrapper.text()).toContain('仅可查看')
     expect(wrapper.findAll('button').some(button => button.text() === '保存阶段')).toBe(false)
@@ -103,7 +104,7 @@ describe('施工阶段配置整页', () => {
   })
 
   it('项目范围改变立即撤旧字段，不能把前一个项目的未保存内容带到另一项目', async () => {
-    const wrapper = mount(QuantityStageFormPage, { props: { projectId: 'p' } })
+    const wrapper = mount(QuantityStageFormPage, { props: { projectId: 'p' }, global })
     await flushPromises()
     await wrapper.get('input[aria-label="阶段名称"]').setValue('项目一草稿')
     read.mockResolvedValue(response({ ...initial, projectId: 'p2', items: [], stages: [], mappings: [] }, 'p2-v1'))
@@ -119,7 +120,7 @@ describe('施工阶段配置整页', () => {
     const items = [...initial.items, { id: 'paint', code: 'PAINT', name: '涂料', trade: '油漆工', unit: '㎡' }]
     const mappings = items.flatMap(item => stages.map(stage => ({ id: `${item.id}-${stage.id}`, itemId: item.id, stageId: stage.id, isReportingStage: stage.id === 'first' })))
     read.mockResolvedValue(response({ ...initial, stages, items, mappings }))
-    const wrapper = mount(QuantityStageFormPage, { props: { projectId: 'p' } })
+    const wrapper = mount(QuantityStageFormPage, { props: { projectId: 'p' }, global })
     await flushPromises()
     await wrapper.get('select[aria-label="腻子的报量阶段"]').setValue('second')
     await wrapper.get('select[aria-label="涂料的报量阶段"]').setValue('second')

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/vue'
 import { describe, expect, it } from 'vitest'
 import { defineComponent, h } from 'vue'
-import ProjectListToolbar from '~/components/project/ProjectListToolbar.vue'
+import ProjectListToolbar from '~/pages/project/_components/ProjectListToolbar.vue'
 
 const SearchInputStub = defineComponent({
   props: {

@@ -28,10 +28,10 @@ async function installFixture(page: Page) {
     })])
   })
   await page.reload()
-  await expect(page.getByRole('main')).toContainText('合成边框验证供应商', { timeout: 30_000 })
 }
 
 async function openPreview(page: Page) {
+  await expect(page.getByRole('main')).toContainText('合成边框验证供应商', { timeout: 30_000 })
   await page.getByRole('button', { name: '导出 Excel', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: '导出 Excel 预览与样式设置' })
   await expect(dialog.getByRole('button', { name: '确认导出' })).toBeEnabled()

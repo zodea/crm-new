@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/vue'
 import { describe, expect, it } from 'vitest'
 import { defineComponent } from 'vue'
-import MaterialContractFactTable from '~/components/contract/MaterialContractFactTable.vue'
+import MaterialContractFactTable from '~/pages/contract/_components/MaterialContractFactTable.vue'
 
 const NuxtLink = defineComponent({
   props: ['to'],

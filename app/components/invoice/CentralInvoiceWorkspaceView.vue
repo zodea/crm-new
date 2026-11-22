@@ -248,6 +248,7 @@ function setDirty(value: boolean) {
       </template>
       <template #review>
         <div class="flex min-h-0 min-w-0 flex-col gap-3 overflow-auto">
+          <slot name="original-verification" />
           <CentralInvoiceDuplicateNotice v-if="selected && sourceAvailable && !selectionUnavailable" :record="selected" :records="records" :dirty="formDirty || !!draftRecord" :busy="busy" @select="emit('select', $event)" />
           <p v-if="selected?.legacy" role="status" class="rounded border border-line bg-panel p-3 text-sm">
             旧资料：{{ legacyOriginalLabels[selected.legacy.originalState] }}。<span v-if="selected.legacy.ambiguousZeroFields.length || selected.legacy.ambiguousItemNumbers">旧金额或明细中的零可能表示未知，请结合原件核对。</span>

@@ -20,7 +20,7 @@ import {
   CREW_WRITE_CAPABILITY,
   WORKER_WRITE_CAPABILITY,
 } from '../../app/lib/crew-worker/command-contract'
-import { CREW_PAYROLL_FEE_FIELDS, crewPayrollFeeValues, updatedCrewPayrollFeeValues } from '../../app/lib/crew-worker/payroll-fee-defaults'
+import { CREW_PAYROLL_FEE_FIELDS, crewFeePriceIssues, crewPayrollFeeValues, updatedCrewPayrollFeeValues } from '../../app/lib/crew-worker/payroll-fee-defaults'
 import { crewWorkerProblem, CrewWorkerRepositoryProblem } from '../../app/lib/crew-worker/read-contract'
 import { commandFingerprint, commandReplay, parseResolveCommandBody, resolveJournalCommand } from './command-journal'
 import { assertRetainedMigrationReferences, migratedIdentityDraft, migratedIdentityRecords, migratedIdentityTimestamp } from './core-identity-migration'
@@ -237,10 +237,18 @@ export function createCrewWorkerCommandService(options: CrewWorkerCommandOptions
     const stored: CrewWorkerStored<TDraft> = { id, draft: { ...draft, id }, version: (existing?.version ?? 0) + 1, updatedAt: timestamp, migrationBatchId: existing?.migrationBatchId ?? null, ...(existing?.linkedWorkerId !== undefined ? { linkedWorkerId: existing.linkedWorkerId } : {}) }
     if (input.kind === 'crew') {
       try {
+        const previousFees = existing?.payrollFeeDefaults ?? (existing ? updatedCrewPayrollFeeValues(existing.draft) : undefined)
+        const issues = crewFeePriceIssues(draft as CrewFormDraft, previousFees)
+        if (issues.length)
+          throw fail('validation-failed', issues[0]!.message, Object.fromEntries(issues.map(({ field, message }) => [field, [message]])))
         const previousDraft = existing ? Object.fromEntries(Object.entries(existing.draft).filter(([key]) => !input.explicitCrewFeeFields?.includes(key))) : null
-        stored.payrollFeeDefaults = updatedCrewPayrollFeeValues(draft, existing ? { draft: previousDraft!, values: existing.payrollFeeDefaults ?? updatedCrewPayrollFeeValues(existing.draft) } : undefined)
+        stored.payrollFeeDefaults = updatedCrewPayrollFeeValues(draft, previousFees ? { draft: previousDraft!, values: previousFees } : undefined)
       }
-      catch (cause) { throw fail('validation-failed', cause instanceof Error ? cause.message : '班组费用默认无效') }
+      catch (cause) {
+        if (cause instanceof CrewWorkerRepositoryProblem)
+          throw cause
+        throw fail('validation-failed', cause instanceof Error ? cause.message : '班组费用默认无效')
+      }
     }
     records.set(id, stored)
     state.sourceVersion += 1

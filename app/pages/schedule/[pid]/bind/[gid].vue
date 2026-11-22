@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import ScheduleContractBindingScreen from '~/pages/schedule/[pid]/bind/_components/ScheduleContractBindingScreen.vue'
 
 const route = useRoute()
 const projectId = computed(() => typeof route.params.pid === 'string' ? route.params.pid : '')

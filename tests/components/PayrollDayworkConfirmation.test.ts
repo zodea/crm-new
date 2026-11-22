@@ -1,7 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import PayrollDayworkConfirmDialog from '~/components/payroll/PayrollDayworkConfirmDialog.vue'
+import PayrollDayworkConfirmDialog from '~/pages/subcontract/daywork/_components/PayrollDayworkConfirmDialog.vue'
 import { dayworkForm } from '../helpers/payroll-c2-ui'
 
 const confirm = vi.fn()

@@ -24,7 +24,7 @@
 | [tests/delivery/request.test.ts](../../../tests/delivery/request.test.ts) | 单元／服务／状态 | 送货 HTTP 命令解析 |
 | [tests/delivery/review.test.ts](../../../tests/delivery/review.test.ts) | 单元／服务／状态 | 送货单号规范化 |
 | [tests/delivery/source-assets.test.ts](../../../tests/delivery/source-assets.test.ts) | 单元／服务／状态 | 送货旧原件到不可变中央资产映射 |
-| [tests/recognize/delivery-parse.test.ts](../../../tests/recognize/delivery-parse.test.ts) | 单元／服务／状态 | parseDeliveryMarkdown |
+| [tests/recognize/delivery-parse.test.ts](../../../tests/recognize/delivery-parse.test.ts) | 单元／服务／状态 | HTML/Markdown 表格和文本识别、短名称表头、粘连单位、零值与缺价、同页多单、跨页及分段合计 |
 | [tests/stores/delivery-central-print.test.ts](../../../tests/stores/delivery-central-print.test.ts) | 单元／服务／状态 | 中央送货打印原件 |
 | [tests/tabs/delivery-restore.test.ts](../../../tests/tabs/delivery-restore.test.ts) | 单元／服务／状态 | 送货详情页签按中央当前记录恢复 |
 | [tests/tabs/delivery-tab-title.test.ts](../../../tests/tabs/delivery-tab-title.test.ts) | 单元／服务／状态 | 送货单归档库页签文案 |
@@ -54,7 +54,7 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
-| [e2e/delivery-central.spec.ts](../../../e2e/delivery-central.spec.ts) | Playwright E2E | 两页真实 PDF 经人工核对形成共享原件的两张逻辑记录，刷新修订下载与五档界面保持同源 |
+| [e2e/delivery-central.spec.ts](../../../e2e/delivery-central.spec.ts) | Playwright E2E | 两页真实 PDF 经人工核对形成共享原件的两张逻辑记录；覆盖五档视口、修订历史、删除和撤回后的归档及价格来源回读、共享原件下载 |
 | [e2e/delivery-export-browser-smoke.spec.ts](../../../e2e/delivery-export-browser-smoke.spec.ts) | Playwright E2E | Chromium 真实图片 API 生成图片 PDF，保留项目 PDF 原字节并通过 Poppler 首末页渲染 |
 | [e2e/delivery-migration.spec.ts](../../../e2e/delivery-migration.spec.ts) | Playwright E2E | 真实 SQLite 送货头行原件打印与历史通过 HTTP 迁移、重试和回滚 |
 | [e2e/delivery-recognition.spec.ts](../../../e2e/delivery-recognition.spec.ts) | Playwright E2E | 送货单闭环：上传识别、主数据匹配、人工核对并自动进入归档库 |

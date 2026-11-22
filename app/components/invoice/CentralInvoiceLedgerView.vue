@@ -221,8 +221,12 @@ function exportVisible() {
                 </td>
                 <td class="p-2">
                   {{ record.printCount ? `已打印 ${record.printCount} 次` : '未打印' }}
+                  <span v-if="record.sourceKind === 'excel'" class="block text-ink-soft">{{ record.originalVerificationId ? '原件已核验' : '原件待核验' }}</span>
                 </td>
                 <td class="p-2">
+                  <NuxtLink v-if="!busy && record.sourceKind === 'excel'" :to="{ path: '/finance/invoice/manual-new', query: { invoice: record.id } }" :aria-label="`核验原件 ${record.fields.invoiceNumber || record.id}`" class="mr-3 text-brand underline">
+                    核验原件
+                  </NuxtLink>
                   <NuxtLink v-if="!busy" :to="`/finance/invoice/correction/${encodeURIComponent(record.id)}`" :aria-label="`更正发票 ${record.fields.invoiceNumber || record.id}`" class="mr-3 text-brand underline">
                     更正
                   </NuxtLink>

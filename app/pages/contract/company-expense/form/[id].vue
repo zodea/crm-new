@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import AuxiliaryContractFormPage from '~/components/contract/AuxiliaryContractFormPage.vue'
+
 definePageMeta({
   name: 'companyExpFormEdit',
 })

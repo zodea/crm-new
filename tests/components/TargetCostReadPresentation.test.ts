@@ -3,9 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, reactive } from 'vue'
 import TargetCostFormFields from '~/components/master-data/TargetCostFormFields.vue'
 import TargetCostAttachments from '~/components/target-cost/TargetCostAttachments.vue'
-import TargetCostMetricValue from '~/components/target-cost/TargetCostMetricValue.vue'
-import TargetCostProjectReturn from '~/components/target-cost/TargetCostProjectReturn.vue'
 import TargetCostSourceReturn from '~/components/target-cost/TargetCostSourceReturn.vue'
+import TargetCostProjectReturn from '~/pages/project/_components/TargetCostProjectReturn.vue'
+import TargetCostMetricValue from '~/pages/project/target-cost/_components/TargetCostMetricValue.vue'
 
 const read = vi.fn()
 const route = reactive({ path: '/contract/subcontract', query: { origin: 'real', budgetId: 'budget-a', budgetProject: 'p', budgetReturnTo: '/project/target-cost/budget-a?origin=real&tab=comparison' } as Record<string, string> })

@@ -1,23 +1,36 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, KeepAlive, reactive, shallowRef } from 'vue'
-import CentralPayrollDetailScreen from '~/components/payroll/CentralPayrollDetailScreen.vue'
-import CentralPayrollScreen from '~/components/payroll/CentralPayrollScreen.vue'
-import CentralPayrollSourcesScreen from '~/components/payroll/CentralPayrollSourcesScreen.vue'
 import PayrollEvidenceTable from '~/components/payroll/PayrollEvidenceTable.vue'
 import PayrollReadDiagnostics from '~/components/payroll/PayrollReadDiagnostics.vue'
 import PayrollReadFilters from '~/components/payroll/PayrollReadFilters.vue'
 import PayrollReadHistory from '~/components/payroll/PayrollReadHistory.vue'
 import PayrollReadNotice from '~/components/payroll/PayrollReadNotice.vue'
-import PayrollSnapshotEvidence from '~/components/payroll/PayrollSnapshotEvidence.vue'
 import PayrollSourceEvidence from '~/components/payroll/PayrollSourceEvidence.vue'
 import KitStatusTag from '~/components/ui/KitStatusTag.vue'
+import CentralPayrollDetailScreen from '~/pages/subcontract/payroll/_components/CentralPayrollDetailScreen.vue'
+import CentralPayrollScreen from '~/pages/subcontract/payroll/_components/CentralPayrollScreen.vue'
+import CentralPayrollSourcesScreen from '~/pages/subcontract/payroll/_components/CentralPayrollSourcesScreen.vue'
+import PayrollSnapshotEvidence from '~/pages/subcontract/payroll/_components/PayrollSnapshotEvidence.vue'
 import { payrollDetailFixture, payrollListFixture, payrollSourcesFixture } from '../helpers/payroll-central-read-fixture'
 
-const table = defineComponent({ props: ['columns', 'data', 'empty'], template: '<div role="table"><div v-for="row in data"><span v-for="column in columns"><slot v-if="column.slot" :name="column.slot" :row="row"/><template v-else>{{ row[column.field] }}</template></span></div></div>' })
+const table = defineComponent({ props: ['columns', 'data', 'empty', 'minRows'], template: '<div role="table"><div v-for="row in data"><span v-for="column in columns" :data-column="column.field"><slot v-if="column.slot" :name="column.slot" :row="row"/><template v-else>{{ row[column.field] }}</template></span></div></div>' })
 const link = defineComponent({ props: ['to'], setup: (props, { slots }) => () => h('a', { href: typeof props.to === 'string' ? props.to : `${props.to.path}?${new URLSearchParams(props.to.query)}` }, slots.default?.()) })
 const components = { PayrollReadNotice, PayrollReadDiagnostics, PayrollReadFilters, PayrollReadHistory, PayrollEvidenceTable, PayrollSnapshotEvidence, PayrollSourceEvidence, KitStatusTag }
-const stubs = { KitTable: table, SectionHeader: { props: ['title'], template: '<h2>{{title}}</h2>' }, KitButton: { template: '<button><slot /></button>' }, KitMultiSelectFilter: defineComponent({ props: ['label', 'modelValue'], setup: props => () => h('button', { 'aria-label': `${props.label}，已选 ${props.modelValue.length} 项` }, props.label) }), PayrollBatchDialog: { props: ['open', 'rows', 'projectId', 'month'], template: '<div v-if="open" data-testid="batch-dialog">{{projectId}}/{{month}}/{{rows.length}}</div>' }, PayrollWorkbookArchiveDialog: { props: ['open'], template: '<div v-if="open" data-testid="archive-dialog" />' }, NuxtLink: link }
+const stubs = {
+  KitTable: table,
+  SectionHeader: { props: ['title'], template: '<h2>{{title}}</h2>' },
+  KitButton: { template: '<button><slot /></button>' },
+  KitMultiSelectFilter: defineComponent({ props: ['label', 'modelValue'], setup: props => () => h('button', { 'aria-label': `${props.label}，已选 ${props.modelValue.length} 项` }, props.label) }),
+  PayrollBatchDialog: { props: ['open', 'rows', 'projectId', 'month'], template: '<div v-if="open" data-testid="batch-dialog">{{projectId}}/{{month}}/{{rows.length}}</div>' },
+  PayrollWorkbookArchiveDialog: { props: ['open'], template: '<div v-if="open" data-testid="archive-dialog" />' },
+  PayrollAStatementWorkspace: true,
+  PayrollC1StatementWorkspace: true,
+  PayrollC2StatementWorkspace: true,
+  PayrollAdjustmentHistorySection: true,
+  PayrollActualLedgerSection: true,
+  NuxtLink: link,
+}
 let route: ReturnType<typeof makeRoute>
 const detailRead = vi.fn()
 const listRead = vi.fn()
@@ -56,6 +69,11 @@ describe('工资中央只读资料', () => {
     route.query = { origin: 'real', project: 'project-a', month: '2026-08' }
     const wrapper = mount(CentralPayrollScreen, { global: { components, stubs } })
     await flushPromises()
+    expect(wrapper.get('[data-list-shell]').classes()).toContain('list-shell--continuous')
+    expect(wrapper.findComponent(table).props('minRows')).toBe(10)
+    expect(wrapper.get('[data-column="grossAmount"]').text()).toBe('¥0.00')
+    expect(wrapper.get('[data-column="actualAmount"]').text()).toBe('未记录')
+    expect(wrapper.get('[aria-label="工资台账汇总"]').text()).toContain('3 份记录 · 1 份已发放 · 1 份隔离历史')
     const checks = wrapper.findAll('input[type="checkbox"]')
     expect(checks).toHaveLength(1)
     await checks[0]!.setValue(true)

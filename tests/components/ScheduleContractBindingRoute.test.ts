@@ -41,7 +41,7 @@ describe('施工排程合同绑定路由', () => {
   it('把项目与分组参数交给独立整页 Screen', () => {
     render(ScheduleContractBindingPage, {
       global: {
-        components: {
+        stubs: {
           ScheduleContractBindingScreen: ScreenStub,
         },
       },

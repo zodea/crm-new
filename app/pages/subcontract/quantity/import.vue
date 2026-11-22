@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import QuantityImportScreen from '~/pages/subcontract/quantity/_components/QuantityImportScreen.vue'
+</script>
+
+<script setup lang="ts">
 </script>
 
 <template>

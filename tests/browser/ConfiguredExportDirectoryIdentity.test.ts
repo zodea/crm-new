@@ -3,11 +3,11 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { render } from 'vitest-browser-vue'
 import { page } from 'vitest/browser'
 import { computed, onUnmounted, shallowRef } from 'vue'
-import ExportConfigForm from '~/components/export/ExportConfigForm.vue'
 import KitButton from '~/components/ui/KitButton.vue'
 import ProcessStepper from '~/components/ui/ProcessStepper.vue'
 import { useConfiguredExportRunner } from '~/composables/useConfiguredExportRunner'
 import ExportConfigPage from '~/pages/export/config/[jobId].vue'
+import ExportConfigForm from '~/pages/export/config/_components/ExportConfigForm.vue'
 
 afterEach(() => vi.unstubAllGlobals())
 

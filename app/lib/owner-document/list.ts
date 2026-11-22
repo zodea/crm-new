@@ -1,3 +1,4 @@
+import type { KitStatusTone } from '~/components/ui/KitStatusTag.vue'
 import type { KitTableColumn } from '~/lib/kit/table'
 import type { OwnerCommercialDocumentListItemDTO } from '~/lib/owner-document/central-repository'
 import type {
@@ -25,8 +26,8 @@ export function ownerDocumentListRecordFromCentral(item: OwnerCommercialDocument
         : item.amounts.kind === 'owner_report'
           ? {
               amount: Number(item.amounts.reported),
-              secondaryAmount: Number(item.amounts.audited ?? 0),
-              tertiaryAmount: Number(item.amounts.difference ?? 0),
+              secondaryAmount: item.amounts.audited === null ? null : Number(item.amounts.audited),
+              tertiaryAmount: item.amounts.difference === null ? null : Number(item.amounts.difference),
             }
           : item.amounts.kind === 'final_settlement'
             ? {
@@ -558,20 +559,32 @@ export function ownerDocumentStatusLabelForList(
   return labels[kind]?.[view] ?? status
 }
 
-export function ownerDocumentStatusClass(
+export function ownerDocumentStatusTone(
   kind: OwnerDocumentKind,
   status: string,
-): string {
+): KitStatusTone {
   const view = ownerDocumentStatusViewKey(kind, status)
-  if (['rejected'].includes(view))
-    return 'chip-danger'
+  if (view === 'rejected')
+    return 'danger'
   if (['submitted', 'reported', 'checking', 'appealing', 'pending'].includes(view))
-    return 'chip-warn'
+    return 'warn'
   if (['approved', 'audited', 'done', 'confirmed', 'accepted', 'expired'].includes(view))
-    return 'chip-ok'
+    return 'ok'
   if (view === 'warranty')
-    return 'chip-brand'
-  return 'chip bg-surface-3 text-ink-faint'
+    return 'brand'
+  return 'neutral'
+}
+
+const OWNER_DOCUMENT_STATUS_CHIP_CLASSES: Record<KitStatusTone, string> = {
+  danger: 'chip-danger',
+  warn: 'chip-warn',
+  ok: 'chip-ok',
+  brand: 'chip-brand',
+  neutral: 'chip bg-surface-3 text-ink-faint',
+}
+
+export function ownerDocumentStatusClass(kind: OwnerDocumentKind, status: string): string {
+  return OWNER_DOCUMENT_STATUS_CHIP_CLASSES[ownerDocumentStatusTone(kind, status)]
 }
 
 export function ownerDocumentTypeLabel(kind: OwnerDocumentKind, type: string): string {

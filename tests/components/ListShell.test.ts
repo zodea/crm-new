@@ -120,6 +120,16 @@ describe('list shell', () => {
     expect(screen.getByRole('table', { name: '合同列表' })).toBeTruthy()
   })
 
+  it('为自定义汇总提供业务名称', () => {
+    render(ListShell, {
+      props: { continuous: true, summaryLabel: '目标成本列表汇总' },
+      slots: { summary: '<span>已签金额 ¥0.00</span>' },
+      global,
+    })
+
+    expect(screen.getByRole('status', { name: '目标成本列表汇总' }).textContent).toContain('¥0.00')
+  })
+
   it('按红圈句式格式化汇总值，并允许自定义汇总覆盖默认呈现', () => {
     const board = render(ListShell, {
       props: {

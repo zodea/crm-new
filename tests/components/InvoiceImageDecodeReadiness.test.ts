@@ -1,9 +1,9 @@
 import { fireEvent, render } from '@testing-library/vue'
 import { beforeEach, expect, it, vi } from 'vitest'
 import { computed, defineComponent, h, nextTick, onMounted, onScopeDispose, ref, shallowRef, useTemplateRef, watch } from 'vue'
-import InvoiceOriginalPanel from '~/components/invoice/InvoiceOriginalPanel.vue'
 import InvoiceRegionViewer from '~/components/invoice/InvoiceRegionViewer.vue'
-import InvoiceWorkspaceScreen from '~/components/invoice/InvoiceWorkspaceScreen.vue'
+import InvoiceOriginalPanel from '~/pages/finance/invoice/_components/InvoiceOriginalPanel.vue'
+import InvoiceWorkspaceScreen from '~/pages/finance/invoice/_components/InvoiceWorkspaceScreen.vue'
 
 const group = { id: 'invoice-number', pageIndex: 0, box: { x: 0.1, y: 0.2, width: 0.3, height: 0.1 }, keys: ['invoiceNumber'], labels: ['单据编号'] }
 const invoice = { id: 'synthetic-invoice', invoiceNumber: '001', fileName: '合成.png', buyer: '合成购买方', seller: '合成销售方', accountStatus: 'none', ocrStatus: 'done', reviewStatus: 'unreviewed', dupStatus: '', fieldConfidence: {} }
@@ -31,7 +31,7 @@ it('旧工作台真实原件面板收到字段定位后，图片解码前不声�
   vi.stubGlobal('useTabsStore', () => ({ registerCloseGuard: () => () => {} }))
   const Workbench = defineComponent({ setup: (_, { slots }) => () => h('div', [slots.source?.(), slots.review?.()]) })
   const Review = defineComponent({ emits: ['locate'], setup: (_, { emit }) => () => h('button', { onClick: () => emit('locate', 'invoiceNumber') }, '定位票号') })
-  const view = render(InvoiceWorkspaceScreen, { global: { components: { AdaptiveWorkbench: Workbench, InvoiceOriginalPanel, InvoiceRegionViewer, InvoiceReviewForm: Review }, stubs: { InvoiceWorkspaceToolbar: true, InvoiceManualEntryDialog: true, InvoicePrintDocument: true, InvoicePrintLayout: true, InvoiceRecognitionChanges: true } } })
+  const view = render(InvoiceWorkspaceScreen, { global: { components: { AdaptiveWorkbench: Workbench, InvoiceOriginalPanel, InvoiceRegionViewer }, stubs: { InvoiceReviewForm: Review, InvoiceWorkspaceToolbar: true, InvoiceManualEntryDialog: true, InvoicePrintDocument: true, InvoicePrintLayout: true, InvoiceRecognitionChanges: true } } })
   const image = view.getByRole('img', { name: '合成.png' })
   await fireEvent.click(view.getByRole('button', { name: '定位票号' }))
   expect(view.queryByTestId('invoice-region-box')).toBeNull()

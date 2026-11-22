@@ -1,6 +1,6 @@
 // BoqBuildingEvidenceScreen — 原合同清单楼栋证据更正 / 只读来源整页（路由 boqBuildingEvidence，
 // 对应实现 /contract/boq/building-evidence?project&contract&origin=real&line&mode=read&returnTo）。
-// 依据：app/components/boq/BoqBuildingEvidenceScreen.vue、app/composables/useBoqBuildingEvidence.ts、
+// 依据：app/pages/contract/boq/_components/BoqBuildingEvidenceScreen.vue、app/composables/useBoqBuildingEvidence.ts、
 //       app/lib/boq/central-building-contract.ts、app/lib/schedule/binding-navigation.ts、ADR 0014（独立整页表单）、
 //       ADR 0017（暂估排程绑定合同）、docs/design/runtime-reference-audit.md（#445 行）。
 // 入口（实现）：排程「绑定施工合同」复核的阻断区「补齐合同楼栋证据」（未绑定 → 更正态）；

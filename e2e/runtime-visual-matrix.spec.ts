@@ -11,6 +11,7 @@ import {
   expectTabSequence,
 } from './helpers/responsive'
 import { VISUAL_BASE_URL, VISUAL_DATA_PROFILE } from './helpers/visual-environment'
+import { installVisualFont, visualFontLoaded } from './helpers/visual-font'
 
 const DATA_VISIBILITY_STORAGE_KEY = 'ruihang:workspace-default:include-demo'
 const RESPONSIVE_WIDTHS = [390, 768, 1024, 1280, 1440] as const
@@ -260,6 +261,7 @@ const SAMPLES: VisualSample[] = [
     key: 'notification-sheet',
     path: '/?project=proj_demo_001&origin=demo',
     prepare: async (page, width) => {
+      await expect(page.getByTestId('home-schedule-scroll')).toBeVisible()
       await page.getByRole('button', { name: /打开通知中心/ }).click()
       const sheet = page.getByRole('dialog', { name: '消息中心' })
       await expect(sheet).toBeVisible()
@@ -294,15 +296,15 @@ const SAMPLES: VisualSample[] = [
     prepare: async (page) => {
       await expect(page.locator('[data-ui="project-detail-screen"]')).toBeVisible()
       await expect(page.getByRole('status', { name: '测试数据只读详情' })).toBeVisible()
+      await expect(page.getByRole('heading', { name: '管理费实际成本' })).toBeVisible()
+      await expect(page.getByRole('heading', { name: '项目收款', exact: true })).toBeVisible()
+      await expect(page.getByRole('heading', { name: '项目商务单据', exact: true })).toBeVisible()
     },
     sensitive: page => [
       ...stableSensitive(page),
       ...tableSensitive(page),
       page.locator('[data-shell-topbar] h1'),
-      page.locator('[data-shell-workspace] h2'),
-      page.locator('[data-shell-workspace] h2').locator('xpath=../following-sibling::div[1]'),
-      page.locator('[data-shell-workspace] h2').locator('xpath=following-sibling::span[1]'),
-      page.locator('[data-shell-workspace] h2').locator('xpath=../../preceding-sibling::span[1]'),
+      page.locator('#project-detail-title'),
       page.locator('[data-shell-workspace] .info-cell > div:last-child'),
       page.locator('[data-shell-workspace] .font-mono'),
       page.locator('[data-shell-workspace] strong'),
@@ -372,6 +374,7 @@ const SAMPLES: VisualSample[] = [
 ]
 
 test.beforeEach(async ({ page }) => {
+  await installVisualFont(page)
   await page.context().setExtraHTTPHeaders({ 'x-ruihang-test-session': `visual-${randomUUID()}` })
   await page.clock.install({ time: VISUAL_NOW })
   await page.addInitScript((dataVisibilityStorageKey) => {
@@ -409,6 +412,8 @@ test.describe('#184 / #186 / #187 / #188 / #189 运行态视觉基线', () => {
         await expectVisualEnvironment(page)
         await sample.prepare(page, width)
         await page.waitForLoadState('networkidle')
+        // 字体未加载时不能退回系统字体并生成看似有效的视觉基线。
+        expect(await visualFontLoaded(page), '视觉测试必须加载固定的中文测试字体').toBe(true)
         // 夹具可能通过正式回执地址重新加载文档，截图脱敏样式须注入最终文档。
         await page.addStyleTag({
           content: `
@@ -461,6 +466,13 @@ test.describe('#184 / #186 / #187 / #188 / #189 运行态视觉基线', () => {
             input.dataset.visualEmptyDate = ''
         }))
         await redactSensitiveText(sample.sensitive?.(page, width) ?? stableSensitive(page))
+        if (sample.key === 'detail') {
+          for (const name of ['管理费实际成本', '项目收款', '项目商务单据']) {
+            const heading = page.getByRole('heading', { name, exact: true })
+            const color = await heading.evaluate(element => getComputedStyle(element).getPropertyValue('-webkit-text-fill-color'))
+            expect(color, `${name} 标题不能被截图脱敏隐藏`).not.toBe('rgba(0, 0, 0, 0)')
+          }
+        }
         await expectNoPageOverflow(page, `${sample.key} @ ${width}px`)
 
         await expect(page).toHaveScreenshot(`${sample.key}-${width}.png`, {
@@ -470,6 +482,20 @@ test.describe('#184 / #186 / #187 / #188 / #189 运行态视觉基线', () => {
           maskColor: MASK_COLOR,
           maxDiffPixels: 0,
         })
+        if (sample.key === 'detail') {
+          // 新增上方信息后，基础信息可能移出首屏；继续保护原有详情区域。
+          const information = page.locator('[data-ui="project-info-section"]').first()
+          await information.scrollIntoViewIfNeeded()
+          await expect(information).toBeInViewport()
+          await expect(page.getByRole('region', { name: '项目分供方' })).toBeVisible()
+          await expectNoPageOverflow(page, `项目详情基础信息 @ ${width}px`)
+          await expect(page).toHaveScreenshot(`detail-lower-${width}.png`, {
+            animations: 'disabled',
+            caret: 'hide',
+            maskColor: MASK_COLOR,
+            maxDiffPixels: 0,
+          })
+        }
       })
     }
   }

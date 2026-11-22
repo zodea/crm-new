@@ -1,30 +1,10 @@
-import { readdirSync } from 'node:fs'
-import { relative, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { routeTitle } from '~/lib/tabs/tab-title'
+import { readAppPageFiles } from '../../scripts/design-coverage.mjs'
 
 function productionPageSamples(): Array<[file: string, routePath: string]> {
-  const pagesRoot = resolve(process.cwd(), 'app/pages')
-  const files: string[] = []
-
-  function collect(directory: string) {
-    for (const entry of readdirSync(directory, { withFileTypes: true })) {
-      const absolutePath = resolve(directory, entry.name)
-      if (entry.isDirectory()) {
-        if (absolutePath === resolve(pagesRoot, 'dev'))
-          continue
-        collect(absolutePath)
-      }
-      else if (entry.name.endsWith('.vue')) {
-        files.push(absolutePath)
-      }
-    }
-  }
-
-  collect(pagesRoot)
-  return files.map((file) => {
-    const segments = relative(pagesRoot, file)
-      .replaceAll('\\', '/')
+  return readAppPageFiles().filter(file => !file.startsWith('dev/')).map((file) => {
+    const segments = file
       .replace(/\.vue$/, '')
       .split('/')
       .filter((segment, index, list) => segment !== 'index' || index !== list.length - 1)
@@ -34,7 +14,7 @@ function productionPageSamples(): Array<[file: string, routePath: string]> {
         const dynamicName = segment.match(/^\[\[?([^\]]+)\]?\]$/)?.[1]
         return dynamicName ? `${dynamicName}_fixture` : segment
       })
-    return [relative(pagesRoot, file).replaceAll('\\', '/'), `/${segments.join('/')}` || '/']
+    return [file, `/${segments.join('/')}` || '/']
   })
 }
 

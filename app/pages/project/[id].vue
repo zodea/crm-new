@@ -9,6 +9,8 @@ import {
 } from '~/lib/nav/return-to'
 import { validateOwnerDocumentDetailReturnTo } from '~/lib/owner-document/return-context'
 import { validateProjectSupplierIdentityReturnTo } from '~/lib/project-supplier/return-context'
+import ProjectDetailScreen from '~/pages/project/_components/ProjectDetailScreen.vue'
+import TargetCostProjectReturn from '~/pages/project/_components/TargetCostProjectReturn.vue'
 import { isDataOriginDTO } from '~/types/read-model'
 
 const route = useRoute()

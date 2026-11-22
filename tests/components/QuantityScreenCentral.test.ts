@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/vue'
 import { flushPromises } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, defineComponent, onMounted, reactive, shallowRef, watch } from 'vue'
-import QuantityScreen from '~/components/quantity/QuantityScreen.vue'
+import QuantityScreen from '~/pages/subcontract/quantity/_components/QuantityScreen.vue'
 
 const databaseRead = vi.hoisted(() => vi.fn(() => {
   throw new Error('浏览器不得直读 SQLite')
@@ -53,7 +53,23 @@ afterEach(() => {
 })
 const Toolbar = defineComponent({ props: ['projectId', 'projectOptions', 'canWrite'], emits: ['update:projectId', 'manageStages', 'toggleArchive', 'exportByCategory'], template: `<div><select aria-label="项目" :value="projectId" @change="$emit('update:projectId', $event.target.value)"><option v-for="option in projectOptions" :key="option.key" :value="option.key">{{ option.label }}</option></select><button @click="$emit('manageStages')">阶段配置</button><button @click="$emit('toggleArchive')">归档矩阵</button><button @click="$emit('exportByCategory')">分类导出</button></div>` })
 function open() {
-  return render(QuantityScreen, { global: { stubs: { QuantityToolbar: Toolbar, QuantityProgressCards: true, QuantityWorkspace: true, QuantityAssignmentDialog: true, QuantityCompletionDialog: true, QuantityBatchCompletionDialog: true, QuantityVarianceDialog: true, NuxtLink: true, KitButton: { template: '<button><slot /></button>' } } } })
+  return render(QuantityScreen, {
+    global: {
+      stubs: {
+        QuantityToolbar: Toolbar,
+        QuantityProgressCards: true,
+        QuantityWorkspace: true,
+        QuantityAssignmentDialog: true,
+        QuantityCommandRecovery: true,
+        QuantityCompletionDialog: true,
+        QuantityBatchCompletionDialog: true,
+        QuantityVarianceDialog: true,
+        PayrollACreateFromQuantity: true,
+        NuxtLink: true,
+        KitButton: { template: '<button><slot /></button>' },
+      },
+    },
+  })
 }
 
 describe('正式工程量矩阵来源与入口', () => {

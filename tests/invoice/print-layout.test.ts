@@ -62,6 +62,15 @@ describe('发票打印排版', () => {
     expect(checkPrintableInvoice({ id: 'confirmed', ...ready })).toEqual({ ok: true })
   })
 
+  it('已补原件的 Excel 票还需要明确的识别、核对和去重状态', () => {
+    const linked = { ...ready, id: 'linked', source: 'excel', original: { id: 'original-1' } }
+    expect(checkPrintableInvoice(linked)).toEqual({ ok: true })
+    expect(checkPrintableInvoice({ ...linked, original: { id: ' ' } }).ok).toBe(false)
+    expect(checkPrintableInvoice({ ...linked, ocrStatus: undefined }).ok).toBe(false)
+    expect(checkPrintableInvoice({ ...linked, reviewStatus: undefined }).ok).toBe(false)
+    expect(checkPrintableInvoice({ ...linked, dupStatus: undefined }).ok).toBe(false)
+  })
+
   it.each([
     { label: 'Excel 导入且没有原件', patch: { source: 'excel' }, reason: 'Excel 导入的发票没有原件，不能打印' },
     { label: '识别失败', patch: { ocrStatus: 'failed' }, reason: '识别尚未完成，不能进入打印队列' },

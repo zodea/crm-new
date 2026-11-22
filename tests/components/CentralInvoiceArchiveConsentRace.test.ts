@@ -26,6 +26,7 @@ const signatories = [{ id: 'synthetic-buyer', label: '合成购方', version: '1
 
 function fixture(workspaceId: string, invoiceNumber: string, amount: number, additional: CentralInvoiceRecord[] = []) {
   const identity = { workspaceId, actorId: 'synthetic-actor' }
+  const capabilities = ['finance-invoice:read', 'finance-invoice:write']
   let current: CentralInvoiceRecord = {
     id: 'same-invoice',
     version: '1',
@@ -68,14 +69,14 @@ function fixture(workspaceId: string, invoiceNumber: string, amount: number, add
     current = { ...current, accountStatus: 'archived', ownerKind: 'project', projectId: command.projectId, supplierId: command.supplierId, archivedAt: '2026-01-02T00:00:00.000Z', updatedAt: '2026-01-02T00:00:00.000Z', version: '2' }
     return { invoiceId: current.id, commandId: command.commandId, version: current.version, updatedAt: current.updatedAt, originalId: null }
   })
-  const get = vi.fn(async () => ({ record: structuredClone(current), sourceVersion: 'invoices:2', meta: { sources: [{ key: 'invoices', sourceVersion: 'invoices:2' }] } }))
-  const list = vi.fn(async () => ({ items: structuredClone([current, ...additional]), pagination: { total: 1 + additional.length }, sourceVersion: 'invoices:1', meta: { sources: [{ key: 'invoices', sourceVersion: 'invoices:1' }] } }))
+  const get = vi.fn(async () => ({ record: structuredClone(current), sourceVersion: 'invoices:2', capabilities: [...capabilities], meta: { sources: [{ key: 'invoices', sourceVersion: 'invoices:2' }] } }))
+  const list = vi.fn(async () => ({ items: structuredClone([current, ...additional]), pagination: { total: 1 + additional.length }, sourceVersion: 'invoices:1', capabilities: [...capabilities], meta: { sources: [{ key: 'invoices', sourceVersion: 'invoices:1' }] } }))
   let contextHook: () => Promise<void> = async () => {}
   const workspace = createCentralInvoiceWorkspace({
     identity,
     context: async () => {
       await contextHook()
-      return { ...identity, capabilities: ['finance-invoice:read', 'finance-invoice:write'] }
+      return { ...identity, capabilities: [...capabilities] }
     },
     client: { list, execute, get } as never,
     recognizeLocal: vi.fn() as never,

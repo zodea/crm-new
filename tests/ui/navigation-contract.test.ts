@@ -1,6 +1,8 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
-import { extname, join, relative } from 'node:path'
+import { existsSync, mkdirSync, mkdtempDisposableSync, readFileSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { readAppPageFiles } from '../../scripts/design-coverage.mjs'
 
 const PROJECT_ROOT = process.cwd()
 const PAGES_ROOT = join(PROJECT_ROOT, 'app/pages')
@@ -8,17 +10,10 @@ const CONTRACT_PATH = join(PROJECT_ROOT, 'docs/rewrite/NAVIGATION.md')
 const READ_MODELS_PATH = join(PROJECT_ROOT, 'docs/rewrite/READ-MODELS.md')
 const DOCS_INDEX_PATH = join(PROJECT_ROOT, 'docs/README.md')
 
-function productionPageFiles(directory = PAGES_ROOT): string[] {
-  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
-    const path = join(directory, entry.name)
-    if (entry.isDirectory()) {
-      const isRootDevDirectory = directory === PAGES_ROOT && entry.name === 'dev'
-      return isRootDevDirectory ? [] : productionPageFiles(path)
-    }
-    return extname(entry.name) === '.vue'
-      ? [relative(PROJECT_ROOT, path).replaceAll('\\', '/')]
-      : []
-  }).sort()
+function productionPageFiles(): string[] {
+  return readAppPageFiles(PAGES_ROOT)
+    .filter(path => !path.startsWith('dev/'))
+    .map(path => `app/pages/${path}`)
 }
 
 function nuxtRouteForPage(page: string): string {
@@ -76,6 +71,26 @@ function readModelDomainCodes(markdown: string): string[] {
 }
 
 describe('cross-domain navigation contract', () => {
+  it('仅排除名为 _components 的各层页面私有目录', () => {
+    using fixture = mkdtempDisposableSync(join(tmpdir(), 'crm-page-files-'))
+    for (const file of [
+      'index.vue',
+      'contract/boq/[id].vue',
+      'contract/boq/_components-copy/index.vue',
+      '_components/PrivateRoot.vue',
+      'contract/boq/_components/nested/PrivateChild.vue',
+    ]) {
+      const path = join(fixture.path, file)
+      mkdirSync(dirname(path), { recursive: true })
+      writeFileSync(path, '<template />')
+    }
+    expect(readAppPageFiles(fixture.path)).toEqual([
+      'contract/boq/[id].vue',
+      'contract/boq/_components-copy/index.vue',
+      'index.vue',
+    ])
+  })
+
   it('registers only existing production target paths', () => {
     expect(existsSync(CONTRACT_PATH)).toBe(true)
 

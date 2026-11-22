@@ -1,4 +1,5 @@
 import { resolveBusinessSession } from '../../../utils/business-session'
+import { demoWorkspaceTestInstance } from '../../../utils/demo-workspace-test-instance'
 import { productionSession, throwProductionStorageError } from '../../../utils/production-runtime'
 import { productionSupplierRuntime } from '../../../utils/production-supplier-runtime'
 import { throwProjectReadError } from '../../../utils/project-read-error'
@@ -12,7 +13,7 @@ export default defineEventHandler(async (event) => {
       return await production.suppliers.importRow(await readBody(event), productionSession(event))
     return await supplierCommandTestInstance.importRow(
       parseSupplierImportCommandRequest(await readBody(event)),
-      resolveBusinessSession(),
+      { ...resolveBusinessSession(), capabilities: demoWorkspaceTestInstance.capabilities(getHeader(event, 'x-ruihang-test-session')) },
       getHeader(event, 'x-ruihang-test-session'),
     )
   }

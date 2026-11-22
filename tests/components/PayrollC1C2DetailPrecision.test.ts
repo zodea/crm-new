@@ -1,7 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, expect, it, vi } from 'vitest'
-import CentralPayrollDetailScreen from '~/components/payroll/CentralPayrollDetailScreen.vue'
-import PayrollEvidenceTable from '~/components/payroll/PayrollEvidenceTable.vue'
+import CentralPayrollDetailScreen from '~/pages/subcontract/payroll/_components/CentralPayrollDetailScreen.vue'
 import { payrollDetailFixture } from '../helpers/payroll-central-read-fixture'
 
 afterEach(() => vi.unstubAllGlobals())
@@ -18,10 +17,12 @@ it.each([
   vi.stubGlobal('usePayrollStatementDetailStore', () => ({ loadRead: async () => read }))
   vi.stubGlobal('useDataVisibilityStore', () => ({ includeDemo: false }))
   vi.stubGlobal('useTabTitle', vi.fn())
-  const view = mount(CentralPayrollDetailScreen, { global: { components: { PayrollEvidenceTable }, stubs: {
+  const view = mount(CentralPayrollDetailScreen, { global: { stubs: {
     PayrollC1StatementWorkspace: true,
     PayrollC2StatementWorkspace: true,
     PayrollAStatementWorkspace: true,
+    PayrollAdjustmentHistorySection: true,
+    PayrollActualLedgerSection: true,
     PayrollReadNotice: true,
     PayrollReadDiagnostics: true,
     PayrollSnapshotEvidence: true,

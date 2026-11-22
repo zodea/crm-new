@@ -1,5 +1,5 @@
 // OtherSettleImportScreen — 支出结算历史迁入（route otherSettleImport ↔ 实现 /contract/other-settlement/import，
-// 对应 app/components/other-settlement/OtherSettlementImportPage.vue；Q-A03-02 既有结算原图显式迁入中央事务）。
+// 对应 app/pages/contract/other-settlement/_components/OtherSettlementImportPage.vue；Q-A03-02 既有结算原图显式迁入中央事务）。
 // 口径：
 //   ① 完整 Native 原库：保留原稳定 ID、原文、原件、旧审计及原命令；旧回执只作历史证据，当前付款来源仍须真实费用
 //      与当前可核实的结算净额；选择完整 SQLite 原库（≤64 MiB）+「从桌面设置导出完整一致快照」+ 明确清除来源包；

@@ -33,7 +33,8 @@ afterEach(() => {
   vi.unstubAllGlobals()
   document.body.innerHTML = ''
 })
-const page = () => mount(QuantityHollowFormPage, { props: { projectId: 'project', unitId: 'unit' }, attachTo: document.body, global: { stubs: { PayrollASourceReturn: true } } })
+const global = { stubs: { PayrollASourceReturn: true, QuantityHollowCommandRecovery: true } }
+const page = () => mount(QuantityHollowFormPage, { props: { projectId: 'project', unitId: 'unit' }, attachTo: document.body, global })
 type Page = ReturnType<typeof page>
 const button = (wrapper: Page, label: string) => wrapper.findAll('button').find(button => button.text() === label)!
 async function fill(wrapper: Page, count = '19') {
@@ -125,7 +126,7 @@ it('同户另一动作冷打开只核对原提交，不把检查字段套进修�
   setActivePinia(createPinia())
   repository.hollow.mockResolvedValue(hollowRead([hollowRecord(original)]))
   route.path = '/subcontract/quantity/project/unit/hollow/form/record'
-  const other = mount(QuantityHollowFormPage, { props: { projectId: 'project', unitId: 'unit', recordId: 'record' }, global: { stubs: { PayrollASourceReturn: true } } })
+  const other = mount(QuantityHollowFormPage, { props: { projectId: 'project', unitId: 'unit', recordId: 'record' }, global })
   await flushPromises()
   expect(other.get('[aria-label="原空鼓提交内容"]').text()).toContain('记录空鼓检查')
   expect(other.get('[aria-label="原空鼓提交内容"]').text()).toContain('0 处')
