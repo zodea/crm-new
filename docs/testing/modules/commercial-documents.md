@@ -17,6 +17,7 @@
 | [tests/owner-document/central-http-repository.test.ts](../../../tests/owner-document/central-http-repository.test.ts) | 单元／服务／状态 | 甲方商务单据中央 HTTP Repository |
 | [tests/owner-document/central-read-instance.test.ts](../../../tests/owner-document/central-read-instance.test.ts) | 单元／服务／状态 | 甲方商务单据中央读取实例 |
 | [tests/owner-document/central-repository-contract.test.ts](../../../tests/owner-document/central-repository-contract.test.ts) | 单元／服务／状态 | 甲方商务单据中央读取契约 |
+| [tests/owner-document/central-snapshot.test.ts](../../../tests/owner-document/central-snapshot.test.ts) | 单元／服务／状态 | 商务完整状态图、原命令/封存、独立整改抵扣、真实零与未知、冻结生命周期及损坏整图拒绝 |
 | [tests/owner-document/command-intent.test.ts](../../../tests/owner-document/command-intent.test.ts) | 单元／服务／状态 | 甲方商务单据命令意图 |
 | [tests/owner-document/form-version.test.ts](../../../tests/owner-document/form-version.test.ts) | 单元／服务／状态 | 甲方商务单据表单实例版本 |
 | [tests/owner-document/forms.test.ts](../../../tests/owner-document/forms.test.ts) | 单元／服务／状态 | f5 甲方/分包单据领域事务 |
@@ -40,6 +41,7 @@
 | [tests/components/OwnerDocumentLineGrid.test.ts](../../../tests/components/OwnerDocumentLineGrid.test.ts) | 组件（jsdom） | ownerDocumentLineGrid behavior |
 | [tests/components/OwnerDocumentListScreen.test.ts](../../../tests/components/OwnerDocumentListScreen.test.ts) | 组件（jsdom） | owner document list screen |
 | [tests/components/OwnerDocumentListToolbar.test.ts](../../../tests/components/OwnerDocumentListToolbar.test.ts) | 组件（jsdom） | 甲方商务单据列表工具栏权限 |
+| [tests/components/OwnerDocumentMigrationPanel.test.ts](../../../tests/components/OwnerDocumentMigrationPanel.test.ts) | 组件（jsdom） | 商务完整来源采用、最小原键及可靠后读、身份/来源切换隔离 |
 | [tests/components/OwnerFinalSettlementDetailScreen.test.ts](../../../tests/components/OwnerFinalSettlementDetailScreen.test.ts) | 组件（jsdom） | 甲方最终结算专属只读详情 |
 | [tests/components/OwnerPenaltyDetailScreen.test.ts](../../../tests/components/OwnerPenaltyDetailScreen.test.ts) | 组件（jsdom） | 甲方罚扣专属只读详情 |
 | [tests/components/SubcontractChangeDetailScreen.test.ts](../../../tests/components/SubcontractChangeDetailScreen.test.ts) | 组件（jsdom） | 分包变洽签专属只读详情 |

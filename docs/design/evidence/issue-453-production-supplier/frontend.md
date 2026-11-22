@@ -26,12 +26,6 @@
 
 页面在 390 / 768 / 1024 / 1280 / 1440px 检查文档无横溢，原件下载操作可在页面内滚动到达。上传弹窗键盘取消后焦点回到上传按钮，证照页返回同一分供方详情。浏览器没有未处理异常。
 
-最终机器回执见[浏览器结果](./browser.json)。截图只保留必要的 390px 与 1440px 两档：
-
-| 页面 | 窄屏 | 桌面 |
-| --- | --- | --- |
-| 未接入的列表数值与正常主档 | [390px](./screens/unavailable-list-390.png) | [1440px](./screens/unavailable-list-1440.png) |
-| 未接入的合同事实 | [390px](./screens/unavailable-facts-390.png) | [1440px](./screens/unavailable-facts-1440.png) |
-| 原证照恢复及原件操作 | [390px](./screens/recovered-credential-390.png) | [1440px](./screens/recovered-credential-1440.png) |
+当时在 390px 和 1440px 保存了列表、合同事实和原证照恢复截图。当前仓库可追溯的验证入口是上述常驻用例和本页结果摘要。
 
 未生成指南 PDF。合成原件只用于运行验证，不作为业务资料交付；普通临时截图、日志和下载副本在证据归档后清理，数据库不纳入清理或 Git。

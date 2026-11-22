@@ -396,9 +396,18 @@ Issue #447 在同一专用响应中返回当前识别快照、原始候选、置
 临期/过期主动进入应用 inbox，提供当前问题状态、首次发现/最近核对时点、当前严重度和资料入口。事件按供应方、证照及同一问题身份去重；继续临期、转过期、续期或补齐后，问题状态随事实更新。readAt 仅表示消息已读，已读不能把持续资料问题变成已解决；问题解除保留可追溯事件。用户刷新时返回当前问题状态和真实来源版本，不以此前 toast 或已读状态代替时效计算。
 
 本机服务运行时按上海业务日重新评估；停机/离线期间不能承诺后台实时提醒，启动后补算当前问题并对账事件。范围仅应用 inbox，不扩展邮件、系统通知或新外部发送通道。当前时效计算、纯读取与事件接入状态见[实现差异](#implementation-gaps)。
-### AX02 分包结算
+<a id="ax02-分包结算"></a>
+<a id="business-document-production-read"></a>
 
-`ownerCommercialDocumentRead` 的 `sub_settlement` 列表/详情使用专属 `SubcontractSettlementAmounts`，项目/合同/分供方与附件按真实 ID 读取。金额和空错权限语义见[页面蓝本](./pages/owner-documents.md#issue-328-分包结算中央只读链)，累计事实不复制到头记录。
+### 商务单据正式读取与 AX02 分包结算
+
+正式 `ownerCommercialDocumentRead` 使用 `owner-document-read-v3`；八类列表/详情、验收双视图及项目/合同宿主均消费同一真实事实，保稳定 ID、来源范围、真实版本和读取时点。原头、已确认量价及历史字段不因关联源重读而被改写。缺 BOQ 或关联主档读权只使对应来源受限，不能把有权读取的既有甲方变洽签文书伪装成空列表；已采用原关系文本以只读登记事实展示，失效/受限目标不生成可点击导航。正式 owner、版本及原件只见 [DATABASE](./DATABASE.md#pg-11-business-storage)，写入与原命令恢复只见 [COMMANDS](./COMMANDS.md#owner-document-production-commands)。
+
+商务 `meta.sources` 分别声明合同、协议、BOQ 变化、申请、实付和普通收款的可读、无权、不可用或未请求状态。读取版本绑定实际消费事实；关联源变化不能只保旧商务头修订。金额缺失为 `null`，明确零保持零，汇总保已知小计与缺失数；只有完整读取的空集合可以为零。当前正式普通收款尚未接入，因此最终结算累计收款/差额保未知，同时已可读的合同、协议和变洽签分区仍独立展示；金额组成只见 [DATABASE](./DATABASE.md#owner-final-settlement-amounts)。
+
+`sub_settlement` 的 `SubcontractSettlementAmounts` 和来源分区保留合同原额、有效协议、独立分包变洽签、本期/往期结算、独立罚扣抵扣、申请/批复与实际支付。原单金额和本单抵扣/分摊分别显示，不能用批复替代现金或把合同汇总反写为结算额。支付按有效申请和已确认支付的精确分摊读取；一份申请关联多张结算且无结算级现金归属时，仍可展示支付原单与申请关系，本单已付/未付保持未知。历史申请资格不可核验时保已确认现金、声明当前申请额度缺口，不释放推算余额。F3 按真实结算 owner 的权限引用同一头，分流决定仅见 [Q-PG11-01](./ARCHITECTURE.md#pg-11-settlement-owner-decision)。各来源独立空态/缺口、稳定原单下钻及返回见[页面蓝本](./pages/owner-documents.md#issue-328-分包结算中央只读链)。
+
+项目详情的九个商务视图在同一次项目读取响应中投影：五类甲方单据中验收/保修分开呈现，再加分包变洽签、分包结算和项目罚扣；验收双视图仍共用一条记录。合同宿主在既有事务中按项目/合同稳定 ID 读取商务事实，不能再次进入 coordinator、复制目录或扩大读取到所有现金来源。
 
 ### AX04 辅助合同中央读面
 
@@ -579,7 +588,7 @@ Issue #425 的 `CustomerDetailReadDTO.contracts` 复用施工合同中央主读�
 <a id="客户已有中央收款来源"></a>
 ### 普通收款及客户关联来源
 
-Issue #436 将普通收款接入单一中央命令事实源，取代 #426 依赖最终结算文档的临时投影边界。列表、详情、表单、客户关系、施工合同累计、项目收入和最终结算共用原始收款，按 `(dataOrigin, id)` 去重；没有最终结算的普通收款仍进入关系，多张结算不重复累计。原始 `facts` 不读取消费方的聚合，避免客户—合同—收款相互递归。读取版本随收款和合同事实变化，普通读取不导入正式样例。
+Issue #436 将开发中央适配的普通收款接入单一命令事实源，取代 #426 依赖最终结算文档的临时投影边界。其列表、详情、表单、客户关系、施工合同累计、项目收入和最终结算共用原始收款，按 `(dataOrigin, id)` 去重；没有最终结算的普通收款仍进入关系，多张结算不重复累计。原始 `facts` 不读取消费方的聚合，避免客户—合同—收款相互递归。读取版本随收款和合同事实变化，普通读取不导入正式样例。此接缝尚不证明正式普通收款 owner 已登记；正式商务读取的当前缺口见[商务读面](#business-document-production-read)。
 
 普通收款读取使用 `receipt:read`；详情按稳定 ID 与 `dataOrigin` 独立读取，客户上下文不是必需身份。项目、客户和合同引用分别复验对应读权，受限引用不返回 ID/名称，包含受限关联的记录撤下 `receipt:write`。列表分页和汇总使用同一完整筛选集，正式与演示分别汇总。金额缺失为 `null`，已知零为两位小数字符串；未知历史账号、分类与类型不从其他字段推断。字段展示及状态口径见[收款页面契约](./pages/finance-receipt.md)。
 
@@ -644,10 +653,10 @@ adapter 切换须用同一确定事实验证身份、列表/详情、三维状�
 | 班组—工人 | app/lib/crew-worker、app/stores/crew-worker-read.ts 与 server/api/read/crews*、workers*；全局列表及成员候选跨页读取稳定身份，项目标签读取现有同源项目主档；原班组/项目变更后回读、原命令回执与历史冻结已有定向验证。显式 Tauri 仍有本地适配；正式持久接管及业务定义分别直达 ARCHITECTURE 与 [DATABASE](./DATABASE.md#global-worker-crew-directory) |
 | 核心/辅助合同、BOQ | app/lib/material-contract、construction-contract、subcontract-contract、auxiliary-contract、other-settlement；canonical kind 与补充协议按稳定父子关系读取 |
 | 施工主合同开支来源 | `GET /api/read/construction-scope/spending` 按实际项目和可选主合同读取；原材采、分包、其他支出合同承诺及唯一原费用分别从自己的持久 owner 派生，已知部分与完整值分开，未接或无权的发票／结算／支付来源明确缺口。工资返回项目范围的原实际事实，归集边界直达 [已答决定](./ARCHITECTURE.md#opt-02-scope-decision) |
-| 甲方/分包单据 | app/lib/owner-document/central-*、owner-commercial-document-read.ts；独立 kind/capability/金额投影，sub_settlement 与 project_penalty 使用专属事实 |
+| 甲方/分包单据 | app/lib/owner-document/central-*、server/utils/production-owner-document-*；八类正式磁盘事实/专属金额与来源证据，BOQ 变洽签沿原 owner，项目及合同宿主同源读取。共享结算与当前收付缺口见[商务读面](#business-document-production-read) |
 | 项目分供方 | app/lib/project-supplier、project-supplier-read.ts；双 ID 与六类事实，合作文件 owner 的实际正文校验已接，其他文件 owner 以实际实现为准 |
 | 送货/材料价格 | app/lib/delivery、material、material-quotation 与 app/stores/delivery-record.ts；送货、合同和独立报价按各实际 owner 组合原价及版本，缺源分别呈现；报价的归属和迁入范围直达 [DATABASE](./DATABASE.md#quotation-target) |
-| 普通收款/支出财务/票据 | 普通收款 app/lib/receipt 独立中央事实；F3 app/lib/finance 的往来、报销、申请、实付和开票申请由正式 finance 参与者读取，实际付款详情同事务关联已接结算与分摊；未登记的采购发票或合同来源仍分别不可用，不能以开票申请代替发票台账 |
+| 普通收款/支出财务/票据 | 开发中央普通收款 app/lib/receipt 保持独立事实，正式 owner 尚未登记。F3 app/lib/finance 的往来、报销、申请、实付和开票申请由正式 finance 参与者读取，付款详情同事务关联已接结算/分摊；未登记的外域分别不可用，不能以开票申请代替发票台账 |
 | 工程量/排程/标准库 | app/lib/quantity、schedule，中央 #442–#445 与本机标准库 #463；冻结依据与当前来源独立 |
 | 工资/目标成本 | app/lib/payroll、target-cost 与专属 read operation；#412 分阶段、#449/#477/#479 有独立证据，生产落盘不能从测试中央通过推定 |
 | 公共洞察/通知 | app/lib/finance/payment-detail.ts、PaymentApplicationInsightPanel.vue、app/stores/notifications.ts；分供方资料提醒已接本机持久公共通知 owner，其他未接领域保留真实缺口；静态样本只在服务端授权演示可见 |
