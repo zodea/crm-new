@@ -38,6 +38,9 @@
 | [tests/production/storage.test.ts](../../../tests/production/storage.test.ts) | 单元／服务／状态 | 磁盘权威事务提交后冷打开保留原值，失败事务不留下半份结果 |
 | [tests/production/boq-migration.test.ts](../../../tests/production/boq-migration.test.ts) | 单元／服务／状态 | 完整 BOQ SQLite 原图、原件、显式映射、隐私与整批恢复 |
 | [tests/production/boq-storage.test.ts](../../../tests/production/boq-storage.test.ts) | 单元／服务／状态 | 日常清单与变洽签、真实上游、原件及原编号冷恢复 |
+| [tests/production/owner-documents-storage.test.ts](../../../tests/production/owner-documents-storage.test.ts) | 真实磁盘与独立进程 | 八类商务单据、原 BOQ 委托事实、验收双视图、原件/回执、实际消费版本、NULL 与冻结历史、整改抵扣及受保护恢复 |
+| [tests/production/owner-documents-migration.test.ts](../../../tests/production/owner-documents-migration.test.ts) | 完整 Native SQLite 与独立进程 | 同 SHA 施工/BOQ 身份、精确原列及未知扩展、原审计/命令、软删、历史 NULL/空原件、Other 原目标与整批危险恢复 |
+| [tests/production/owner-settlement.test.ts](../../../tests/production/owner-settlement.test.ts) | 同库共享结算与 F3 | 商务/Other owner 权限、合同领域与版本证据、不可变 Other 头、原结算与独立抵扣、申请及实际支付精确分摊、项目/合同宿主来源与冷恢复 |
 | [tests/production/construction-contract-storage.test.ts](../../../tests/production/construction-contract-storage.test.ts) | 单元／服务／状态 | 施工主合同与协议、完整原件、历史与实际源冷恢复；合成旧库夹具设异常关闭保护 |
 | [tests/production/construction-scope-storage.test.ts](../../../tests/production/construction-scope-storage.test.ts) | 单元／服务／状态 | 同库单份工程关联、原费用去重、权限及真实来源消费 |
 | [tests/production/migration-domain-evidence.test.ts](../../../tests/production/migration-domain-evidence.test.ts) | 单元／服务／状态 | 来源原列、未知扩展、整数与 BLOB 的精确保全 |
@@ -71,3 +74,5 @@
 | [e2e/helpers/browser-production-snapshot.ts](../../../e2e/helpers/browser-production-snapshot.ts) | 辅助／夹具 | 供测试导入的夹具／辅助代码；按所属业务就近查阅 |
 | [tests/helpers/production-backup-paused-cold.ts](../../../tests/helpers/production-backup-paused-cold.ts) | 辅助／独立进程 | 合成备份原键回读与副本摘要核对 |
 | [tests/helpers/production-target-cost-cold.ts](../../../tests/helpers/production-target-cost-cold.ts) | 辅助／夹具 | 预算版本、原基线与原件独立进程读取入口 |
+| [tests/helpers/production-owner-document-cold.ts](../../../tests/helpers/production-owner-document-cold.ts) | 辅助／夹具 | 商务列表/详情/表单、验收双视图、原件、原 journal、独立事件及项目/合同宿主的独立冷进程入口 |
+| [tests/helpers/production-owner-document-import-cold.ts](../../../tests/helpers/production-owner-document-import-cold.ts) | 辅助／夹具 | 原完整来源采用定位、原回执、采用状态及共享原件的独立冷进程入口 |
