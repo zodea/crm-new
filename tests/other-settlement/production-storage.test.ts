@@ -1,7 +1,7 @@
 import type { OtherSettlementCommand } from '~/lib/other-settlement/contract'
 import { mkdir, mkdtemp } from 'node:fs/promises'
 import { afterAll, describe, expect, it } from 'vitest'
-import { validateOtherSettlementJournal } from '~/lib/other-settlement/storage'
+import { readOtherSettlementStored, validateOtherSettlementJournal } from '~/lib/other-settlement/storage'
 import { formDefaults } from '../../app/lib/master-data/page'
 import { readWorkerReference } from '../../server/utils/production-crew-worker-references'
 import { createProductionCrewWorkerService } from '../../server/utils/production-crew-worker-service'
@@ -39,6 +39,29 @@ async function fixture(workerPayee = false) {
   return { storage, actor, session, owner, finance, supplier, payee, worker, source, expense, request, project: engineering.project }
 }
 describe('同一真实持久存储无合同费用结算', () => {
+  it('商务与Other共用唯一结算头，明确owner隔离解析、冻结和独有历史', { timeout: 15000 }, async () => {
+    const f = await fixture()
+    try {
+      const saved = await f.owner.execute({ ...f.request, attachments: {} }, f.session)
+      const confirmed = await f.owner.execute({ ...f.request, attachments: {}, id: saved.id, baseVersion: saved.version, commandId: 'routing-other-confirm', action: 'confirm' }, f.session)
+      const business = { id: 'business-routing-settlement', kind: 'sub_settlement', version: 1, amount: 100, files: [], updatedAt: '2026-10-07T00:00:00.000Z', legacyExtension: { value: '原独有事实' } }
+      await f.storage.execute('INSERT INTO expenditure_settlements(id,biz_type,document_owner,status,total_amount,version,record_json) VALUES(?,?,?,?,?,?,?)', [business.id, '分包', 'business', 'confirmed', 100, 1, JSON.stringify(business)])
+      const ownRows = await f.storage.withTransaction(tx => readOtherSettlementStored(tx, f.actor))
+      expect(ownRows.records.map(row => row.id)).toEqual([saved.id])
+      await validateOtherSettlementJournal(f.storage, f.actor)
+      expect((await f.owner.detail(saved.id, { origin: 'real' }, f.session)).settlement.version).toBe(confirmed.version)
+      await expect(f.storage.execute('UPDATE expenditure_settlements SET version=version+1 WHERE id=?', [saved.id])).rejects.toThrow('immutable')
+      await expect(f.storage.execute('UPDATE expenditure_settlements SET document_owner=\'other\' WHERE id=?', [business.id])).rejects.toThrow('immutable')
+      await expect(f.storage.execute('INSERT INTO other_settlement_history VALUES(?,?,?,?,?,?)', [business.id, 1, '{}', f.actor.actorId, 'wrong-owner', '2026-10-07T00:00:00.000Z'])).rejects.toThrow('another owner')
+      await f.storage.execute('UPDATE expenditure_settlements SET version=2,record_json=json_set(record_json,\'$.version\',2) WHERE id=?', [business.id])
+      await expect(f.storage.execute('UPDATE expenditure_settlements SET version=3,total_amount=101,record_json=json_set(record_json,\'$.version\',3) WHERE id=?', [business.id])).rejects.toThrow('immutable')
+      await expect(f.storage.execute('UPDATE expenditure_settlements SET version=3,record_json=json_set(record_json,\'$.version\',3,\'$.legacyExtension.value\',\'changed\') WHERE id=?', [business.id])).rejects.toThrow('immutable')
+      expect(await f.storage.select('SELECT document_owner,total_amount,version,record_json FROM expenditure_settlements WHERE id=?', [business.id])).toEqual([{ document_owner: 'business', total_amount: 100, version: 2, record_json: JSON.stringify({ ...business, version: 2 }) }])
+      await f.storage.close()
+      expect((await f.owner.detail(saved.id, { origin: 'real' }, f.session)).settlement.version).toBe(confirmed.version)
+    }
+    finally { await f.storage.close() }
+  })
   it.each([false, true])('原费用→结算→实际%s收款人申请→确认支付，同owner冷开只记一次成本与现金', { timeout: 15000 }, async (workerPayee) => {
     const f = await fixture(workerPayee)
     try {

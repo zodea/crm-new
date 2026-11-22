@@ -5,7 +5,10 @@ import { createOwnerCommercialDocumentReadTestInstance } from '../../server/util
 
 describe('甲方商务单据中央读取实例', () => {
   it('ready 场景隔离各类正式记录并返回结算与罚扣真实事实', () => {
-    const commands = createOwnerCommercialDocumentCommandTestInstance({ documents: OWNER_COMMERCIAL_DOCUMENT_READY_RECORDS })
+    const commands: ReturnType<typeof createOwnerCommercialDocumentCommandTestInstance> = createOwnerCommercialDocumentCommandTestInstance({
+      documents: OWNER_COMMERCIAL_DOCUMENT_READY_RECORDS,
+      finalSettlementChanges: contractId => commands.rawRows().filter(row => row.kind === 'owner_change' && row.contractId === contractId && row.dataOrigin === 'real'),
+    })
     const read = createOwnerCommercialDocumentReadTestInstance(
       () => ['owner-document:read', 'owner-document:write'],
       commands,
@@ -30,7 +33,7 @@ describe('甲方商务单据中央读取实例', () => {
       kind: 'final_settlement',
       declared: '1280000.00',
       audited: null,
-      changedContract: '1280000.00',
+      changedContract: '1292800.00',
       cumulativeReceipts: '900000.00',
       receiptDifference: '380000.00',
     })
@@ -38,8 +41,33 @@ describe('甲方商务单据中央读取实例', () => {
     expect(settlement.document.amounts.audited).toBeNull()
     expect(settlement.finalSettlementEvidence?.sources).toEqual([
       expect.objectContaining({ kind: 'contract-supplement', id: 'supplement-real-325' }),
+      expect.objectContaining({ kind: 'owner-change', id: 'change-manual-real-323', amount: '12800.00' }),
       expect.objectContaining({ kind: 'receipt', id: 'receipt-real-325' }),
     ])
+    expect(changes.items.map(row => [row.kind, row.id, row.project.id, row.contract.id])).toEqual([
+      ['owner_change', 'change-manual-real-323', 'project-real-320', 'construction-contract-existing-320'],
+      ['owner_change', 'change-real-323', 'project-real-320', 'construction-contract-existing-320'],
+    ])
+    expect(changes.summary.origins.real).toEqual({
+      count: 2,
+      reportedAmount: '13320.00',
+      auditedAmount: null,
+      taxInclusiveAmount: '13320.00',
+      taxExclusiveAmount: null,
+      appliedTaxExclusiveAmount: null,
+      subcontractApprovedAmount: '0.00',
+      differenceAmount: '0.00',
+      amountCompleteness: {
+        reportedAmount: { knownValue: '13320.00', missingCount: 0 },
+        auditedAmount: { knownValue: '0.00', missingCount: 2 },
+        taxInclusiveAmount: { knownValue: '13320.00', missingCount: 0 },
+        taxExclusiveAmount: { knownValue: '0.00', missingCount: 2 },
+        appliedTaxExclusiveAmount: { knownValue: '0.00', missingCount: 2 },
+        subcontractApprovedAmount: { knownValue: '0.00', missingCount: 0 },
+        differenceAmount: { knownValue: '0.00', missingCount: 0 },
+      },
+      subcontractActualApproved: { value: null, status: 'missing' },
+    })
     expect(settlement.files).toContainEqual(expect.objectContaining({ fileName: '甲方最终结算书.pdf' }))
     expect(read.detail('owner_penalty', 'owner-penalty-real-326', { origin: 'real' })).toMatchObject({
       ownerPenaltyFacts: {

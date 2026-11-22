@@ -380,6 +380,7 @@ describe('甲方商务单据中央命令契约', () => {
         customerId: 'customer-switch-325',
         amount: 2000000,
       }],
+      finalSettlementChanges: contractId => ['contract-switch-a-325', 'contract-switch-b-325'].includes(contractId) ? [] : null,
       finalSettlementSupplements: [{
         contractId: 'contract-switch-a-325',
         id: 'supplement-switch-a-draft-325',
@@ -387,6 +388,14 @@ describe('甲方商务单据中央命令契约', () => {
         name: '施工合同 A 草稿补充协议',
         status: '草稿',
         amount: 500000,
+        date: '2026-08-20',
+      }, {
+        contractId: 'contract-switch-b-325',
+        id: 'supplement-switch-b-draft-325',
+        no: 'BC-B-DRAFT-325',
+        name: '施工合同 B 英文草稿补充协议',
+        status: 'draft',
+        amount: 700000,
         date: '2026-08-20',
       }, {
         contractId: 'contract-switch-a-325',
@@ -446,6 +455,7 @@ describe('甲方商务单据中央命令契约', () => {
       changedContractAmount: 1100000,
       receivedAmount: 300000,
     })
+    expect(commands.rows().find(row => row.id === saved.id)?.finalSettlementEvidence?.changes).toEqual([])
 
     const switched = await commands.execute({
       ...commandEnvelope('save-final-settlement-contract-b-325'),
@@ -464,6 +474,7 @@ describe('甲方商务单据中央命令契约', () => {
       changedContractAmount: 2200000,
       receivedAmount: 400000,
     })
+    expect(commands.rows().find(row => row.id === switched.id)?.finalSettlementEvidence?.changes).toEqual([])
   })
 
   it('按合同保留来源完整性，不因其他合同已知而伪造空集合', () => {
@@ -838,7 +849,7 @@ describe('甲方商务单据中央命令契约', () => {
     }, session)
 
     expect(commands.form('owner_change', result.id, session).draft).toMatchObject({
-      approvedTaxInclusiveAmount: 0,
+      approvedTaxInclusiveAmount: null,
       approvedTaxExclusiveAmount: 88,
       totalAmount: 0,
       status: 'submitted',

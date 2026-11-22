@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest'
+import { createHttpOwnerCommercialDocumentReadRepository } from '~/lib/owner-document/central-http-repository'
 import { buildOwnerCommercialDocumentDetail } from '~/lib/owner-document/central-repository'
 import { validateOwnerDocumentDetailReturnTo } from '~/lib/owner-document/return-context'
+import { buildSubcontractSettlementEvidenceRead } from '~/lib/owner-document/subcontract-settlement'
 import { parseOwnerCommercialDocumentCommandRequest } from '../../server/utils/owner-commercial-document-command-request'
 import { createOwnerCommercialDocumentCommandTestInstance } from '../../server/utils/owner-commercial-document-command-test-instance'
 import { createOwnerCommercialDocumentReadTestInstance } from '../../server/utils/owner-commercial-document-read-test-instance'
+import { withReadMeta } from '../../server/utils/read-meta'
+import { publicReadMeta } from '../helpers/public-read-meta'
 
 const session = { workspaceId: 'workspace-default', actorId: 'actor-default', capabilities: ['subcontract-document:read', 'subcontract-document:write'] }
 function instance() {
@@ -29,6 +33,43 @@ function request(overrides: Record<string, unknown> = {}) {
 }
 
 describe('aX02 分包结算中央事实', () => {
+  it('来源HTTP强检未知批复与真实零的语义，不接受坏金额、缺少分区或畸形导航', async () => {
+    const commands = instance()
+    const confirmed = await commands.execute(request({ action: 'submit' }), session)
+    const source = commands.rows().find(row => row.id === confirmed.id)!
+    source.subcontractSettlementEvidence = { contractAmount: 0, supplements: [], changes: [], settlements: [source], deductions: [], penalties: [], applications: [{ id: 'application-decode', projectId: source.projectId, supplierId: source.supplierId!, contractId: source.contractId, status: 'approved', allocations: [{ settlementId: source.id, amount: 0 }], payments: [], applyAmount: 0, approvedAmount: 0, approvedAmountState: 'known' }] }
+    const query = { kind: 'sub_settlement' as const, id: source.id, origin: 'real' as const, includeDemo: false }
+    const detail = withReadMeta(buildOwnerCommercialDocumentDetail({ documents: [source], query, capabilities: session.capabilities, asOf: source.updatedAt, sourceVersion: 'source-decode' }), publicReadMeta({ schemaVersion: 'owner-document-read-v3', dataOrigin: 'real', asOf: source.updatedAt, sourceVersion: 'source-decode', capabilities: session.capabilities, requested: true, scope: query }))
+    await expect(createHttpOwnerCommercialDocumentReadRepository({ fetcher: async () => detail }).get(query)).resolves.toMatchObject({ subcontractSettlementEvidence: { originalContractAmount: '0.00', sections: { applications: [expect.objectContaining({ approvedAmount: '0.00', approvedAmountState: 'known' })] } } })
+    for (const mutation of [
+      (value: typeof detail) => { value.subcontractSettlementEvidence!.sections.applications![0]!.approvedAmountState = 'legacy-unknown' },
+      (value: typeof detail) => { value.subcontractSettlementEvidence!.sections.applications![0]!.amount = 'invalid' },
+      (value: typeof detail) => { Reflect.set(value.subcontractSettlementEvidence!.sections.applications![0]!, 'navigation', { kind: 'unavailable', reason: 'invalid' }) },
+    ]) {
+      const invalid = structuredClone(detail)
+      mutation(invalid)
+      await expect(createHttpOwnerCommercialDocumentReadRepository({ fetcher: async () => invalid }).get(query)).rejects.toMatchObject({ problem: { code: 'internal-error' } })
+    }
+    const invalidSections = structuredClone(detail)
+    Reflect.deleteProperty(invalidSections.subcontractSettlementEvidence!.sections, 'payments')
+    await expect(createHttpOwnerCommercialDocumentReadRepository({ fetcher: async () => invalidSections }).get(query)).rejects.toMatchObject({ problem: { code: 'internal-error' } })
+  })
+  it('完整来源投影保原合同、有效协议、每张结算和独立抵扣，多结算现金未知与明确零分开', () => {
+    const source = { id: 'settlement-current', dataOrigin: 'real' as const, projectId: 'project-source', supplierId: 'supplier-source', contractId: 'contract-source', status: 'confirmed', amount: 100 }
+    const original = { id: 'supplement-valid', no: 'BC-1', name: '有效补充协议', date: '2026-10-07', status: '生效', amount: 20 }
+    const application = { id: 'application-source', no: 'FK-1', name: '原付款申请', date: '2026-10-07', projectId: source.projectId, supplierId: source.supplierId, contractId: source.contractId, status: 'submitted', applyAmount: 60, approvedAmount: 0, approvedAmountState: 'known' as const, allocations: [{ settlementId: source.id, amount: 30 }, { settlementId: 'settlement-other', amount: 30 }], payments: [{ id: 'payment-source', no: 'ZF-1', totalAmount: 40, amount: 20, confirmed: true }] }
+    const result = buildSubcontractSettlementEvidenceRead(source, { contractAmount: 1000, supplements: [original, { ...original, id: 'draft', status: 'draft', amount: 999 }], changes: [{ ...original, id: 'change-source', status: 'submitted', amount: null }], settlements: [{ ...source, name: '本期结算' }, { ...source, id: 'prior', name: '往期已确认', amount: 0 }], deductions: [], penalties: [{ ...original, id: 'penalty-source', deductionId: 'deduction-source', amount: 10, deductionAmount: 5 }], applications: [application] })
+    expect(result.originalContractAmount).toBe('1000.00')
+    expect(result.effectiveContractAmount).toBe('1020.00')
+    expect(result.sections.supplements).toHaveLength(1)
+    expect(result.sections.changes?.[0]).toMatchObject({ id: 'change-source', amount: null, status: 'submitted' })
+    expect(result.sections.settlements?.[1]).toMatchObject({ amount: '0.00', note: '往期已确认结算' })
+    expect(result.sections.penalties?.[0]).toMatchObject({ id: 'deduction-source', amount: '10.00', allocatedAmount: '5.00', navigation: { subject: { id: 'penalty-source' } } })
+    expect(result.sections.applications?.[0]).toMatchObject({ amount: '60.00', allocatedAmount: '30.00', approvedAmount: '0.00', approvedAmountState: 'known' })
+    expect(result.sections.payments?.[0]).toMatchObject({ amount: '40.00', allocatedAmount: null, navigation: { subject: { id: 'application-source' } } })
+    expect(result.sections.payments?.[0]?.note).toContain('归属未知')
+    expect(buildSubcontractSettlementEvidenceRead(source).sections).toEqual({ supplements: null, changes: null, settlements: null, penalties: null, applications: null, payments: null })
+  })
   it('接受结算详情返回上下文并保持 canonical settlement variant', () => {
     expect(validateOwnerDocumentDetailReturnTo('/subcontract/settlement/settlement-328?origin=real', 'real', 'sub_settlement')).toBe('/subcontract/settlement/settlement-328?origin=real')
   })

@@ -880,7 +880,9 @@ describe('甲方商务单据受控中央迁移', () => {
   })
 
   it('确认后同源保全甲方历史和后来单据，危险回滚整批拒绝且原图与回执不变', async () => {
-    const commands = createOwnerCommercialDocumentCommandTestInstance()
+    const commands: ReturnType<typeof createOwnerCommercialDocumentCommandTestInstance> = createOwnerCommercialDocumentCommandTestInstance({
+      finalSettlementChanges: contractId => commands.rawRows().filter(row => row.kind === 'owner_change' && row.contractId === contractId && row.dataOrigin === 'real'),
+    })
     const core = createCoreMigrationTestInstance({
       createServerId: input => `central-${input.entityType}-${input.legacyId}`,
       now: () => '2026-08-25T00:00:00.000Z',
@@ -987,7 +989,7 @@ describe('甲方商务单据受控中央迁移', () => {
         amounts: {
           declared: '1020000.00',
           audited: null,
-          changedContract: '1040000.00',
+          changedContract: '1040520.00',
           cumulativeReceipts: '900000.00',
           receiptDifference: '120000.00',
         },
@@ -997,6 +999,7 @@ describe('甲方商务单据受控中央迁移', () => {
         differenceNote: '审定金额尚未回传',
         sources: [
           { kind: 'contract-supplement', id: 'central-contract_supplements-supplement-legacy-325' },
+          { kind: 'owner-change', id: changeId, amount: '520.00' },
           { kind: 'receipt', id: 'central-receipt_registrations-receipt-legacy-325' },
         ],
       },

@@ -1,4 +1,4 @@
-/** PG-11 v30: one expenditure settlement head, with an explicit immutable owner. */
+/** PG-11 v35: one expenditure settlement head, with an explicit immutable owner. */
 export const PRODUCTION_OWNER_SETTLEMENT_UPGRADE = `
 ALTER TABLE expenditure_settlements ADD COLUMN document_owner TEXT NOT NULL DEFAULT 'other' CHECK(document_owner IN ('other','business'));
 CREATE INDEX expenditure_settlement_owner ON expenditure_settlements(document_owner,project_id,deleted_at);
@@ -26,7 +26,7 @@ WHEN (SELECT document_owner FROM expenditure_settlements WHERE id=NEW.${column})
 BEGIN SELECT RAISE(ABORT,'other settlement evidence cannot adopt another owner'); END;`).join('\n')}
 `
 
-/** v31 permits only the protected import batch archive after its immutable restore proof exists. */
+/** v36 permits only the protected import batch archive after its immutable restore proof exists. */
 export const PRODUCTION_OWNER_SETTLEMENT_RESTORE_UPGRADE = `
 DROP TRIGGER business_settlement_confirmed_lock;
 CREATE TRIGGER business_settlement_confirmed_lock BEFORE UPDATE ON expenditure_settlements

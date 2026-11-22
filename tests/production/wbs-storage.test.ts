@@ -4,6 +4,7 @@ import { Buffer } from 'node:buffer'
 import { mkdir, mkdtemp, readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { afterAll, afterEach, expect, it } from 'vitest'
+import { readProductionOwnerDocumentFacts } from '../../server/utils/production-owner-document-service'
 import { createProductionProcessLibraryService } from '../../server/utils/production-process-library-service'
 import { createProductionProjectService } from '../../server/utils/production-project-service'
 import { createProductionStorage } from '../../server/utils/production-storage'
@@ -351,9 +352,12 @@ it('施工详情只消费实际同Main已存BOQ变更，真实零/已批增额�
   const f = await fixture()
   const source = await createWbsActualBoqFixture(f)
   const before = await source.construction.detail(source.main.id, { origin: 'real' }, f.session)
+  const beforeFacts = await f.storage.withTransaction(tx => readProductionOwnerDocumentFacts(tx, f.session(), { contractId: source.main.id }))
   expect(before.sections.changes).toEqual([])
-  expect(before.meta.sources.find(row => row.key === 'boq-changes')).toMatchObject({ state: 'readable', sourceVersion: expect.any(String) })
-  expect(before.contract.amounts).toMatchObject({ contract: null, changed: null, settled: null, received: null })
+  expect(beforeFacts.documents).toEqual([])
+  expect(before.meta.sources.find(row => row.key === 'owner-documents')).toEqual({ key: 'owner-documents', state: 'readable', sourceVersion: beforeFacts.sourceVersion, asOf: before.meta.asOf })
+  expect(before.meta.sources.find(row => row.key === 'business-boq-owner-changes')).toEqual({ key: 'business-boq-owner-changes', state: 'not-requested', sourceVersion: null, asOf: null })
+  expect(before.contract.amounts).toEqual({ contract: null, changed: null, settled: null, invoiced: null, received: null, bySettlementReceivable: null, invoicedUnreceived: null })
   const actor = f.session()
   const draft = { projectId: f.project.id, contractId: source.main.id, no: 'WBS-MAIN-CHANGE', name: '真正已批增加工程量', documentType: 'change_negotiation', applicationDate: '2026-10-07', reason: '原施工明确增加依据', note: '', lines: [{ id: 'main-real-quantity-change', operation: 'qty', boqLineId: source.saved.lineIds![0], deltaQty: 2, newUnitPrice: null }] }
   const base = { workspaceId: actor.workspaceId, actorId: actor.actorId, requiredCapability: 'owner-document:write' as const, kind: 'owner_change' as const, attachments: {} }
@@ -362,13 +366,31 @@ it('施工详情只消费实际同Main已存BOQ变更，真实零/已批增额�
   const { attachments: _saveOnlyAttachments, ...approvalBase } = base
   await source.owner.execute({ ...source.command, commandId: 'main-boq-change-approve', action: { kind: 'owner-change', command: { ...approvalBase, commandId: 'main-boq-change-approve', id: saved.changeId!, baseVersion: '2', action: 'approve', approvedAt: '2026-10-07' } } }, f.session)
   const actual = await source.construction.detail(source.main.id, { origin: 'real' }, f.session)
-  expect(actual.sections.changes).toEqual([expect.objectContaining({ id: saved.changeId, status: 'approved', amount: '24.00', navigation: { kind: 'unavailable', reason: 'unverified-target' } })])
-  expect(actual.meta.sources.find(row => row.key === 'boq-changes')?.sourceVersion).not.toBe(before.meta.sources.find(row => row.key === 'boq-changes')?.sourceVersion)
+  const actualFacts = await f.storage.withTransaction(tx => readProductionOwnerDocumentFacts(tx, f.session(), { contractId: source.main.id }))
+  const changeRows = [{ id: saved.changeId, no: draft.no, name: draft.name, amount: '24.00', date: '2026-10-07', status: 'approved', navigation: { kind: 'entity-detail', subject: { state: 'resolved', entity: 'owner-document', id: saved.changeId, label: draft.name, no: draft.no }, variant: 'change', view: null, filters: { dataOrigin: 'real' } } }]
+  expect(actual.sections.changes).toEqual(changeRows)
+  expect(actualFacts.documents.map(row => [row.id, row.projectId, row.contractId, row.amount, row.sourceId])).toEqual([[saved.changeId, f.project.id, source.main.id, 24, saved.changeId]])
+  expect(actual.meta.sources.find(row => row.key === 'owner-documents')).toEqual({ key: 'owner-documents', state: 'readable', sourceVersion: actualFacts.sourceVersion, asOf: actual.meta.asOf })
+  expect(actualFacts.sourceVersion).not.toBe(beforeFacts.sourceVersion)
+  const boqEvidence = actualFacts.sourceEvidence.find(row => row.key === 'boq-owner-changes')!
+  const adoptedBoqEvidence = actual.meta.sources.find(row => row.key === 'business-boq-owner-changes')!
+  expect({ key: adoptedBoqEvidence.key, state: adoptedBoqEvidence.state, sourceVersion: adoptedBoqEvidence.sourceVersion }).toEqual({ key: 'business-boq-owner-changes', state: 'readable', sourceVersion: boqEvidence.sourceVersion })
+  expect(adoptedBoqEvidence.asOf).not.toBeNull()
+  expect(Date.parse(adoptedBoqEvidence.asOf!)).toBeLessThanOrEqual(Date.parse(actual.meta.asOf))
+  expect(actual.contract.amounts).toEqual(before.contract.amounts)
   f.setActor({ ...actor, capabilities: actor.capabilities.filter(capability => capability !== 'boq:read') })
   const blocked = await source.construction.detail(source.main.id, { origin: 'real' }, f.session)
-  expect(blocked.meta.sources.find(row => row.key === 'boq-changes')).toMatchObject({ state: 'forbidden', sourceVersion: null })
-  expect(blocked.sections.changes).toEqual([])
+  const blockedFacts = await f.storage.withTransaction(tx => readProductionOwnerDocumentFacts(tx, f.session(), { contractId: source.main.id }))
+  expect(blocked.meta.sources.find(row => row.key === 'owner-documents')).toEqual({ key: 'owner-documents', state: 'readable', sourceVersion: blockedFacts.sourceVersion, asOf: blocked.meta.asOf })
+  expect(blocked.meta.sources.find(row => row.key === 'business-boq-owner-changes')).toEqual({ key: 'business-boq-owner-changes', state: 'forbidden', sourceVersion: null, asOf: null })
+  expect(blocked.sections.changes).toEqual(changeRows)
   expect(blocked.contract.amounts.changed).toBeNull()
+  f.setActor({ ...actor, capabilities: actor.capabilities.filter(capability => capability !== 'owner-document:read') })
+  const documentsForbidden = await source.construction.detail(source.main.id, { origin: 'real' }, f.session)
+  expect(documentsForbidden.meta.sources.find(row => row.key === 'owner-documents')).toEqual({ key: 'owner-documents', state: 'forbidden', sourceVersion: null, asOf: null })
+  expect(documentsForbidden.meta.sources.filter(row => row.key.startsWith('business-'))).toEqual([])
+  expect(documentsForbidden.sections.changes).toEqual([])
+  expect(documentsForbidden.contract.amounts).toEqual(before.contract.amounts)
 })
 
 it('被真实BOQ消费的Main跨项目改写整动作拒绝，旧原号/数据仍可读；无消费Main可合法改项目', async () => {

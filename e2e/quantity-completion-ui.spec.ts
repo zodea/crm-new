@@ -12,7 +12,7 @@ test('中央责任、缺照草稿、照片完成和责任替换保留历史，�
   await page.context().setExtraHTTPHeaders(headers)
   const session = await (await page.request.get('/api/read/business-session')).json()
   const create = async (entity: string, capability: string, draft: Record<string, unknown>, action = 'draft') => {
-    const response = await page.request.post(`/api/commands/${entity}`, { data: { ...session, requiredCapability: capability, commandId: randomUUID(), baseVersion: null, action, draft, attachments: {} } })
+    const response = await page.request.post(`/api/commands/${entity}`, { data: { workspaceId: session.workspaceId, actorId: session.actorId, requiredCapability: capability, commandId: randomUUID(), baseVersion: null, action, draft, attachments: {} } })
     expect(response.ok(), await response.text()).toBe(true)
     return response.json()
   }
