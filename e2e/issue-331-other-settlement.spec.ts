@@ -1,5 +1,4 @@
 import { Buffer } from 'node:buffer'
-import { mkdir } from 'node:fs/promises'
 import process from 'node:process'
 import { expect, test } from '@playwright/test'
 import { expectEscapeReturnsFocus, expectLocalHorizontalScroll, expectNoPageOverflow, expectOverlayAboveShell, RESPONSIVE_WIDTHS } from './helpers/responsive'
@@ -69,7 +68,7 @@ test.describe('AX05 其他支出结算中央往返', () => {
     await page.getByRole('button', { name: '返回来源', exact: true }).click()
     await expect(page.getByPlaceholder('搜索合同名称 / 编号 / 对方单位')).toHaveValue('检测')
   })
-  test('四档视口列表局部滚动、独立表单和浮层焦点', async ({ page }) => {
+  test('四档视口列表局部滚动、独立表单和浮层焦点', async ({ page }, info) => {
     test.setTimeout(180000)
     const context = await (await page.request.get('/api/read/auxiliary-contracts/context')).json()
     const contract = (await (await page.request.get('/api/read/auxiliary-contracts?kind=other_expense')).json()).items[0]
@@ -77,8 +76,6 @@ test.describe('AX05 其他支出结算中央往返', () => {
     const created = await page.request.post('/api/commands/other-settlements', { data: { ...context, commandId: 'viewport-fixture', requiredCapability: 'other-settlement:write', baseVersion: null, action: 'save', draft: { name: '视口合成结算', no: 'JS-VIEW-331', projectId: contract.draft.projectId, contractId: contract.id, totalAmount: 0, settlementDate: '2026-09-06' }, attachments: {} } })
     expect(created.ok(), await created.text()).toBe(true)
     const { id } = await created.json()
-    if (process.env.AX05_EVIDENCE)
-      await mkdir('docs/design/evidence/issue-331', { recursive: true })
     for (const width of RESPONSIVE_WIDTHS) {
       await page.setViewportSize({ width, height: 900 })
       await page.goto('/contract/other-settlement')
@@ -90,19 +87,19 @@ test.describe('AX05 其他支出结算中央往返', () => {
       await menu.click()
       await expectEscapeReturnsFocus(page, page.getByRole('menu'), menu, `结算菜单 ${width}`)
       if (process.env.AX05_EVIDENCE)
-        await page.screenshot({ path: `docs/design/evidence/issue-331/list-${width}.png` })
+        await page.screenshot({ path: info.outputPath(`list-${width}.png`) })
       await page.getByRole('link', { name: '视口合成结算', exact: true }).click()
       await expect(page.getByRole('heading', { name: '视口合成结算' })).toBeVisible()
       await expectNoPageOverflow(page, `结算详情 ${width}`)
       if (process.env.AX05_EVIDENCE)
-        await page.screenshot({ path: `docs/design/evidence/issue-331/detail-${width}.png` })
+        await page.screenshot({ path: info.outputPath(`detail-${width}.png`) })
       await page.getByRole('button', { name: '编辑结算' }).click()
       await expect(page.getByRole('combobox', { name: '检索项目' })).toHaveValue('中央正式施工项目')
       await expect(page.getByRole('combobox', { name: '检索其他支出合同' })).toHaveValue('验收检测服务合同')
       await page.getByLabel('结算名称 *').fill(`未保存修改${width}`)
       await expectNoPageOverflow(page, `结算表单 ${width}`)
       if (process.env.AX05_EVIDENCE)
-        await page.screenshot({ path: `docs/design/evidence/issue-331/form-${width}.png` })
+        await page.screenshot({ path: info.outputPath(`form-${width}.png`) })
       await page.getByRole('button', { name: '返回来源', exact: true }).click()
       await expectOverlayAboveShell(page.getByRole('dialog'), `未保存结算 ${width}`)
       await page.getByRole('dialog').getByRole('button', { name: '放弃修改', exact: true }).click()
@@ -198,7 +195,7 @@ test.describe('AX05 其他支出结算中央往返', () => {
       await expect(page.getByRole('region', { name: '源单只读详情' })).toContainText('凭证号')
       await expectNoPageOverflow(page, `支付源单 ${width}`)
       if (process.env.AX05_EVIDENCE)
-        await page.screenshot({ path: `docs/design/evidence/issue-331/source-${width}.png` })
+        await page.screenshot({ path: info.outputPath(`source-${width}.png`) })
     }
     await page.getByRole('button', { name: '查看来源付款申请' }).click()
     await expect(page.getByRole('region', { name: '源单只读详情' })).toContainText('源单总金额：¥1,000.00')

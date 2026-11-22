@@ -2,6 +2,7 @@ import type { TestDb } from '../helpers/memory-db'
 import type { QuantityCommand } from '~/lib/quantity/central-contract'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createDbCoordinator } from '~/lib/db/coordinator'
+import { seedIfEmpty } from '~/lib/db/seed'
 import { createQuantityService } from '~/lib/quantity/central-service'
 import { blankQuantityTemplateDraft, borrowedQuantityTemplateDraft, editableQuantityTemplateDraft } from '~/lib/quantity/template'
 import { createMigratedMemoryDb } from '../helpers/memory-db'
@@ -29,6 +30,23 @@ beforeEach(async () => {
 afterEach(() => memory.close())
 
 describe('中央工程量公共服务', () => {
+  it('所选合同的月报不消费同项目其他合同未配置的报量阶段，全项目读取仍核其缺口', async () => {
+    await seedIfEmpty(memory)
+    const mapped = await memory.select<{ id: string, itemId: string }>('SELECT DISTINCT boq_line_id AS id,item_id AS itemId FROM house_type_template_items WHERE boq_line_id IS NOT NULL ORDER BY item_id,boq_line_id')
+    const selected = mapped[0]!
+    const unrelated = mapped.find(row => row.itemId !== selected.itemId)!
+    expect(selected).toBeDefined()
+    expect(unrelated).toBeDefined()
+    await memory.execute('UPDATE construction_stage_items SET is_reporting_stage=0 WHERE item_id=?', [unrelated.itemId])
+    const lines = [selected, unrelated].map((row, index) => ({ id: row.id, contractId: index === 0 ? 'contract-a' : 'contract-b', contractName: '实际合同', contractNo: 'HT', itemName: '实际分项', unit: '㎡', qty: 100, unitPrice: 2, effectiveUnitPrice: 2, approvedDeltaQty: 0, building: null, updatedAt: null }))
+    const service = createQuantityService({ workspaceId: context.workspaceId, database: createDbCoordinator(async () => ({ ...memory, close: async () => memory.close() })), project: async id => ({ id, name: '已配置项目', code: 'P' }), boq: async projectId => ({ projectId, sourceVersion: 'actual-owner-lines', lines }) })
+    const request = { projectId: 'proj_demo_001', origin: 'real' as const, includeDemo: false, periodNo: '2099-12', basis: 'field' as const }
+    const monthlyContext = { ...context, capabilities: [...context.capabilities, 'construction-contract:read', 'owner-document:read'] }
+    const facts = await service.withMonthly({ ...request, contractId: 'contract-a' }, monthlyContext, rows => [...rows])
+    expect(facts.length).toBeGreaterThan(0)
+    expect(facts.every(row => row.contractId === 'contract-a')).toBe(true)
+    await expect(service.withMonthly(request, monthlyContext, rows => [...rows])).rejects.toMatchObject({ problem: { code: 'validation-failed', message: expect.stringContaining('报量阶段') } })
+  })
   it('迁移切换只推进受影响项目版本并失效其旧命令重放，其他项目的幂等回执保留', async () => {
     const service = currentService()
     const commandFor = async (projectId: string, commandId: string): Promise<QuantityCommand> => ({

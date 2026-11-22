@@ -30,10 +30,24 @@ function historicalFixtureSchema(db: DatabaseSync, version: 12 | 13) {
   const untouchedRevisionTables = new Set(['payroll_revision', 'construction_contract_revision', 'construction_scope_revision', 'subcontract_contract_revision', 'auxiliary_contract_revision', 'boq_revision'])
   for (const table of added) {
     const rows = db.prepare(`SELECT * FROM ${table}`).all()
-    expect(rows).toEqual(untouchedRevisionTables.has(table) ? [{ singleton: 1, revision: 0 }] : [])
+    expect(rows).toEqual(table === 'owner_document_revision'
+      ? [{ singleton: 1, revision: 1, metadata_json: '{"migrationKeys":[],"migrationSnapshotFingerprint":null}' }]
+      : untouchedRevisionTables.has(table) ? [{ singleton: 1, revision: 0 }] : [])
   }
   db.exec('PRAGMA foreign_keys=OFF; BEGIN')
   try {
+    if (currentVersion >= 29) {
+      for (const trigger of ['production_owner_document_bytes_update', 'production_owner_document_bytes_delete', 'production_owner_document_file_metadata', 'production_owner_document_file_no_delete'])
+        db.exec(`DROP TRIGGER ${trigger}`)
+    }
+    // Reverse only the v30 routing structure in this isolated empty-business fixture.
+    if (currentVersion >= 30) {
+      expect(db.prepare('SELECT id FROM expenditure_settlements WHERE document_owner<>\'other\'').all()).toEqual([])
+      for (const trigger of ['expenditure_settlement_owner_immutable', 'business_settlement_confirmed_lock', 'other_settlement_confirmed_lock', 'expenditure_settlement_expense_allocations_other_owner', 'other_settlement_history_other_owner', 'other_settlement_commands_other_owner', 'other_settlement_files_other_owner'])
+        db.exec(`DROP TRIGGER ${trigger}`)
+      db.exec('DROP INDEX expenditure_settlement_owner; ALTER TABLE expenditure_settlements DROP COLUMN document_owner')
+      db.exec('CREATE TRIGGER other_settlement_confirmed_lock BEFORE UPDATE ON expenditure_settlements WHEN OLD.status IN (\'confirmed\',\'已确认\') BEGIN SELECT RAISE(ABORT,\'confirmed expenditure settlement is immutable\'); END')
+    }
     for (const table of added.reverse()) db.exec(`DROP TABLE ${table}`)
     for (const table of ['crews', 'workers']) {
       const columns = db.prepare(`PRAGMA table_xinfo(${table})`).all().filter(column => Number(column.hidden) === 2)
@@ -46,6 +60,8 @@ function historicalFixtureSchema(db: DatabaseSync, version: 12 | 13) {
     db.exec('ALTER TABLE projects DROP COLUMN matrix_archived_at')
     for (const domain of Object.keys(current.participants).filter(domain => !historical.participants[domain]))
       db.prepare('DELETE FROM production_participants WHERE domain=?').run(domain)
+    for (const [domain, participant] of Object.entries(historical.participants))
+      db.prepare('UPDATE production_participants SET schema_version=? WHERE domain=?').run(participant.schemaVersion, domain)
     db.prepare('UPDATE production_metadata SET schema_version=? WHERE singleton=1').run(version)
     db.exec('COMMIT; PRAGMA foreign_keys=ON; PRAGMA journal_mode=DELETE')
   }

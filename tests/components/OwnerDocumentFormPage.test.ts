@@ -16,10 +16,12 @@ import {
 } from 'vue'
 import OwnerDocumentFormPage from '~/components/owner-document/OwnerDocumentFormPage.vue'
 import { ownerCommercialDocumentProblem, OwnerCommercialDocumentRepositoryProblem } from '~/lib/owner-document/central-repository'
+import { bindReadAuthority } from '~/lib/read-model/authority'
 
 vi.mock('vue-router', () => ({
   onBeforeRouteLeave: vi.fn(),
 }))
+vi.mock('~/lib/read-model/authority', () => ({ bindReadAuthority: vi.fn() }))
 
 vi.mock('@vueuse/core', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@vueuse/core')>()
@@ -42,6 +44,7 @@ const loadBoqLines = vi.fn()
 const confirm = vi.fn()
 const saveForm = vi.fn()
 const saveAttachments = vi.fn()
+const hydrateCommand = vi.fn()
 
 const EntityFormShellStub = defineComponent({
   props: {
@@ -179,6 +182,7 @@ describe('甲方与分包单据整页表单状态', () => {
     confirm.mockReset().mockResolvedValue(true)
     saveForm.mockReset()
     saveAttachments.mockReset()
+    hydrateCommand.mockReset().mockResolvedValue(null)
     loadOne.mockResolvedValue(null)
     loadAttachments.mockResolvedValue([])
     loadContractOptions.mockResolvedValue([])
@@ -205,6 +209,11 @@ describe('甲方与分包单据整页表单状态', () => {
       loadContractSummary,
       saveForm,
       saveAttachments,
+      pendingCommand: () => null,
+      hydrateCommand,
+      recoverCommand: vi.fn(),
+      lookupVersion: () => null,
+      refreshRelationshipVersions: async () => undefined,
     }))
     vi.stubGlobal('useKitUI', () => ({
       confirm,
@@ -218,10 +227,13 @@ describe('甲方与分包单据整页表单状态', () => {
       pendingRemoveIds: ref([]),
       pendingRestoreIds: ref([]),
       desktopAttachmentPicker: false,
+      readingFiles: ref(false),
       dirty: ref(false),
       reset: vi.fn(),
       clearPending: vi.fn(),
       changes: () => ({ add: [], removeIds: [], restoreIds: [] }),
+      capture: () => ({ add: [], removeIds: [], restoreIds: [] }),
+      acknowledge: vi.fn(),
       handleFiles: vi.fn(),
       pickNativeFiles: vi.fn(),
       toggleExisting: vi.fn(),
@@ -247,6 +259,52 @@ describe('甲方与分包单据整页表单状态', () => {
     }))
   })
 
+  it('已删草稿经原key冷恢复后保持只读，无保存提交与附件写入口，并可返回列表', async () => {
+    route.fullPath = '/owner/penalty/form/deleted-original'
+    route.params = { id: 'deleted-original' }
+    hydrateCommand.mockResolvedValue({ recovered: true, form: { kind: 'owner_penalty', id: 'deleted-original', draft: { id: 'deleted-original', no: 'DELETED-ORIGINAL', status: 'draft', name: '原已删草稿', reason: '原原因', amount: null, lines: [] }, attachments: [], version: '2', updatedAt: '2026-10-08T00:00:00.000Z', readOnly: true, deletionVerification: { commandId: 'original-delete-key', deletedAt: '2026-10-08T00:00:00.000Z' } } })
+    render(OwnerDocumentFormPage, { props: { kind: 'owner_penalty' }, global: { components: globalComponents } })
+    await screen.findByText('原单据已删除，当前仅供核对。可返回列表查看其他单据。')
+    expect(screen.getByRole('textbox', { name: '变更名称' }).getAttribute('readonly')).not.toBeNull()
+    expect(screen.queryByRole('button', { name: '保存并提交' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '保存附件' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '选择附件' })).toBeNull()
+    expect(screen.getByRole('button', { name: '返回甲方罚扣单' })).not.toBeNull()
+    expect(loadContractSummary).not.toHaveBeenCalled()
+    expect(saveForm).not.toHaveBeenCalled()
+  })
+
+  it('原已删结算使旧合同读取失效，页签返回和迟到来源不能改原金额或重开写入口', async () => {
+    route.fullPath = '/subcontract/settlement/form/deleted-settlement'
+    route.params = { id: 'deleted-settlement' }
+    const form = { kind: 'sub_settlement', id: 'deleted-settlement', draft: { id: 'deleted-settlement', no: 'ORIGINAL-DELETED', name: '原已删结算', status: 'draft', projectId: 'project-original', contractId: 'contract-original', totalAmount: null, contractAmount: 1234, priorSettlementAmount: null, lines: [] }, attachments: [], version: '2', updatedAt: '2026-10-08T00:00:00.000Z' }
+    hydrateCommand.mockResolvedValueOnce({ recovered: false, form }).mockResolvedValue({ recovered: true, form: { ...form, readOnly: true, deletionVerification: { commandId: 'original-delete-key', deletedAt: '2026-10-08T00:00:00.000Z' } } })
+    let finish!: (value: unknown) => void
+    loadContractSummary.mockReturnValueOnce(new Promise(resolve => finish = resolve))
+    const visible = ref(true)
+    render(defineComponent({ setup: () => () => h(KeepAlive, null, { default: () => visible.value ? h(OwnerDocumentFormPage, { kind: 'sub_settlement' }) : null }) }), { global: { components: globalComponents } })
+    await waitFor(() => expect(loadContractSummary).toHaveBeenCalledTimes(1))
+    vi.mocked(bindReadAuthority).mock.calls.at(-1)![0](ownerCommercialDocumentProblem('unavailable', '原读取已失效'))
+    await fireEvent.click(await screen.findByRole('button', { name: '重新载入' }))
+    await screen.findByText('原单据已删除，当前仅供核对。可返回列表查看其他单据。')
+    finish({ contractAmount: 99999, priorSettlementAmount: 77 })
+    await flushPromises()
+    visible.value = false
+    await nextTick()
+    route.fullPath = '/subcontract/settlement'
+    await nextTick()
+    route.fullPath = '/subcontract/settlement/form/deleted-settlement'
+    visible.value = true
+    await flushPromises()
+    await fireEvent.click(screen.getByRole('button', { name: '选择合同乙' }))
+    await flushPromises()
+    expect(JSON.parse(screen.getByTestId('settlement-draft').textContent!)).toMatchObject({ contractId: 'contract-original', contractAmount: 1234, priorSettlementAmount: null, totalAmount: null })
+    expect(loadContractSummary).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('button', { name: '改用服务器最新版' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '保存并提交' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '选择附件' })).toBeNull()
+  })
+
   function prepareReport(status = 'draft') {
     route.fullPath = '/owner/report/form/monthly-current'
     route.params = { id: 'monthly-current' }
@@ -270,6 +328,27 @@ describe('甲方与分包单据整页表单状态', () => {
       missingQtyCount: 0,
     }])
   }
+
+  it('报量提交保生成时实际采用版本，来源冲突仅显式刷新后换token且保手工量', async () => {
+    prepareReport()
+    loadOne.mockResolvedValue({ id: 'monthly-current', status: 'draft', projectId: 'project-current', contractId: 'contract-current', periodNo: '2026-09', quantityBasis: 'field', applicationDate: '2026-09-30', lines: [{ boqLineId: 'boq-current', reportedQty: 17, unitPrice: 20 }] })
+    const first = { id: 'boq-current', itemName: '墙面', unit: '㎡', qty: 100, unitPrice: 20, autoQty: 9, missingQtyCount: 0, quantityConsumedVersion: 'quantity-original', quantitySourceVersion: 'full-original', quantitySourceUpdatedAt: '2026-10-07T08:00:00.000Z' }
+    loadBoqLines.mockResolvedValue([first])
+    saveForm.mockRejectedValue(new OwnerCommercialDocumentRepositoryProblem(ownerCommercialDocumentProblem('stale-source', '实际完成量来源已变化')))
+    render(OwnerDocumentFormPage, { props: { kind: 'owner_report' }, global: { components: globalComponents } })
+    await waitFor(() => expect(screen.getByTestId('report-draft').textContent).toContain('quantity-original'))
+    const originalReads = loadBoqLines.mock.calls.length
+    await fireEvent.click(screen.getByRole('button', { name: '保存并提交' }))
+    await waitFor(() => expect(saveForm).toHaveBeenCalled())
+    expect(saveForm).toHaveBeenCalledWith('owner_report', expect.objectContaining({ quantityConsumedVersion: 'quantity-original', quantitySourceVersion: 'full-original', lines: [expect.objectContaining({ reportedQty: 17 })] }), 'submit', expect.any(Object))
+    expect(loadBoqLines.mock.calls).toHaveLength(originalReads)
+    loadBoqLines.mockResolvedValue([{ ...first, unitPrice: 30, autoQty: 12, quantityConsumedVersion: 'quantity-current', quantitySourceVersion: 'full-current' }])
+    await fireEvent.click(await screen.findByRole('button', { name: '重新读取依据并保留手工量' }))
+    await waitFor(() => expect(screen.getByTestId('report-draft').textContent).toContain('quantity-current'))
+    const current = JSON.parse(screen.getByTestId('report-draft').textContent!)
+    expect(current.lines[0]).toMatchObject({ reportedQty: 17, autoQty: 12, unitPrice: 30 })
+    expect(current.reportedAmount).toBe(510)
+  })
 
   const SETTLEMENT_CASES = [
     {

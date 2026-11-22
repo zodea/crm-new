@@ -1,7 +1,8 @@
-import { fireEvent, render, screen } from '@testing-library/vue'
+import { fireEvent, render, screen, within } from '@testing-library/vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, reactive } from 'vue'
 import SubcontractSettlementDetailScreen from '~/components/owner-document/SubcontractSettlementDetailScreen.vue'
+import { buildSubcontractSettlementEvidenceRead } from '~/lib/owner-document/subcontract-settlement'
 
 const mocks = vi.hoisted(() => ({
   store: {
@@ -105,7 +106,7 @@ describe('分包结算专属只读详情', () => {
     expect(screen.getAllByText('八月劳务结算')).toHaveLength(2)
     expect(screen.getByText(/含税结算额/).textContent).toContain('¥32,000.00')
     expect(screen.getByText(/累计已确认结算/).textContent).toContain('¥62,000.00')
-    expect(screen.getByRole('group', { name: '累计已付' }).textContent).toContain('未记录')
+    expect(screen.getByRole('group', { name: '累计已付' }).textContent).toContain('未知')
     expect(screen.getByText('瑞航商务中心项目')).not.toBeNull()
     expect(screen.getByText('联创建筑劳务')).not.toBeNull()
     expect(screen.getAllByText('主体劳务分包合同')).toHaveLength(2)
@@ -124,6 +125,27 @@ describe('分包结算专属只读详情', () => {
       path: '/subcontract/settlement/form/sub-settlement-328',
       query: { origin: 'real', returnTo: route.fullPath },
     })
+  })
+
+  it('按完整合同往来结构展示原额、协议、变洽签、结算、独立抵扣、批复及实付，不把未知归属填零', () => {
+    const identity = { id: detail.document.id, dataOrigin: 'real' as const, projectId: project.id, supplierId: supplier.id, contractId: contract.id, amount: 32000, status: 'confirmed', name: detail.document.name, no: detail.document.no }
+    const fact = { id: 'supplement-328', no: 'BC-328', name: '真实补充协议', date: '2026-08-01', status: '生效', amount: 10000 }
+    const evidence = buildSubcontractSettlementEvidenceRead(identity, { contractAmount: 100000, supplements: [fact], changes: [{ ...fact, id: 'change-328', name: '真实分包变洽签', status: 'submitted', amount: null }], settlements: [identity, { ...identity, id: 'prior-328', name: '往期结算', amount: 30000 }], deductions: [{ id: 'deduction-328', settlementId: identity.id, active: true, amount: 1000 }], penalties: [{ ...fact, id: 'penalty-328', name: '真实项目罚扣', amount: 2000, deductionId: 'deduction-328', deductionAmount: 1000 }], applications: [{ id: 'application-328', no: 'FK-328', name: '真实付款申请', projectId: project.id, supplierId: supplier.id, contractId: contract.id, status: 'approved', applyAmount: 12000, approvedAmount: 0, approvedAmountState: 'known', allocations: [{ settlementId: identity.id, amount: 8000 }, { settlementId: 'prior-328', amount: 4000 }], payments: [{ id: 'payment-328', no: 'ZF-328', name: '真实银行支付', totalAmount: 10000, amount: 3000, confirmed: true }] }] })
+    mocks.store.detailState = { kind: 'ready', data: { ...structuredClone(detail), subcontractSettlementEvidence: evidence } }
+    render(SubcontractSettlementDetailScreen, { props: { documentId: identity.id, origin: 'real' }, ...common })
+    expect(screen.getByText(/补充协议后合同额/).textContent).toContain('¥110,000.00')
+    expect(within(screen.getByRole('region', { name: '有效补充协议' })).getByText('真实补充协议')).not.toBeNull()
+    expect(within(screen.getByRole('region', { name: '分包变洽签' })).getByText('未知')).not.toBeNull()
+    expect(within(screen.getByRole('region', { name: '本期与往期结算' })).getByRole('link', { name: '往期结算' })).not.toBeNull()
+    const penalties = within(screen.getByRole('region', { name: '项目罚扣与独立抵扣' }))
+    expect(penalties.getByText('¥2,000.00')).not.toBeNull()
+    expect(penalties.getByText('¥1,000.00')).not.toBeNull()
+    expect(within(screen.getByRole('region', { name: '付款申请与批复' })).getByText('¥0.00')).not.toBeNull()
+    const payments = within(screen.getByRole('region', { name: '实际支付来源' }))
+    expect(payments.getByText('¥10,000.00')).not.toBeNull()
+    expect(payments.getByText('未知')).not.toBeNull()
+    expect(payments.getByText(/本单现金归属未知/)).not.toBeNull()
+    expect(screen.queryByRole('button', { name: /审批|确认支付/ })).toBeNull()
   })
 
   it('区分关系错配与可重试读取失败', async () => {

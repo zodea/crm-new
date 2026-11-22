@@ -201,6 +201,27 @@ describe('owner document list screen', () => {
     expect(Number(table.getAttribute('data-min-width'))).toBeGreaterThan(1200)
   })
 
+  it('列表完整总额缺失时呈现已知小计和缺项，不把真实零与未知混为一谈', () => {
+    runtime.desktop = false
+    route.query = {}
+    centralSummary = { projects: [], contracts: [], statuses: [], documentTypes: [], origins: { real: {
+      count: 2,
+      taxInclusiveAmount: null,
+      taxExclusiveAmount: '0.00',
+      appliedTaxExclusiveAmount: '0.00',
+      amountCompleteness: {
+        taxInclusiveAmount: { knownValue: '12.00', missingCount: 1 },
+        taxExclusiveAmount: { knownValue: '0.00', missingCount: 0 },
+        appliedTaxExclusiveAmount: { knownValue: '0.00', missingCount: 0 },
+      },
+    } } }
+    render(OwnerDocumentListScreen, { props: { kind: 'owner_change' }, global })
+    const summary = screen.getByRole('status', { name: '甲方变洽签列表汇总' })
+    expect(summary.textContent).toMatch(/含税审定金额总和：\s*未记录/)
+    expect(summary.textContent).toContain('已知小计 ¥12.00，缺 1 项')
+    expect(summary.textContent).toMatch(/无税申报金额总和：\s*¥0.00/)
+  })
+
   it('筛选无结果显示业务空态并可清除筛选', async () => {
     render(OwnerDocumentListScreen, {
       props: { kind: 'owner_change' },

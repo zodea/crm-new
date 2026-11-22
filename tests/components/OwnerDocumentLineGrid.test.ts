@@ -64,6 +64,16 @@ const boqLines = [{
 }]
 
 describe('ownerDocumentLineGrid behavior', () => {
+  it('只读冻结明细保原金额未知与真实零，不用完整量价重算历史金额', async () => {
+    const original = { operation: 'qty', boqLineId: 'boq-real-id', itemName: '原冻结分项', unit: '㎡', qty: 10, unitPrice: 20, deltaQty: 2, newUnitPrice: null, amount: null }
+    const wrapper = mount(OwnerDocumentLineGrid, { props: { kind: 'owner_change', lines: [original], boqLines, readonly: true }, global })
+    expect(wrapper.text()).toContain('合计 未记录')
+    expect(wrapper.text()).not.toContain('40.00')
+    await wrapper.setProps({ lines: [{ ...original, amount: 0 }] })
+    expect(wrapper.text()).toContain('合计 ¥0.00')
+    expect(wrapper.text()).not.toContain('40.00')
+  })
+
   it('缺量不预填申报零，未知单价和金额保留未记录，已知零仍能显示零', async () => {
     const missing = [{ ...boqLines[0]!, unitPrice: null, autoQty: 0, missingQtyCount: 1 }]
     const wrapper = mount(OwnerDocumentLineGrid, {

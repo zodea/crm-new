@@ -8,9 +8,83 @@ import { createOtherSettlementPay08Source } from '../tests/helpers/other-settlem
 import { createCrewWorkerProductionFixture } from './helpers/crew-worker-production-fixture'
 import { createHistoricalClearanceMigrationSource } from './helpers/historical-clearance-migration-source'
 import { createOtherSettlementMigrationSource } from './helpers/other-settlement-migration-source'
-import { expectNoPageOverflow } from './helpers/responsive'
+import { EQUIVALENT_200_PERCENT_VIEWPORT, expectLocalHorizontalScroll, expectNoPageOverflow, tabUntilFocused } from './helpers/responsive'
 
 test.skip(process.env.CRM_PRODUCTION_ACCEPTANCE !== '1', '全新正式构建与隔离合成存储验收，不连接用户数据库')
+for (const input of ['合成未保存输入甲', '合成未保存输入乙']) {
+  test(`付款申请正式来源：${input}在五档视口及200%布局下键盘操作可达`, async ({ page }, info) => {
+    test.setTimeout(120_000)
+    const f = await createCrewWorkerProductionFixture(page, info)
+    try {
+      await f.start()
+      await f.login()
+      await page.goto(`${f.origin}/finance/payment/new`)
+      const type = page.getByRole('button', { name: '有合同-材料', exact: true })
+      await expect(type).toBeVisible()
+      await type.focus()
+      await expect(type).toBeFocused()
+      await page.keyboard.press('Enter')
+      await expect(page.getByRole('heading', { name: '新建 · 付款申请' })).toBeVisible()
+      const field = page.getByTestId('finance-name')
+      const footer = page.getByRole('group', { name: '表单操作' })
+      const cancel = footer.getByRole('button', { name: '取消', exact: true })
+      const save = footer.getByRole('button', { name: '保存', exact: true })
+      await expect(save).toBeEnabled()
+      if (input === '合成未保存输入甲') {
+        await page.setViewportSize({ width: 390, height: 844 })
+        await page.getByTestId('add-grid-line').first().click({ timeout: 15_000 })
+        const grid = page.getByTestId('finance-line-grid').first()
+        const scrollRoot = grid.locator(':scope > .overflow-auto')
+        await expectLocalHorizontalScroll(scrollRoot, '正式付款申请明细')
+        await expect.poll(() => scrollRoot.evaluate(root => [...root.querySelectorAll<HTMLElement>('*')].filter((element) => {
+          const overflowX = getComputedStyle(element).overflowX
+          return ['auto', 'scroll'].includes(overflowX) && element.scrollWidth > element.clientWidth + 1
+        }).length)).toBe(0)
+        await scrollRoot.evaluate(root => root.scrollLeft = root.scrollWidth)
+        await expect.poll(() => scrollRoot.evaluate(root => root.scrollLeft)).toBeGreaterThan(0)
+        const lastAction = grid.getByTitle('删除').last()
+        await lastAction.scrollIntoViewIfNeeded()
+        await expect(lastAction).toBeInViewport()
+        await expectNoPageOverflow(page, '正式付款申请明细 @ 390px')
+      }
+      for (const width of [390, 768, 1024, 1280, 1440]) {
+        await page.setViewportSize({ width, height: width === 390 ? 844 : 900 })
+        await expectNoPageOverflow(page, `正式付款申请 ${width}px`)
+        await field.focus()
+        await expect(field).toBeFocused()
+        await tabUntilFocused(page, cancel)
+        await expect(cancel).toBeInViewport()
+        await tabUntilFocused(page, save)
+        await expect(save).toBeFocused()
+        await expect(save).toBeInViewport()
+      }
+      await page.setViewportSize(EQUIVALENT_200_PERCENT_VIEWPORT)
+      await expectNoPageOverflow(page, '正式付款申请 200%')
+      await field.fill(input)
+      await field.focus()
+      await tabUntilFocused(page, cancel)
+      await tabUntilFocused(page, save)
+      await tabUntilFocused(page, cancel, 'backward', 10)
+      await page.keyboard.press('Enter')
+      const dialog = page.getByRole('dialog', { name: '放弃修改' })
+      await expect(dialog).toBeVisible()
+      await expect(dialog.getByRole('button', { name: '取消', exact: true })).toBeFocused()
+      await page.keyboard.press('Escape')
+      await expect(dialog).toBeHidden()
+      await expect(cancel).toBeFocused()
+      await page.keyboard.press('Enter')
+      await expect(dialog).toBeVisible()
+      await page.keyboard.press('Tab')
+      await expect(dialog.getByRole('button', { name: '放弃修改', exact: true })).toBeFocused()
+      await page.keyboard.press('Enter')
+      await expect.poll(() => new URL(page.url()).pathname).toBe('/finance/payment')
+    }
+    finally {
+      await f.cleanup()
+    }
+  })
+}
+
 test('真实原费用→结算→申请→实付，整页原键恢复、版本冻结、原件与完整Native迁入冷开五档', async ({ page }, info) => {
   test.setTimeout(180000)
   const f = await createCrewWorkerProductionFixture(page, info)

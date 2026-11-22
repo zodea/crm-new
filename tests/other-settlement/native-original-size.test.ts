@@ -22,7 +22,7 @@ it.each([null, 0])('真实Native历史原件大小%s冷读取不伪造0、不改
   await writeFile(path, nativeTemplate)
   const seed = new DatabaseSync(path)
   try {
-    seed.prepare('INSERT INTO expenditure_settlements(id,name,total_amount,status) VALUES(?,?,?,?)').run('old-head', '原结算', 0, 'draft')
+    seed.prepare('INSERT INTO expenditure_settlements(id,name,biz_type,total_amount,status) VALUES(?,?,?,?,?)').run('old-head', '原结算', '其他', 0, 'draft')
     seed.prepare('INSERT INTO file_refs(id,owner_type,owner_id,file_name,file_path,file_size,mime_type,category,uploader,uploaded_at) VALUES(?,?,?,?,?,?,?,?,?,?)').run('old-original', 'expenditure_settlement', 'old-head', '原历史文件.txt', '', fileSize, 'text/plain', '历史原件', '原上传人', '2026-10-05T00:00:00.000Z')
     if (fileSize === 0)
       seed.prepare('INSERT INTO file_payloads(file_ref_id,encoding,content) VALUES(?,?,?)').run('old-original', 'base64', '')
@@ -42,7 +42,7 @@ it.each([null, 0])('真实Native历史原件大小%s冷读取不伪造0、不改
       expect((await readOtherSettlementStored(tx, { workspaceId: 'historical-workspace' })).records[0]!.attachments[0]).toMatchObject({ id: 'old-original', fileSize: 0, fileName: '原历史文件.txt', uploader: '原上传人' })
     expect(raw.prepare('SELECT file_size,uploader FROM file_refs WHERE id=?').get('old-original')).toMatchObject({ file_size: fileSize, uploader: '原上传人' })
     expect(raw.prepare('SELECT * FROM file_payloads WHERE file_ref_id=?').all('old-original').map(row => ({ ...row }))).toEqual(fileSize === null ? [] : [{ file_ref_id: 'old-original', encoding: 'base64', content: '' }])
-    expect(raw.prepare('SELECT total_amount,status,version,record_json FROM expenditure_settlements WHERE id=?').get('old-head')).toMatchObject({ total_amount: 0, status: 'draft', version: 0, record_json: null })
+    expect(raw.prepare('SELECT biz_type,total_amount,status,version,record_json FROM expenditure_settlements WHERE id=?').get('old-head')).toMatchObject({ biz_type: '其他', total_amount: 0, status: 'draft', version: 0, record_json: null })
   }
   finally { raw.close() }
   expect((await readFile(path)).equals(bytes)).toBe(true)

@@ -11,8 +11,10 @@ import { createProductionStorage } from '../../server/utils/production-storage'
 import { PRODUCTION_STORAGE_SCHEMA, PRODUCTION_STORAGE_UPGRADES, productionStorageManifest } from '../../server/utils/production-storage-schema'
 
 // Independent expected release scope: checking only the version would miss a partial owner registration.
-const expectedParticipants = ['auxiliary-contract', 'backup', 'boq', 'construction-contracts', 'construction-scope', 'contract-number-registry', 'crew-worker', 'customer', 'finance', 'material-contracts', 'material-quotations', 'notifications', 'other-settlements', 'our-signatories', 'payroll', 'process-library', 'project', 'quantity', 'subcontract-contracts', 'supplier', 'target-cost', 'wbs']
-const appendedOpt02Participants = ['target-cost', 'quantity', 'payroll', 'wbs', 'construction-contracts', 'boq', 'construction-scope', 'subcontract-contracts', 'auxiliary-contract'].map(domain => ({ domain, schema_version: domain === 'construction-scope' ? 2 : 1 }))
+const expectedSchemaVersion = 31
+const expectedParticipantVersions: Record<string, number> = { 'construction-scope': 2, 'other-settlements': 2, 'owner-documents': 3 }
+const expectedParticipants = ['auxiliary-contract', 'backup', 'boq', 'construction-contracts', 'construction-scope', 'contract-number-registry', 'crew-worker', 'customer', 'finance', 'material-contracts', 'material-quotations', 'notifications', 'other-settlements', 'our-signatories', 'owner-documents', 'payroll', 'process-library', 'project', 'quantity', 'subcontract-contracts', 'supplier', 'target-cost', 'wbs']
+const appendedProductionParticipants = ['target-cost', 'quantity', 'payroll', 'wbs', 'construction-contracts', 'boq', 'construction-scope', 'subcontract-contracts', 'auxiliary-contract', 'owner-documents'].map(domain => ({ domain, schema_version: expectedParticipantVersions[domain] ?? 1 }))
 
 it('真实v26工程关联扩展保全已有绑定、解绑和两种来源全部原证据，冷开不改写且不可变保护继续生效', async () => {
   const base = resolve('.tmp/opt02-scope-upgrade')
@@ -45,7 +47,7 @@ it('真实v26工程关联扩展保全已有绑定、解绑和两种来源全部�
   raw.close()
   const storage = createProductionStorage({ directory, workspaceId: 'scope-upgrade-workspace', ownerId: 'scope-upgrade-owner', purpose: 'verification' })
   try {
-    expect((await storage.status()).schemaVersion).toBe(28)
+    expect((await storage.status()).schemaVersion).toBe(expectedSchemaVersion)
     expect(await Promise.all(PRODUCTION_CONSTRUCTION_SCOPE_TABLES.map(table => storage.select(`SELECT * FROM ${table} ORDER BY rowid`)))).toEqual(before)
     expect(await storage.select('PRAGMA foreign_key_check')).toEqual([])
     await storage.close()
@@ -58,8 +60,9 @@ it('真实v26工程关联扩展保全已有绑定、解绑和两种来源全部�
   }
   finally { await storage.close() }
 })
-function participantsAfterOpt02(originals: Record<string, unknown>[]) {
-  return [...originals, ...appendedOpt02Participants].sort((left, right) => String(left.domain).localeCompare(String(right.domain)))
+function participantsAfterProductionUpgrade(originals: Record<string, unknown>[]) {
+  const current = originals.map(row => row.domain === 'other-settlements' ? { ...row, schema_version: 2 } : row)
+  return [...current, ...appendedProductionParticipants].sort((left, right) => String(left.domain).localeCompare(String(right.domain)))
 }
 const newOwnerTables = [
   'auxiliary_contract_revision',
@@ -267,13 +270,36 @@ const newOwnerTables = [
   'subcontract_contract_import_intents',
   'subcontract_contract_import_receipts',
   'subcontract_contract_import_resolutions',
+  'monthly_statements',
+  'project_acceptances',
+  'owner_final_settlements',
+  'owner_penalties',
+  'subcontract_change_orders',
+  'penalty_records',
+  'owner_document_revision',
+  'owner_document_command_intents',
+  'owner_document_command_receipts',
+  'owner_document_command_resolutions',
+  'owner_document_history',
+  'penalty_settlement_deductions',
+  'penalty_rectification_events',
+  'owner_document_files',
+  'owner_document_imports',
+  'owner_document_import_bindings',
+  'owner_document_import_restores',
+  'owner_document_import_intents',
+  'owner_document_import_commands',
+  'owner_document_import_resolutions',
 ]
 async function assertCurrentOwnerStructure(storage: ReturnType<typeof createProductionStorage>) {
-  expect((await storage.status()).schemaVersion).toBe(28)
+  expect((await storage.status()).schemaVersion).toBe(expectedSchemaVersion)
   expect((await storage.status()).participants.slice().sort()).toEqual(expectedParticipants)
-  expect(await storage.select('SELECT * FROM production_participants ORDER BY domain')).toEqual(expectedParticipants.map(domain => ({ domain, schema_version: domain === 'construction-scope' ? 2 : 1 })))
+  expect(await storage.select('SELECT * FROM production_participants ORDER BY domain')).toEqual(expectedParticipants.map(domain => ({ domain, schema_version: expectedParticipantVersions[domain] ?? 1 })))
   for (const table of newOwnerTables) {
-    expect(await storage.select(`SELECT * FROM ${table}`)).toEqual(table.endsWith('_revision') ? [{ singleton: 1, revision: 0 }] : [])
+    const initial = table === 'owner_document_revision'
+      ? [{ singleton: 1, revision: 1, metadata_json: '{"migrationKeys":[],"migrationSnapshotFingerprint":null}' }]
+      : table.endsWith('_revision') ? [{ singleton: 1, revision: 0 }] : []
+    expect(await storage.select(`SELECT * FROM ${table}`)).toEqual(initial)
   }
   const references = [
     ['material_quotation_lines', 'quotation_id', 'material_quotations'],
@@ -287,6 +313,11 @@ async function assertCurrentOwnerStructure(storage: ReturnType<typeof createProd
     ['finance_expense_clearance_verifications', 'command_id', 'finance_commands'],
     ['expenditure_settlement_clearance_links', 'expense_allocation_id', 'expenditure_settlement_expense_allocations'],
     ['expenditure_settlement_clearance_links', 'verification_id', 'finance_expense_clearance_verifications'],
+    ['owner_document_command_receipts', 'command_id', 'owner_document_command_intents'],
+    ['penalty_settlement_deductions', 'penalty_id', 'penalty_records'],
+    ['penalty_rectification_events', 'penalty_id', 'penalty_records'],
+    ['owner_document_files', 'file_ref_id', 'file_refs'],
+    ['owner_document_import_bindings', 'import_id', 'owner_document_imports'],
   ]
   for (const [table, from, target] of references)
     expect(await storage.select(`PRAGMA foreign_key_list(${table})`)).toEqual(expect.arrayContaining([expect.objectContaining({ from, table: target })]))
@@ -294,7 +325,7 @@ async function assertCurrentOwnerStructure(storage: ReturnType<typeof createProd
     expect((await storage.select<{ name: string }>(`PRAGMA index_info(${index})`)).map(row => row.name)).toEqual(columns)
   for (const [table, keys] of [['material_quotation_history', ['quotation_id', 'version']], ['finance_history', ['kind', 'id', 'version']], ['crew_worker_command_receipts', ['workspace_id', 'actor_id', 'kind', 'command_id']], ['other_settlement_history', ['settlement_id', 'version']]] as const)
     expect((await storage.select<{ name: string, pk: number }>(`PRAGMA table_info(${table})`)).filter(row => row.pk > 0).sort((left, right) => left.pk - right.pk).map(row => row.name)).toEqual(keys)
-  const guards = ['quotation_history_update', 'quotation_history_delete', 'finance_history_no_update', 'finance_history_no_delete', 'finance_payment_verifications_no_update', 'finance_payment_verifications_no_delete', 'finance_expense_clearance_verifications_no_update', 'finance_expense_clearance_verifications_no_delete', 'expenditure_settlement_clearance_links_no_update', 'expenditure_settlement_clearance_links_no_delete', 'crew_worker_audits_immutable_update', 'crew_worker_audits_immutable_delete', 'worker_roster_archives_immutable_update', 'worker_roster_archives_immutable_delete', 'other_settlement_history_update', 'other_settlement_history_delete', 'other_settlement_confirmed_expense_insert']
+  const guards = ['quotation_history_update', 'quotation_history_delete', 'finance_history_no_update', 'finance_history_no_delete', 'finance_payment_verifications_no_update', 'finance_payment_verifications_no_delete', 'finance_expense_clearance_verifications_no_update', 'finance_expense_clearance_verifications_no_delete', 'expenditure_settlement_clearance_links_no_update', 'expenditure_settlement_clearance_links_no_delete', 'crew_worker_audits_immutable_update', 'crew_worker_audits_immutable_delete', 'worker_roster_archives_immutable_update', 'worker_roster_archives_immutable_delete', 'other_settlement_history_update', 'other_settlement_history_delete', 'other_settlement_confirmed_expense_insert', 'expenditure_settlement_owner_immutable', 'business_settlement_confirmed_lock', 'production_owner_document_history_update', 'production_owner_document_history_delete', 'production_owner_document_bytes_update', 'production_owner_document_bytes_delete']
   expect((await storage.select<{ name: string }>(`SELECT name FROM sqlite_schema WHERE type='trigger' AND name IN (${guards.map(() => '?').join(',')}) ORDER BY name`, guards)).map(row => row.name)).toEqual(guards.slice().sort())
   expect(await storage.select('PRAGMA foreign_key_check')).toEqual([])
 }
@@ -563,15 +594,15 @@ it('真实v12升级核验表冲突保整份旧库；核实处理冲突后重试�
   finally { preserved.close() }
   const retried = createProductionStorage(options)
   try {
-    expect((await retried.status()).schemaVersion).toBe(28)
+    expect((await retried.status()).schemaVersion).toBe(expectedSchemaVersion)
     expect(await retried.select('SELECT * FROM payment_applications ORDER BY id')).toEqual(oldApplications)
     expect(await retried.select('SELECT * FROM payment_records')).toEqual(oldCash)
     expect(await retried.select('SELECT * FROM payment_record_application_allocations')).toEqual(oldAllocations)
-    expect(await retried.select('SELECT * FROM production_participants ORDER BY domain')).toEqual(participantsAfterOpt02(oldParticipants))
+    expect(await retried.select('SELECT * FROM production_participants ORDER BY domain')).toEqual(participantsAfterProductionUpgrade(oldParticipants))
     expect(await retried.select('SELECT * FROM finance_payment_verifications')).toEqual([])
     expect(await retried.select('PRAGMA foreign_key_check')).toEqual([])
     await retried.close()
-    expect((await retried.status()).schemaVersion).toBe(28)
+    expect((await retried.status()).schemaVersion).toBe(expectedSchemaVersion)
     expect(await retried.select('SELECT * FROM payment_applications ORDER BY id')).toEqual(oldApplications)
     expect(await retried.select('SELECT * FROM payment_records')).toEqual(oldCash)
     expect(await retried.select('SELECT * FROM finance_payment_verifications')).toEqual([])
@@ -658,10 +689,10 @@ it.each([null, 'finance_expense_clearance_verifications', 'expenditure_settlemen
     for (const cold of [false, true]) {
       if (cold)
         await upgraded.close()
-      expect((await upgraded.status()).schemaVersion).toBe(28)
+      expect((await upgraded.status()).schemaVersion).toBe(expectedSchemaVersion)
       for (const [table, rows] of Object.entries(graph.rows)) {
         if (table === 'production_participants')
-          expect(await upgraded.select('SELECT * FROM production_participants ORDER BY domain')).toEqual(participantsAfterOpt02(rows))
+          expect(await upgraded.select('SELECT * FROM production_participants ORDER BY domain')).toEqual(participantsAfterProductionUpgrade(rows))
         else
           expect(await upgraded.select(`SELECT * FROM ${table} ORDER BY rowid`)).toEqual(rows)
       }

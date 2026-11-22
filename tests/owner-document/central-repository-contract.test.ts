@@ -208,6 +208,7 @@ const finalSettlement: OwnerCommercialDocumentSource = {
   settlementDifferenceNote: '审定金额尚未回传',
   finalSettlementEvidence: {
     originalContractAmount: 1200000,
+    changes: [],
     supplements: [
       {
         id: 'supplement-real-325-draft',
@@ -593,6 +594,53 @@ describe('甲方商务单据中央读取契约', () => {
     expect(detail.finalSettlementEvidence?.sources).toBeNull()
   })
 
+  it('最终结算复用原已签证变更含税金额，收款缺源不吞掉协议和变更', () => {
+    const detail = buildOwnerCommercialDocumentDetail({
+      ...base,
+      documents: [{ ...finalSettlement, finalSettlementEvidence: {
+        ...finalSettlement.finalSettlementEvidence!,
+        changes: [
+          { id: change.id, no: change.no, name: change.name, status: 'approved', amount: -520, date: '2026-08-10', sourceType: 'boq_change_order' },
+          { id: 'change-draft', no: 'BG-DRAFT', name: '未签证变更', status: 'draft', amount: 999999, date: null },
+        ],
+        receipts: null,
+      } }],
+      query: parseOwnerCommercialDocumentDetailQuery('final_settlement', finalSettlement.id, { origin: 'real' }),
+    })
+    expect(detail.document.amounts).toMatchObject({ changedContract: '1279480.00', cumulativeReceipts: null, receiptDifference: null })
+    expect(detail.finalSettlementEvidence?.sources).toEqual([
+      expect.objectContaining({ kind: 'contract-supplement', id: 'supplement-real-325-approved', amount: '80000.00' }),
+      expect.objectContaining({ kind: 'owner-change', id: change.id, amount: '-520.00', navigation: expect.objectContaining({ subject: expect.objectContaining({ id: change.id }), variant: 'change' }) }),
+    ])
+    expect(detail.finalSettlementEvidence?.sourceStates).toEqual({ supplements: 'readable', changes: 'readable', receipts: 'unavailable' })
+  })
+
+  it('已知空变更为零，原签证金额未知会阻断完整合同额而保留来源', () => {
+    const get = (changes: NonNullable<OwnerCommercialDocumentSource['finalSettlementEvidence']>['changes']) => buildOwnerCommercialDocumentDetail({
+      ...base,
+      documents: [{ ...finalSettlement, finalSettlementEvidence: { ...finalSettlement.finalSettlementEvidence!, changes } }],
+      query: parseOwnerCommercialDocumentDetailQuery('final_settlement', finalSettlement.id, { origin: 'real' }),
+    })
+    expect(get([]).document.amounts).toMatchObject({ changedContract: '1280000.00' })
+    expect(get(null).document.amounts).toMatchObject({ changedContract: null })
+    const unknown = get([{ id: change.id, no: change.no, name: change.name, status: 'approved', amount: null, date: '2026-08-10' }])
+    expect(unknown.document.amounts).toMatchObject({ changedContract: null })
+    expect(unknown.finalSettlementEvidence?.sources).toContainEqual(expect.objectContaining({ kind: 'owner-change', id: change.id, amount: null }))
+  })
+
+  it('草稿金额的未知与真实零分别读回，汇总只报告有证小计及缺项', () => {
+    const documents = [{ ...finalSettlement, id: 'missing', amount: null }, { ...finalSettlement, id: 'zero', amount: 0 }]
+    const page = buildOwnerCommercialDocumentListPage({ ...base, documents, query: parseOwnerCommercialDocumentListQuery('final_settlement', { origin: 'real' }) })
+    expect(page.items.map(item => item.amounts)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ declared: null, receiptDifference: null }),
+      expect.objectContaining({ declared: '0.00', receiptDifference: '-900000.00' }),
+    ]))
+    expect(page.summary.origins.real).toMatchObject({ reportedAmount: null, amountCompleteness: { reportedAmount: { knownValue: '0.00', missingCount: 1 } } })
+    expect(page.items.map(ownerDocumentListRecordFromCentral).map(row => row.amount)).toEqual(expect.arrayContaining([null, 0]))
+    const empty = buildOwnerCommercialDocumentListPage({ ...base, documents: [], query: parseOwnerCommercialDocumentListQuery('final_settlement', { origin: 'real' }) })
+    expect(empty.summary.origins.real).toMatchObject({ reportedAmount: '0.00', amountCompleteness: { reportedAmount: { knownValue: '0.00', missingCount: 0 } } })
+  })
+
   it('验收与保修按同一稳定 ID 生成双视图，并只暴露各自字段和附件', () => {
     const documents = [acceptance]
     const acceptanceDetail = buildOwnerCommercialDocumentDetail({
@@ -718,11 +766,21 @@ describe('甲方商务单据中央读取契约', () => {
     expect(page.summary.origins.real).toEqual({
       count: 1,
       reportedAmount: '520.00',
-      auditedAmount: '0.00',
+      auditedAmount: null,
       taxInclusiveAmount: '520.00',
       taxExclusiveAmount: '480.00',
       appliedTaxExclusiveAmount: '500.00',
       subcontractApprovedAmount: '0.00',
+      differenceAmount: '0.00',
+      amountCompleteness: {
+        reportedAmount: { knownValue: '520.00', missingCount: 0 },
+        auditedAmount: { knownValue: '0.00', missingCount: 1 },
+        taxInclusiveAmount: { knownValue: '520.00', missingCount: 0 },
+        taxExclusiveAmount: { knownValue: '480.00', missingCount: 0 },
+        appliedTaxExclusiveAmount: { knownValue: '500.00', missingCount: 0 },
+        subcontractApprovedAmount: { knownValue: '0.00', missingCount: 0 },
+        differenceAmount: { knownValue: '0.00', missingCount: 0 },
+      },
       subcontractActualApproved: { value: null, status: 'missing' },
     })
   })

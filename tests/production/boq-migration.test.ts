@@ -104,6 +104,8 @@ it('真实完整SQLite同SHA施工→清单/E/有效变化原图；保SQL扩展/
     const unknownManual = productionBoqWorkspaceProjection({ ...read, changes: read.changes.map(change => change.id === 'legacy-manual-change' ? { ...change, amount: null } : change) }, '原项目', '原施工主合同', 'LEGACY-MAIN')
     expect(unknownManual.changes.find(change => change.id === 'legacy-manual-change')?.totalAmount).toBeNull()
     expect(unknownManual.summary.approvedChangeAmount).toBeNull()
+    const unknownLine = productionBoqWorkspaceProjection({ ...read, changes: read.changes.map(change => ({ ...change, document: { ...change.document, lines: change.document.lines.map(line => ({ ...line, amount: null })) } })) }, '原项目', '原施工主合同', 'LEGACY-MAIN')
+    expect(unknownLine.changes.find(change => change.lines.length)?.lines[0]?.amount).toBeNull()
     const [row] = await storage.select<{ evidence_json: string }>('SELECT evidence_json FROM boq_source_imports')
     const evidence = JSON.parse(row!.evidence_json)
     expect(evidence.rawDomain.file_refs.find((row: { legacyId: string }) => row.legacyId === 'legacy-embedded-ref').columns).toMatchObject({ uploader: { sqliteType: 'null', exactValue: null }, category: { sqliteType: 'null', exactValue: null }, uploaded_at: { sqliteType: 'null', exactValue: null } })
