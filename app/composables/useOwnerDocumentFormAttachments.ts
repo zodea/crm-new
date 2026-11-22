@@ -1,21 +1,24 @@
 import type {
   FileRefChanges,
   FileRefDraft,
-  FileRefRecord,
 } from '~/lib/forms/file-refs'
+import type { OwnerDocumentAttachmentRecord } from '~/lib/owner-document/central-command-contract'
 import { isTauri } from '@tauri-apps/api/core'
 import { computed, readonly, shallowRef } from 'vue'
+import { fileRefDraftFromFile } from '~/lib/forms/file-refs'
 import { toErrorMessage } from '~/lib/util/error'
 
 export type PendingOwnerDocumentAttachment = FileRefDraft & { localId: string }
 
 export function useOwnerDocumentFormAttachments(options: { defaultCategory?: () => string } = {}) {
   const { warning, error } = useKitUI()
-  const attachments = shallowRef<FileRefRecord[]>([])
+  const attachments = shallowRef<OwnerDocumentAttachmentRecord[]>([])
   const pendingAttachments = shallowRef<PendingOwnerDocumentAttachment[]>([])
   const pendingRemoveIds = shallowRef<string[]>([])
   const pendingRestoreIds = shallowRef<string[]>([])
   const desktopAttachmentPicker = shallowRef(isTauri())
+  const readingFiles = shallowRef(false)
+  let fileGeneration = 0
 
   const dirty = computed(() =>
     pendingAttachments.value.length > 0
@@ -24,12 +27,14 @@ export function useOwnerDocumentFormAttachments(options: { defaultCategory?: () 
   )
 
   function clearPending() {
+    fileGeneration++
+    readingFiles.value = false
     pendingAttachments.value = []
     pendingRemoveIds.value = []
     pendingRestoreIds.value = []
   }
 
-  function reset(files: FileRefRecord[] = []) {
+  function reset(files: OwnerDocumentAttachmentRecord[] = []) {
     attachments.value = files
     clearPending()
   }
@@ -40,6 +45,22 @@ export function useOwnerDocumentFormAttachments(options: { defaultCategory?: () 
       removeIds: pendingRemoveIds.value,
       restoreIds: pendingRestoreIds.value,
     }
+  }
+
+  function capture() {
+    return JSON.parse(JSON.stringify({ add: pendingAttachments.value, removeIds: pendingRemoveIds.value, restoreIds: pendingRestoreIds.value })) as {
+      add: PendingOwnerDocumentAttachment[]
+      removeIds: string[]
+      restoreIds: string[]
+    }
+  }
+
+  function acknowledge(files: OwnerDocumentAttachmentRecord[], sent: ReturnType<typeof capture>) {
+    attachments.value = files
+    const submitted = new Map(sent.add.map(file => [file.localId, JSON.stringify(file)]))
+    pendingAttachments.value = pendingAttachments.value.filter(file => submitted.get(file.localId) !== JSON.stringify(file))
+    pendingRemoveIds.value = pendingRemoveIds.value.filter(id => !sent.removeIds.includes(id))
+    pendingRestoreIds.value = pendingRestoreIds.value.filter(id => !sent.restoreIds.includes(id))
   }
 
   function append(files: FileRefDraft[]) {
@@ -59,32 +80,52 @@ export function useOwnerDocumentFormAttachments(options: { defaultCategory?: () 
     ]
   }
 
-  function handleFiles(files: File[]) {
-    append(files.map(file => ({
-      fileName: file.name,
-      fileSize: file.size,
-      mimeType: file.type,
-    })))
+  async function handleFiles(files: File[]) {
+    const generation = ++fileGeneration
+    readingFiles.value = true
+    try {
+      const drafts = await Promise.all(files.map(file => fileRefDraftFromFile(file)))
+      if (generation === fileGeneration)
+        append(drafts)
+    }
+    catch (cause) {
+      if (generation === fileGeneration)
+        error(`附件读取失败：${toErrorMessage(cause)}`)
+    }
+    finally {
+      if (generation === fileGeneration)
+        readingFiles.value = false
+    }
   }
 
   async function pickNativeFiles() {
+    const generation = ++fileGeneration
+    readingFiles.value = true
     try {
-      const [{ open }, { stat }, { basename }] = await Promise.all([
+      const [{ open }, { stat, readFile }, { basename }] = await Promise.all([
         import('@tauri-apps/plugin-dialog'),
         import('@tauri-apps/plugin-fs'),
         import('@tauri-apps/api/path'),
       ])
       const selected = await open({ multiple: true, directory: false })
       const paths = selected == null ? [] : Array.isArray(selected) ? selected : [selected]
-      const files = await Promise.all(paths.map(async filePath => ({
-        fileName: await basename(filePath),
-        filePath,
-        fileSize: (await stat(filePath)).size,
-      })))
-      append(files)
+      const files = await Promise.all(paths.map(async (filePath) => {
+        const metadata = await stat(filePath)
+        const bytes = await readFile(filePath)
+        if (bytes.byteLength !== metadata.size)
+          throw new Error('附件选择后字节发生变化，请重新选择同一原件')
+        return { ...await fileRefDraftFromFile(new File([bytes], await basename(filePath))), filePath }
+      }))
+      if (generation === fileGeneration)
+        append(files)
     }
     catch (cause) {
-      error(`选择附件失败：${toErrorMessage(cause)}`)
+      if (generation === fileGeneration)
+        error(`选择附件失败：${toErrorMessage(cause)}`)
+    }
+    finally {
+      if (generation === fileGeneration)
+        readingFiles.value = false
     }
   }
 
@@ -120,6 +161,9 @@ export function useOwnerDocumentFormAttachments(options: { defaultCategory?: () 
     pendingRemoveIds: readonly(pendingRemoveIds),
     pendingRestoreIds: readonly(pendingRestoreIds),
     desktopAttachmentPicker: readonly(desktopAttachmentPicker),
+    readingFiles: readonly(readingFiles),
+    capture,
+    acknowledge,
     dirty,
     reset,
     clearPending,

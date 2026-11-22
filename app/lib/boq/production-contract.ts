@@ -42,6 +42,7 @@ export interface BoqCommandResult {
   restored?: boolean
   deleted?: boolean
   buildingResult?: import('./central-building-contract').BoqBuildingResult
+  ownerResult?: import('../owner-document/central-command-contract').OwnerCommercialDocumentCommandResultDTO
 }
 export interface ProductionBoqLine extends QuantityBoqLine {
   declaredBuildingId?: string

@@ -6,7 +6,7 @@ import { hiddenCtesFor, visibleCond } from '../db/soft-delete'
 import { assertQuantityBasis, QUANTITY_BASIS_COLUMNS } from './basis'
 import { quantityProblem } from './central-contract'
 
-export interface QuantityMonthlyReadQuery extends QuantityReadQuery { basis?: QuantityBasis }
+export interface QuantityMonthlyReadQuery extends QuantityReadQuery { basis?: QuantityBasis, periodNo?: string, contractId?: string }
 
 export interface QuantityMonthlyBoqFact {
   projectId: string
@@ -21,8 +21,10 @@ export interface QuantityMonthlyBoqFact {
   sourceUpdatedAt: string | null
 }
 
-export async function loadQuantityMonthlyBoqFacts(db: Pick<SoftDb, 'select'>, projectId: string, lines: readonly QuantityBoqLine[], sourceVersion: string, basis: QuantityBasis = 'field'): Promise<QuantityMonthlyBoqFact[]> {
+export async function loadQuantityMonthlyBoqFacts(db: Pick<SoftDb, 'select'>, projectId: string, lines: readonly QuantityBoqLine[], sourceVersion: string, basis: QuantityBasis = 'field', periodNo?: string): Promise<QuantityMonthlyBoqFact[]> {
   assertQuantityBasis(basis)
+  if (periodNo !== undefined && !/^\d{4}-(?:0[1-9]|1[0-2])$/.test(periodNo))
+    throw quantityProblem('invalid-query', '报量期次格式必须为 yyyy-mm')
   const column = QUANTITY_BASIS_COLUMNS[basis]
   const byId = new Map(lines.map(line => [line.id, line]))
   const unconfigured = await db.select<{ boq_line_id: string, item_name: string }>(
@@ -72,10 +74,11 @@ export async function loadQuantityMonthlyBoqFacts(db: Pick<SoftDb, 'select'>, pr
        AND csi.is_reporting_stage = 1 AND usc.status = 'completed'
        AND usc.completed_at IS NOT NULL AND hti.boq_line_id IS NOT NULL
        AND b.project_id = ? AND ht.project_id = ? AND s.project_id = ? AND item.project_id = ?
+       AND s.trade = item.trade
      GROUP BY hti.boq_line_id, month ORDER BY month, hti.boq_line_id`,
     [projectId, projectId, projectId, projectId],
   )
-  return rows.flatMap((row) => {
+  const facts = rows.filter(row => periodNo === undefined || row.month === periodNo).flatMap((row) => {
     const line = byId.get(row.boq_line_id)
     if (!line)
       return []
@@ -91,4 +94,30 @@ export async function loadQuantityMonthlyBoqFacts(db: Pick<SoftDb, 'select'>, pr
       sourceUpdatedAt: row.updated_at || null,
     }]
   })
+  if (periodNo !== undefined) {
+    // A configured, actually used reporting scope with no completion in this month is known zero.
+    // Unused templates and unconfigured reporting scopes cannot create a zero candidate.
+    const configured = await db.select<{ boq_line_id: string, updated_at: string }>(
+      `${hiddenCtesFor('units', 'house_type_template_items', 'construction_stage_items')}
+       SELECT hti.boq_line_id, MAX(MAX(hti.updated_at, csi.updated_at)) AS updated_at
+       FROM units u JOIN floors f ON f.id = u.floor_id JOIN buildings b ON b.id = f.building_id
+       JOIN house_type_templates ht ON ht.id = u.house_type_template_id
+       JOIN rooms r ON r.template_id = ht.id JOIN house_type_template_items hti ON hti.room_id = r.id
+       JOIN items item ON item.id = hti.item_id
+       JOIN construction_stage_items csi ON csi.item_id = item.id AND csi.is_reporting_stage = 1
+       JOIN construction_stages s ON s.id = csi.stage_id
+       WHERE ${visibleCond('units', 'u')} AND ${visibleCond('house_type_template_items', 'hti')}
+         AND ${visibleCond('construction_stage_items', 'csi')}
+         AND b.project_id = ? AND ht.project_id = ? AND item.project_id = ? AND s.project_id = ?
+         AND s.trade = item.trade AND hti.boq_line_id IS NOT NULL
+       GROUP BY hti.boq_line_id ORDER BY hti.boq_line_id`,
+      [projectId, projectId, projectId, projectId],
+    )
+    for (const row of configured) {
+      const line = byId.get(row.boq_line_id)
+      if (line && !facts.some(fact => fact.boqLineId === line.id))
+        facts.push({ projectId, contractId: line.contractId, periodNo, boqLineId: line.id, autoQty: 0, missingQtyCount: 0, quantityBasis: basis, sourceVersion, sourceUpdatedAt: row.updated_at || null })
+    }
+  }
+  return facts
 }

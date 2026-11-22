@@ -2,15 +2,20 @@ import type { TransactionDb } from '../../app/lib/db/coordinator'
 import type { FormAttachmentChanges, ProjectFormDraft } from '../../app/lib/master-data/forms'
 import type { ProjectCommandResultDTO, ProjectFormReadDTO } from '../../app/lib/project/command-contract'
 import type { ProjectCommandLookup, ProjectLifecycleCommand } from '../../app/lib/project/production-contract'
+import type { ProjectDetailReadDTO } from '../../app/lib/project/read-contract'
+import type { SourceEvidenceDTO } from '../../app/types/read-model'
 import type { BusinessSession } from './business-session'
 import type { ProjectRow } from './production-project-record'
 import type { ProductionStorage } from './production-storage'
 import { Buffer } from 'node:buffer'
 import { createHash, randomUUID } from 'node:crypto'
+import { buildOwnerCommercialDocumentListPage, parseOwnerCommercialDocumentListQuery } from '../../app/lib/owner-document/central-repository'
 import { decodeProjectImportSource } from '../../app/lib/project/import'
+import { PROJECT_BUSINESS_DOCUMENT_VIEWS } from '../../app/lib/project/read-contract'
 import { buildProjectDetailRead, buildProjectListPage, parseProjectDetailQuery, parseProjectListQuery } from '../../app/lib/project/repository'
 import { readProductionConstructionDirectoryProjection } from './production-construction-contract-sources'
 import { readMaterialContractProjectFacts } from './production-material-contract-service'
+import { readProductionOwnerDocumentFacts } from './production-owner-document-service'
 import { projectFailure as fail, normalizedProject, projectAttachment, projectDraft, projectListRow } from './production-project-record'
 import { parseProductionProjectRequest, productionProjectCommandId, productionProjectId } from './production-project-request'
 import { assertProjectCommandBusinessRules, deriveProjectApprovalStatus } from './project-command-domain'
@@ -75,6 +80,37 @@ async function names(tx: TransactionDb, actor: BusinessSession) {
   return new Map(actor.capabilities.includes('customer:list:read')
     ? (await tx.select<{ id: string, name: string }>('SELECT id,name FROM customers WHERE deleted_at IS NULL')).map(row => [row.id, row.name])
     : [])
+}
+
+async function projectBusinessDocuments(tx: TransactionDb, actor: BusinessSession, projectId: string, asOf: string) {
+  const pages: NonNullable<ProjectDetailReadDTO['ownerJourneys']>['pages'] = {}
+  const issues: string[] = []
+  const available = actor.capabilities.includes('owner-document:read') || actor.capabilities.includes('subcontract-document:read')
+  const failure = (state: 'forbidden' | 'unavailable') => ({ journeys: { pages, issues }, sources: [{ key: 'owner-documents', state, sourceVersion: null, asOf: null }] satisfies SourceEvidenceDTO[] })
+  if (!available) {
+    issues.push('当前身份无项目商务单据读取权限')
+    return failure('forbidden')
+  }
+  try {
+    const actual = await readProductionOwnerDocumentFacts(tx, actor, { projectId })
+    for (const key of Object.keys(PROJECT_BUSINESS_DOCUMENT_VIEWS) as Array<keyof typeof PROJECT_BUSINESS_DOCUMENT_VIEWS>) {
+      const [kind, variant] = PROJECT_BUSINESS_DOCUMENT_VIEWS[key]
+      const capability = kind.startsWith('sub_') || kind === 'project_penalty' ? 'subcontract-document:read' : 'owner-document:read'
+      if (!actor.capabilities.includes(capability)) {
+        issues.push(`${key}：无读取权限`)
+        continue
+      }
+      const query = parseOwnerCommercialDocumentListQuery(kind, { projectId, origin: 'real', page: 1, pageSize: 10, ...(variant ? { variant } : {}) })
+      const meta = createReadMeta({ session: actor, schemaVersion: 'owner-document-read-v3', operation: 'owner-document:list', dataOrigin: 'real', asOf, sources: actual.sourceEvidence.map(source => ({ ...source, asOf: source.state === 'readable' ? asOf : null })), coverage: 'complete', scope: query })
+      const demo = createReadMeta({ session: actor, schemaVersion: 'owner-document-read-v3', operation: 'owner-document:list', dataOrigin: 'demo', asOf, sources: [], coverage: 'unknown', scope: query })
+      pages[key] = withOriginReadMeta(buildOwnerCommercialDocumentListPage({ documents: actual.documents, query, asOf, sourceVersion: meta.sourceVersion, capabilities: [...actor.capabilities] }), { real: meta, demo })
+    }
+    return { journeys: { pages, issues }, sources: [{ key: 'owner-documents', state: 'readable' as const, sourceVersion: actual.sourceVersion, asOf }, ...actual.sourceEvidence.filter(source => source.key !== 'owner-documents').map(source => ({ ...source, key: `business-${source.key}` }))] }
+  }
+  catch (cause) {
+    issues.push(cause instanceof Error ? cause.message : '项目商务单据来源暂不可用')
+    return failure('unavailable')
+  }
 }
 async function applyOriginals(tx: TransactionDb, id: string, changes: FormAttachmentChanges, actor: string, now: string) {
   const current = await attachments(tx, id)
@@ -286,6 +322,7 @@ export function createProductionProjectService(storage: ProductionStorage) {
         const asOf = new Date().toISOString()
         const materialFacts = await readMaterialContractProjectFacts(tx, actor, id, asOf)
         const construction = await readProductionConstructionDirectoryProjection(tx, actor, asOf, id)
+        const commercial = await projectBusinessDocuments(tx, actor, id, asOf)
         const meta = createReadMeta({ session: actor, schemaVersion: 'project-read-v2', operation: 'project:detail', dataOrigin: 'real', asOf, coverage: 'complete', scope: query, sources: [
           { key: 'projects', state: 'readable', sourceVersion: `project:${row.version}`, asOf },
           customerRevision === null ? { key: 'customers', state: 'forbidden', sourceVersion: null, asOf: null } : { key: 'customers', state: 'readable', sourceVersion: `customers:${customerRevision}`, asOf },
@@ -295,8 +332,9 @@ export function createProductionProjectService(storage: ProductionStorage) {
           { key: 'project-suppliers', state: 'unavailable', sourceVersion: null, asOf: null },
           { key: 'receipts', state: 'not-requested', sourceVersion: null, asOf: null },
           { key: 'target-costs', state: 'not-requested', sourceVersion: null, asOf: null },
+          ...commercial.sources,
         ] })
-        return withReadMeta({ ...buildProjectDetailRead({ rows: [projectListRow(row, await names(tx, actor), actor.capabilities.includes('customer:list:read'))], query, materialContractCount: materialFacts.count, materialContractAccess: materialFacts.source.state === 'readable' ? 'allowed' : materialFacts.source.state === 'forbidden' ? 'forbidden' : 'unknown', projectSupplierAccess: 'error', asOf, sourceVersion: meta.sourceVersion, capabilities: meta.capabilities }), ...(construction.configuration ? { constructionManagementFees: construction.configuration } : {}) }, meta)
+        return withReadMeta({ ...buildProjectDetailRead({ rows: [projectListRow(row, await names(tx, actor), actor.capabilities.includes('customer:list:read'))], query, materialContractCount: materialFacts.count, materialContractAccess: materialFacts.source.state === 'readable' ? 'allowed' : materialFacts.source.state === 'forbidden' ? 'forbidden' : 'unknown', projectSupplierAccess: 'error', asOf, sourceVersion: meta.sourceVersion, capabilities: meta.capabilities }), ownerJourneys: commercial.journeys, ...(construction.configuration ? { constructionManagementFees: construction.configuration } : {}) }, meta)
       })
     },
     file(projectId: string, fileId: string, session: ProductionSession) {

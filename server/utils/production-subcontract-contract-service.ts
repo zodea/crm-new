@@ -1,6 +1,6 @@
 import type { TransactionDb } from '../../app/lib/db/coordinator'
 import type { SubcontractContractCommandRequestDTO, SubcontractContractCommandResultDTO } from '../../app/lib/subcontract-contract/command-contract'
-import type { SubcontractContractFileSource } from '../../app/lib/subcontract-contract/read-contract'
+import type { SubcontractContractFactSources, SubcontractContractFileSource } from '../../app/lib/subcontract-contract/read-contract'
 import type { BusinessSession } from './business-session'
 import type { ProductionStorage } from './production-storage'
 import type { SubcontractContractOwnerSnapshot } from './subcontract-contract-command-test-instance'
@@ -14,6 +14,7 @@ import { buildSubcontractContractDetail, buildSubcontractContractListPage, parse
 import { commandFingerprint } from './command-journal'
 import { contractOriginalBytes } from './contract-original'
 import { assertProductionConstructionScope, constructionScopeDigest, constructionScopeLinkId, persistProductionConstructionScopeCommand, readProductionConstructionScopeMainFact as readProductionConstructionMainFact, readProductionConstructionMainOptions, readProductionConstructionScopeLink, readProductionConstructionScopeSourceFact, validateProductionConstructionScopeState } from './production-construction-scope-record'
+import { readProductionOwnerDocumentFacts } from './production-owner-document-service'
 import { subcontractFailure as fail, productionSubcontractLegacyCommandExists, subcontractCanonicalRecord, validateProductionSubcontractState } from './production-subcontract-contract-record'
 import { productionSubcontractContractConsumed } from './production-subcontract-contract-reference-guard'
 import { loadProductionSuppliers } from './production-supplier-record'
@@ -26,6 +27,20 @@ type Row = Record<string, unknown>
 /** SQLite datetime text is UTC in the established source adapter; this projection never rewrites original snapshots. */
 function readFileTime(value: string | null): string | null {
   return value !== null && /^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d(?:\.\d+)?$/.test(value) ? `${value.replace(' ', 'T')}Z` : value
+}
+async function actualDocuments(tx: TransactionDb, actor: BusinessSession, scope: { projectId?: string, contractId?: string }) {
+  const empty = { changes: [], settlements: [], penalties: [], paymentApplications: [], paymentRecords: [] } satisfies Partial<SubcontractContractFactSources>
+  if (!actor.capabilities.includes('subcontract-document:read'))
+    return { state: 'forbidden' as const, sourceVersion: null, facts: empty, sources: [] }
+  try {
+    const actual = await readProductionOwnerDocumentFacts(tx, actor, scope)
+    const factsFor = (kind: typeof actual.documents[number]['kind']) => actual.documents.filter(row => row.kind === kind).map(row => ({ dataOrigin: row.dataOrigin, id: row.id, contractId: row.contractId, no: row.no, name: row.name, amount: row.amount, date: row.approvalDate ?? row.applicationDate, status: row.status, ...(kind === 'sub_settlement' ? { settlementKind: row.documentType === '完工结算' ? 'completion' as const : 'progress' as const } : {}) }))
+    const settlements = actual.documents.filter(row => row.kind === 'sub_settlement')
+    const applications = [...new Map(settlements.flatMap(settlement => [...(settlement.subcontractSettlementEvidence?.applications ?? []), ...(settlement.subcontractSettlementEvidence?.cashApplications ?? [])].map(row => [row.id, { dataOrigin: settlement.dataOrigin, id: row.id, contractId: row.contractId, no: row.no ?? '', name: row.name ?? '', amount: row.applyAmount ?? null, date: row.date ?? null, status: row.status }] as const))).values()]
+    const payments = [...new Map(settlements.flatMap(settlement => (settlement.subcontractSettlementEvidence?.cashApplications ?? []).flatMap(application => (application.payments ?? []).map(payment => [payment.id, { dataOrigin: settlement.dataOrigin, id: payment.id, contractId: settlement.contractId, no: payment.no ?? '', name: payment.name ?? '', amount: payment.totalAmount ?? payment.amount, date: payment.date ?? null, status: payment.confirmed ? 'confirmed' : 'draft' }] as const)))).values()]
+    return { state: 'readable' as const, sourceVersion: actual.sourceVersion, sources: actual.sourceEvidence, facts: { changes: factsFor('sub_change'), settlements: factsFor('sub_settlement'), penalties: factsFor('project_penalty'), paymentApplications: applications, paymentRecords: payments } }
+  }
+  catch { return { state: 'unavailable' as const, sourceVersion: null, facts: empty, sources: [] } }
 }
 async function domain(tx: TransactionDb, actor: BusinessSession, state: SubcontractContractOwnerSnapshot) {
   const projects = await tx.select<{ id: string, name: string, deleted_at: string | null }>('SELECT id,name,deleted_at FROM projects ORDER BY id')
@@ -106,12 +121,12 @@ export function createProductionSubcontractContractService(storage: ProductionSt
       throw cause
     })
   }
-  async function meta(tx: TransactionDb, actor: BusinessSession, state: SubcontractContractOwnerSnapshot, operation: string, scope: unknown) {
+  async function meta(tx: TransactionDb, actor: BusinessSession, state: SubcontractContractOwnerSnapshot, operation: string, scope: unknown, commercial: Awaited<ReturnType<typeof actualDocuments>>) {
     const asOf = new Date().toISOString()
     const scopeSource = actor.capabilities.includes('construction-scope:read')
       ? (await validateProductionConstructionScopeState(tx), { key: 'construction-scope', state: 'readable' as const, sourceVersion: commandFingerprint(await tx.select('SELECT * FROM construction_scope_links ORDER BY id')), asOf })
       : { key: 'construction-scope', state: 'forbidden' as const, sourceVersion: null, asOf: null }
-    return createReadMeta({ session: actor, schemaVersion: 'subcontract-contract-read-v2', operation, dataOrigin: 'real', asOf, coverage: 'complete', scope, sources: [{ key: 'subcontract-contracts', state: 'readable', sourceVersion: `subcontract-${state.sourceVersion}`, asOf }, { key: 'subcontract-documents', state: actor.capabilities.includes('owner-document:read') ? 'unavailable' : 'forbidden', sourceVersion: null, asOf: null }, scopeSource] })
+    return createReadMeta({ session: actor, schemaVersion: 'subcontract-contract-read-v2', operation, dataOrigin: 'real', asOf, coverage: 'complete', scope, sources: [{ key: 'subcontract-contracts', state: 'readable', sourceVersion: `subcontract-${state.sourceVersion}`, asOf }, { key: 'subcontract-documents', state: commercial.state, sourceVersion: commercial.sourceVersion, asOf: commercial.state === 'readable' ? asOf : null }, { key: 'contract-finance', state: 'unavailable', sourceVersion: null, asOf: null }, ...commercial.sources.filter(source => source.key !== 'owner-documents').map(source => ({ ...source, key: `business-${source.key}` })), scopeSource] })
   }
   async function visible(tx: TransactionDb, actor: BusinessSession, state: SubcontractContractOwnerSnapshot) {
     const { owner } = await domain(tx, actor, state)
@@ -156,17 +171,20 @@ export function createProductionSubcontractContractService(storage: ProductionSt
         if (query.origin === 'demo' || query.includeDemo)
           fail('forbidden', '正式分包仅使用真实来源')
         const read = await visible(tx, actor, state)
-        const proof = await meta(tx, actor, state, 'subcontract-contract:list', query)
-        const page = buildSubcontractContractListPage({ contracts: read.rows, facts: await facts(tx, read.owner), query, asOf: proof.asOf, sourceVersion: proof.sourceVersion, capabilities: [...actor.capabilities] })
+        const commercial = await actualDocuments(tx, actor, { projectId: query.projectId ?? undefined })
+        const proof = await meta(tx, actor, state, 'subcontract-contract:list', query, commercial)
+        const page = buildSubcontractContractListPage({ contracts: read.rows, facts: { ...await facts(tx, read.owner), ...commercial.facts }, query, asOf: proof.asOf, sourceVersion: proof.sourceVersion, capabilities: [...actor.capabilities] })
         for (const row of page.items) {
           row.amounts.invoiced = null
           row.amounts.paid = null
-          row.amounts.settled = null
+          if (commercial.state !== 'readable')
+            row.amounts.settled = null
           row.amounts.bySettlementPayable = null
           row.amounts.byInvoicePayable = null
-          row.amounts.completionSettlement = null
+          if (commercial.state !== 'readable')
+            row.amounts.completionSettlement = null
         }
-        Object.assign(page.summary.origins.real, { settledAmount: null, paidAmount: null })
+        Object.assign(page.summary.origins.real, { ...(commercial.state !== 'readable' ? { settledAmount: null } : {}), paidAmount: null })
         const demo = createReadMeta({ session: actor, schemaVersion: 'subcontract-contract-read-v2', operation: 'subcontract-contract:list', dataOrigin: 'demo', asOf: proof.asOf, coverage: 'complete', scope: query, sources: [] })
         return withOriginReadMeta(page, { real: proof, demo })
       })
@@ -177,9 +195,10 @@ export function createProductionSubcontractContractService(storage: ProductionSt
         if (query.origin !== 'real' || query.includeDemo)
           fail('forbidden', '正式分包不读演示源')
         const read = await visible(tx, actor, state)
-        const proof = await meta(tx, actor, state, 'subcontract-contract:detail', query)
-        const dto = buildSubcontractContractDetail({ contracts: read.rows, facts: await facts(tx, read.owner), query, asOf: proof.asOf, sourceVersion: proof.sourceVersion, capabilities: [...actor.capabilities] })
-        Object.assign(dto.contract.amounts, { invoiced: null, paid: null, settled: null, bySettlementPayable: null, byInvoicePayable: null, completionSettlement: null })
+        const commercial = await actualDocuments(tx, actor, { contractId: id })
+        const proof = await meta(tx, actor, state, 'subcontract-contract:detail', query, commercial)
+        const dto = buildSubcontractContractDetail({ contracts: read.rows, facts: { ...await facts(tx, read.owner), ...commercial.facts }, query, asOf: proof.asOf, sourceVersion: proof.sourceVersion, capabilities: [...actor.capabilities] })
+        Object.assign(dto.contract.amounts, { invoiced: null, paid: null, ...(commercial.state !== 'readable' ? { settled: null, completionSettlement: null } : {}), bySettlementPayable: null, byInvoicePayable: null })
         return withReadMeta(dto, proof)
       })
     },

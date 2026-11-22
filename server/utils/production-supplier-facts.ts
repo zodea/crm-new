@@ -25,7 +25,7 @@ export interface ProductionSupplierFacts {
 /** Every read uses the caller's existing owner transaction and current server authorization. */
 export async function readProductionSupplierFacts(tx: TransactionDb, actor: BusinessSession, asOf: string): Promise<ProductionSupplierFacts> {
   const participants = await tx.select<{ domain: string, schema_version: number }>('SELECT domain,schema_version FROM production_participants')
-  const hasOwner = (domain: string) => participants.some(row => row.domain === domain && row.schema_version === 1)
+  const hasOwner = (domain: string) => participants.some(row => row.domain === domain && (domain === 'other-settlements' ? [1, 2].includes(row.schema_version) : row.schema_version === 1))
   const sources: SourceEvidenceDTO[] = []
   const data: ProductionSupplierFacts = { sources, projects: [], contracts: [], settlements: [], paymentApplications: [], paymentRecords: [], paymentAllocations: [] }
   async function source(key: string, domain: string, capabilities: string[], revisionTable: string): Promise<boolean> {

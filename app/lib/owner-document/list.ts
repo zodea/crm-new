@@ -7,41 +7,42 @@ import type {
 import { normalizeEnumSelection } from '~/lib/util/enum-selection'
 
 export function ownerDocumentListRecordFromCentral(item: OwnerCommercialDocumentListItemDTO): OwnerDocumentListRecord {
+  const nullableNumber = (value: string | null) => value === null ? null : Number(value)
   const settlementAmounts = item.amounts.kind === 'sub_settlement' ? item.amounts : null
   const itemAmounts = item.amounts.kind === 'sub_settlement'
-    ? { amount: Number(item.amounts.total), secondaryAmount: 0, tertiaryAmount: 0 }
+    ? { amount: nullableNumber(item.amounts.total), secondaryAmount: null, tertiaryAmount: null }
     : item.amounts.kind === 'owner_change'
       ? {
-          amount: Number(item.amounts.taxInclusive),
-          secondaryAmount: Number(item.amounts.taxExclusive),
-          tertiaryAmount: Number(item.amounts.appliedTaxExclusive),
+          amount: nullableNumber(item.amounts.taxInclusive),
+          secondaryAmount: nullableNumber(item.amounts.taxExclusive),
+          tertiaryAmount: nullableNumber(item.amounts.appliedTaxExclusive),
         }
       : item.amounts.kind === 'sub_change'
         ? {
-            amount: Number(item.amounts.approved),
+            amount: nullableNumber(item.amounts.approved),
             secondaryAmount: item.amounts.actualApproved === null ? null : Number(item.amounts.actualApproved),
             tertiaryAmount: 0,
           }
         : item.amounts.kind === 'owner_report'
           ? {
-              amount: Number(item.amounts.reported),
-              secondaryAmount: Number(item.amounts.audited ?? 0),
-              tertiaryAmount: Number(item.amounts.difference ?? 0),
+              amount: nullableNumber(item.amounts.reported),
+              secondaryAmount: nullableNumber(item.amounts.audited),
+              tertiaryAmount: nullableNumber(item.amounts.difference),
             }
           : item.amounts.kind === 'final_settlement'
             ? {
-                amount: Number(item.amounts.declared),
-                secondaryAmount: Number(item.amounts.audited ?? 0),
-                tertiaryAmount: Number(item.amounts.receiptDifference ?? 0),
+                amount: nullableNumber(item.amounts.declared),
+                secondaryAmount: nullableNumber(item.amounts.audited),
+                tertiaryAmount: nullableNumber(item.amounts.receiptDifference),
               }
             : (item.amounts.kind === 'owner_penalty' || item.amounts.kind === 'project_penalty')
                 ? {
-                    amount: Number(item.amounts.amount),
+                    amount: nullableNumber(item.amounts.amount),
                     secondaryAmount: 0,
                     tertiaryAmount: 0,
                   }
                 : {
-                    amount: Number(item.amounts.contractEstimate),
+                    amount: nullableNumber(item.amounts.contractEstimate),
                     secondaryAmount: 0,
                     tertiaryAmount: 0,
                   }
@@ -69,17 +70,17 @@ export function ownerDocumentListRecordFromCentral(item: OwnerCommercialDocument
     name: item.name,
     noticeNo: item.ownerPenaltyFacts?.noticeNo,
     projectId: item.project.state === 'resolved' ? item.project.id : null,
-    projectName: item.project.state === 'resolved' ? item.project.label : '',
+    projectName: item.project.state === 'resolved' ? item.project.label : item.recordedRelations?.projectName ?? '',
     contractId: item.contract.state === 'resolved' ? item.contract.id : null,
-    contractName: item.contract.state === 'resolved' ? item.contract.label : '',
+    contractName: item.contract.state === 'resolved' ? item.contract.label : item.recordedRelations?.contractName ?? '',
     supplierId: item.supplier.state === 'resolved' ? item.supplier.id : null,
-    supplierName: item.supplier.state === 'resolved' ? item.supplier.label : '',
+    supplierName: item.supplier.state === 'resolved' ? item.supplier.label : item.recordedRelations?.supplierName ?? '',
     crewId: item.crew?.state === 'resolved' ? item.crew.id : null,
-    crewName: item.crew?.state === 'resolved' ? item.crew.label : '',
+    crewName: item.crew?.state === 'resolved' ? item.crew.label : item.recordedRelations?.crewName ?? '',
     type: item.documentType,
     period: item.periodNo,
     ...itemAmounts,
-    ...(item.amounts.kind === 'project_penalty' ? { secondaryAmount: Number(item.amounts.deducted), tertiaryAmount: Number(item.amounts.remaining) } : {}),
+    ...(item.amounts.kind === 'project_penalty' ? { secondaryAmount: Number(item.amounts.deducted), tertiaryAmount: nullableNumber(item.amounts.remaining) } : {}),
     ...(settlementAmounts
       ? Object.fromEntries((['deductions', 'netSettlement', 'cumulativeApplied', 'remainingApplicable', 'cumulativePaid', 'remainingUnpaid'] as const).map((key) => {
           const value = settlementAmounts[key]

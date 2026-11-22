@@ -35,6 +35,8 @@ export function createFormCommandActions<C extends CommandContext, Capability ex
     resolve: (commandId: string) => Promise<CommandResolution<CommandResult>>
   }
   capability: Capability
+  family?: string
+  scopeId?: string
   problemFromUnknown: (cause: unknown) => Error & { problem: { code: string } }
   conflict: (latest: Read) => Error
   validateReadContext?: (form: Read, context: C) => void
@@ -45,7 +47,8 @@ export function createFormCommandActions<C extends CommandContext, Capability ex
   const latestWrite = shallowRef<{ id: string, version: string } | null>(null)
   const recovery = options.recoveryAdapter ?? createCommandRecoveryStorage(options.recoveryStorage)
   const recoveryKey = options.recoveryAdapter?.key ?? commandRecoveryKey
-  const family = options.capability.split(':')[0]!
+  const family = options.family ?? options.capability.split(':')[0]!
+  const scope = { family, ...(options.scopeId ? { scopeId: options.scopeId } : {}) }
   function versionAtLeast(current: string, original: string, evidence: { result?: CommandResult, form?: Read }) {
     return options.versionAtLeast ? options.versionAtLeast(current, original, evidence) : commandVersionAtLeast(current, original)
   }
@@ -109,7 +112,7 @@ export function createFormCommandActions<C extends CommandContext, Capability ex
       throw new Error('原提交仍在处理中，请等待当前结果。')
     const generation = ++session.generation
     const context = await options.repository().context()
-    const key = recoveryKey({ ...context, family, targetId: id })
+    const key = recoveryKey({ ...context, ...scope, targetId: id })
     const descriptor = recovery.read(key, { ...context, family, targetId: id })
     if (session.generation !== generation)
       throw new Error('此读取不属于当前记录页面。')
@@ -228,7 +231,7 @@ export function createFormCommandActions<C extends CommandContext, Capability ex
     const content: CommandContent<D, A, Files> & Extra = JSON.parse(JSON.stringify({ ...extra, ...(id ? { id } : {}), baseVersion: session.baseVersion, action, draft: { ...draft, ...(id ? { id } : {}) }, attachments }))
     const fingerprint = JSON.stringify(content)
     const commandId = crypto.randomUUID()
-    const descriptor = { commandId, workspaceId: originalContext.workspaceId, actorId: originalContext.actorId, family, targetId: id, action }
+    const descriptor = { commandId, workspaceId: originalContext.workspaceId, actorId: originalContext.actorId, ...scope, targetId: id, action }
     session.pendingKey = recoveryKey(descriptor)
     recovery.remember(session.pendingKey, descriptor)
     const pending: PendingCommand = { id: commandId, fingerprint, descriptor, result: null }
@@ -308,7 +311,7 @@ export function createFormCommandActions<C extends CommandContext, Capability ex
     session.targetId = null
     session.baseVersion = null
     if (session.context)
-      session.pendingKey = recoveryKey({ ...session.context, family, targetId: null })
+      session.pendingKey = recoveryKey({ ...session.context, ...scope, targetId: null })
   }
   function invalidate(session: FormSession<C>) {
     session.generation++

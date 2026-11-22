@@ -140,9 +140,9 @@ export interface OtherSettlementSourceDocument {
   files: Array<{
     id: string
     fileName: string
-    fileSize: number
+    fileSize: number | null
     uploader: string
-    uploadedAt: string
+    uploadedAt: string | null
   }>
 }
 export const OTHER_SETTLEMENT_AMOUNT_LABELS = {

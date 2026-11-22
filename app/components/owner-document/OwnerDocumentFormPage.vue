@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { LookupOption } from '~/lib/kit/lookup'
 import type { FormFooterAction } from '~/lib/master-data/page'
+import type { OwnerCommercialDocumentFormReadDTO } from '~/lib/owner-document/central-command-contract'
 import type {
   OwnerDocumentBoqLine,
   OwnerDocumentDraft,
@@ -8,11 +9,13 @@ import type {
   OwnerDocumentSaveAction,
 } from '~/lib/owner-document/forms'
 import { useDebounceFn } from '@vueuse/core'
+import KitButton from '~/components/ui/KitButton.vue'
 import { useTabCloseGuard } from '~/composables/useTabCloseGuard'
 import { OwnerCommercialDocumentRepositoryProblem } from '~/lib/owner-document/central-repository'
 import {
   ownerDocumentFormCanRebase,
   rebaseOwnerDocumentFormVersion,
+  withOwnerDocumentFormVersion,
 } from '~/lib/owner-document/form-version'
 import { ownerDocumentStatusIsEditable } from '~/lib/owner-document/forms'
 import {
@@ -32,6 +35,7 @@ import {
 } from '~/lib/owner-document/return-context'
 import { isDesktopRuntime } from '~/lib/platform/runtime'
 import { isQuantityBasis } from '~/lib/quantity/basis'
+import { bindReadAuthority } from '~/lib/read-model/authority'
 import { deriveKey } from '~/lib/tabs/tab-machine'
 import { toErrorMessage } from '~/lib/util/error'
 
@@ -73,10 +77,13 @@ const {
   pendingRemoveIds,
   pendingRestoreIds,
   desktopAttachmentPicker,
+  readingFiles,
   dirty: attachmentsDirty,
   reset: resetAttachments,
   clearPending: clearPendingAttachments,
   changes: attachmentChanges,
+  capture: captureAttachments,
+  acknowledge: acknowledgeAttachments,
   handleFiles,
   pickNativeFiles,
   toggleExisting: toggleExistingAttachment,
@@ -97,7 +104,24 @@ const loadingAction = shallowRef<FormFooterAction | null>(null)
 const closeAfterSave = shallowRef(true)
 const savedSnapshot = shallowRef('')
 const conflictReadOnly = shallowRef(false)
+const deletionVerification = shallowRef<OwnerCommercialDocumentFormReadDTO['deletionVerification'] | null>(null)
+const sourceConflict = shallowRef('')
+const commandPending = computed(() => store.pendingCommand(props.kind, routeId.value ?? null))
+const recoveryBusy = shallowRef(false)
+let submittedInput: string | null = null
+let submittedFiles: ReturnType<typeof captureAttachments> | null = null
+let pageReadGeneration = 0
+let preserveOnReload = false
+let hydratedOnce = false
+const inputSnapshot = () => JSON.stringify({ draft: Object.fromEntries(Object.entries(draft.value).filter(([key]) => key !== 'id' && !key.startsWith('_central'))), attachments: attachmentChanges() })
 let allowLeave = false
+bindReadAuthority((problem) => {
+  pageReadGeneration++
+  preserveOnReload = hydratedOnce
+  loadError.value = problem.message
+  boqLines.value = []
+  loading.value = false
+})
 
 async function completeCentralLifecycle() {
   allowLeave = true
@@ -151,7 +175,7 @@ const acceptanceAttachmentCategory = computed(() => ['accepted', 'warranty', 'ex
 const visibleAttachments = computed(() => props.kind === 'acceptance'
   ? attachments.value.filter(file => file.category === acceptanceAttachmentCategory.value)
   : attachments.value)
-const editable = computed(() => !conflictReadOnly.value && ownerDocumentStatusIsEditable(status.value))
+const editable = computed(() => !conflictReadOnly.value && !commandPending.value && ownerDocumentStatusIsEditable(status.value))
 const title = computed(() =>
   `${isEditing.value ? (editable.value ? '编辑' : '查看') : '新建'} · ${meta.value.label}`,
 )
@@ -189,6 +213,7 @@ const dirty = computed(() =>
 )
 const footerActions = computed<FormFooterAction[]>(() =>
   conflictReadOnly.value
+  || commandPending.value
     ? ['cancel']
     : editable.value
       ? ['cancel', 'draft', 'saveSubmit']
@@ -197,6 +222,7 @@ const footerActions = computed<FormFooterAction[]>(() =>
         : ['cancel', 'save'],
 )
 const attachmentsReadonly = computed(() => conflictReadOnly.value
+  || Boolean(commandPending.value)
   || (props.kind === 'acceptance' && status.value === 'expired'))
 const footerLabels = computed(() => ({
   saveSubmit: meta.value.postLabel,
@@ -257,6 +283,8 @@ async function fetchContracts(keyword: string): Promise<LookupOption[]> {
 
 let contractAvailabilitySequence = 0
 async function refreshContractAvailability() {
+  if (conflictReadOnly.value || deletionVerification.value)
+    return
   const sequence = ++contractAvailabilitySequence
   if (!draft.value.projectId) {
     eligibleContractCount.value = null
@@ -265,11 +293,11 @@ async function refreshContractAvailability() {
   eligibleContractCount.value = null
   try {
     const options = await fetchContracts('')
-    if (sequence === contractAvailabilitySequence)
+    if (sequence === contractAvailabilitySequence && !conflictReadOnly.value && !deletionVerification.value)
       eligibleContractCount.value = options.length
   }
   catch {
-    if (sequence === contractAvailabilitySequence)
+    if (sequence === contractAvailabilitySequence && !conflictReadOnly.value && !deletionVerification.value)
       eligibleContractCount.value = null
   }
 }
@@ -278,7 +306,7 @@ let boqSequence = 0
 let pageActive = true
 const boqIdentity = () => JSON.stringify([route.fullPath, props.kind, draft.value.projectId, draft.value.contractId, draft.value.periodNo, draft.value.quantityBasis])
 const refreshBoqLines = useDebounceFn(async () => {
-  if (!pageActive || route.fullPath !== pageFullPath)
+  if (!pageActive || conflictReadOnly.value || deletionVerification.value || route.fullPath !== pageFullPath)
     return
   const sequence = ++boqSequence
   const identity = boqIdentity()
@@ -296,10 +324,19 @@ const refreshBoqLines = useDebounceFn(async () => {
       props.kind === 'owner_report' ? String(draft.value.periodNo ?? '') : '',
       props.kind === 'owner_report' && !isDesktopRuntime() && isQuantityBasis(draft.value.quantityBasis) ? draft.value.quantityBasis : undefined,
     )
-    if (!pageActive || sequence !== boqSequence || identity !== boqIdentity() || route.fullPath !== pageFullPath)
+    if (!pageActive || conflictReadOnly.value || deletionVerification.value || sequence !== boqSequence || identity !== boqIdentity() || route.fullPath !== pageFullPath)
       return
     boqLines.value = rows
     if (editable.value) {
+      if (props.kind === 'owner_report' && rows.length) {
+        const evidence = rows[0]!
+        if (rows.some(row => row.quantityConsumedVersion !== evidence.quantityConsumedVersion || row.quantitySourceVersion !== evidence.quantitySourceVersion))
+          throw new Error('报量取数明细不属于同一次真实读取，请保留当前草稿')
+        if (evidence.quantityConsumedVersion && evidence.quantitySourceVersion) {
+          draft.value = { ...draft.value, quantityConsumedVersion: evidence.quantityConsumedVersion, quantitySourceVersion: evidence.quantitySourceVersion, quantitySourceUpdatedAt: evidence.quantitySourceUpdatedAt ?? null }
+          sourceConflict.value = ''
+        }
+      }
       const current = draft.value.lines ?? []
       const byId = new Map(boqLines.value.map(line => [line.id, line]))
       const lines = props.kind === 'owner_report' && !current.length
@@ -334,23 +371,25 @@ const refreshBoqLines = useDebounceFn(async () => {
       if (lines.length)
         patchLines(lines)
     }
+    return true
   }
   catch (cause) {
-    if (!pageActive || sequence !== boqSequence || identity !== boqIdentity() || route.fullPath !== pageFullPath)
+    if (!pageActive || conflictReadOnly.value || deletionVerification.value || sequence !== boqSequence || identity !== boqIdentity() || route.fullPath !== pageFullPath)
       return
     boqLines.value = []
     error(`载入合同清单失败：${toErrorMessage(cause)}`)
+    return false
   }
 }, 150)
 
 let contractSummarySequence = 0
 const contractSummaryIdentity = () => JSON.stringify([route.fullPath, props.kind, draft.value.id, draft.value.projectId, draft.value.supplierId, draft.value.contractId])
 const refreshContractSummary = useDebounceFn(async () => {
-  if (!pageActive || route.fullPath !== pageFullPath)
+  if (!pageActive || conflictReadOnly.value || deletionVerification.value || route.fullPath !== pageFullPath)
     return
   const sequence = ++contractSummarySequence
   const identity = contractSummaryIdentity()
-  const isCurrent = () => pageActive && sequence === contractSummarySequence
+  const isCurrent = () => pageActive && !conflictReadOnly.value && !deletionVerification.value && sequence === contractSummarySequence
     && identity === contractSummaryIdentity() && route.fullPath === pageFullPath
   const contractId = typeof draft.value.contractId === 'string'
     ? draft.value.contractId
@@ -405,15 +444,64 @@ const refreshContractSummary = useDebounceFn(async () => {
   }
 }, 150)
 
+function retainDeletedRead(form: OwnerCommercialDocumentFormReadDTO): boolean {
+  if (form.readOnly !== true)
+    return false
+  pageReadGeneration += 1
+  boqSequence += 1
+  contractSummarySequence += 1
+  contractAvailabilitySequence += 1
+  sourceConflict.value = ''
+  boqLines.value = []
+  eligibleContractCount.value = null
+  loading.value = false
+  deletionVerification.value = form.deletionVerification ?? null
+  conflictReadOnly.value = true
+  draft.value = { ...ownerDocumentDefaults(props.kind), ...form.draft }
+  resetAttachments(form.attachments)
+  savedSnapshot.value = JSON.stringify(draft.value)
+  submittedInput = null
+  submittedFiles = null
+  hydratedOnce = true
+  return true
+}
+
 async function initialize() {
+  const generation = ++pageReadGeneration
+  const preserve = preserveOnReload
   loading.value = true
   loadError.value = ''
   fieldErrors.value = {}
   eligibleContractCount.value = null
-  clearPendingAttachments()
   try {
     const id = routeId.value
-    if (!id) {
+    const hydrated = await store.hydrateCommand(props.kind, id ?? null)
+    if (generation !== pageReadGeneration || route.fullPath !== pageFullPath)
+      return
+    if (hydrated?.form && retainDeletedRead(hydrated.form))
+      return
+    deletionVerification.value = null
+    if (preserve) {
+      if (hydrated?.form && hydrated.recovered) {
+        draft.value = withOwnerDocumentFormVersion({ ...draft.value, id: hydrated.form.id }, hydrated.form.version)
+        if (!ownerDocumentStatusIsEditable(String(hydrated.form.draft.status ?? 'draft')))
+          conflictReadOnly.value = true
+        if (submittedFiles)
+          acknowledgeAttachments(hydrated.form.attachments, submittedFiles)
+        submittedInput = null
+        submittedFiles = null
+      }
+      await refreshBoqLines()
+      await refreshContractAvailability()
+      preserveOnReload = false
+      return
+    }
+    if (hydrated?.form) {
+      draft.value = { ...ownerDocumentDefaults(props.kind), ...hydrated.form.draft }
+      resetAttachments(hydrated.form.attachments)
+      await refreshDeductions(hydrated.form.id)
+    }
+    else if (!id) {
       draft.value = ownerDocumentDefaults(props.kind)
       resetAttachments()
       await refreshDeductions()
@@ -424,6 +512,8 @@ async function initialize() {
         store.loadAttachments(props.kind, id, true),
         refreshDeductions(id),
       ])
+      if (generation !== pageReadGeneration || route.fullPath !== pageFullPath)
+        return
       if (!record) {
         error(`${meta.value.label}不存在或已删除`)
         allowLeave = true
@@ -439,22 +529,30 @@ async function initialize() {
     await refreshBoqLines()
     await refreshContractSummary()
     await refreshContractAvailability()
+    if (generation !== pageReadGeneration || deletionVerification.value)
+      return
     updateDerivedAmounts()
     await nextTick()
+    if (generation !== pageReadGeneration || deletionVerification.value)
+      return
     savedSnapshot.value = JSON.stringify(draft.value)
+    hydratedOnce = true
     conflictReadOnly.value = false
   }
   catch (cause) {
+    if (generation !== pageReadGeneration)
+      return
     loadError.value = toErrorMessage(cause)
     error(`载入失败：${loadError.value}`)
   }
   finally {
-    loading.value = false
+    if (generation === pageReadGeneration)
+      loading.value = false
   }
 }
 
 async function patchDraft(patch: Partial<OwnerDocumentDraft>) {
-  if (props.kind === 'owner_report' && !editable.value)
+  if (deletionVerification.value || (props.kind === 'owner_report' && !editable.value))
     return
   const previous = draft.value
   const basisChanged = props.kind === 'owner_report'
@@ -471,6 +569,33 @@ async function patchDraft(patch: Partial<OwnerDocumentDraft>) {
       return
   }
   const next = { ...previous, ...patch }
+  const relationships = ['projectId', 'contractId', 'supplierId', 'crewId', 'customerId']
+  const changed = relationships.filter(field => field in patch && patch[field] !== previous[field])
+  if (changed.length && !isDesktopRuntime()) {
+    let versions: Record<string, { id: string, version: string }> = {}
+    if (typeof previous.relationshipVersionsJson === 'string') {
+      try {
+        versions = JSON.parse(previous.relationshipVersionsJson)
+      }
+      catch { throw new Error('原关系采用证据不能读取，请保留草稿重新核对') }
+    }
+    for (const field of changed) {
+      const id = typeof patch[field] === 'string' ? patch[field] as string : null
+      const selected = id ? store.lookupVersion(field, id) : null
+      if (selected)
+        versions[field] = selected
+      else delete versions[field]
+    }
+    if ('projectId' in patch) {
+      delete versions.contractId
+      delete versions.customerId
+      if (!next.projectId)
+        delete versions.supplierId
+    }
+    if ('supplierId' in patch)
+      delete versions.contractId
+    next.relationshipVersionsJson = JSON.stringify(versions)
+  }
   if (basisChanged)
     next.lines = []
   if ('projectId' in patch) {
@@ -484,6 +609,9 @@ async function patchDraft(patch: Partial<OwnerDocumentDraft>) {
   if (basisChanged)
     updateDerivedAmounts()
   if ('projectId' in patch || 'contractId' in patch || 'periodNo' in patch || 'quantityBasis' in patch) {
+    delete draft.value.quantityConsumedVersion
+    delete draft.value.quantitySourceVersion
+    delete draft.value.quantitySourceUpdatedAt
     boqSequence += 1
     boqLines.value = []
     void refreshBoqLines()
@@ -501,12 +629,16 @@ async function patchDraft(patch: Partial<OwnerDocumentDraft>) {
 }
 
 function patchLines(lines: Array<Record<string, unknown>>) {
+  if (conflictReadOnly.value || deletionVerification.value)
+    return
   draft.value = { ...draft.value, lines }
   clearFieldError('lines')
   updateDerivedAmounts()
 }
 
 function updateDerivedAmounts() {
+  if (conflictReadOnly.value || deletionVerification.value)
+    return
   const lines = draft.value.lines ?? []
   const amount = ownerDocumentTotalAmount(props.kind, lines)
   if (props.kind === 'owner_change')
@@ -562,6 +694,8 @@ function validateSubmit(): boolean {
 }
 
 async function persist(action: OwnerDocumentSaveAction, footerAction: FormFooterAction) {
+  if (conflictReadOnly.value || commandPending.value || readingFiles.value)
+    return
   if (action === 'submit' && !validateSubmit())
     return
   if (action === 'submit') {
@@ -575,6 +709,8 @@ async function persist(action: OwnerDocumentSaveAction, footerAction: FormFooter
       return
   }
   loadingAction.value = footerAction
+  submittedInput = inputSnapshot()
+  submittedFiles = captureAttachments()
   try {
     const result = await store.saveForm(
       props.kind,
@@ -583,6 +719,16 @@ async function persist(action: OwnerDocumentSaveAction, footerAction: FormFooter
       attachmentChanges(),
     )
     success(action === 'submit' ? `${meta.value.postLabel.replace('保存并', '')}成功` : '草稿已保存')
+    if (inputSnapshot() !== submittedInput || ('retainedInput' in result && result.retainedInput)) {
+      if (result.form && submittedFiles)
+        acknowledgeAttachments(result.form.attachments, submittedFiles)
+      warning('原提交已保存并读回，保存期间的新输入保留在本页，请核对后继续')
+      submittedInput = null
+      submittedFiles = null
+      return
+    }
+    submittedInput = null
+    submittedFiles = null
     clearPendingAttachments()
     fieldErrors.value = {}
     if (action === 'submit' && closeAfterSave.value) {
@@ -602,6 +748,11 @@ async function persist(action: OwnerDocumentSaveAction, footerAction: FormFooter
     allowLeave = false
   }
   catch (cause) {
+    if (cause instanceof OwnerCommercialDocumentRepositoryProblem && cause.problem.code === 'stale-source') {
+      sourceConflict.value = cause.problem.message
+      warning('实际来源已变化；请重新读取依据并保留手工量后核对')
+      return
+    }
     if (await recoverCentralConflict(cause))
       return
     if (applyCentralFieldErrors(cause))
@@ -610,6 +761,64 @@ async function persist(action: OwnerDocumentSaveAction, footerAction: FormFooter
   }
   finally {
     loadingAction.value = null
+  }
+}
+
+async function recoverOriginalCommand() {
+  recoveryBusy.value = true
+  try {
+    const result = await store.recoverCommand(props.kind, routeId.value ?? null)
+    if (result.outcome === 'applied') {
+      if (retainDeletedRead(result.form)) {
+        loadError.value = ''
+        return
+      }
+      const retain = submittedInput !== null && inputSnapshot() !== submittedInput
+      if (retain) {
+        draft.value = withOwnerDocumentFormVersion({ ...draft.value, id: result.form.id }, result.form.version)
+        if (!ownerDocumentStatusIsEditable(String(result.form.draft.status ?? 'draft')))
+          conflictReadOnly.value = true
+        if (submittedFiles)
+          acknowledgeAttachments(result.form.attachments, submittedFiles)
+        warning('原提交已保存并读回，后来输入与附件保留在本页')
+      }
+      else {
+        draft.value = { ...ownerDocumentDefaults(props.kind), ...result.form.draft }
+        resetAttachments(result.form.attachments)
+        savedSnapshot.value = JSON.stringify(draft.value)
+        success('原提交已保存，已读取同一单据')
+      }
+    }
+    else {
+      warning('原编号已确认未应用并封存，当前输入保留，可重新核对后保存')
+    }
+    submittedInput = null
+    submittedFiles = null
+    loadError.value = ''
+  }
+  catch (cause) {
+    error(toErrorMessage(cause))
+  }
+  finally {
+    recoveryBusy.value = false
+  }
+}
+
+async function refreshConsumedSources() {
+  const original = draft.value
+  const identity = boqIdentity()
+  try {
+    const versions = await store.refreshRelationshipVersions(props.kind, original)
+    if (draft.value !== original || identity !== boqIdentity() || route.fullPath !== pageFullPath)
+      return
+    draft.value = { ...draft.value, relationshipVersionsJson: versions }
+    if (props.kind === 'owner_report' && !await refreshBoqLines())
+      throw new Error('报量依据未成功读取，旧采用版本与手工量保留')
+    sourceConflict.value = ''
+    warning('已读取当前关系与依据，手工输入保留；请核对后重新提交')
+  }
+  catch (cause) {
+    sourceConflict.value = toErrorMessage(cause)
   }
 }
 
@@ -640,7 +849,7 @@ async function handleFooterAction(action: FormFooterAction) {
     await leaveToList()
     return
   }
-  if (conflictReadOnly.value)
+  if (conflictReadOnly.value || commandPending.value || readingFiles.value)
     return
   if (!editable.value) {
     await saveFinalAttachments()
@@ -708,28 +917,32 @@ onActivated(() => {
     @state-action="initialize"
   >
     <template #status>
+      <span v-if="deletionVerification" class="chip">已删除 · 只读核对</span>
       <span class="chip" :class="ownerDocumentStatusClass(kind, status)">
         {{ ownerDocumentStatusLabelForList(kind, status) }}
       </span>
     </template>
 
     <template #actions>
+      <KitButton v-if="commandPending" :loading="recoveryBusy" @click="recoverOriginalCommand">
+        {{ commandPending.result ? '重新读取已保存单据' : '核对原提交' }}
+      </KitButton>
       <KitButton
-        v-if="canApproveChange && !conflictReadOnly"
+        v-if="canApproveChange && !conflictReadOnly && !commandPending"
         :loading="lifecycleLoading"
         @click="approveChange"
       >
         <span class="i-lucide-badge-check mr-1" aria-hidden="true" />确认签证
       </KitButton>
       <KitButton
-        v-if="auditMode && !conflictReadOnly"
+        v-if="auditMode && !conflictReadOnly && !commandPending"
         :loading="lifecycleLoading"
         @click="auditReport"
       >
         <span class="i-lucide-stamp mr-1" aria-hidden="true" />确认审定
       </KitButton>
       <KitButton
-        v-if="acceptanceAction && !conflictReadOnly"
+        v-if="acceptanceAction && !conflictReadOnly && !commandPending"
         :loading="lifecycleLoading"
         @click="moveAcceptance"
       >
@@ -738,8 +951,17 @@ onActivated(() => {
     </template>
 
     <form class="flex min-w-0 flex-col gap-4" @submit.prevent>
+      <div v-if="sourceConflict" role="alert" class="flex flex-wrap items-center justify-between gap-3">
+        <span>{{ sourceConflict }}</span>
+        <KitButton @click="refreshConsumedSources">
+          重新读取依据并保留手工量
+        </KitButton>
+      </div>
+      <div v-if="commandPending" role="status" class="flex flex-wrap items-center justify-between gap-3">
+        <span>{{ commandPending.result ? '已保存，等待重新读取同一单据。' : '原提交结果未知，请先核对原编号。' }}</span>
+      </div>
       <div
-        v-if="conflictReadOnly"
+        v-if="conflictReadOnly && !deletionVerification"
         role="status"
         class="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-card)] border border-warn/35 bg-warn-soft px-4 py-3 text-12px text-ink"
       >
@@ -749,6 +971,9 @@ onActivated(() => {
         </KitButton>
       </div>
 
+      <p v-if="deletionVerification" role="status" class="panel p-3 text-12px text-ink-soft">
+        原单据已删除，当前仅供核对。可返回列表查看其他单据。
+      </p>
       <OwnerDocumentFormFields
         :kind="kind"
         :draft="draft"

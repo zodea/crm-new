@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { RowActionItem } from '~/components/ui/RowActionMenu.vue'
-import type { OwnerCommercialDocumentKind } from '~/lib/owner-document/central-repository'
+import type { OwnerCommercialDocumentKind, OwnerDocumentSummaryAmountKey } from '~/lib/owner-document/central-repository'
 import type { OwnerDocumentKind, OwnerDocumentListRecord } from '~/lib/owner-document/forms'
 import { clampPage, paginate } from '~/lib/kit/table'
 import { resolveNavigationTarget } from '~/lib/nav/target-registry'
@@ -224,33 +224,38 @@ const emptyState = computed(() => {
 })
 const summaries = computed(() =>
   config.value.amountSummaries.map((summary) => {
-    const subcontractActualApproved = centralSummary.value?.origins.real.subcontractActualApproved
+    const origin = centralSummary.value?.origins.real
+    const subcontractActualApproved = origin?.subcontractActualApproved
+    const actualApprovedSummary = props.kind === 'sub_change' && summary.field !== 'amount'
+    const metric: OwnerDocumentSummaryAmountKey = props.kind === 'sub_change'
+      ? 'subcontractApprovedAmount'
+      : props.kind === 'owner_change'
+        ? summary.field === 'amount' ? 'taxInclusiveAmount' : summary.field === 'secondaryAmount' ? 'taxExclusiveAmount' : 'appliedTaxExclusiveAmount'
+        : props.kind === 'owner_report'
+          ? summary.field === 'amount' ? 'reportedAmount' : summary.field === 'secondaryAmount' ? 'auditedAmount' : 'differenceAmount'
+          : 'reportedAmount'
+    const localAmounts = filtered.value.map(row => row[summary.field])
+    const missingCount = origin
+      ? actualApprovedSummary
+        ? subcontractActualApproved?.status === 'missing' ? origin.count : subcontractActualApproved?.status === 'partial' ? null : 0
+        : origin.amountCompleteness?.[metric]?.missingCount ?? (origin[metric] == null ? origin.count : 0)
+      : localAmounts.filter(value => value === null).length
+    const knownValue = origin
+      ? actualApprovedSummary
+        ? subcontractActualApproved?.value == null ? null : Number(subcontractActualApproved.value)
+        : origin.amountCompleteness?.[metric]?.knownValue == null ? null : Number(origin.amountCompleteness[metric].knownValue)
+      : localAmounts.reduce<number>((total, value) => total + (value ?? 0), 0)
+    const rawValue = actualApprovedSummary ? subcontractActualApproved?.value : origin?.[metric]
     return {
-      label: props.kind === 'sub_change' && summary.field !== 'amount' && subcontractActualApproved?.status === 'partial'
+      label: actualApprovedSummary && subcontractActualApproved?.status === 'partial'
         ? `${summary.label}（部分记录）`
         : summary.label,
-      completeness: props.kind === 'sub_change' && summary.field !== 'amount'
+      completeness: actualApprovedSummary
         ? subcontractActualApproved?.status ?? null
         : null,
-      value: centralSummary.value
-        ? props.kind === 'sub_change'
-          ? summary.field === 'amount'
-            ? Number(centralSummary.value.origins.real.subcontractApprovedAmount)
-            : subcontractActualApproved?.value == null ? null : Number(subcontractActualApproved.value)
-          : props.kind === 'owner_change'
-            ? summary.field === 'amount'
-              ? Number(centralSummary.value.origins.real.taxInclusiveAmount)
-              : summary.field === 'secondaryAmount'
-                ? Number(centralSummary.value.origins.real.taxExclusiveAmount)
-                : Number(centralSummary.value.origins.real.appliedTaxExclusiveAmount)
-            : props.kind === 'owner_report'
-              ? summary.field === 'amount'
-                ? Number(centralSummary.value.origins.real.reportedAmount)
-                : summary.field === 'secondaryAmount'
-                  ? Number(centralSummary.value.origins.real.auditedAmount)
-                  : Number(centralSummary.value.origins.real.auditedAmount) - Number(centralSummary.value.origins.real.reportedAmount)
-              : Number(centralSummary.value.origins.real.reportedAmount)
-        : filtered.value.reduce((total, row) => total + Number(row[summary.field] || 0), 0),
+      missingCount,
+      knownValue,
+      value: origin ? rawValue == null ? null : Number(rawValue) : missingCount ? null : knownValue,
     }
   }),
 )
@@ -777,7 +782,8 @@ onActivated(async () => {
         <span>{{ config.countLabel }}：<strong class="text-ink">{{ totalRows }}</strong></span>
         <span v-for="summary in summaries" :key="summary.label">
           {{ summary.label }}：
-          <strong class="whitespace-nowrap font-mono text-ink">{{ yuan(summary.value) }}</strong>
+          <strong class="whitespace-nowrap font-mono text-ink">{{ summary.value === null ? '未记录' : yuan(summary.value) }}</strong>
+          <span v-if="summary.missingCount && summary.knownValue !== null" class="ml-1">已知小计 {{ yuan(summary.knownValue) }}，缺 {{ summary.missingCount }} 项</span>
           <span v-if="summary.completeness === 'missing'" class="ml-1 text-ink-faint">尚未回填</span>
         </span>
         <button

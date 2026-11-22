@@ -21,7 +21,7 @@ export function prepareLegacyReceiptTestFixtures(sessionId?: string | null, docu
         batchId,
         name: receipt.no,
         references: { projectId: document.projectId, customerId: document.customerId, contractId: document.contractId },
-        amount: receipt.amount.toFixed(2),
+        amount: receipt.amount === null ? null : receipt.amount.toFixed(2),
         quantity: null,
         deletedAt: null,
         attributes: { no: receipt.no, receiptDate: receipt.date, status: receipt.status },

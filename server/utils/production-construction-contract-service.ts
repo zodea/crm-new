@@ -14,10 +14,9 @@ import { commandFingerprint } from './command-journal'
 import { parseConstructionContractCommandRequest } from './construction-contract-command-request'
 import { createConstructionContractCommandTestInstance } from './construction-contract-command-test-instance'
 import { contractOriginalBytes } from './contract-original'
-import { readProductionBoqChanges } from './production-boq-record'
-import { validateProductionBoqState } from './production-boq-validation'
 import { constructionCanonicalRecord, constructionFailure as fail, productionConstructionLegacyCommandExists, readProductionConstructionState, validateProductionConstructionState } from './production-construction-contract-record'
 import { productionConstructionContractConsumed } from './production-construction-contract-reference-guard'
+import { readProductionOwnerDocumentFacts } from './production-owner-document-service'
 import { createReadMeta, withOriginReadMeta, withReadMeta } from './read-meta'
 
 type Session = () => BusinessSession
@@ -34,14 +33,17 @@ async function originalFiles(tx: TransactionDb): Promise<ConstructionContractFil
     WHERE f.deleted_at IS NULL AND (b.owner_kind='head' OR json_extract(s.record_json,'$.deletedAt') IS NULL) ORDER BY b.file_ref_id`)
   return files.map(file => ({ ...file, uploadedAt: readFileTime(file.uploadedAt) }))
 }
-async function actualChanges(tx: TransactionDb, actor: BusinessSession, scope: { projectId?: string, contractId?: string }) {
-  if (!actor.capabilities.includes('boq:read') || !actor.capabilities.includes('owner-document:read'))
-    return { state: 'forbidden' as const, sourceVersion: null, facts: [] }
-  if ((await tx.select<{ schema_version: number }>('SELECT schema_version FROM production_participants WHERE domain=\'boq\''))[0]?.schema_version !== 1)
-    return { state: 'unavailable' as const, sourceVersion: null, facts: [] }
-  await validateProductionBoqState(tx)
-  const rows = await readProductionBoqChanges(tx, scope.projectId, scope.contractId)
-  return { state: 'readable' as const, sourceVersion: `boq-changes:${commandFingerprint(rows)}`, facts: rows.map(row => ({ dataOrigin: 'real' as const, id: row.id, contractId: row.contractId, no: row.no, name: row.name, amount: row.amount, date: row.approvalDate ?? row.applicationDate, status: row.status })) }
+async function actualDocuments(tx: TransactionDb, actor: BusinessSession, scope: { projectId?: string, contractId?: string }) {
+  const empty = { changes: [], monthlyStatements: [], finalSettlements: [], penalties: [], acceptances: [], warranties: [] } satisfies Partial<ConstructionContractFactSources>
+  if (!actor.capabilities.includes('owner-document:read'))
+    return { state: 'forbidden' as const, sourceVersion: null, facts: empty, sources: [] }
+  try {
+    const actual = await readProductionOwnerDocumentFacts(tx, actor, scope)
+    const factsFor = (kind: typeof actual.documents[number]['kind']) => actual.documents.filter(row => row.kind === kind).map(row => ({ dataOrigin: row.dataOrigin, id: row.id, ownerDocumentId: row.id, sourceId: row.sourceId, contractId: row.contractId, no: row.no, name: row.name, amount: row.amount, date: row.approvalDate ?? row.applicationDate, status: row.status }))
+    const acceptances = factsFor('acceptance')
+    return { state: 'readable' as const, sourceVersion: actual.sourceVersion, sources: actual.sourceEvidence, facts: { changes: factsFor('owner_change'), monthlyStatements: factsFor('owner_report'), finalSettlements: factsFor('final_settlement'), penalties: factsFor('owner_penalty'), acceptances, warranties: acceptances.filter(row => ['warranty', 'expired'].includes(row.status)) } }
+  }
+  catch { return { state: 'unavailable' as const, sourceVersion: null, facts: empty, sources: [] } }
 }
 async function domain(tx: TransactionDb, actor: BusinessSession, state: ConstructionContractOwnerSnapshot) {
   const projects = await tx.select<{ id: string, name: string, customer_id: string | null, deleted_at: string | null }>('SELECT id,name,customer_id,deleted_at FROM projects ORDER BY id')
@@ -120,15 +122,15 @@ export function createProductionConstructionContractService(storage: ProductionS
       return result
     })
   }
-  async function meta(tx: TransactionDb, actor: BusinessSession, state: ConstructionContractOwnerSnapshot, operation: string, scope: unknown, changes: Awaited<ReturnType<typeof actualChanges>>) {
+  async function meta(tx: TransactionDb, actor: BusinessSession, state: ConstructionContractOwnerSnapshot, operation: string, scope: unknown, commercial: Awaited<ReturnType<typeof actualDocuments>>) {
     const asOf = new Date().toISOString()
     return createReadMeta({ session: actor, schemaVersion: 'construction-contract-read-v2', operation, dataOrigin: 'real', asOf, coverage: 'complete', scope, sources: [
       { key: 'construction-contracts', state: 'readable', sourceVersion: `construction-${state.sourceVersion}`, asOf },
       { key: 'projects', state: actor.capabilities.includes('project:list:read') ? 'readable' : 'forbidden', sourceVersion: actor.capabilities.includes('project:list:read') ? `project-${(await tx.select<{ revision: number }>('SELECT revision FROM project_revision WHERE singleton=1'))[0]!.revision}` : null, asOf: actor.capabilities.includes('project:list:read') ? asOf : null },
       { key: 'customers', state: actor.capabilities.includes('customer:list:read') ? 'readable' : 'forbidden', sourceVersion: actor.capabilities.includes('customer:list:read') ? `customer-${(await tx.select<{ revision: number }>('SELECT revision FROM customer_revision WHERE singleton=1'))[0]!.revision}` : null, asOf: actor.capabilities.includes('customer:list:read') ? asOf : null },
-      { key: 'owner-documents', state: 'unavailable', sourceVersion: null, asOf: null },
+      { key: 'owner-documents', state: commercial.state, sourceVersion: commercial.sourceVersion, asOf: commercial.state === 'readable' ? asOf : null },
       { key: 'construction-finance', state: 'unavailable', sourceVersion: null, asOf: null },
-      { key: 'boq-changes', state: changes.state, sourceVersion: changes.sourceVersion, asOf: changes.state === 'readable' ? asOf : null },
+      ...commercial.sources.filter(source => source.key !== 'owner-documents').map(source => ({ ...source, key: `business-${source.key}` })),
     ] })
   }
   async function readableRows(tx: TransactionDb, actor: BusinessSession, state: ConstructionContractOwnerSnapshot) {
@@ -162,11 +164,11 @@ export function createProductionConstructionContractService(storage: ProductionS
         if (query.includeDemo || query.origin === 'demo')
           fail('forbidden', '正式施工合同只读取真实来源')
         const read = await readableRows(tx, actor, state)
-        const changes = await actualChanges(tx, actor, { projectId: query.projectId ?? undefined })
-        const proof = await meta(tx, actor, state, 'construction-contract:list', query, changes)
-        const facts: ConstructionContractFactSources = { ...read.service.facts(), files: await originalFiles(tx), changes: changes.facts }
+        const commercial = await actualDocuments(tx, actor, { projectId: query.projectId ?? undefined })
+        const proof = await meta(tx, actor, state, 'construction-contract:list', query, commercial)
+        const facts: ConstructionContractFactSources = { ...read.service.facts(), files: await originalFiles(tx), ...commercial.facts }
         const page = buildConstructionContractListPage({ contracts: read.rows, facts, query, asOf: proof.asOf, sourceVersion: proof.sourceVersion, capabilities: [...actor.capabilities] })
-        if (changes.state !== 'readable') {
+        if (commercial.state !== 'readable' || !actor.capabilities.includes('boq:read')) {
           for (const row of page.items)
             row.amounts.changed = null
           page.summary.origins.real.changedAmount = null
@@ -181,11 +183,11 @@ export function createProductionConstructionContractService(storage: ProductionS
         if (query.origin !== 'real' || query.includeDemo)
           fail('forbidden', '正式施工合同不读取演示来源')
         const read = await readableRows(tx, actor, state)
-        const changes = await actualChanges(tx, actor, { contractId: id })
-        const proof = await meta(tx, actor, state, 'construction-contract:detail', query, changes)
-        const facts: ConstructionContractFactSources = { ...read.service.facts(), files: await originalFiles(tx), changes: changes.facts }
+        const commercial = await actualDocuments(tx, actor, { contractId: id })
+        const proof = await meta(tx, actor, state, 'construction-contract:detail', query, commercial)
+        const facts: ConstructionContractFactSources = { ...read.service.facts(), files: await originalFiles(tx), ...commercial.facts }
         const dto = buildConstructionContractDetail({ contracts: read.rows, facts, query, asOf: proof.asOf, sourceVersion: proof.sourceVersion, capabilities: [...actor.capabilities] })
-        if (changes.state !== 'readable')
+        if (commercial.state !== 'readable' || !actor.capabilities.includes('boq:read'))
           dto.contract.amounts.changed = null
         return withReadMeta(dto, proof)
       })

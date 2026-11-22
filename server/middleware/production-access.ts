@@ -10,6 +10,7 @@ import { isProductionFinanceRoute } from '../utils/production-finance-access'
 import { isProductionMaterialContractRoute } from '../utils/production-material-contract-access'
 import { isProductionMaterialQuotationRoute } from '../utils/production-material-quotation-access'
 import { isProductionOtherSettlementRoute } from '../utils/production-other-settlement-access'
+import { isProductionOwnerDocumentRoute } from '../utils/production-owner-document-schema'
 import { isProductionPayrollRoute } from '../utils/production-payroll-access'
 import { isProductionProcessLibraryRequest } from '../utils/production-process-library-access'
 import { isProductionProjectRoute } from '../utils/production-project-access'
@@ -45,6 +46,7 @@ export default defineEventHandler((event) => {
     || isProductionFinanceRoute(event.method, path)
     || isProductionCrewWorkerRoute(event.method, path)
     || isProductionOtherSettlementRoute(event.method, path)
+    || isProductionOwnerDocumentRoute(event.method, path)
     || isProductionTargetCostRoute(event.method, path)
     || isProductionPayrollRoute(event.method, path)
     || isProductionQuantityRoute(event.method, path)

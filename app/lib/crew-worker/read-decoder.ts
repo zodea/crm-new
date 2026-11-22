@@ -170,7 +170,7 @@ function detailSummary(value: unknown, entity: 'crew' | 'worker'): boolean {
   const amounts = entity === 'crew' ? ['releasedWageAmount', 'penaltyAmount'] : ['knownAllocatedAmount', 'penaltyAmount']
   const sourceFor = (key: string) => key === 'penaltyAmount' ? 'penalties' : ['projectCount', 'assignedUnitCount', 'completedStageCount'].includes(key) ? 'assignments' : 'wages'
   return counts.every(key => (unknown(sourceFor(key)) && summary[key] === null) || count(summary[key]))
-    && amounts.every(key => (unknown(sourceFor(key)) && summary[key] === null) || (typeof summary[key] === 'string' && /^-?\d+(?:\.\d{1,2})?$/.test(summary[key])))
+    && amounts.every(key => ((unknown(sourceFor(key)) || (key === 'penaltyAmount' && Array.isArray(value.penalties) && value.penalties.some(row => object(row) && row.amount === null))) && summary[key] === null) || (typeof summary[key] === 'string' && /^-?\d+(?:\.\d{1,2})?$/.test(summary[key])))
     && (entity === 'worker' || (count(summary.memberCount) && count(summary.activeMemberCount)))
 }
 

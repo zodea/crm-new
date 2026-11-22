@@ -51,6 +51,12 @@ export async function assertProductionBoqRestoreSafe(tx: Pick<TransactionDb, 'se
     ['payroll_workbooks', 'record_json'],
     ['payroll_source_imports', 'evidence_json'],
     ['payroll_command_receipts', 'request_json'],
+    ['monthly_statements', 'record_json'],
+    ['owner_document_history', 'after_json'],
+    ['owner_document_history', 'before_json'],
+    ['owner_document_command_intents', 'request_json'],
+    ['owner_document_imports', 'evidence_json'],
+    ['owner_document_import_intents', 'request_json'],
   ] as const
   for (const [table, column] of snapshots) {
     const fields = await tx.select<{ name: string }>(`PRAGMA table_info(${table})`)
@@ -65,7 +71,7 @@ export async function assertProductionBoqRestoreSafe(tx: Pick<TransactionDb, 'se
       }
       catch { return boqFail('unavailable', '完整冻结来源无法读取，不能用空集合放行危险恢复') }
       if (references(snapshot, lineIds))
-        return boqFail('conflict', '整批危险恢复拒绝：原命令、WBS冻结或完整工资历史仍采用原清单')
+        return boqFail('conflict', '整批危险恢复拒绝：商务月报、原命令、WBS冻结或完整工资历史仍采用原清单')
     }
   }
   const ownedConsumers = await tx.select<{ name: string }>('SELECT name FROM sqlite_master WHERE type=\'table\'')

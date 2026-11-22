@@ -1,12 +1,13 @@
 import type { BoqBuildingAudit, BoqBuildingCommand, BoqBuildingContext, BoqBuildingEvidence, BoqBuildingQuery, BoqBuildingResult, BoqLineSource } from '../../app/lib/boq/central-building-contract'
 import type { BoqChangeOperation } from '../../app/lib/boq/read-model'
-import type { FileRefChanges, FileRefRecord } from '../../app/lib/forms/file-refs'
+import type { FileRefChanges } from '../../app/lib/forms/file-refs'
 import type { CoreMigrationServerEntityDTO, CoreMigrationSnapshotDTO } from '../../app/lib/migration/core-contract'
 import type {
   OwnerCommercialDocumentCommandContextDTO,
   OwnerCommercialDocumentCommandRequestDTO,
   OwnerCommercialDocumentCommandResultDTO,
   OwnerCommercialDocumentFormReadDTO,
+  OwnerDocumentAttachmentRecord,
 } from '../../app/lib/owner-document/central-command-contract'
 import type {
   OwnerCommercialDocumentKind,
@@ -34,14 +35,16 @@ import {
   SUBCONTRACT_CHANGE_WRITE_CAPABILITY,
 } from '../../app/lib/owner-document/central-command-contract'
 import {
+  OWNER_COMMERCIAL_DOCUMENT_KINDS,
   ownerCommercialDocumentProblem,
   OwnerCommercialDocumentRepositoryProblem,
+  ownerFinalSettlementChangedContractAmount,
   ownerFinalSettlementReceiptIsActive,
-  ownerFinalSettlementSupplementIsActive,
 } from '../../app/lib/owner-document/central-repository'
 import { matchesPenaltySettlement } from '../../app/lib/owner-document/project-penalty'
 import { isQuantityBasis } from '../../app/lib/quantity/basis'
 import { ReceiptRepositoryProblem } from '../../app/lib/receipt/contract'
+import { isStableRouteIdentity } from '../../app/lib/util/stable-route-identity'
 import { isISODateDTO, isISODateTimeDTO } from '../../app/types/read-model'
 import { assertCommandUnsealed, commandFingerprint, commandJournalKey, commandReplay, parseResolveCommandBody, resolveJournalCommand } from './command-journal'
 import { constructionContractCommandTestInstance } from './construction-contract-command-test-instance'
@@ -110,7 +113,7 @@ interface FinalSettlementSupplementSeed {
   no: string
   name: string
   status: string
-  amount: number
+  amount: number | null
   date: string | null
 }
 
@@ -122,7 +125,7 @@ interface FinalSettlementReceiptSeed {
   no: string
   name: string
   status: string
-  amount: number
+  amount: number | null
   date: string | null
 }
 
@@ -131,6 +134,8 @@ export interface OwnerCommercialDocumentCommandTestInstanceOptions {
   createId?: (kind: OwnerCommercialDocumentKind) => string
   createBoqLineId?: (changeId: string, changeLineId: string) => string
   createAttachmentId?: () => string
+  attachmentActor?: string
+  attachmentMetadata?: (id: string) => OwnerCommercialDocumentSource['files'][number] | undefined
   /** A production adapter may explicitly confirm the original declared label's stable actual identity. */
   confirmExistingBuildingIdentity?: (lineId: string, buildingId: string) => boolean
   crews?: readonly SupplierSeed[]
@@ -151,6 +156,28 @@ export interface OwnerCommercialDocumentCommandTestInstanceOptions {
   finalSettlementReceipts?: readonly FinalSettlementReceiptSeed[]
   receiptSource?: typeof receiptReadTestInstance.facts
   documents?: readonly OwnerCommercialDocumentSource[]
+  /** Caller-owned durable business facts; upstream masters, BOQ and quantity are never included. */
+  snapshot?: unknown
+  /** Production callers supply actual masters explicitly; document labels cannot create identities. */
+  strictSources?: boolean
+  knownSupplementContractIds?: readonly string[]
+  finalSettlementChanges?: (contractId: string, sessionId?: string | null) => readonly OwnerCommercialDocumentSource[] | null
+  /** Historical deductions may reference an explicitly adopted external settlement; no new write candidate. */
+  penaltySettlementReferences?: readonly { id: string, projectId: string | null, supplierId: string | null, contractId: string | null, status: string, amount: number | null }[]
+}
+
+export interface OwnerCommercialDocumentSnapshot {
+  schemaVersion: 1
+  documents: OwnerCommercialDocumentSource[]
+  commands: [string, OwnerCommercialDocumentCommandResultDTO][]
+  commandFingerprints: [string, string][]
+  sealedCommands: string[]
+  commandKinds: [string, OwnerCommercialDocumentKind][]
+  penaltyDeductions: PenaltyDeductionSource[]
+  penaltyRectifications: (PenaltyRectificationEvent & { penaltyId: string })[]
+  migrationKeys: string[]
+  migrationSnapshotFingerprint: string | null
+  sourceVersion: number
 }
 
 interface WorkspaceState extends CommandJournal<OwnerCommercialDocumentCommandResultDTO> {
@@ -183,6 +210,176 @@ interface WorkspaceState extends CommandJournal<OwnerCommercialDocumentCommandRe
 
 function clone<T>(value: T): T {
   return structuredClone(value)
+}
+
+function validateOwnerSnapshot(input: unknown, externalSettlements: OwnerCommercialDocumentCommandTestInstanceOptions['penaltySettlementReferences']): OwnerCommercialDocumentSnapshot {
+  const invalid = () => {
+    throw failure('unavailable', '商务单据持久图损坏或关系不一致，请保留原图与原命令')
+  }
+  const object = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value)
+  const kind = (value: unknown): value is OwnerCommercialDocumentKind => OWNER_COMMERCIAL_DOCUMENT_KINDS.includes(value as OwnerCommercialDocumentKind)
+  const amount = (value: unknown) => value === null || (typeof value === 'number' && Number.isFinite(value))
+  const hash = (value: unknown) => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value)
+  const unique = (values: readonly unknown[]) => new Set(values).size === values.length
+  const journalKey = (value: unknown): string[] => {
+    if (typeof value !== 'string')
+      return invalid()
+    try {
+      const parts: unknown = JSON.parse(value)
+      if (!Array.isArray(parts) || parts.length !== 4 || parts[2] !== 'owner-commercial-document'
+        || ![parts[0], parts[1], parts[3]].every(isStableRouteIdentity) || JSON.stringify(parts) !== value) {
+        return invalid()
+      }
+      return parts as string[]
+    }
+    catch { return invalid() }
+  }
+  if (!object(input) || input.schemaVersion !== 1 || !Number.isSafeInteger(input.sourceVersion) || Number(input.sourceVersion) < 1
+    || !(input.migrationSnapshotFingerprint === null || hash(input.migrationSnapshotFingerprint))) {
+    return invalid()
+  }
+  for (const name of ['documents', 'commands', 'commandFingerprints', 'sealedCommands', 'commandKinds', 'penaltyDeductions', 'penaltyRectifications', 'migrationKeys']) {
+    if (!Array.isArray(input[name]))
+      return invalid()
+  }
+  const snapshot = clone(input) as unknown as OwnerCommercialDocumentSnapshot
+  const documentKeys = new Set<string>()
+  for (const document of snapshot.documents) {
+    if (!object(document) || !kind(document.kind) || !isStableRouteIdentity(document.id) || document.dataOrigin !== 'real'
+      || !Number.isSafeInteger(document.version) || document.version < 1 || !amount(document.amount) || !amount(document.auditedAmount)
+      || !isISODateTimeDTO(document.createdAt) || !isISODateTimeDTO(document.updatedAt) || typeof document.status !== 'string'
+      || typeof document.sourceLocked !== 'boolean' || !isStableRouteIdentity(document.sourceId)
+      || !['no', 'name', 'documentType', 'projectName', 'customerName', 'contractNo', 'contractName', 'periodNo', 'statusNote', 'note'].every(name => typeof document[name as keyof typeof document] === 'string')
+      || !['allowed', 'forbidden'].includes(document.projectPermission) || !['allowed', 'forbidden'].includes(document.customerPermission) || !['allowed', 'forbidden'].includes(document.contractPermission)
+      || !Array.isArray(document.lines) || !Array.isArray(document.files)) {
+      return invalid()
+    }
+    for (const id of [document.projectId, document.customerId, document.contractId, document.supplierId, document.crewId]) {
+      if (id !== undefined && id !== null && !isStableRouteIdentity(id))
+        return invalid()
+    }
+    const identity = key(document.kind, document.id)
+    if (documentKeys.has(identity))
+      return invalid()
+    documentKeys.add(identity)
+    for (const date of [document.applicationDate, document.approvalDate]) {
+      if (date !== undefined && date !== null && !isISODateDTO(date))
+        return invalid()
+    }
+    if (!document.lines.every(object) || !document.files.every(object)
+      || !unique(document.lines.map(line => line.id)) || !unique(document.files.map(file => file.id))) {
+      return invalid()
+    }
+    for (const line of document.lines) {
+      if (!object(line) || !isStableRouteIdentity(line.id) || (line.boqLineId !== null && !isStableRouteIdentity(line.boqLineId))
+        || ![null, 'add', 'qty', 'price'].includes(line.operation) || typeof line.itemName !== 'string' || typeof line.unit !== 'string'
+        || !['contractQty', 'contractUnitPrice', 'autoQty', 'reportedQty', 'auditedQty', 'deltaQty', 'newUnitPrice', 'amount', 'auditedAmount'].every(name => amount(line[name as keyof typeof line]))) {
+        return invalid()
+      }
+    }
+    for (const file of document.files) {
+      if (!object(file) || !isStableRouteIdentity(file.id) || typeof file.fileName !== 'string'
+        || !(file.fileSize === null || (Number.isSafeInteger(file.fileSize) && file.fileSize >= 0))
+        || typeof file.mimeType !== 'string' || typeof file.category !== 'string' || typeof file.uploader !== 'string'
+        || (file.uploadedAt !== null && !isISODateTimeDTO(file.uploadedAt)) || (file.deletedAt !== null && !isISODateTimeDTO(file.deletedAt))) {
+        return invalid()
+      }
+    }
+    if (document.acceptanceLifecycle !== undefined) {
+      const lifecycle = document.acceptanceLifecycle
+      if (document.kind !== 'acceptance' || !object(lifecycle) || !Array.isArray(lifecycle.events) || !lifecycle.events.every(object)
+        || !unique(lifecycle.events.map(event => event.id))) {
+        return invalid()
+      }
+      for (const date of [lifecycle.acceptanceDate, lifecycle.warrantyStartDate, lifecycle.warrantyEndDate, lifecycle.warrantyConfirmationDate]) {
+        if (date !== null && !isISODateDTO(date))
+          return invalid()
+      }
+      const transitions = { 'submit': ['draft', 'submitted'], 'accept': ['submitted', 'accepted'], 'start-warranty': ['accepted', 'warranty'], 'confirm-expiry': ['warranty', 'expired'] }
+      for (const event of lifecycle.events) {
+        const states = transitions[event.action]
+        if (!object(event) || !isStableRouteIdentity(event.id) || !states || event.fromStatus !== states[0] || event.toStatus !== states[1]
+          || typeof event.actorId !== 'string' || typeof event.actorName !== 'string' || typeof event.note !== 'string' || !isISODateTimeDTO(event.occurredAt)) {
+          return invalid()
+        }
+      }
+    }
+  }
+  const entries = <T>(values: readonly [string, T][], check: (value: T, key: string) => boolean) => {
+    if (!unique(values.map(entry => Array.isArray(entry) ? entry[0] : null)))
+      return invalid()
+    for (const entry of values) {
+      if (!Array.isArray(entry) || entry.length !== 2)
+        return invalid()
+      journalKey(entry[0])
+      if (!check(entry[1], entry[0]))
+        return invalid()
+    }
+    return new Map(values)
+  }
+  const fingerprints = entries(snapshot.commandFingerprints, value => hash(value))
+  const kinds = entries(snapshot.commandKinds, value => kind(value))
+  const receipts = entries(snapshot.commands, (receipt, commandKey) => object(receipt) && isStableRouteIdentity(receipt.id)
+    && receipt.commandId === journalKey(commandKey)[3] && typeof receipt.version === 'string' && /^[1-9]\d*$/.test(receipt.version)
+    && Number.isSafeInteger(Number(receipt.version)) && isISODateTimeDTO(receipt.updatedAt) && typeof receipt.deleted === 'boolean'
+    && Array.isArray(receipt.attachmentIds) && receipt.attachmentIds.every(isStableRouteIdentity) && unique(receipt.attachmentIds)
+    && fingerprints.has(commandKey) && kinds.has(commandKey))
+  for (const [commandKey, receipt] of receipts) {
+    const document = snapshot.documents.find(row => row.kind === kinds.get(commandKey) && row.id === receipt.id)
+    if (document ? document.version < Number(receipt.version) : ![...receipts].some(([otherKey, other]) => other.deleted && other.id === receipt.id && kinds.get(otherKey) === kinds.get(commandKey)))
+      return invalid()
+  }
+  if (!unique(snapshot.sealedCommands))
+    return invalid()
+  for (const commandKey of snapshot.sealedCommands) {
+    journalKey(commandKey)
+    if (receipts.has(commandKey))
+      return invalid()
+  }
+  if (!unique(snapshot.migrationKeys))
+    return invalid()
+  for (const identity of snapshot.migrationKeys) {
+    if (typeof identity !== 'string')
+      return invalid()
+    const [documentKind, id, extra] = identity.split('\u001F')
+    if (!kind(documentKind) || !isStableRouteIdentity(id) || extra !== undefined
+      || (!documentKeys.has(identity) && ![...receipts].some(([commandKey, receipt]) => receipt.deleted && receipt.id === id && kinds.get(commandKey) === documentKind))) {
+      return invalid()
+    }
+  }
+  const deductionIds = new Set<string>()
+  const penaltyTotals = new Map<string, number>()
+  const settlementTotals = new Map<string, number>()
+  for (const deduction of snapshot.penaltyDeductions) {
+    if (!object(deduction))
+      return invalid()
+    const penalty = snapshot.documents.find(row => row.kind === 'project_penalty' && row.id === deduction.penaltyId)
+    const settlement = snapshot.documents.find(row => row.kind === 'sub_settlement' && row.id === deduction.settlementId) ?? externalSettlements?.find(row => row.id === deduction.settlementId)
+    if (!object(deduction) || !isStableRouteIdentity(deduction.id) || deductionIds.has(deduction.id) || !penalty || !settlement
+      || !matchesPenaltySettlement(penalty, settlement)
+      || !Number.isFinite(deduction.amount) || deduction.amount <= 0 || round(deduction.amount) !== deduction.amount
+      || typeof deduction.actorId !== 'string' || typeof deduction.commandId !== 'string' || typeof deduction.note !== 'string' || !isISODateTimeDTO(deduction.occurredAt)) {
+      return invalid()
+    }
+    deductionIds.add(deduction.id)
+    penaltyTotals.set(penalty.id, round((penaltyTotals.get(penalty.id) ?? 0) + deduction.amount))
+    settlementTotals.set(settlement.id, round((settlementTotals.get(settlement.id) ?? 0) + deduction.amount))
+    if ((penalty.amount !== null && penaltyTotals.get(penalty.id)! > penalty.amount)
+      || (settlement.amount !== null && settlementTotals.get(settlement.id)! > settlement.amount)) {
+      return invalid()
+    }
+  }
+  const rectificationIds = new Set<string>()
+  for (const event of snapshot.penaltyRectifications) {
+    if (!object(event) || !isStableRouteIdentity(event.id) || rectificationIds.has(event.id)
+      || !snapshot.documents.some(row => row.kind === 'project_penalty' && row.id === event.penaltyId)
+      || typeof event.actorId !== 'string' || !isISODateTimeDTO(event.occurredAt) || typeof event.note !== 'string'
+      || !(event.deadline === null || isISODateDTO(event.deadline))) {
+      return invalid()
+    }
+    rectificationIds.add(event.id)
+  }
+  return snapshot
 }
 
 function key(kind: OwnerCommercialDocumentKind, id: string): string {
@@ -220,8 +417,16 @@ function round(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100
 }
 
+function roundedNullable(value: number | null): number | null {
+  return value === null ? null : round(value)
+}
+
+function lineAmountSum(lines: readonly OwnerCommercialDocumentLineSource[]): number | null {
+  return lines.some(line => line.amount === null) ? null : round(lines.reduce((sum, line) => sum + line.amount!, 0))
+}
+
 function failure(
-  code: 'forbidden' | 'not-found' | 'relationship-mismatch' | 'validation-failed' | 'conflict',
+  code: 'forbidden' | 'not-found' | 'relationship-mismatch' | 'validation-failed' | 'conflict' | 'unavailable',
   message: string,
 ): OwnerCommercialDocumentRepositoryProblem {
   return new OwnerCommercialDocumentRepositoryProblem(ownerCommercialDocumentProblem(code, message))
@@ -311,9 +516,9 @@ function formDraft(source: OwnerCommercialDocumentSource): OwnerDocumentDraft & 
       sourceLocked: source.sourceLocked,
       approvalDate: source.approvalDate ?? null,
       approvedTaxInclusiveAmount: source.amount,
-      approvedTaxExclusiveAmount: source.taxExclusiveAmount ?? 0,
-      appliedTaxExclusiveAmount: source.appliedTaxExclusiveAmount ?? 0,
-      totalAmount: source.boqAmount ?? round(source.lines.reduce((sum, line) => sum + line.amount, 0)),
+      approvedTaxExclusiveAmount: source.taxExclusiveAmount ?? null,
+      appliedTaxExclusiveAmount: source.appliedTaxExclusiveAmount ?? null,
+      totalAmount: source.boqAmount !== undefined ? source.boqAmount : lineAmountSum(source.lines),
       reason: source.note,
       note: source.note,
       lines: source.lines.map(line => ({
@@ -365,14 +570,11 @@ function formDraft(source: OwnerCommercialDocumentSource): OwnerDocumentDraft & 
   }
   if (source.kind === 'final_settlement') {
     const amounts = source.finalSettlementEvidence
-    const activeSupplements = amounts?.supplements?.filter(item => ownerFinalSettlementSupplementIsActive(item.status)) ?? null
     const activeReceipts = amounts?.receipts?.filter(item => ownerFinalSettlementReceiptIsActive(item.status)) ?? null
-    const changedContractAmount = amounts?.originalContractAmount == null || activeSupplements == null
+    const changedContractAmount = ownerFinalSettlementChangedContractAmount(amounts)
+    const receivedAmount = activeReceipts == null || activeReceipts.some(item => item.amount === null)
       ? null
-      : round(amounts.originalContractAmount + activeSupplements.reduce((sum, item) => sum + item.amount, 0))
-    const receivedAmount = activeReceipts == null
-      ? null
-      : round(activeReceipts.reduce((sum, item) => sum + item.amount, 0))
+      : round(activeReceipts.reduce((sum, item) => sum + item.amount!, 0))
     return {
       id: source.id,
       no: source.no,
@@ -384,7 +586,7 @@ function formDraft(source: OwnerCommercialDocumentSource): OwnerDocumentDraft & 
       submissionDate: source.applicationDate ?? '',
       changedContractAmount,
       receivedAmount,
-      settlementReceiptGap: receivedAmount == null ? null : round(source.amount - receivedAmount),
+      settlementReceiptGap: receivedAmount == null || source.amount === null ? null : round(source.amount - receivedAmount),
       basis: source.settlementBasis ?? '',
       differenceNote: source.settlementDifferenceNote ?? '',
       status: source.status,
@@ -436,7 +638,7 @@ function formDraft(source: OwnerCommercialDocumentSource): OwnerDocumentDraft & 
     sourceLocked: source.sourceLocked,
     reportedAmount: source.amount,
     auditedAmount: source.auditedAmount,
-    auditDifference: source.auditedAmount == null ? null : round(source.auditedAmount - source.amount),
+    auditDifference: source.auditedAmount == null || source.amount === null ? null : round(source.auditedAmount - source.amount),
     note: source.note,
     lines: source.lines.map(line => ({
       id: line.id,
@@ -458,7 +660,7 @@ function fileRecord(
   kind: OwnerCommercialDocumentKind,
   ownerId: string,
   source: OwnerCommercialDocumentSource['files'][number],
-): FileRefRecord {
+): OwnerDocumentAttachmentRecord {
   return {
     id: source.id,
     ownerType: fileOwnerType(kind),
@@ -469,7 +671,7 @@ function fileRecord(
     mimeType: source.mimeType,
     category: source.category,
     uploader: source.uploader,
-    uploadedAt: source.uploadedAt ?? '',
+    uploadedAt: source.uploadedAt,
     deletedAt: source.deletedAt,
   }
 }
@@ -531,7 +733,8 @@ export function createOwnerCommercialDocumentCommandTestInstance(
   const baseBoqLines = (options.boqLines ?? []).map(clone)
   const baseMonthlyQuantityFacts = (options.monthlyQuantityFacts ?? []).map(clone)
   const baseDocuments = (options.documents ?? []).map(clone)
-  const embeddedFinalSettlements = baseDocuments.filter(row => row.kind === 'final_settlement')
+  const retainedSnapshot = options.snapshot === undefined ? null : validateOwnerSnapshot(options.snapshot, options.penaltySettlementReferences)
+  const embeddedFinalSettlements = options.strictSources ? [] : baseDocuments.filter(row => row.kind === 'final_settlement')
   const baseFinalSettlementSupplements = options.finalSettlementSupplements !== undefined
     ? options.finalSettlementSupplements.map(clone)
     : embeddedFinalSettlements.flatMap(row => (row.finalSettlementEvidence?.supplements ?? []).map(source => ({
@@ -550,6 +753,8 @@ export function createOwnerCommercialDocumentCommandTestInstance(
   const customerIds = new Set(baseCustomers.map(row => row.id))
   const contractIds = new Set(baseContracts.map(row => row.id))
   for (const row of baseDocuments) {
+    if (options.strictSources)
+      continue
     if (row.projectId && !projectIds.has(row.projectId)) {
       const project = {
         id: row.projectId,
@@ -577,11 +782,13 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       contractIds.add(row.contractId)
     }
   }
-  const baseFinalSettlementSupplementsKnownContractIds = options.finalSettlementSupplements !== undefined
-    ? new Set(baseContracts.map(row => row.id))
-    : new Set(embeddedFinalSettlements
-        .filter(row => row.contractId && row.finalSettlementEvidence?.supplements != null)
-        .map(row => row.contractId!))
+  const baseFinalSettlementSupplementsKnownContractIds = options.knownSupplementContractIds !== undefined
+    ? new Set(options.knownSupplementContractIds)
+    : options.finalSettlementSupplements !== undefined
+      ? new Set(baseContracts.map(row => row.id))
+      : new Set(embeddedFinalSettlements
+          .filter(row => row.contractId && row.finalSettlementEvidence?.supplements != null)
+          .map(row => row.contractId!))
   const baseFinalSettlementReceiptsKnownContractIds = options.finalSettlementReceipts !== undefined
     ? new Set(baseContracts.map(row => row.id))
     : new Set(embeddedFinalSettlements
@@ -590,7 +797,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
   const workspaces = new Map<string, WorkspaceState>()
 
   function freshState(): WorkspaceState {
-    return {
+    const state: WorkspaceState = {
       linkedCrewIds: new Set(),
       crews: new Map((options.crews ?? []).map(row => [row.id, clone(row)])),
       penaltyDeductions: new Map(),
@@ -618,6 +825,25 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       finalSettlementReceiptsKnownContractIds: new Set(baseFinalSettlementReceiptsKnownContractIds),
       sourceVersion: 1,
     }
+    if (retainedSnapshot) {
+      for (const row of retainedSnapshot.documents) {
+        const identity = key(row.kind, row.id)
+        const existing = state.documents.get(identity)
+        if (existing && commandFingerprint(existing) !== commandFingerprint(row))
+          throw failure('unavailable', '商务单据原图与注入来源的同一稳定身份冲突')
+        state.documents.set(identity, clone(row))
+      }
+      state.commands = new Map(clone(retainedSnapshot.commands))
+      state.commandFingerprints = new Map(clone(retainedSnapshot.commandFingerprints))
+      state.sealedCommands = new Set(retainedSnapshot.sealedCommands)
+      state.commandKinds = new Map(clone(retainedSnapshot.commandKinds))
+      state.penaltyDeductions = new Map(retainedSnapshot.penaltyDeductions.map(row => [row.id, clone(row)]))
+      state.penaltyRectifications = new Map(retainedSnapshot.penaltyRectifications.map(row => [row.id, clone(row)]))
+      state.migrationKeys = new Set(retainedSnapshot.migrationKeys)
+      state.migrationSnapshotFingerprint = retainedSnapshot.migrationSnapshotFingerprint
+      state.sourceVersion = retainedSnapshot.sourceVersion
+    }
+    return state
   }
 
   function workspaceKey(sessionId?: string | null): string {
@@ -736,6 +962,8 @@ export function createOwnerCommercialDocumentCommandTestInstance(
   function effectiveProjects(state: WorkspaceState): Map<string, ProjectSeed> {
     if (options.projectSource)
       return new Map(options.projectSource.rows(state.sessionId).map(row => [row.id, { id: row.id, name: row.name, customerId: row.customerId }]))
+    if (options.strictSources)
+      return state.projects
     return new Map([
       ...linkedSubcontractRows(state)
         .filter(row => row.projectId)
@@ -772,6 +1000,8 @@ export function createOwnerCommercialDocumentCommandTestInstance(
   }
 
   function effectiveSuppliers(state: WorkspaceState): Map<string, SupplierSeed> {
+    if (options.strictSources)
+      return state.suppliers
     return new Map([
       ...linkedSubcontractRows(state)
         .filter(row => row.supplierId)
@@ -809,6 +1039,19 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       ...(receiptSource?.problem ? { receiptsProblem: receiptSource.problem } : {}),
       originalContractAmount: contract.amount ?? null,
       supplements: finalSettlementSupplements(state, contract.id),
+      changes: options.finalSettlementChanges
+        ? options.finalSettlementChanges(contract.id, state.sessionId)?.map(row => ({
+          id: row.id,
+          no: row.no,
+          name: row.name,
+          status: row.status,
+          amount: row.status === 'approved' || row.sourceLocked || row.approvalDate
+            ? row.amount
+            : null,
+          date: row.approvalDate ?? null,
+          sourceType: row.sourceType,
+        })) ?? null
+        : null,
       receipts: receiptSource
         ? receiptSource.rows === null
           ? null
@@ -849,15 +1092,12 @@ export function createOwnerCommercialDocumentCommandTestInstance(
 
   function contractSummary(state: WorkspaceState, contract: ContractSeed) {
     const evidence = finalSettlementEvidenceForContract(state, contract.id)
-    const activeSupplements = evidence?.supplements?.filter(source => ownerFinalSettlementSupplementIsActive(source.status)) ?? null
     const activeReceipts = evidence?.receipts?.filter(source => ownerFinalSettlementReceiptIsActive(source.status)) ?? null
     return {
-      changedContractAmount: evidence?.originalContractAmount == null || activeSupplements == null
+      changedContractAmount: ownerFinalSettlementChangedContractAmount(evidence),
+      receivedAmount: activeReceipts == null || activeReceipts.some(source => source.amount === null)
         ? null
-        : round(evidence.originalContractAmount + activeSupplements.reduce((sum, source) => sum + source.amount, 0)),
-      receivedAmount: activeReceipts == null
-        ? null
-        : round(activeReceipts.reduce((sum, source) => sum + source.amount, 0)),
+        : round(activeReceipts.reduce((sum, source) => sum + source.amount!, 0)),
     }
   }
 
@@ -1045,7 +1285,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
     })
   }
 
-  function reportSnapshot(draft: OwnerDocumentDraft, state: WorkspaceState) {
+  function reportSnapshot(draft: OwnerDocumentDraft, state: WorkspaceState, requireComplete = true) {
     const periodNo = required(draft.periodNo, '报量期次')
     if (!isPeriod(periodNo))
       throw failure('validation-failed', '报量期次格式必须为 yyyy-mm')
@@ -1068,12 +1308,12 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       const effectiveLine = effective.get(catalog.id)
       if (!effectiveLine)
         throw failure('relationship-mismatch', 'BOQ 行不属于当前施工合同有效量价台账')
-      if (effectiveLine.effectiveUnitPrice === null)
+      if (requireComplete && effectiveLine.effectiveUnitPrice === null)
         throw failure('validation-failed', '当前清单单价未知，请补齐清单后再申报')
-      const reportedQty = nullableNumber(raw.reportedQty) ?? fact.autoQty
-      if (nullableNumber(raw.reportedQty) === null && fact.missingQtyCount > 0)
+      const reportedQty = nullableNumber(raw.reportedQty) ?? (fact.missingQtyCount > 0 ? null : fact.autoQty)
+      if (requireComplete && reportedQty === null)
         throw failure('validation-failed', '当前自动完成量存在缺量，请核实后明确填写申报量')
-      if (reportedQty < 0)
+      if (reportedQty !== null && reportedQty < 0)
         throw failure('validation-failed', '申报量不能为负数')
       return {
         id: text(raw.id) || `report-line-${index + 1}`,
@@ -1088,7 +1328,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         auditedQty: null,
         deltaQty: null,
         newUnitPrice: null,
-        amount: round(reportedQty * effectiveLine.effectiveUnitPrice),
+        amount: reportedQty === null || effectiveLine.effectiveUnitPrice === null ? null : round(reportedQty * effectiveLine.effectiveUnitPrice),
         auditedAmount: null,
         note: text(raw.note),
       }
@@ -1127,7 +1367,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         auditedQty: nullableNumber(raw.auditedQty),
         deltaQty: nullableNumber(raw.deltaQty),
         newUnitPrice: nullableNumber(raw.newUnitPrice),
-        amount: number(raw.amount),
+        amount: nullableNumber(raw.amount),
         auditedAmount: nullableNumber(raw.auditedAmount),
         note: text(raw.note),
       }
@@ -1177,13 +1417,14 @@ export function createOwnerCommercialDocumentCommandTestInstance(
     }))
     for (const raw of changes.add ?? []) {
       const fileName = required(raw.fileName, '附件名称')
-      files.push({
-        id: createAttachmentId(),
+      const id = createAttachmentId()
+      files.push(options.attachmentMetadata?.(id) ?? {
+        id,
         fileName,
         fileSize: Math.max(number(raw.fileSize), 0),
         mimeType: text(raw.mimeType),
         category: text(raw.category),
-        uploader: text(raw.uploader),
+        uploader: options.attachmentActor ?? text(raw.uploader),
         uploadedAt: timestamp,
         deletedAt: null,
       })
@@ -1241,6 +1482,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       if (isSubmit && (totalAmount == null || totalAmount <= 0))
         throw failure('validation-failed', '罚扣金额必须大于 0')
       const source: OwnerCommercialDocumentSource = {
+        ...current,
         dataOrigin: 'real',
         kind: 'project_penalty',
         crewId,
@@ -1270,7 +1512,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         approvalDate: null,
         status: isSubmit ? 'pending' : 'draft',
         statusNote: isSubmit ? '待结算抵扣' : '',
-        amount: round(totalAmount ?? 0),
+        amount: roundedNullable(totalAmount),
         auditedAmount: null,
         penaltyFacts: { deadline: text(request.draft.deadline) || null, rectificationNote: text(request.draft.rectificationNote), deductionMethod: text(request.draft.deductionMethod) },
         note: text(request.draft.note),
@@ -1290,6 +1532,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       if (isSubmit && (totalAmount == null || totalAmount <= 0))
         throw failure('validation-failed', '结算金额必须大于 0')
       const source: OwnerCommercialDocumentSource = {
+        ...current,
         dataOrigin: 'real',
         kind: 'sub_settlement',
         id,
@@ -1317,7 +1560,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         approvalDate: null,
         status: isSubmit ? 'confirmed' : 'draft',
         statusNote: isSubmit ? '已确认分包结算' : '',
-        amount: round(totalAmount ?? 0),
+        amount: roundedNullable(totalAmount),
         auditedAmount: null,
         deductionNote: text(request.draft.deductionNote),
         note: text(request.draft.note),
@@ -1337,6 +1580,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       if (isSubmit && (approvedAmount == null || approvedAmount <= 0))
         throw failure('validation-failed', '审批金额必须大于 0')
       const source: OwnerCommercialDocumentSource = {
+        ...current,
         dataOrigin: 'real',
         kind: 'sub_change',
         id,
@@ -1364,7 +1608,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         approvalDate: null,
         status: isSubmit ? 'submitted' : 'draft',
         statusNote: isSubmit ? '已提交分包变洽签' : '',
-        amount: round(approvedAmount ?? 0),
+        amount: roundedNullable(approvedAmount),
         auditedAmount: null,
         changedArea: nullableNumber(request.draft.changedArea),
         actualApprovedPrice: nullableNumber(request.draft.actualApprovedPrice),
@@ -1385,6 +1629,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       if (isSubmit && (settlementAmount == null || settlementAmount <= 0))
         throw failure('validation-failed', '结算金额必须大于 0')
       const source: OwnerCommercialDocumentSource = {
+        ...current,
         dataOrigin: 'real',
         kind: 'final_settlement',
         id,
@@ -1409,7 +1654,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         approvalDate: current?.approvalDate ?? null,
         status: isSubmit ? 'submitted' : 'draft',
         statusNote: isSubmit ? '已提交甲方结算资料' : '',
-        amount: round(settlementAmount ?? 0),
+        amount: roundedNullable(settlementAmount),
         auditedAmount: current?.auditedAmount ?? null,
         note: text(request.draft.note),
         version: (current?.version ?? 0) + 1,
@@ -1431,6 +1676,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       if (isSubmit && (penaltyAmount == null || penaltyAmount <= 0))
         throw failure('validation-failed', '罚扣金额必须大于 0')
       const source: OwnerCommercialDocumentSource = {
+        ...current,
         dataOrigin: 'real',
         kind: 'owner_penalty',
         id,
@@ -1455,7 +1701,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         approvalDate: null,
         status: isSubmit ? 'submitted' : 'draft',
         statusNote: isSubmit ? '已提交甲方罚扣事实' : '',
-        amount: round(penaltyAmount ?? 0),
+        amount: roundedNullable(penaltyAmount),
         auditedAmount: null,
         note: text(request.draft.note),
         version: (current?.version ?? 0) + 1,
@@ -1501,6 +1747,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         })
       }
       const source: OwnerCommercialDocumentSource = {
+        ...current,
         dataOrigin: 'real',
         kind: 'acceptance',
         id,
@@ -1525,7 +1772,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         approvalDate: null,
         status: isSubmit ? 'submitted' : 'draft',
         statusNote: isSubmit ? '验收中' : '',
-        amount: number(request.draft.contractEstimate),
+        amount: nullableNumber(request.draft.contractEstimate),
         auditedAmount: null,
         note: text(request.draft.note),
         version: (current?.version ?? 0) + 1,
@@ -1546,7 +1793,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       lines = request.kind === 'owner_change' ? changeLines(request.draft, state) : report!.lines
     }
     else if (!(request.kind === 'owner_report' && options.withMonthlyQuantity) && canResolveDraft(request.kind, request.draft, state)) {
-      report = request.kind === 'owner_report' ? reportSnapshot(request.draft, state) : null
+      report = request.kind === 'owner_report' ? reportSnapshot(request.draft, state, false) : null
       lines = request.kind === 'owner_change' ? changeLines(request.draft, state) : report!.lines
     }
     else {
@@ -1570,16 +1817,19 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       if (duplicate)
         throw failure('conflict', '同一施工合同同一月份只能有一张有效月度报量')
     }
-    const lineAmount = round(lines.reduce((sum, line) => sum + line.amount, 0))
+    const lineAmount = lineAmountSum(lines)
+    if (isSubmit && lineAmount === null)
+      throw failure('validation-failed', '当前明细仍有未知金额，不能以零提交')
     const amount = request.kind === 'owner_change'
-      ? round(nullableNumber(request.draft.approvedTaxInclusiveAmount) ?? current?.amount ?? lineAmount)
-      : lineAmount
+      ? roundedNullable(nullableNumber(request.draft.approvedTaxInclusiveAmount) ?? current?.amount ?? (lines.length ? lineAmount : null))
+      : lines.length ? lineAmount : null
     const name = request.kind === 'owner_change'
       ? (isSubmit ? required(request.draft.name, '变更名称') : text(request.draft.name))
       : `${periodNo || '未定期次'}月度报量`
     if (request.kind === 'owner_change' && isSubmit)
       required(request.draft.reason, '变更事由')
     const source: OwnerCommercialDocumentSource = {
+      ...current,
       dataOrigin: 'real',
       kind: request.kind,
       id,
@@ -1613,10 +1863,10 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       amount,
       boqAmount: request.kind === 'owner_change' ? lineAmount : null,
       taxExclusiveAmount: request.kind === 'owner_change'
-        ? nullableNumber(request.draft.approvedTaxExclusiveAmount) ?? current?.taxExclusiveAmount ?? 0
+        ? nullableNumber(request.draft.approvedTaxExclusiveAmount) ?? current?.taxExclusiveAmount ?? null
         : null,
       appliedTaxExclusiveAmount: request.kind === 'owner_change'
-        ? nullableNumber(request.draft.appliedTaxExclusiveAmount) ?? current?.appliedTaxExclusiveAmount ?? 0
+        ? nullableNumber(request.draft.appliedTaxExclusiveAmount) ?? current?.appliedTaxExclusiveAmount ?? null
         : null,
       auditedAmount: null,
       note: text(request.draft.note) || text(request.draft.reason),
@@ -1866,7 +2116,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       sourceLocked: true,
       approvalDate: request.approvedAt,
       approvalSequenceAt: timestamp,
-      boqAmount: round(lines.reduce((sum, line) => sum + line.amount, 0)),
+      boqAmount: lineAmountSum(lines),
       version: current.version + 1,
       updatedAt: timestamp,
       lines,
@@ -1893,7 +2143,9 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       const auditedQty = line.boqLineId ? auditedByBoqId.get(line.boqLineId) : undefined
       if (auditedQty == null || !Number.isFinite(auditedQty) || auditedQty < 0)
         throw failure('validation-failed', '审定量无效')
-      const auditedAmount = round(auditedQty * (line.contractUnitPrice ?? 0))
+      if (line.contractUnitPrice === null)
+        throw failure('unavailable', '该历史明细没有冻结单价，不能以零价计算审定金额')
+      const auditedAmount = round(auditedQty * line.contractUnitPrice)
       return { ...line, auditedQty, auditedAmount }
     })
     const auditedAmount = round(lines.reduce((sum, line) => sum + (line.auditedAmount ?? 0), 0))
@@ -1928,6 +2180,8 @@ export function createOwnerCommercialDocumentCommandTestInstance(
       const settlement = document(state, 'sub_settlement', request.settlementId)
       if (!settlement || !matchesPenaltySettlement(current, settlement))
         throw failure('relationship-mismatch', '必须选择真实、已确认且来源合同或分供方一致的分包结算')
+      if (current.amount === null || settlement.amount === null)
+        throw failure('unavailable', '罚扣或结算金额尚未记录，不能以零核对抵扣余额')
       assertVersion(settlement, request.settlementVersion)
       const amount = round(request.amount)
       if (amount <= 0 || amount !== request.amount)
@@ -2476,7 +2730,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         status,
         statusNote: entityAttribute(entity, 'statusNote'),
         amount: ownerPenaltyAmount ?? number(entity.amount),
-        boqAmount: kind === 'owner_change' ? round(lines.reduce((sum, line) => sum + line.amount, 0)) : null,
+        boqAmount: kind === 'owner_change' ? lineAmountSum(lines) : null,
         taxExclusiveAmount: kind === 'owner_change' ? entityNumberAttribute(entity, 'taxExclusiveAmount') ?? 0 : null,
         appliedTaxExclusiveAmount: kind === 'owner_change' ? entityNumberAttribute(entity, 'appliedTaxExclusiveAmount') ?? 0 : null,
         auditedAmount: kind === 'sub_change' ? null : entityNumberAttribute(entity, 'auditedAmount'),
@@ -2567,10 +2821,12 @@ export function createOwnerCommercialDocumentCommandTestInstance(
           throw failure('validation-failed', '迁移抵扣超出结算金额')
       }
       const total = round([...state.penaltyDeductions.values()].filter(row => row.penaltyId === penalty.id).reduce((sum, row) => sum + row.amount, 0))
-      if (total > penalty.amount || (penalty.amount > 0 && total === penalty.amount && penalty.status !== 'deducted') || (penalty.status === 'draft' && total > 0) || (penalty.status === 'deducted' && total !== penalty.amount))
+      if ((penalty.amount !== null && (total > penalty.amount || (penalty.amount > 0 && total === penalty.amount && penalty.status !== 'deducted')))
+        || (penalty.status === 'draft' && total > 0) || (penalty.status === 'deducted' && (penalty.amount === null || total !== penalty.amount))) {
         throw failure('validation-failed', '迁移罚扣金额、状态与抵扣事实不一致')
+      }
       for (const settlement of [...state.documents.values()].filter(row => row.kind === 'sub_settlement')) {
-        if (round([...state.penaltyDeductions.values()].filter(row => row.settlementId === settlement.id).reduce((sum, row) => sum + row.amount, 0)) > settlement.amount)
+        if (settlement.amount !== null && round([...state.penaltyDeductions.values()].filter(row => row.settlementId === settlement.id).reduce((sum, row) => sum + row.amount, 0)) > settlement.amount)
           throw failure('validation-failed', '迁移抵扣超出结算金额')
       }
     }
@@ -2592,6 +2848,25 @@ export function createOwnerCommercialDocumentCommandTestInstance(
   }
 
   return {
+    snapshot(sessionId?: string | null): OwnerCommercialDocumentSnapshot {
+      const state = stateFor(sessionId)
+      return clone({
+        schemaVersion: 1,
+        documents: [...state.documents.values()],
+        commands: [...state.commands],
+        commandFingerprints: [...state.commandFingerprints],
+        sealedCommands: [...state.sealedCommands],
+        commandKinds: [...state.commandKinds],
+        penaltyDeductions: [...state.penaltyDeductions.values()],
+        penaltyRectifications: [...state.penaltyRectifications.values()],
+        migrationKeys: [...state.migrationKeys],
+        migrationSnapshotFingerprint: state.migrationSnapshotFingerprint,
+        sourceVersion: state.sourceVersion,
+      })
+    },
+    rawRows(sessionId?: string | null) {
+      return [...stateFor(sessionId).documents.values()].map(clone)
+    },
     boqBuildingContext,
     correctBoqBuilding,
     hasBoqBuildingCommand(commandId: string, sessionId?: string | null) {
@@ -2659,7 +2934,7 @@ export function createOwnerCommercialDocumentCommandTestInstance(
         actorId: session.actorId,
         capabilities: [...session.capabilities],
         crews: includeSubcontract ? [...state.crews.values()].map(row => ({ id: row.id, label: row.name })) : [],
-        settlements: includeSubcontract ? [...state.documents.values()].filter(row => row.kind === 'sub_settlement' && row.status === 'confirmed').map(row => ({ id: row.id, label: row.name || row.no, projectId: row.projectId, supplierId: row.supplierId ?? null, contractId: row.contractId, amount: row.amount, version: String(row.version), remainingAmount: round(row.amount - [...state.penaltyDeductions.values()].filter(d => d.settlementId === row.id).reduce((sum, d) => sum + d.amount, 0)) })) : [],
+        settlements: includeSubcontract ? [...state.documents.values()].filter((row): row is OwnerCommercialDocumentSource & { amount: number } => row.kind === 'sub_settlement' && row.status === 'confirmed' && row.amount !== null).map(row => ({ id: row.id, label: row.name || row.no, projectId: row.projectId, supplierId: row.supplierId ?? null, contractId: row.contractId, amount: row.amount, version: String(row.version), remainingAmount: round(row.amount - [...state.penaltyDeductions.values()].filter(d => d.settlementId === row.id).reduce((sum, d) => sum + d.amount, 0)) })) : [],
         projects: [...effectiveProjects(state).values()].map(row => ({ id: row.id, label: row.name, customerId: row.customerId })),
         customers: includeOwner ? [...effectiveCustomers(state).values()].map(row => ({ id: row.id, label: row.name })) : [],
         suppliers: includeSubcontract ? [...effectiveSuppliers(state).values()].map(row => ({ id: row.id, label: row.name })) : [],
@@ -2855,13 +3130,15 @@ export function createOwnerCommercialDocumentCommandTestInstance(
   }
 }
 
-export const ownerCommercialDocumentCommandTestInstance
+export const ownerCommercialDocumentCommandTestInstance: ReturnType<typeof createOwnerCommercialDocumentCommandTestInstance>
   = createOwnerCommercialDocumentCommandTestInstance({
     withMonthlyQuantity: async (projectId, sessionId, consume, basis) => {
       const { quantityTestInstance } = await import('./quantity-runtime')
       return quantityTestInstance.withMonthly({ projectId, origin: 'real', includeDemo: false, basis }, consume, sessionId)
     },
     receiptSource: sessionId => receiptReadTestInstance.facts(sessionId),
+    finalSettlementChanges: (contractId, sessionId) => ownerCommercialDocumentCommandTestInstance.rawRows(sessionId)
+      .filter(row => row.dataOrigin === 'real' && row.kind === 'owner_change' && row.contractId === contractId),
     projectSource: projectCommandTestInstance,
     customerSource: customerCommandTestInstance,
     constructionContractSource: constructionContractCommandTestInstance,

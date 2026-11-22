@@ -152,6 +152,7 @@ async function actualFacts(tx: TransactionDb, record: OtherSettlementStored, act
   return { facts, sources, qualificationUnavailableReason, unavailableFactKinds: [...unavailableFactKinds] }
 }
 async function loaded(tx: TransactionDb, actor: BusinessSession) {
+  await assertProductionOtherSettlementParticipant(tx)
   const data = await readOtherSettlementStored(tx, actor)
   const source = await identities(tx, actor)
   const sources: OtherSettlementSourceDocument[] = []
@@ -172,6 +173,15 @@ async function loaded(tx: TransactionDb, actor: BusinessSession) {
   }
   return { ...data, originalRecords: data.records, source, records, sources, qualificationReasons, deletedAtById, unavailableFactKindsById }
 }
+
+async function assertProductionOtherSettlementParticipant(tx: Pick<TransactionDb, 'select'>) {
+  const participant = (await tx.select<{ schema_version: number }>('SELECT schema_version FROM production_participants WHERE domain=\'other-settlements\''))[0]
+  const columns = await tx.select<{ name: string }>('PRAGMA table_info(expenditure_settlements)')
+  const routed = columns.some(column => column.name === 'document_owner')
+  if (!participant || ![1, 2].includes(participant.schema_version) || routed !== (participant.schema_version === 2))
+    return fail('unavailable', '正式其他支出结算的参与版本与单一 owner 边界不一致，停止读取或写入')
+}
+
 async function readAdoptionSources(tx: TransactionDb, actor: BusinessSession, input: OtherSettlementExpenseInput[], previous?: OtherSettlementStored) {
   const sources = await listOriginalExpenseReferences(tx, actor)
   if (!previous || isConfirmedExpenditureSettlement(previous.draft.status ?? ''))
@@ -248,6 +258,7 @@ export function createProductionOtherSettlementService(storage: ProductionStorag
     if (write)
       storage.assertBusinessWrite()
     return storage.withTransaction(async (tx) => {
+      await assertProductionOtherSettlementParticipant(tx)
       if (otherSettlementFingerprint(authorize(session, write)) !== otherSettlementFingerprint(actor))
         return fail('forbidden', '身份或权限已变化')
       await validateOtherSettlementJournal(tx, storage.identity)
@@ -443,7 +454,7 @@ export async function listProductionOtherSettlementReferences(tx: TransactionDb,
   const service = instance(data)
   return data.records.map((record) => {
     const dto = service.detail(record.id, { origin: 'real' }, actor).settlement
-    return { id: record.id, name: record.draft.name ?? '', no: record.draft.no ?? '', project_id: record.draft.projectId ?? null, contract_id: record.draft.contractId ?? null, supplier_id: record.draft.payeeSupplierId ?? (record.draft.originalExpenses?.length ? null : record.draft.supplierId ?? null), worker_id: record.draft.payeeWorkerId ?? null, payee_name_snapshot: record.draft.payeeNameSnapshot ?? null, total_amount: dto.amounts.net === null ? null : Number(dto.amounts.net), status: record.draft.status ?? '', original_expense_line_ids: record.draft.originalExpenses?.map(line => line.originalExpenseLineId) ?? [], service_supplier_id: record.draft.supplierId ?? null, deleted_at: data.deletedAtById.get(record.id) ?? null, version: String(record.version), source_revision: `other-settlement-${data.revision}`, unavailable_reason: dto.qualificationUnavailableReason ?? null }
+    return { id: record.id, document_owner: 'other' as const, name: record.draft.name ?? '', no: record.draft.no ?? '', project_id: record.draft.projectId ?? null, contract_id: record.draft.contractId ?? null, supplier_id: record.draft.payeeSupplierId ?? (record.draft.originalExpenses?.length ? null : record.draft.supplierId ?? null), worker_id: record.draft.payeeWorkerId ?? null, payee_name_snapshot: record.draft.payeeNameSnapshot ?? null, total_amount: dto.amounts.net === null ? null : Number(dto.amounts.net), status: record.draft.status ?? '', original_expense_line_ids: record.draft.originalExpenses?.map(line => line.originalExpenseLineId) ?? [], service_supplier_id: record.draft.supplierId ?? null, deleted_at: data.deletedAtById.get(record.id) ?? null, version: String(record.version), source_revision: `other-settlement-${data.revision}`, unavailable_reason: dto.qualificationUnavailableReason ?? null }
   })
 }
 export async function readProductionOtherSettlementReference(tx: TransactionDb, actor: BusinessSession, id: string) {

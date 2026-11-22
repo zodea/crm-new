@@ -137,6 +137,7 @@ useTabTitle(() => detail.value?.document.name ?? '最终结算详情')
           :sources="detail.finalSettlementEvidence?.sources ?? null"
           :return-to="route.fullPath"
           :receipts-problem="detail.finalSettlementEvidence?.receiptsProblem"
+          :source-states="detail.finalSettlementEvidence?.sourceStates"
           @retry="load"
         />
         <OwnerAcceptanceFilesPanel label="最终结算" :files="detail.files" />

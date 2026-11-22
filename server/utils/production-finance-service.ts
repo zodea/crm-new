@@ -25,7 +25,7 @@ import { createExpenseClearanceVerification, expenseClearanceVerificationState, 
 import { financeRecordSnapshot, validateFinanceJournal } from './production-finance-journal'
 import { authorizeFinanceImport, importNativeFinance, previewNativeFinance, readNativeFinanceSource } from './production-finance-migration'
 import { financePersistedDateTime, productionPaymentApplicationDetail } from './production-finance-payment-detail'
-import { productionFinanceReferences } from './production-finance-references'
+import { hasProductionSettlementRead, productionFinanceReferences, productionSettlementReadCapability } from './production-finance-references'
 import { financeCommandFingerprint, financeId, parseFinanceCommand } from './production-finance-request'
 import { createPaymentVerification, paymentVerificationCap, paymentVerificationState } from './production-finance-verification'
 import { createReadMeta, withReadMeta } from './read-meta'
@@ -160,6 +160,7 @@ const referenceSources = [
   ['subcontract-contracts', 'subcontract-contracts', 'subcontract-contract:read', 'subcontract_contract_revision'],
   ['auxiliary-contracts', 'auxiliary-contract', 'auxiliary-contract:read', 'auxiliary_contract_revision'],
   ['expenditure-settlements', 'other-settlements', 'other-settlement:read', 'other_settlement_revision'],
+  ['business-settlements', 'owner-documents', 'subcontract-document:read', 'owner_document_revision'],
   ['invoices', 'invoices', 'finance-invoice:read', 'invoice_revision'],
 ] as const
 async function envelope<T extends object>(tx: TransactionDb, actor: BusinessSession, scope: FinanceReadScope, value: T) {
@@ -173,7 +174,7 @@ async function envelope<T extends object>(tx: TransactionDb, actor: BusinessSess
   for (const [key, domain, capability, table] of referenceSources) {
     let state: SourceEvidenceDTO['state'] = actor.capabilities.includes(capability) ? 'unavailable' : 'forbidden'
     let sourceVersion: string | null = null
-    if (state !== 'forbidden' && participants.some(row => row.domain === domain && row.schema_version === 1) && tables.some(row => row.name === table)) {
+    if (state !== 'forbidden' && participants.some(row => row.domain === domain && (domain === 'owner-documents' ? [1, 2, 3].includes(row.schema_version) : domain === 'other-settlements' ? [1, 2].includes(row.schema_version) : row.schema_version === 1)) && tables.some(row => row.name === table)) {
       const revision = (await tx.select<{ revision: number }>(`SELECT revision FROM ${table} WHERE singleton=1`))[0]
       if (!revision || !Number.isSafeInteger(revision.revision) || revision.revision < 0)
         fail('unavailable', '财务关联来源版本损坏，不能继续使用旧结果。')
@@ -468,13 +469,20 @@ export function createProductionFinanceService(storage: ProductionStorage, optio
         rows = (await readProductionConstructionMainOptions(tx, actor)).filter(main => !query.projectId || main.projectId === query.projectId).map(main => ({ id: main.id, label: `${main.projectName} · ${main.name}${main.no ? ` / ${main.no}` : ''}`, hint: main.no, constructionMain: { id: main.id, projectId: main.projectId, basis: main.basis } }))
       }
       else if (query.kind === 'settlements') {
-        if (!actor.capabilities.includes('other-settlement:read'))
+        if (!hasProductionSettlementRead(actor))
           fail('forbidden', '当前身份无结算读取权限。')
         if (!owners.settlementCandidates)
           fail('unavailable', '正式支出结算来源尚未接通。')
-        const source = (await owners.settlementCandidates()).filter(row => row.project_id === (query.projectId ?? null) && row.contract_id === (query.contractId ?? null) && (!query.supplierId || row.supplier_id === query.supplierId) && (!query.workerId || row.worker_id === query.workerId) && isConfirmedExpenditureSettlement(String(row.status)) && !row.deleted_at)
+        const source = (await owners.settlementCandidates()).filter((row) => {
+          const cap = productionSettlementReadCapability(row)
+          if (!cap)
+            fail('unavailable', '结算候选缺少真实 owner 依据。')
+          return actor.capabilities.includes(cap) && row.project_id === (query.projectId ?? null) && row.contract_id === (query.contractId ?? null) && (!query.supplierId || row.supplier_id === query.supplierId) && (!query.workerId || row.worker_id === query.workerId) && isConfirmedExpenditureSettlement(String(row.status)) && !row.deleted_at
+        })
         if (source.some(row => typeof row.total_amount !== 'number' || !Number.isFinite(row.total_amount)))
           fail('unavailable', '结算净额尚未核实，不能显示为零或采用旧总额。')
+        if (source.some(row => row.unavailable_reason))
+          fail('unavailable', '所选结算范围的原申请或余款资格不可证明；保留实际现金，不释放新的付款额度。')
         rows = source.filter(row => Number(row.total_amount) > 0).map(row => ({ id: String(row.id), label: String(row.name), hint: `${row.no || '未编号'} · 净额 ¥${Number(row.total_amount).toFixed(2)}` }))
       }
       else if (query.kind === 'invoices') {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { OwnerCommercialDocumentCommandContextDTO, OwnerCommercialDocumentCommandRequestDTO } from '~/lib/owner-document/central-command-contract'
+import type { OwnerCommercialDocumentCommandContextDTO } from '~/lib/owner-document/central-command-contract'
 import type { OwnerCommercialDocumentDetailReadDTO } from '~/lib/owner-document/central-repository'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '~/components/ui/dialog'
 import { OwnerCommercialDocumentRepositoryProblem } from '~/lib/owner-document/central-repository'
@@ -19,7 +19,8 @@ const settlementId = ref<string | null>(null)
 const amount = ref('')
 const note = ref('')
 const deadline = ref('')
-let pending: { fingerprint: string, commandId: string } | null = null
+const pending = computed(() => store.pendingCommand('project_penalty', props.detail.document.id))
+const fieldsLocked = computed(() => saving.value || Boolean(pending.value))
 const candidates = computed(() => {
   const document = props.detail.document
   const identity = { projectId: document.project.id, supplierId: document.supplier.id, contractId: document.contract.id }
@@ -35,7 +36,14 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    context.value = await useNuxtApp().$repositories.ownerCommercialDocumentCommands.context('project_penalty')
+    if (pending.value)
+      return
+    const hydrated = await store.hydrateCommand('project_penalty', props.detail.document.id)
+    context.value = hydrated?.context ?? null
+    if (hydrated?.recoveryOutcome === 'applied') {
+      emit('saved')
+      emit('close')
+    }
   }
   catch (cause) { error.value = cause instanceof Error ? cause.message : '候选读取失败' }
   finally { loading.value = false }
@@ -50,12 +58,11 @@ watch(() => props.mode, async (mode) => {
   amount.value = ''
   note.value = ''
   deadline.value = props.detail.penaltyFacts?.deadline ?? ''
-  pending = null
   await load()
 }, { immediate: true })
 
 async function save() {
-  if (!context.value || saving.value || props.refreshing)
+  if (!context.value || fieldsLocked.value || props.refreshing)
     return
   const value = Number(amount.value)
   if (props.mode === 'deduct' && (!selected.value?.version || value <= 0 || value > remaining.value || value > (selected.value.remainingAmount ?? selected.value.amount))) {
@@ -67,15 +74,12 @@ async function save() {
     return
   }
   const values = props.mode === 'deduct'
-    ? { action: 'deduct-penalty' as const, settlementId: settlementId.value, settlementVersion: selected.value!.version!, amount: value, note: note.value }
+    ? { action: 'deduct-penalty' as const, settlementId: selected.value!.id, settlementVersion: selected.value!.version!, amount: value, note: note.value }
     : { action: 'rectify-penalty' as const, deadline: deadline.value || null, note: note.value }
-  const fingerprint = JSON.stringify({ id: props.detail.document.id, version: props.detail.document.version, ...values })
-  if (pending?.fingerprint !== fingerprint)
-    pending = { fingerprint, commandId: `penalty-${crypto.randomUUID()}` }
   saving.value = true
   error.value = ''
   try {
-    await store.executePenaltyAction({ workspaceId: context.value.workspaceId, actorId: context.value.actorId, requiredCapability: 'subcontract-document:write', kind: 'project_penalty', id: props.detail.document.id, baseVersion: props.detail.document.version, commandId: pending.commandId, ...values } as Extract<OwnerCommercialDocumentCommandRequestDTO, { action: 'deduct-penalty' | 'rectify-penalty' }>)
+    await store.executePenaltyAction({ workspaceId: context.value.workspaceId, actorId: context.value.actorId, requiredCapability: 'subcontract-document:write', kind: 'project_penalty', id: props.detail.document.id, baseVersion: props.detail.document.version, ...values })
     emit('saved')
     emit('close')
   }
@@ -85,11 +89,30 @@ async function save() {
   }
   finally { saving.value = false }
 }
+async function recover() {
+  if (!pending.value || saving.value)
+    return
+  saving.value = true
+  error.value = ''
+  try {
+    const recovered = await store.recoverCommand('project_penalty', props.detail.document.id)
+    context.value = recovered.context
+    if (recovered.outcome === 'applied') {
+      emit('saved')
+      emit('close')
+    }
+    else {
+      emit('refresh')
+      error.value = '原提交未生效，请核对当前余额后重新保存'
+    }
+  }
+  catch (cause) { error.value = cause instanceof Error ? cause.message : '原提交暂未可靠核对' }
+  finally { saving.value = false }
+}
 async function refreshConflict() {
   emit('refresh')
   await load()
   conflict.value = false
-  pending = null
 }
 function restoreFocus(event: Event) {
   event.preventDefault()
@@ -116,12 +139,12 @@ function restoreFocus(event: Event) {
         <p v-if="loading" role="status">
           正在读取可用资料…
         </p>
-        <button v-if="!context && !loading" type="button" class="btn-secondary" @click="load">
+        <button v-if="!context && !loading && !pending" type="button" class="btn-secondary" @click="load">
           重新加载
         </button>
         <template v-if="mode === 'deduct' && context">
           <label class="grid gap-2 text-13px">真实分包结算
-            <LookupSelect v-model="settlementId" :fetch="fetchSettlements" placeholder="检索真实分包结算" :disabled-reason="saving ? '正在保存' : undefined" />
+            <LookupSelect v-model="settlementId" :fetch="fetchSettlements" placeholder="检索真实分包结算" :disabled-reason="fieldsLocked ? '请等待原提交核对' : undefined" />
           </label>
           <p v-if="!candidates.length" class="text-13px text-ink-soft">
             暂无来源一致的已确认结算。请先核对罚扣的合同或分供方关系。
@@ -131,15 +154,18 @@ function restoreFocus(event: Event) {
               · 结算可抵扣 {{ yuan(selected.remainingAmount ?? selected.amount) }}
             </template>
           </p>
-          <label class="grid gap-2 text-13px">本次抵扣金额<input v-model="amount" class="input w-full" type="number" min="0.01" step="0.01" required :disabled="saving"></label>
+          <label class="grid gap-2 text-13px">本次抵扣金额<input v-model="amount" class="input w-full" type="number" min="0.01" step="0.01" required :disabled="fieldsLocked"></label>
         </template>
-        <label v-if="mode === 'rectify'" class="grid gap-2 text-13px">整改期限<input v-model="deadline" class="input w-full" type="date" :disabled="saving"></label>
-        <label class="grid gap-2 text-13px">{{ mode === 'deduct' ? '抵扣备注' : '整改说明' }}<textarea v-model="note" class="input w-full min-h-24" :required="mode === 'rectify'" :disabled="saving" /></label>
+        <label v-if="mode === 'rectify'" class="grid gap-2 text-13px">整改期限<input v-model="deadline" class="input w-full" type="date" :disabled="fieldsLocked"></label>
+        <label class="grid gap-2 text-13px">{{ mode === 'deduct' ? '抵扣备注' : '整改说明' }}<textarea v-model="note" class="input w-full min-h-24" :required="mode === 'rectify'" :disabled="fieldsLocked" /></label>
         <div class="flex justify-end gap-2 border-t border-line pt-4">
           <button type="button" class="btn-secondary" :disabled="saving" @click="emit('close')">
             取消
           </button>
-          <button type="submit" class="btn-primary" :disabled="saving || refreshing || loading || conflict || !context || (mode === 'deduct' && !candidates.length)">
+          <button v-if="pending" type="button" class="btn-primary" :disabled="saving || loading" @click="recover">
+            {{ pending.result ? '重新读取已保存单据' : '核对原提交' }}
+          </button>
+          <button v-else type="submit" class="btn-primary" :disabled="saving || refreshing || loading || conflict || !context || (mode === 'deduct' && !candidates.length)">
             {{ saving ? '正在保存…' : mode === 'deduct' ? '确认抵扣' : '保存整改' }}
           </button>
         </div>

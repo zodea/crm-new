@@ -236,7 +236,7 @@ onActivated(() => void load())
                 </td><td class="p-3">
                   {{ row.reason || '—' }}
                 </td><td class="p-3">
-                  ¥{{ row.amount }}
+                  {{ row.amount === null ? '未记录' : `¥${row.amount}` }}
                 </td><td class="p-3">
                   {{ row.status }}
                 </td>
@@ -432,7 +432,7 @@ onActivated(() => void load())
                 </td><td class="p-3">
                   {{ row.reason || '—' }}
                 </td><td class="p-3">
-                  ¥{{ row.amount }}
+                  {{ row.amount === null ? '未记录' : `¥${row.amount}` }}
                 </td><td class="p-3">
                   {{ row.status }}
                 </td>

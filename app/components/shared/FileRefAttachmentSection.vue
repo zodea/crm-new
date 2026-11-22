@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type {
   FileRefDraft,
-  FileRefRecord,
+  FileRefPresentation,
 } from '~/lib/forms/file-refs'
 import KitButton from '~/components/ui/KitButton.vue'
 
@@ -10,7 +10,7 @@ export interface PendingFileRef extends FileRefDraft {
 }
 
 defineProps<{
-  attachments: ReadonlyArray<Readonly<FileRefRecord>>
+  attachments: ReadonlyArray<Readonly<FileRefPresentation>>
   pendingAttachments: ReadonlyArray<Readonly<PendingFileRef>>
   pendingRemoveIds: readonly string[]
   pendingRestoreIds: readonly string[]

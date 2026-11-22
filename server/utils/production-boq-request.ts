@@ -35,7 +35,7 @@ function ownerChange(value: Record<string, unknown>) {
   if ((value.id !== null && !boqStableId(value.id)) || (value.baseVersion !== null && (typeof value.baseVersion !== 'string' || !value.baseVersion)) || ((value.id === null) !== (value.baseVersion === null)))
     return boqFail('validation-failed', '签证须保明确原ID及实际版本，新建不能携带旧版本')
   if (['save', 'submit'].includes(String(value.action))) {
-    const draft = boqClosed(value.draft, ['id', 'code', 'no', 'name', 'projectId', 'contractId', 'changeType', 'directiveNo', 'directiveType', 'documentType', 'applicationDate', 'reason', 'approvedTaxInclusiveAmount', 'approvedTaxExclusiveAmount', 'appliedTaxExclusiveAmount', 'note', 'lines'])
+    const draft = boqClosed(value.draft, ['id', 'code', 'no', 'name', 'projectId', 'contractId', 'relationshipVersionsJson', 'changeType', 'directiveNo', 'directiveType', 'documentType', 'applicationDate', 'reason', 'approvedTaxInclusiveAmount', 'approvedTaxExclusiveAmount', 'appliedTaxExclusiveAmount', 'note', 'lines'])
     if (!boqStableId(draft.projectId) || !boqStableId(draft.contractId) || (draft.id !== undefined && draft.id !== value.id) || !Array.isArray(draft.lines) || Object.entries(draft).some(([key, entry]) => key !== 'lines' && !['approvedTaxInclusiveAmount', 'approvedTaxExclusiveAmount', 'appliedTaxExclusiveAmount'].includes(key) && typeof entry !== 'string') || ['approvedTaxInclusiveAmount', 'approvedTaxExclusiveAmount', 'appliedTaxExclusiveAmount'].some(key => draft[key] !== undefined && !nullableNumber(draft[key])))
       return boqFail('validation-failed', '签证草稿字段与真实项目主合同格式不符')
     for (const raw of draft.lines) {

@@ -145,7 +145,9 @@ function money(value: string | null): string {
   return value == null ? '—' : yuan(Number(value))
 }
 
-function fileSize(bytes: number): string {
+function fileSize(bytes: number | null): string {
+  if (bytes === null)
+    return '大小未知'
   if (bytes < 1024)
     return `${bytes} B`
   if (bytes < 1024 * 1024)
