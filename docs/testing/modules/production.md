@@ -34,7 +34,7 @@
 | [tests/production/material-contract-storage.test.ts](../../../tests/production/material-contract-storage.test.ts) | 单元／服务／状态 | 材采日常 SQL 事务、原件与回执冷读、完整混合图备份及封存；损坏图停止恢复，未接管正式初次写入保持门禁 |
 | [tests/production/storage-backup.test.ts](../../../tests/production/storage-backup.test.ts) | 单元／服务／状态 | 一致备份保留已提交事实并拒绝覆盖已有目标，原库和副本能独立读取 |
 | [tests/production/storage-boundaries.test.ts](../../../tests/production/storage-boundaries.test.ts) | 单元／服务／状态 | 缺失目录、损坏文件与未知版本停止初始化，不替换已有文件 |
-| [tests/production/storage-upgrade.test.ts](../../../tests/production/storage-upgrade.test.ts) | 单元／服务／状态 | v1/v7/v12 同事务升级与冲突回滚、原金额和现金保全、v13 核验追加及旧备份表清单保留；v13→v14 核定和明确采用关系冲突回滚、原费用／清偿／批复／银行分摊及原件保全，v28 起发票登记、v29–32 清单及冲突回滚；冷重开不补造核验 |
+| [tests/production/storage-upgrade.test.ts](../../../tests/production/storage-upgrade.test.ts) | 单元／服务／状态 | 旧版同事务升级、冲突回滚和历史保全；v32→v33 原件核验、v33→v36 PG-11、v36→v37 工作簿及 `invoices:5` 清单；冷重开不补造核验 |
 | [tests/production/storage.test.ts](../../../tests/production/storage.test.ts) | 单元／服务／状态 | 磁盘权威事务提交后冷打开保留原值，失败事务不留下半份结果 |
 | [tests/production/boq-migration.test.ts](../../../tests/production/boq-migration.test.ts) | 单元／服务／状态 | 完整 BOQ SQLite 原图、原件、显式映射、隐私与整批恢复 |
 | [tests/production/boq-storage.test.ts](../../../tests/production/boq-storage.test.ts) | 单元／服务／状态 | 日常清单与变洽签、真实上游、原件及原编号冷恢复 |

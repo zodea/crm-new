@@ -42,7 +42,7 @@ function corrupt(): never {
 
 export async function hasOriginalVerificationSchema(tx: SelectDb) {
   const [participant] = await tx.select<{ schema_version: number }>('SELECT schema_version FROM production_participants WHERE domain=\'invoices\'')
-  return participant?.schema_version === 4
+  return [4, 5].includes(participant?.schema_version ?? 0)
 }
 
 export function matchesVerificationOriginal(invoice: CentralInvoiceRecord, request: VerificationRequest): boolean {

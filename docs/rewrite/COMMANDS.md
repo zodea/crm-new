@@ -307,11 +307,21 @@ F3 五类事实使用现有 `POST /api/commands/finance`，按 `kind` 对应原�
 
 ### 发票中央 owner 与旧库迁入（隔离实现，尚未开放）
 
-代码中注册发票参与者、权限和精确路由，并以 v29–v32 持久化和备份；运行中的局域网服务尚未更新，旧入口尚未切换。局域网登录页不表示中央发票上传或跨电脑原件读取已可用。
+代码中注册发票参与者、权限和精确路由，正本、工作簿与回执沿正式存储版本纳入备份。运行中的局域网服务尚未更新，旧入口尚未切换。
 
 迁入以完整 SQLite 字节及摘要为来源，在同一事务核对可信身份、项目、分供方、合同稳定身份及版本和旧付款分摊；保留原发票 ID、原始行、附件、审计、孤立日志及批次回执。旧公司票的合同及主体应按同一份旧快照明确映射，规则见[发票页面规格](pages/finance-invoice.md#二业务流程与状态)。有歧义的零保留为未知并留存原值，缺失原件明示；来源版本或关键字段无法核实时整批拒绝，保留原库。
 
 结果未知时按原命令编号核对，未应用的编号封存；恢复批次前核对原版本及全部票款历史，存在后续更正、打印或付款关联时整批拒绝。安全恢复保留原件和原证据并记录不可变结果。旧归档须人工重新核对后才可作为新增付款候选；已有票款历史沿用当时冻结依据。实施见[发票迁入服务](../../server/utils/production-invoice-migration.ts)及[发票 owner](../../server/utils/production-invoice-service.ts)。
+
+<a id="central-invoice-workbooks"></a>
+
+#### 中央发票工作簿（隔离实现）
+
+- `POST /api/read/invoices/import-preview` 只查询当前权限内的候选与差异。浏览器先核验所选 `.xlsx` 并在本地映射字段，查询携带原工作表、行号及来源快照。
+- `POST /api/commands/invoices/import-workbook` 随原工作簿和明确映射提交单行归档。`POST /api/commands/invoice-corrections/submit-workbook` 随原工作簿提交已有更正草稿，来源只可补充原票的空字段。两条写入都核可信身份、导入能力、归属与对应版本，服务端独立核验 ZIP、XML、工作表范围及行快照。已有付款或打印的原票沿现行规则拒绝更正。
+- `GET /api/read/invoice-workbooks/by-invoice/:id` 按已授权发票查其工作簿，`GET /api/read/invoice-workbooks/:id` 读取整本原件。正式存储从 v36 升级到 v37 时登记 `invoices:5`，详见 [DATABASE](./DATABASE.md#共享正式存储版本与参与者463)。
+
+结果未知按[公共恢复](#idempotency-and-recovery)使用原编号核对。技术限额及逐行复核见[发票页面规格](pages/finance-invoice.md#中央工作簿导入与补空隔离实现)。
 
 <a id="archived-invoice-original-verification"></a>
 

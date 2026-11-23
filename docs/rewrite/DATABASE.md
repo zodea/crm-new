@@ -77,6 +77,8 @@ v31→v32 将发票参与者升级为 `invoices:3`，新增更正单修订、草
 
 v32→v33 将发票参与者升级为 `invoices:4`。追加不可变的 `invoice_original_verifications` 保存候选与确认，按原命令编号、发票版本、原件和候选父键关联；`invoice_print_lines.verification_id` 保存实际采用的核验依据，既有打印行保持原证据。归档票面及初次审计继续从原票和原归档证据读取。新证据纳入备份和独立恢复核验，命令契约见 [已归档发票原件核验](./COMMANDS.md#archived-invoice-original-verification)。
 
+v36→v37 将发票参与者升级为 `invoices:5`。`invoice_import_workbooks` 按 SHA-256 保存每本工作簿的身份并关联 `file_refs` 和原始 `file_payloads`，`invoice_import_workbook_rows` 绑定成功命令、发票、工作表、原行号、来源快照和字段映射。首笔成功导入或补空更正与原件同事务写入，后续相同原字节复用原件。备份及恢复核对正文、摘要、来源行和原回执。v32→v33 和 PG-11 的历次升级与备份清单沿用原定义。接口见[中央发票工作簿](./COMMANDS.md#central-invoice-workbooks)。
+
 <a id="pg-11-business-storage"></a>
 
 ### PG-11 商务单据持久参与者
