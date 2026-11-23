@@ -142,8 +142,6 @@ Q-INV-09 / Q-INV-11：付款申请有合同且回票类型需要发票时，保�
 
 本业务门槛来自用户确认，不作为所有交易的法定付款前置条件。有关发票取得、真实业务和票面内容，参见国家税务总局现行[《中华人民共和国发票管理办法》](https://fgk.chinatax.gov.cn/zcfgk/c100010/c5195084/content.html)及[实施细则](https://fgk.chinatax.gov.cn/zcfgk/c100011/c5221006/content.html)；具体交易仍依其事实和适用规定核对。
 
-上述新核验为中央后端隔离实现，运行中的局域网服务尚未更新。
-
 页面提供图片/PDF识别和手工录入两种入口，并排展示原图、识别值、置信度和人工修订值；OCR 失败时允许切换手工录入。支付事实、人工确认、重复提示、分摊守恒和撤回后的计算直接见 [DATABASE 支付事实](../DATABASE.md#entity-payment-record)；[ADR 0015 决策 5-6](../../adr/0015-form-persistence-and-payment-reconciliation.md)保留历史依据。样本数值场景见[睿璟验收清单](../../migration/ruijing-acceptance.md)。
 
 ---

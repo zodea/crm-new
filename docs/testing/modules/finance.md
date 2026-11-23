@@ -20,7 +20,6 @@
 | [tests/production/payment-invoice-confirmation.test.ts](../../../tests/production/payment-invoice-confirmation.test.ts) | 隔离 SQLite／真实来源 | 付款确认的发票核对、冻结及原编号 |
 | [tests/production/payment-invoice-evidence.test.ts](../../../tests/production/payment-invoice-evidence.test.ts) | 单元／服务 | 合同、权限、来源及发票归属拒绝 |
 | [tests/production/payment-settlement-evidence.test.ts](../../../tests/production/payment-settlement-evidence.test.ts) | 隔离 SQLite／真实来源 | 结算合同、来源版本与付款冻结 |
-| [tests/helpers/finance-evidence-corruption.ts](../../../tests/helpers/finance-evidence-corruption.ts) | 辅助／夹具 | 供隔离财务证据验证使用的合成历史 |
 | [tests/db/f3-finance-migrations.test.ts](../../../tests/db/f3-finance-migrations.test.ts) | 单元／服务／状态 | v22 F3 资金表单与票款分摊迁移 |
 | [tests/db/finance-seed.test.ts](../../../tests/db/finance-seed.test.ts) | 单元／服务／状态 | 演示与合成付款分摊通过业务汇总读取，已确认、待核和不同申请分别核对 |
 | [tests/db/payment-approval-migration.test.ts](../../../tests/db/payment-approval-migration.test.ts) | 单元／服务／状态 | 付款批复金额来源迁移 |
@@ -82,8 +81,8 @@
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
 | [e2e/finance-forms.spec.ts](../../../e2e/finance-forms.spec.ts) | Playwright E2E | 中央收款、中央未配置及演示来源的 F3 输入保留／禁写／零写请求与五档布局；显式合成 Native 旧库的完整字节、12 表、原件和审计对账。Native 保存、真实分摊与人工确认由 FinanceNativeFlows 独立验证 |
-| [e2e/production-company-payment-contract.spec.ts](../../../e2e/production-company-payment-contract.spec.ts) | 实际正式构建与隔离 SQLite | 公司合同手选分供方，项目和公司付款选择合同领域、ID 与版本；版本变化后刷新、原编号恢复、五视口及重启冷读。页面验证真实会话注销，付款采用发票时单项读取权限撤销由 [finance-storage.test.ts](../../../tests/production/finance-storage.test.ts) 的服务级合成旅程验证。运行时显式设置 `CRM_COMPANY_PAYMENT_ACCEPTANCE=1` 与 `CRM_COMPANY_PAYMENT_E2E_ENTRY` 为项目内全新隔离构建的 `server/index.mjs`，并通过 `--output` 指定新的项目临时目录 |
 | [e2e/production-finance-storage.spec.ts](../../../e2e/production-finance-storage.spec.ts) | 实际正式构建与隔离 SQLite | F3 整页未知提交冷重启后原键恢复，已保存后读失败只重读；实际工作台、列表失败重读、付款申请 context/list/form/detail JSON 与同域范围、详情编辑及正式登记预填、三类回票义务与真实零、五档交互、原件、后来输入与真实零/未填写批复 |
+| [e2e/production-company-payment-contract.spec.ts](../../../e2e/production-company-payment-contract.spec.ts) | 实际正式构建与隔离 SQLite | 公司合同手选分供方，项目和公司付款选择合同领域、ID 与版本；版本变化后刷新、原编号恢复、五视口及重启冷读。页面验证真实会话注销，付款采用发票时单项读取权限撤销由 [finance-storage.test.ts](../../../tests/production/finance-storage.test.ts) 的服务级合成旅程验证。运行时显式设置 `CRM_COMPANY_PAYMENT_ACCEPTANCE=1` 与 `CRM_COMPANY_PAYMENT_E2E_ENTRY` 为项目内全新隔离构建的 `server/index.mjs`，并通过 `--output` 指定新的项目临时目录 |
 | [e2e/production-payment-approval.spec.ts](../../../e2e/production-payment-approval.spec.ts) | 生产 Playwright E2E | Issue #439 批复空值、明确零和历史核验；使用隔离合成正式来源 |
 | [e2e/payment-management.spec.ts](../../../e2e/payment-management.spec.ts) | Playwright E2E · 测试数据只读 | 付款管理四档布局、筛选/键盘、表格局部横滚，以及测试来源禁止正式详情/编辑/登记；原正式导航与金额预填保护由上方真实生产链承接 |
 | [e2e/receipt-migration.spec.ts](../../../e2e/receipt-migration.spec.ts) | Playwright E2E | Issue #436 真实 SQLite 迁移、更正后拒绝危险回滚并保全原件 |
@@ -93,6 +92,7 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
+| [tests/helpers/finance-evidence-corruption.ts](../../../tests/helpers/finance-evidence-corruption.ts) | 辅助／夹具 | 供隔离财务证据验证使用的合成历史 |
 | [e2e/helpers/finance-readonly-source.ts](../../../e2e/helpers/finance-readonly-source.ts) | 辅助／非空只读来源夹具 | 一次真实 Native v55→v60 迁移生成不可变 SQLite 字节，各隔离上下文独立安装副本；旧姓名、真实零、NULL 身份、原件正文与旧审计保全，禁写前后核完整 SHA、结构及 12 表。仅构造来源，不赋予中央身份或写权 |
 | [e2e/helpers/receipt-migration-source.ts](../../../e2e/helpers/receipt-migration-source.ts) | 辅助／夹具 | 供测试导入的夹具／辅助代码；按所属业务就近查阅 |
 | [tests/receipt/fixtures.ts](../../../tests/receipt/fixtures.ts) | 辅助／夹具 | 供测试导入的夹具／辅助代码；按所属业务就近查阅 |

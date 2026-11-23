@@ -8,25 +8,24 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
-| [tests/invoice/central-original-binding.test.ts](../../../tests/invoice/central-original-binding.test.ts) | 单元／状态 | 原件字节与权限核对 |
+| [tests/stores/invoice-manual-startup.test.ts](../../../tests/stores/invoice-manual-startup.test.ts) | 单元／状态 | 手工原编号刷新与身份隔离 |
+| [tests/invoice/central-import-preview.test.ts](../../../tests/invoice/central-import-preview.test.ts) | 单元／服务／状态 | 中央 Excel 只读预览与来源行 |
+| [tests/invoice/central-migration-bootstrap.test.ts](../../../tests/invoice/central-migration-bootstrap.test.ts) | 单元／服务／状态 | 迁入目录的身份、权限与来源版本 |
+| [tests/invoice/central-migration-pending.test.ts](../../../tests/invoice/central-migration-pending.test.ts) | 单元／状态 | 迁入原编号发现、身份隔离及损坏存储阻断 |
+| [tests/invoice/central-original-binding.test.ts](../../../tests/invoice/central-original-binding.test.ts) | 单元／服务／状态 | 原件字节、身份和撤权核对 |
 | [tests/invoice/central-upload-file-authority-race.test.ts](../../../tests/invoice/central-upload-file-authority-race.test.ts) | 单元／合成传输 | 原件读取和末次授权等待时来源失效、正常上传与原编号；不访问真实服务 |
-| [tests/invoice/central-pending-discovery.test.ts](../../../tests/invoice/central-pending-discovery.test.ts) | 单元／状态 | 原编号发现与身份隔离 |
+| [tests/invoice/central-pending-discovery.test.ts](../../../tests/invoice/central-pending-discovery.test.ts) | 单元／服务／状态 | 当前身份原编号发现及更正分流 |
+| [tests/invoice/central-session-read-authority.test.ts](../../../tests/invoice/central-session-read-authority.test.ts) | 单元／合成传输 | 普通及打印会话失读权或能力集合变化时保留原编号，并在权限恢复后核对原号；不访问真实服务 |
 | [tests/invoice/central-http-revision-safety.test.ts](../../../tests/invoice/central-http-revision-safety.test.ts) | 单元／合成传输 | 来源修订安全整数、列表／详情／预检及普通和打印原编号恢复；不访问真实服务 |
 | [tests/invoice/central-workspace-read-interleaving.test.ts](../../../tests/invoice/central-workspace-read-interleaving.test.ts) | 单元／合成传输 | 已开始提交或打印与旧列表交错、恢复和后继读取代次保护；不访问真实服务 |
 | [tests/invoice/central-workspace-read-consistency.test.ts](../../../tests/invoice/central-workspace-read-consistency.test.ts) | 单元／合成传输 | 分页能力与来源、同版本完整回读、打印整批及原编号；不复算不透明范围指纹 |
 | [tests/invoice/central-workspace-real-scope.test.ts](../../../tests/invoice/central-workspace-real-scope.test.ts) | 隔离内存 SQLite／真实服务 | 101 张合成票经真实服务和 HTTP 适配器分页，核对真实分页范围与来源；不连接真实服务或磁盘库 |
 | [tests/invoice/central-workspace-observed-authority.test.ts](../../../tests/invoice/central-workspace-observed-authority.test.ts) | 单元／合成传输 | 已观察会话核验失败及旧 401/403 的遮蔽、重验代次与原编号保护；不访问真实服务 |
-| [tests/invoice/central-session-read-authority.test.ts](../../../tests/invoice/central-session-read-authority.test.ts) | 单元／合成传输 | 普通及打印会话失读权或能力集合变化时保留原编号，并在权限恢复后核对原号；不访问真实服务 |
-| [tests/invoice/central-recognition.test.ts](../../../tests/invoice/central-recognition.test.ts) | 单元／状态 | 识别区域不进入写命令 |
-| [tests/invoice/central-workspace-recognition.test.ts](../../../tests/invoice/central-workspace-recognition.test.ts) | 单元／状态 | 识别后的身份权限核对 |
-| [tests/stores/invoice-manual-startup.test.ts](../../../tests/stores/invoice-manual-startup.test.ts) | 单元／状态 | 手工原编号刷新与身份隔离 |
-| [tests/invoice/central-migration-bootstrap.test.ts](../../../tests/invoice/central-migration-bootstrap.test.ts) | 单元／服务／状态 | 迁入目录的身份、权限与来源版本 |
-| [tests/invoice/central-migration-pending.test.ts](../../../tests/invoice/central-migration-pending.test.ts) | 单元／状态 | 迁入原编号发现、身份隔离及损坏存储阻断 |
+| [tests/invoice/central-recognition.test.ts](../../../tests/invoice/central-recognition.test.ts) | 单元／服务／状态 | 中央识别命令不携带本机区域和源帧 |
+| [tests/invoice/central-workspace-recognition.test.ts](../../../tests/invoice/central-workspace-recognition.test.ts) | 单元／服务／状态 | 识别完成后再次核验身份与权限 |
 | [tests/invoice/correction-contract.test.ts](../../../tests/invoice/correction-contract.test.ts) | 单元／服务／状态 | 更正差异、未知和真实零 |
 | [tests/invoice/correction-http.test.ts](../../../tests/invoice/correction-http.test.ts) | 单元／服务／状态 | 更正读取与回执身份、权限、版本 |
 | [tests/invoice/correction-session.test.ts](../../../tests/invoice/correction-session.test.ts) | 单元／服务／状态 | 更正未知结果及回读失败保留原编号 |
-| [tests/production/invoice-migration-catalog-client.test.ts](../../../tests/production/invoice-migration-catalog-client.test.ts) | 单元／客户端 | 目录来源、版本及身份权限 |
-| [tests/production/invoice-migration-catalog-integration.test.ts](../../../tests/production/invoice-migration-catalog-integration.test.ts) | 隔离 SQLite／服务 | 真实项目目录与客户端核验 |
 | [tests/production/invoice-access.test.ts](../../../tests/production/invoice-access.test.ts) | 路由边界 | 正式发票与更正 API 方法及范围 |
 | [tests/production/invoice-owner.test.ts](../../../tests/production/invoice-owner.test.ts) | 隔离 SQLite／服务 | 发票原件、核对、归档、回执及冷读取 |
 | [tests/production/invoice-contracts.test.ts](../../../tests/production/invoice-contracts.test.ts) | 隔离 SQLite／服务 | 其他支出合同来源核验 |
@@ -39,11 +38,13 @@
 | [tests/production/invoice-correction-eligibility.test.ts](../../../tests/production/invoice-correction-eligibility.test.ts) | 隔离 SQLite／服务 | 更正资格、付款打印阻断、提交与冷恢复 |
 | [tests/production/invoice-correction-schema.test.ts](../../../tests/production/invoice-correction-schema.test.ts) | 隔离 SQLite／结构 | 更正版本、回执、附件及回滚 |
 | [tests/production/invoice-migration-backup.test.ts](../../../tests/production/invoice-migration-backup.test.ts) | 隔离 SQLite／备份 | 迁入证据、原件与原回执冷恢复 |
+| [tests/production/invoice-migration-catalog-client.test.ts](../../../tests/production/invoice-migration-catalog-client.test.ts) | 单元／客户端 | 目录来源、版本及身份权限 |
+| [tests/production/invoice-migration-catalog-integration.test.ts](../../../tests/production/invoice-migration-catalog-integration.test.ts) | 隔离 SQLite／服务 | 真实项目目录与客户端核验 |
 | [tests/production/invoice-migration-catalog.test.ts](../../../tests/production/invoice-migration-catalog.test.ts) | 隔离 SQLite／服务 | 迁入目标目录编排和来源缺口 |
 | [tests/production/invoice-migration-correction-number.test.ts](../../../tests/production/invoice-migration-correction-number.test.ts) | 隔离 SQLite／服务 | 迁入与普通发票命令族各自恢复 |
 | [tests/production/invoice-migration-preview.test.ts](../../../tests/production/invoice-migration-preview.test.ts) | 单元／客户端 | 预检来源与权限变化 |
-| [tests/production/invoice-migration-session.test.ts](../../../tests/production/invoice-migration-session.test.ts) | 单元／客户端 | 旧库摘要不符时保留原编号 |
 | [tests/production/invoice-migration-publish.test.ts](../../../tests/production/invoice-migration-publish.test.ts) | 隔离 SQLite／服务 | 完整旧库原子发布、原证据及原号恢复 |
+| [tests/production/invoice-migration-session.test.ts](../../../tests/production/invoice-migration-session.test.ts) | 单元／客户端 | 旧库摘要不符时保留原编号 |
 | [tests/production/invoice-migration-source.test.ts](../../../tests/production/invoice-migration-source.test.ts) | 合成旧库／预检 | 旧来源和公司合同引用保护 |
 | [tests/server/invoice-migration-catalog-route.test.ts](../../../tests/server/invoice-migration-catalog-route.test.ts) | 路由／服务 | 发票迁入目录请求与鉴权 |
 | [tests/tabs/invoice-migration-startup.test.ts](../../../tests/tabs/invoice-migration-startup.test.ts) | 单元／状态 | 迁入未决命令的启动恢复 |
@@ -69,40 +70,48 @@
 
 ## 组件（jsdom）
 
+中央入口的身份、真实目录缺口和失权撤下由 [CentralInvoiceEntry.test.ts](../../../tests/components/CentralInvoiceEntry.test.ts) 验证；入口尚未切换现有路由。
+
+导出弹层多视口、键盘、项目版本和样式持久化验证见 [CentralInvoiceLedgerExport.test.ts](../../../tests/browser/CentralInvoiceLedgerExport.test.ts)，使用隔离的合成资料与内存设置替身。
+
+[CentralInvoiceLedgerScreen.test.ts](../../../tests/components/CentralInvoiceLedgerScreen.test.ts) 使用明确的合成组件数据验证真实零写为数值、未知金额留空与合计不统计；当前正式归档要求价税合计大于零，旧库零值迁入按未知处理，不能把此组件夹具当作正式零额归档事实。
+
 本机 OCR 几何的浏览器解码验证见 [InvoiceLocalGeometry.test.ts](../../../tests/browser/InvoiceLocalGeometry.test.ts)：合成图片、EXIF 方向和旋转 PDF 采用模拟 OCR 结果，真实 OCR 模型尚未验收。
+
+中央工作台定位接线的五视口、焦点/悬停、切票和撤权恢复验证见 [CentralInvoiceRegions.test.ts](../../../tests/browser/CentralInvoiceRegions.test.ts)。验证使用模拟识别数据；中央组件仍在隔离验收，正式旧入口未切换。
+
+废弃或恢复后丢失响应的原编号发现、身份和权限隔离及更正单分流见 [CentralInvoicePendingRecovery.test.ts](../../../tests/components/CentralInvoicePendingRecovery.test.ts) 与 [CentralInvoicePendingRecovery.test.ts](../../../tests/browser/CentralInvoicePendingRecovery.test.ts)。
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
-| [tests/components/CentralInvoiceEntry.test.ts](../../../tests/components/CentralInvoiceEntry.test.ts) | 组件（jsdom） | 中央目录缺口和权限 |
-| [tests/components/CentralInvoiceBatchUpload.test.ts](../../../tests/components/CentralInvoiceBatchUpload.test.ts) | 组件（jsdom）／合成来源 | 批量逐项结果、来源失效时停止及页面提交守卫 |
-| [tests/components/InvoiceExportTableAmounts.test.ts](../../../tests/components/InvoiceExportTableAmounts.test.ts) | 组件（jsdom） | 旧及中央台账共用预览区分未知与真实零 |
-| [tests/components/CentralInvoiceLedgerScreen.test.ts](../../../tests/components/CentralInvoiceLedgerScreen.test.ts) | 组件（jsdom） | 台账导出及来源版本 |
-| [tests/components/CentralInvoicePrintAuthorityRace.test.ts](../../../tests/components/CentralInvoicePrintAuthorityRace.test.ts) | 组件（jsdom）／合成来源 | 打印确认授权期间切源、卸载及失效恢复不发送旧登记；已发送后来源变化、原编号与存储缺口 |
-| [tests/components/CentralInvoiceLoadInterleaving.test.ts](../../../tests/components/CentralInvoiceLoadInterleaving.test.ts) | 组件（jsdom）／合成传输 | 工作台与台账旧载入成功或网络失败、新读取；旧权限拒绝时遮蔽、提示及重验 |
-| [tests/components/CentralInvoiceLedgerSnapshot.test.ts](../../../tests/components/CentralInvoiceLedgerSnapshot.test.ts) | 组件（jsdom）／合成来源 | 跨页导出来源变化、新匹配、目录核验竞态、权限失效与零和未知 |
-| [tests/components/CentralInvoiceLedgerView.test.ts](../../../tests/components/CentralInvoiceLedgerView.test.ts) | 组件（jsdom） | 台账来源与筛选 |
-| [tests/components/CentralInvoiceManualCreate.test.ts](../../../tests/components/CentralInvoiceManualCreate.test.ts) | 组件（jsdom） | 手工草稿、输入保护与原编号 |
 | [tests/components/CentralInvoiceManualEntry.test.ts](../../../tests/components/CentralInvoiceManualEntry.test.ts) | 组件（jsdom） | 失权隐藏及身份隔离 |
-| [tests/components/CentralInvoicePendingRecovery.test.ts](../../../tests/components/CentralInvoicePendingRecovery.test.ts) | 组件（jsdom） | 待核对提交与更正分流 |
-| [tests/components/CentralInvoiceQueue.test.ts](../../../tests/components/CentralInvoiceQueue.test.ts) | 组件（jsdom） | 队列金额与上传 |
+| [tests/components/CentralInvoiceBatchUpload.test.ts](../../../tests/components/CentralInvoiceBatchUpload.test.ts) | 组件（jsdom）／合成来源 | 批量逐项结果、来源失效时停止及页面提交守卫 |
+| [tests/components/CentralInvoiceManualCreate.test.ts](../../../tests/components/CentralInvoiceManualCreate.test.ts) | 组件（jsdom） | 手工草稿、输入保护与原编号 |
+| [tests/components/InvoiceExportTableAmounts.test.ts](../../../tests/components/InvoiceExportTableAmounts.test.ts) | 组件（jsdom） | 旧及中央台账共用预览区分未知与真实零 |
+| [tests/components/CentralInvoiceCorrectionAuthority.test.ts](../../../tests/components/CentralInvoiceCorrectionAuthority.test.ts) | 组件（jsdom） | 撤权隐藏原票与同身份草稿恢复 |
+| [tests/components/CentralInvoiceCorrectionRoute.test.ts](../../../tests/components/CentralInvoiceCorrectionRoute.test.ts) | 组件（jsdom） | 同路由切票的未保存输入保护 |
+| [tests/components/CentralInvoiceCorrectionScreen.test.ts](../../../tests/components/CentralInvoiceCorrectionScreen.test.ts) | 组件（jsdom） | 更正草稿、提交、打印阻断及原编号 |
+| [tests/components/CentralInvoiceFieldsForm.test.ts](../../../tests/components/CentralInvoiceFieldsForm.test.ts) | 组件（jsdom） | 票面零与未知、版本冲突及识别草稿 |
+| [tests/components/CentralInvoiceDragUpload.test.ts](../../../tests/components/CentralInvoiceDragUpload.test.ts) | 组件（jsdom） | 上传确认期间目录、权限和原编号变化阻断 |
+| [tests/components/CentralInvoiceImportPreview.test.ts](../../../tests/components/CentralInvoiceImportPreview.test.ts) | 组件（jsdom） | 预览映射和来源失败撤下 |
+| [tests/components/CentralInvoicePrintAuthorityRace.test.ts](../../../tests/components/CentralInvoicePrintAuthorityRace.test.ts) | 组件（jsdom）／合成来源 | 打印确认授权期间切源、卸载及失效恢复不发送旧登记；已发送后来源变化、原编号与存储缺口 |
+| [tests/components/CentralInvoiceLedgerSnapshot.test.ts](../../../tests/components/CentralInvoiceLedgerSnapshot.test.ts) | 组件（jsdom）／合成来源 | 跨页导出来源变化、新匹配、目录核验竞态、权限失效与零和未知 |
+| [tests/components/CentralInvoiceLedgerView.test.ts](../../../tests/components/CentralInvoiceLedgerView.test.ts) | 组件（jsdom） | 台账金额、项目及公司筛选 |
+| [tests/components/CentralInvoiceQueue.test.ts](../../../tests/components/CentralInvoiceQueue.test.ts) | 组件（jsdom） | 队列金额与稳定发票身份 |
 | [tests/components/CentralInvoiceQueueSearch.test.ts](../../../tests/components/CentralInvoiceQueueSearch.test.ts) | 组件（jsdom） | 队列已保存字段搜索、选中与草稿保留、来源变化清词 |
 | [tests/components/CentralInvoiceQueueStatusFilter.test.ts](../../../tests/components/CentralInvoiceQueueStatusFilter.test.ts) | 组件（jsdom） | 队列状态多选与搜索组合、识别进行中区分、草稿保护及来源失效清理 |
-| [tests/components/CentralInvoiceRerecognition.test.ts](../../../tests/components/CentralInvoiceRerecognition.test.ts) | 组件（jsdom） | 未保存输入和重识别 |
+| [tests/components/CentralInvoiceRerecognition.test.ts](../../../tests/components/CentralInvoiceRerecognition.test.ts) | 组件（jsdom） | 未保存输入、识别失败、撤权与原编号恢复 |
 | [tests/components/CentralInvoiceRerecognitionConsentRace.test.ts](../../../tests/components/CentralInvoiceRerecognitionConsentRace.test.ts) | 组件（jsdom） | 重识别草稿的来源绑定、提交守卫、迟到回包和原编号恢复；切票或放弃确认期间来源重读、切换及表单变化保留草稿；合成原件与写入 sink |
 | [tests/components/CentralInvoiceEditAuthorityRace.test.ts](../../../tests/components/CentralInvoiceEditAuthorityRace.test.ts) | 组件（jsdom） | 普通保存的授权等待、同源重读、存储缺口提示、迟到回包和原编号恢复；真实 workspace/session 配合合成来源与存储 |
 | [tests/components/CentralInvoiceReviewAuthorityRace.test.ts](../../../tests/components/CentralInvoiceReviewAuthorityRace.test.ts) | 组件（jsdom） | 票面核对的授权等待、同源重读、存储缺口、失权和原编号恢复；真实 workspace/session 配合合成来源与存储 |
+| [tests/components/CentralInvoiceLoadInterleaving.test.ts](../../../tests/components/CentralInvoiceLoadInterleaving.test.ts) | 组件（jsdom）／合成传输 | 工作台与台账旧载入成功或网络失败、新读取；旧权限拒绝时遮蔽、提示及重验 |
 | [tests/components/CentralInvoiceCloudConsentRace.test.ts](../../../tests/components/CentralInvoiceCloudConsentRace.test.ts) | 组件（jsdom） | 云识别确认与来源变化；合成原件和云 sink，不连接真实云服务 |
 | [tests/components/CentralInvoiceDiscardConsentRace.test.ts](../../../tests/components/CentralInvoiceDiscardConsentRace.test.ts) | 组件（jsdom） | 废弃确认、授权期间生命周期和来源变化；真实 workspace/session 配合合成写入 sink |
 | [tests/components/CentralInvoiceArchiveConsentRace.test.ts](../../../tests/components/CentralInvoiceArchiveConsentRace.test.ts) | 组件（jsdom） | 归档确认、授权等待和来源变化；真实 workspace/session 配合合成写入 sink |
 | [tests/components/CentralInvoiceAttachConsentRace.test.ts](../../../tests/components/CentralInvoiceAttachConsentRace.test.ts) | 组件（jsdom） | 关联原件确认、读取、授权和迟到回包；真实 workspace/session 配合合成写入 sink 与原编号恢复 |
 | [tests/components/CentralInvoiceLegacyConsentRace.test.ts](../../../tests/components/CentralInvoiceLegacyConsentRace.test.ts) | 组件（jsdom） | 旧票核对确认、授权和迟到回包；真实 workspace/session 配合合成写入 sink 与原编号恢复 |
-| [tests/components/CentralInvoiceWorkspaceScreen.test.ts](../../../tests/components/CentralInvoiceWorkspaceScreen.test.ts) | 组件（jsdom） | 工作台与原编号恢复 |
-| [tests/components/CentralInvoiceWorkspaceView.test.ts](../../../tests/components/CentralInvoiceWorkspaceView.test.ts) | 组件（jsdom） | 归档归属与来源版本 |
-| [tests/components/CentralInvoiceDragUpload.test.ts](../../../tests/components/CentralInvoiceDragUpload.test.ts) | 组件（jsdom） | 上传确认期间目录、权限和原编号变化阻断 |
-| [tests/components/CentralInvoiceCorrectionAuthority.test.ts](../../../tests/components/CentralInvoiceCorrectionAuthority.test.ts) | 组件（jsdom） | 撤权隐藏原票与同身份草稿恢复 |
-| [tests/components/CentralInvoiceCorrectionRoute.test.ts](../../../tests/components/CentralInvoiceCorrectionRoute.test.ts) | 组件（jsdom） | 同路由切票的未保存输入保护 |
-| [tests/components/CentralInvoiceCorrectionScreen.test.ts](../../../tests/components/CentralInvoiceCorrectionScreen.test.ts) | 组件（jsdom） | 更正草稿、提交、打印阻断及原编号 |
-| [tests/components/CentralInvoiceFieldsForm.test.ts](../../../tests/components/CentralInvoiceFieldsForm.test.ts) | 组件（jsdom） | 票面零与未知、版本冲突及识别草稿 |
+| [tests/components/CentralInvoiceWorkspaceScreen.test.ts](../../../tests/components/CentralInvoiceWorkspaceScreen.test.ts) | 组件（jsdom） | 工作台读取、失权与公司票原编号 |
+| [tests/components/CentralInvoiceWorkspaceView.test.ts](../../../tests/components/CentralInvoiceWorkspaceView.test.ts) | 组件（jsdom） | 归档归属、手选主体合同与版本变化 |
 | [tests/components/InvoiceMigrationPanel.test.ts](../../../tests/components/InvoiceMigrationPanel.test.ts) | 组件（jsdom） | 旧票映射、公司主体及预检缺口 |
 | [tests/components/InvoiceMigrationAuthorityRace.test.ts](../../../tests/components/InvoiceMigrationAuthorityRace.test.ts) | 组件（jsdom） | 迁入及撤回的授权等待、已发送后失权保留原编号与原命令恢复；使用真实迁入 session 和合成预检、授权、存储及服务替身 |
 | [tests/components/InvoiceMigrationRecoverAuthorityRace.test.ts](../../../tests/components/InvoiceMigrationRecoverAuthorityRace.test.ts) | 组件（jsdom） | 原编号核对期间失权、切源与能力变化保号；已应用和未应用使用真实迁入 session 及合成授权、存储和服务替身 |
@@ -126,26 +135,27 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
-| [tests/browser/CentralInvoiceArchive.test.ts](../../../tests/browser/CentralInvoiceArchive.test.ts) | 真实组件／模拟来源 | 归档来源及主要视口 |
+| [tests/browser/CentralInvoiceArchive.test.ts](../../../tests/browser/CentralInvoiceArchive.test.ts) | 真实组件／模拟来源 | 项目和公司票手选主体、合同及键盘 |
 | [tests/browser/CentralInvoiceDragUpload.test.ts](../../../tests/browser/CentralInvoiceDragUpload.test.ts) | 真实组件／模拟来源 | 五视口拖放、归属失效与键盘上传入口 |
-| [tests/browser/CentralInvoiceLedgerExport.test.ts](../../../tests/browser/CentralInvoiceLedgerExport.test.ts) | 真实组件／模拟来源 | 台账导出与主要视口 |
+| [tests/browser/CentralInvoiceCorrection.test.ts](../../../tests/browser/CentralInvoiceCorrection.test.ts) | 真实组件／模拟来源 | 更正票面与归属的多视口操作 |
+| [tests/browser/CentralInvoiceCorrectionAuthority.test.ts](../../../tests/browser/CentralInvoiceCorrectionAuthority.test.ts) | 真实组件／模拟来源 | 失权隐藏与同身份草稿恢复 |
+| [tests/browser/CentralInvoiceCorrectionNavigation.test.ts](../../../tests/browser/CentralInvoiceCorrectionNavigation.test.ts) | 真实组件／模拟来源 | 键盘切票和离开保护 |
+| [tests/browser/CentralInvoiceImportPreview.test.ts](../../../tests/browser/CentralInvoiceImportPreview.test.ts) | 真实组件／模拟来源 | 多视口预览与目录版本变化 |
 | [tests/browser/CentralInvoicePrintAuthorityRace.test.ts](../../../tests/browser/CentralInvoicePrintAuthorityRace.test.ts) | 真实组件／合成来源 | 两视口键盘打印确认、授权期间及已发送后切源与同源登记；系统打印与原件核验为替身 |
 | [tests/browser/CentralInvoiceLedgerSnapshot.test.ts](../../../tests/browser/CentralInvoiceLedgerSnapshot.test.ts) | 真实组件／模拟来源 | 五视口筛选、键盘、焦点和来源变化；导出文件调用为替身 |
-| [tests/browser/CentralInvoiceManualCompany.test.ts](../../../tests/browser/CentralInvoiceManualCompany.test.ts) | 真实组件／模拟来源 | 手工公司票归档选择 |
-| [tests/browser/CentralInvoicePendingRecovery.test.ts](../../../tests/browser/CentralInvoicePendingRecovery.test.ts) | 真实组件／模拟来源 | 原编号发现与恢复 |
-| [tests/browser/CentralInvoiceSessionReadAuthority.test.ts](../../../tests/browser/CentralInvoiceSessionReadAuthority.test.ts) | 真实组件／合成传输 | 失读权隐藏票面、重新读取与键盘核对原号；会话与服务响应均为合成 |
-| [tests/browser/CentralInvoiceObservedAuthority.test.ts](../../../tests/browser/CentralInvoiceObservedAuthority.test.ts) | 浏览器组件／合成传输 | 两视口旧 403 后隐藏票面、保留输入及键盘重读，并回归原编号恢复；不访问真实服务 |
-| [tests/browser/CentralInvoiceLoadInterleaving.test.ts](../../../tests/browser/CentralInvoiceLoadInterleaving.test.ts) | 真实组件／合成传输 | 两视口旧读取成功或网络失败迟到不覆盖新数据或提示，键盘焦点；外部并发使用合成来源 |
-| [tests/browser/CentralInvoiceRegions.test.ts](../../../tests/browser/CentralInvoiceRegions.test.ts) | 真实组件／模拟来源 | 原件定位与撤权 |
+| [tests/browser/CentralInvoiceManualCompany.test.ts](../../../tests/browser/CentralInvoiceManualCompany.test.ts) | 真实组件／模拟来源 | 手工公司票选择、版本变化与键盘 |
 | [tests/browser/InvoiceImageDecodeReadiness.test.ts](../../../tests/browser/InvoiceImageDecodeReadiness.test.ts) | 真实浏览器／合成图片 | 五视口真实图片解码后的定位、旋转及损坏恢复；不读取真实发票 |
 | [tests/browser/InvoiceLegacyDetailLoading.test.ts](../../../tests/browser/InvoiceLegacyDetailLoading.test.ts) | 真实浏览器／合成来源 | 五视口旧单票读取失败、键盘重试与无请求时暂不可用；不验证跨来源草稿恢复 |
 | [tests/browser/InvoiceWorkspaceDiscardRealConfirm.test.ts](../../../tests/browser/InvoiceWorkspaceDiscardRealConfirm.test.ts) | 真实浏览器／合成来源 | 五视口真实工作台及确认弹窗的键盘、焦点、取消和确认；异步草稿变化由测试受控注入 |
 | [tests/browser/InvoicePdfPageDecodeFailure.test.ts](../../../tests/browser/InvoicePdfPageDecodeFailure.test.ts) | 真实浏览器／合成页图 | 五视口 PDF 页图解码失败、键盘重试和焦点返回 |
 | [tests/browser/pdf-preview-real-browser.test.ts](../../../tests/browser/pdf-preview-real-browser.test.ts) | 真实浏览器／合成 PDF | 真实 pdf.js 和 canvas 渲染单页旋转 PDF、图像解码与调用者释放 URL |
-| [tests/browser/CentralInvoiceRerecognition.test.ts](../../../tests/browser/CentralInvoiceRerecognition.test.ts) | 真实组件／模拟来源 | 重识别草稿与交互 |
+| [tests/browser/CentralInvoiceRerecognition.test.ts](../../../tests/browser/CentralInvoiceRerecognition.test.ts) | 真实组件／模拟来源 | 重识别输入保留、焦点和失权 |
 | [tests/browser/CentralInvoiceRerecognitionConsentRace.test.ts](../../../tests/browser/CentralInvoiceRerecognitionConsentRace.test.ts) | 真实组件／模拟来源 | 五视口键盘、焦点与重识别提交来源守卫；切票和放弃草稿的确认迟到、取消及正常操作；受控确认替身和合成原件、写入 sink |
 | [tests/browser/CentralInvoiceEditAuthorityRace.test.ts](../../../tests/browser/CentralInvoiceEditAuthorityRace.test.ts) | 真实组件／模拟来源 | 五视口键盘普通保存、授权期间切源、存储缺口与恢复及同源成功；合成授权、存储和写入 sink |
 | [tests/browser/CentralInvoiceReviewAuthorityRace.test.ts](../../../tests/browser/CentralInvoiceReviewAuthorityRace.test.ts) | 真实组件／模拟来源 | 五视口键盘核对、授权期间切源或卸载、存储缺口与恢复及同源成功；合成授权、存储和写入 sink |
+| [tests/browser/CentralInvoiceSessionReadAuthority.test.ts](../../../tests/browser/CentralInvoiceSessionReadAuthority.test.ts) | 真实组件／合成传输 | 失读权隐藏票面、重新读取与键盘核对原号；会话与服务响应均为合成 |
+| [tests/browser/CentralInvoiceObservedAuthority.test.ts](../../../tests/browser/CentralInvoiceObservedAuthority.test.ts) | 浏览器组件／合成传输 | 两视口旧 403 后隐藏票面、保留输入及键盘重读，并回归原编号恢复；不访问真实服务 |
+| [tests/browser/CentralInvoiceLoadInterleaving.test.ts](../../../tests/browser/CentralInvoiceLoadInterleaving.test.ts) | 真实组件／合成传输 | 两视口旧读取成功或网络失败迟到不覆盖新数据或提示，键盘焦点；外部并发使用合成来源 |
 | [tests/browser/CentralInvoiceLeaveRealConfirm.test.ts](../../../tests/browser/CentralInvoiceLeaveRealConfirm.test.ts) | 真实组件／模拟来源 | 五视口真实确认宿主的 Escape、焦点、来源重读后迟到确认和单宿主抢占；第二次确认由测试直接触发，识别及数据来源为合成替身 |
 | [tests/browser/CentralInvoiceCloudConsentRace.test.ts](../../../tests/browser/CentralInvoiceCloudConsentRace.test.ts) | 真实组件／模拟来源 | 五视口键盘、焦点与云识别来源切换；受控确认替身、合成原件及云 sink，不连接真实云 |
 | [tests/browser/CentralInvoiceDiscardConsentRace.test.ts](../../../tests/browser/CentralInvoiceDiscardConsentRace.test.ts) | 真实组件／模拟来源 | 五视口键盘、焦点与确认期间卸载；受控确认替身和合成写入 sink |
@@ -155,9 +165,6 @@
 | [tests/browser/CentralInvoiceLegacyConsentRace.test.ts](../../../tests/browser/CentralInvoiceLegacyConsentRace.test.ts) | 真实组件／模拟来源 | 五视口键盘、焦点与旧票核对确认期间切换来源或卸载；受控确认和合成写入 sink |
 | [tests/browser/CentralInvoiceQueueSearch.test.ts](../../../tests/browser/CentralInvoiceQueueSearch.test.ts) | 真实组件／模拟来源 | 五视口键盘搜索、草稿保护、来源变化清词和队列局部滚动 |
 | [tests/browser/CentralInvoiceQueueStatusFilter.test.ts](../../../tests/browser/CentralInvoiceQueueStatusFilter.test.ts) | 真实组件／模拟来源 | 五视口状态多选浮层键盘与焦点、取消和应用、组合筛选、来源切换及队列局部滚动 |
-| [tests/browser/CentralInvoiceCorrection.test.ts](../../../tests/browser/CentralInvoiceCorrection.test.ts) | 真实组件／模拟来源 | 更正票面与归属的多视口操作 |
-| [tests/browser/CentralInvoiceCorrectionAuthority.test.ts](../../../tests/browser/CentralInvoiceCorrectionAuthority.test.ts) | 真实组件／模拟来源 | 失权隐藏与同身份草稿恢复 |
-| [tests/browser/CentralInvoiceCorrectionNavigation.test.ts](../../../tests/browser/CentralInvoiceCorrectionNavigation.test.ts) | 真实组件／模拟来源 | 键盘切票和离开保护 |
 | [tests/browser/InvoiceMigrationPendingReadFailure.test.ts](../../../tests/browser/InvoiceMigrationPendingReadFailure.test.ts) | 真实组件／模拟来源 | 读取失败时原编号提示、撤权和多视口 |
 | [tests/browser/InvoiceMigrationPanel.test.ts](../../../tests/browser/InvoiceMigrationPanel.test.ts) | 真实组件／模拟来源 | 迁入映射和原编号多视口操作 |
 | [tests/browser/InvoiceMigrationAuthorityRace.test.ts](../../../tests/browser/InvoiceMigrationAuthorityRace.test.ts) | 真实组件／合成来源 | 五视口键盘确认及授权等待期间失权；确认、文件、授权、存储及命令使用受控合成替身 |
@@ -168,12 +175,12 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
-| [e2e/production-invoice-company-manual.spec.ts](../../../e2e/production-invoice-company-manual.spec.ts) | 隔离服务／合成数据 | 手工建票与公司合同归档 |
-| [e2e/production-invoice-drag-upload.spec.ts](../../../e2e/production-invoice-drag-upload.spec.ts) | Playwright 隔离生产构建 | 项目及公司拖放、响应丢失后原编号与原件冷恢复；不运行真实 OCR |
 | [e2e/production-invoice-manual-recovery.spec.ts](../../../e2e/production-invoice-manual-recovery.spec.ts) | 隔离服务／合成数据 | 手工创建响应丢失、重启重新登录及原编号刷新恢复 |
-| [e2e/production-invoice-ledger-export.spec.ts](../../../e2e/production-invoice-ledger-export.spec.ts) | 隔离服务／合成数据 | 台账筛选导出与隔离冷读 |
-| [e2e/production-invoice-migration.spec.ts](../../../e2e/production-invoice-migration.spec.ts) | 隔离服务／合成数据 | 项目和公司旧票发布、原件及断线原编号恢复 |
 | [e2e/production-invoice-correction.spec.ts](../../../e2e/production-invoice-correction.spec.ts) | 隔离服务／合成数据 | 更正草稿、断线原编号恢复与打印阻断 |
+| [e2e/production-invoice-migration.spec.ts](../../../e2e/production-invoice-migration.spec.ts) | 隔离服务／合成数据 | 项目和公司旧票发布、原件及断线原编号恢复 |
+| [e2e/production-invoice-ledger-export.spec.ts](../../../e2e/production-invoice-ledger-export.spec.ts) | Playwright 隔离生产构建 | 旧票迁入、备份隔离恢复与独立进程冷读后，从中央台账实际下载 Excel，核验票号、项目、未知金额和样式；仅测试层显式构建 |
+| [e2e/production-invoice-company-manual.spec.ts](../../../e2e/production-invoice-company-manual.spec.ts) | Playwright 隔离生产构建 | 合成手工票在真实工作台选择公司开销、已有合同及购销主体，确认税号并归档；仅测试层显式构建 |
+| [e2e/production-invoice-drag-upload.spec.ts](../../../e2e/production-invoice-drag-upload.spec.ts) | Playwright 隔离生产构建 | 项目及公司拖放、响应丢失后原编号与原件冷恢复；不运行真实 OCR |
 | [e2e/factor-solver.spec.ts](../../../e2e/factor-solver.spec.ts) | Playwright E2E | 精确因子组合工作台 |
 | [e2e/invoice-export-borders.spec.ts](../../../e2e/invoice-export-borders.spec.ts) | Playwright E2E | Issue #437 发票 Excel 分组边框 |
 | [e2e/invoice-ledger-print-mode.spec.ts](../../../e2e/invoice-ledger-print-mode.spec.ts) | Playwright E2E | 发票台账打印入口：Excel 行可在台账勾选合计但不进入打印，进入双栏选择、打印确认并返回台账 |
@@ -185,7 +192,9 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
-| [tests/fixtures/invoice-ledger-layer/nuxt.config.ts](../../../tests/fixtures/invoice-ledger-layer/nuxt.config.ts) | 辅助／夹具 | 中央发票隔离验收层 |
-| [tests/fixtures/invoice-ledger-layer/app/pages/invoice-workspace-acceptance.vue](../../../tests/fixtures/invoice-ledger-layer/app/pages/invoice-workspace-acceptance.vue) | 辅助／夹具 | 工作台隔离验收入口 |
-| [tests/fixtures/invoice-ledger-layer/app/pages/invoice-ledger-acceptance.vue](../../../tests/fixtures/invoice-ledger-layer/app/pages/invoice-ledger-acceptance.vue) | 辅助／夹具 | 台账隔离验收入口 |
+| [tests/fixtures/invoice-ledger-layer/nuxt.config.ts](../../../tests/fixtures/invoice-ledger-layer/nuxt.config.ts) | 隔离构建测试层 | 仅 `--extends` 显式启用中央台账和工作台验收页；测试页不参与正式路由 |
+| [tests/fixtures/invoice-ledger-layer/app/pages/invoice-ledger-acceptance.vue](../../../tests/fixtures/invoice-ledger-layer/app/pages/invoice-ledger-acceptance.vue) | 隔离构建测试层 | 中央台账验收入口，不参与正式路由 |
+| [tests/fixtures/invoice-ledger-layer/app/pages/invoice-workspace-acceptance.vue](../../../tests/fixtures/invoice-ledger-layer/app/pages/invoice-workspace-acceptance.vue) | 隔离构建测试层 | 中央工作台验收入口，不参与正式路由 |
 | [tests/fixtures/invoice-workbook.ts](../../../tests/fixtures/invoice-workbook.ts) | 辅助／夹具 | 供测试导入的夹具／辅助代码；按所属业务就近查阅 |
+
+中央台账冷恢复验收须在项目内 `.tmp` 使用每次新建的独立目录：设置 `NUXT_BUILD_DIR` 和 `CRM_E2E_BUILD_OUTPUT_DIR` 为两个尚不存在的不同直属目录，以 `pnpm exec nuxt build --extends=./tests/fixtures/invoice-ledger-layer` 构建；再设置 `CRM_INVOICE_ACCEPTANCE=1`、`CRM_INVOICE_E2E_ENTRY` 为该构建的 `server/index.mjs`，以及 `CRM_INVOICE_E2E_DOWNLOADS` 为项目临时目录内新建的绝对空目录。运行该 spec 的 `production` 项目时通过 `--output` 指定另一个新目录；测试只启动指向合成数据的独立服务，合成数据库和备份保留待核对。
