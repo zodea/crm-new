@@ -92,6 +92,59 @@ test.describe('Issue #279：正式与演示数据边界', () => {
     expect(await page.evaluate(storageKey => localStorage.getItem(storageKey), DATA_VISIBILITY_STORAGE_KEY)).toBe('false')
   })
 
+  test('同名正式项目与测试项目在列表中保持独立身份、权限和汇总', async ({ page }) => {
+    test.setTimeout(90_000)
+    await openProductionOnlyList(page)
+    await page.goto('/project/form')
+    await page.getByLabel('项目名称 *').fill('合和新城')
+    await page.getByLabel('项目经理 *').fill('合成项目经理')
+    const saved = page.waitForResponse(response =>
+      response.request().method() === 'POST'
+      && new URL(response.url()).pathname === '/api/commands/projects',
+    )
+    await page.getByRole('button', { name: '保存草稿' }).click()
+    const savedResponse = await saved
+    expect(savedResponse.ok()).toBe(true)
+    const savedProject = await savedResponse.json() as { id: string }
+    expect(savedProject.id).toBeTruthy()
+    expect(savedProject.id).not.toBe('proj_demo_001')
+    await expect(page).toHaveURL(new RegExp(`/project/${savedProject.id}\\?origin=real$`))
+
+    await page.goto('/project')
+    await expect(page.locator('[data-origin-summary="real"]')).toContainText(/当前筛选范围\s*1 个/)
+    await includeDemo(page)
+    await expect(page.locator('[data-origin-summary="real"]')).toContainText(/当前筛选范围\s*1 个/)
+    await expect(page.locator('[data-origin-summary="demo"]')).toContainText(/当前筛选范围\s*12 个/)
+
+    await page.getByPlaceholder('搜索项目、客户、经理…').fill('合和新城')
+    await expect(page.locator('[data-origin-summary="real"]')).toContainText(/当前筛选范围\s*1 个/)
+    await expect(page.locator('[data-origin-summary="demo"]')).toContainText(/当前筛选范围\s*1 个/)
+    const formalRow = page.getByRole('row').filter({ has: page.locator(`[id="project-row-real:${savedProject.id}"]`) })
+    const demoRow = page.getByRole('row').filter({ has: page.locator('[id="project-row-demo:proj_demo_001"]') })
+    await expect(formalRow).toBeVisible()
+    await expect(demoRow).toBeVisible()
+    await expect(formalRow.getByText('正式数据', { exact: true })).toBeVisible()
+    await expect(demoRow.getByText('测试数据', { exact: true })).toBeVisible()
+    const formalLink = formalRow.getByRole('link', { name: '合和新城', exact: true })
+    const demoLink = demoRow.getByRole('link', { name: '合和新城', exact: true })
+    const formalTarget = new URL((await formalLink.getAttribute('href'))!, page.url())
+    const demoTarget = new URL((await demoLink.getAttribute('href'))!, page.url())
+    expect(formalTarget.pathname).toBe(`/project/${savedProject.id}`)
+    expect(formalTarget.searchParams.get('origin')).toBe('real')
+    expect(demoTarget.pathname).toBe('/project/proj_demo_001')
+    expect(demoTarget.searchParams.get('origin')).toBe('demo')
+    await expect(formalRow.getByRole('link', { name: '编辑合和新城项目' })).toBeVisible()
+    await expect(demoRow.getByRole('button', { name: '编辑项目' })).toBeDisabled()
+    await expect(demoRow.getByRole('button', { name: '删除项目' })).toBeDisabled()
+
+    await page.getByRole('button', { name: '关闭测试数据' }).click()
+    await page.getByRole('button', { name: '确认切换' }).click()
+    await expect(formalRow).toBeVisible()
+    await expect(demoRow).toHaveCount(0)
+    await expect(page.locator('[data-origin-summary="real"]')).toContainText(/当前筛选范围\s*1 个/)
+    await expect(page.locator('[data-origin-summary="demo"]')).toHaveCount(0)
+  })
+
   test('演示行与详情拒绝正式写入口，直接演示编辑路由也被拦截', async ({ page }) => {
     await openProductionOnlyList(page)
     await includeDemo(page)

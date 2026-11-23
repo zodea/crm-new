@@ -11,6 +11,43 @@ async function openSidebarRoute(page: Page, label: string, path: string) {
   await expect(sidebar.getByRole('searchbox', { name: '搜索菜单' })).toHaveValue('', { timeout: 30_000 })
 }
 
+for (const width of [390, 1440]) {
+  test(`页签右键关闭左侧并保留首页和目标 @ ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.addInitScript(() => localStorage.setItem('ruihang-sidebar-pinned', 'true'))
+    await page.goto('/')
+    await openSidebarRoute(page, '项目列表', '/project')
+    await openSidebarRoute(page, '分供方', '/base/supplier')
+    await openSidebarRoute(page, '发票台账', '/finance/ledger')
+    await page.setViewportSize({ width, height: 900 })
+    const tabs = page.getByRole('navigation', { name: '已打开页面' })
+    const target = tabs.getByRole('button', { name: '发票台账', exact: true })
+    await target.click({ button: 'right' })
+    const menu = page.getByRole('menu')
+    await expect(menu.getByRole('menuitem', { name: '关闭左侧' })).toBeEnabled()
+    const rect = await menu.boundingBox()
+    expect(rect).not.toBeNull()
+    expect(rect!.x).toBeGreaterThanOrEqual(0)
+    expect(rect!.x + rect!.width).toBeLessThanOrEqual(width)
+    expect(rect!.y + rect!.height).toBeLessThanOrEqual(900)
+    await page.keyboard.press('Escape')
+    await expect(target).toBeFocused()
+    await page.keyboard.press('Shift+F10')
+    await menu.getByRole('menuitem', { name: '关闭左侧' }).click()
+    await expect(tabs.getByRole('button', { name: '首页', exact: true })).toBeVisible()
+    await expect(tabs.getByRole('button', { name: '项目列表', exact: true })).toHaveCount(0)
+    await expect(tabs.getByRole('button', { name: '分供方', exact: true })).toHaveCount(0)
+    await expect(target).toHaveAttribute('aria-current', 'page')
+    await expect.poll(() => new URL(page.url()).pathname).toBe('/finance/ledger')
+    await target.click({ button: 'right' })
+    await expect(menu.getByRole('menuitem', { name: '关闭左侧' })).toBeDisabled()
+    await expect(menu.getByRole('menuitem', { name: '关闭全部' })).toBeEnabled()
+    await menu.getByRole('menuitem', { name: '关闭全部' }).click()
+    await expect(target).toHaveCount(0)
+    await expect.poll(() => new URL(page.url()).pathname).toBe('/')
+  })
+}
+
 // 上限 15 指可关闭页签；固定首页另行验证，不依赖偶然的初始页签数量。
 for (const input of [
   { width: 1280, first: PROJECT_INPUTS[0], second: PROJECT_INPUTS[1] },
@@ -53,7 +90,7 @@ for (const input of [
     await expect(projectTab).toHaveAttribute('aria-current', 'page')
     await projectTab.click({ button: 'right' })
     const menu = page.getByRole('menu')
-    await expect(menu.getByRole('menuitem')).toHaveText(['关闭当前', '关闭其他', '关闭右侧', '关闭全部'])
+    await expect(menu.getByRole('menuitem')).toHaveText(['关闭当前', '关闭其他', '关闭右侧', '关闭左侧', '关闭全部'])
     await menu.getByRole('menuitem', { name: '关闭当前', exact: true }).click()
     await expect.poll(() => new URL(page.url()).pathname).toBe('/base/supplier')
     await expect(projectTab).toHaveCount(0)

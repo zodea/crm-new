@@ -1,7 +1,7 @@
 import type { APIRequestContext, TestInfo } from '@playwright/test'
 import { Buffer } from 'node:buffer'
 import { expect, test } from '@playwright/test'
-import { expectNoPageOverflow, RESPONSIVE_WIDTHS } from './helpers/responsive'
+import { expectLocalHorizontalScroll, expectNoPageOverflow, RESPONSIVE_WIDTHS } from './helpers/responsive'
 
 const STORAGE_KEY = 'ruihang:workspace-default:include-demo'
 const WORKBENCH = '/project/proj_demo_002/supplier/sup_demo_004?origin=demo&tab=overview'
@@ -84,14 +84,62 @@ test.describe('Issue #317：项目分供方六类事实工作台', () => {
   })
 
   test('显式正式中央实例提供六类非零事实且不回退本地来源', async ({ page }, testInfo) => {
+    test.setTimeout(90_000)
     await reset(page.context().request, session(testInfo), 'formal-ready')
     await page.goto('/project/project-real-317/supplier/supplier-real-317?tab=overview')
     await expect(page.getByRole('heading', { name: '中央正式项目 × 中央正式分供方' })).toBeVisible({ timeout: 20_000 })
     for (const tab of ['合同1', '请款1', '收票1', '付款1', '结算1'])
       await expect(page.getByRole('tab', { name: tab })).toBeVisible()
+
+    const summary = page.getByTestId('project-supplier-header')
+    for (const [label, amount] of [
+      ['变更后合同额', '¥120,000.00'],
+      ['已审批请款', '¥50,000.00'],
+      ['已归档收票', '¥31,800.00'],
+      ['收票税额', '¥1,800.00'],
+      ['已确认支付', '¥30,000.00'],
+      ['已确认结算', '¥45,000.00'],
+      ['应付余额', '¥90,000.00'],
+    ]) {
+      const metric = summary.locator('div').filter({ has: page.getByText(label, { exact: true }) }).filter({ has: page.getByText(amount, { exact: true }) })
+      await expect(metric.last()).toBeVisible()
+    }
+
     await page.getByRole('tab', { name: '合同1' }).click()
     await expect(page.getByLabel('合同事实').getByText('目标待核验')).toBeVisible()
     await expect(page.getByRole('link', { name: '查看源单' })).toHaveCount(0)
+
+    for (const item of [
+      { tab: '合同1', region: '合同事实', query: 'contract', number: 'HT-REAL-317', amounts: ['¥100,000.00', '¥120,000.00'] },
+      { tab: '请款1', region: '请款事实', query: 'claim', number: 'QK-REAL-317', amounts: ['¥60,000.00', '¥50,000.00'] },
+      { tab: '收票1', region: '收票事实', query: 'ticket', number: 'INV-REAL-317', amounts: ['¥31,800.00', '¥1,800.00'] },
+      { tab: '付款1', region: '付款事实', query: 'payment', number: 'ZF-REAL-317', amounts: ['¥30,000.00'] },
+      { tab: '结算1', region: '结算事实', query: 'settlement', number: 'JS-REAL-317', amounts: ['¥45,000.00'] },
+    ]) {
+      await page.getByRole('tab', { name: item.tab }).click()
+      const row = page.getByLabel(item.region).getByRole('row').filter({ has: page.getByRole('cell', { name: item.number, exact: true }) })
+      await expect(row).toBeVisible()
+      for (const amount of item.amounts)
+        await expect(row.getByRole('cell', { name: amount, exact: true })).toBeVisible()
+      await expect(row.getByText('目标待核验')).toBeVisible()
+      await expect(row.getByRole('link', { name: '查看源单' })).toHaveCount(0)
+      await expect(page).toHaveURL(new RegExp(`tab=${item.query}$`))
+      await page.reload()
+      await expect(page.getByRole('tab', { name: item.tab })).toHaveAttribute('aria-selected', 'true')
+      await expect(row).toBeVisible()
+    }
+
+    await page.setViewportSize({ width: 390, height: 900 })
+    const table = page.getByLabel('业务记录表格，可横向滚动')
+    await expectLocalHorizontalScroll(table, '#317 正式结算事实表')
+    await table.focus()
+    await expect(table).toBeFocused()
+    await table.evaluate((element) => {
+      element.scrollLeft = 0
+    })
+    await page.keyboard.press('ArrowRight')
+    await expect.poll(() => table.evaluate(element => element.scrollLeft)).toBeGreaterThan(0)
+    await expectNoPageOverflow(page, '#317 正式结算事实表 @ 390px')
   })
 
   for (const input of [

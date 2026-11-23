@@ -119,7 +119,7 @@ async function showMenu(key: string, x: number, y: number) {
   menu.value = {
     open: true,
     x: Math.min(x, window.innerWidth - 148),
-    y: Math.min(y, window.innerHeight - 166),
+    y: Math.min(y, window.innerHeight - 198),
     key,
   }
   await nextTick()
@@ -185,7 +185,9 @@ function onMenuKeydown(event: KeyboardEvent) {
 const menuTab = computed(() => tabsStore.tabs.find(tab => tab.key === menu.value.key))
 const menuIndex = computed(() => tabsStore.tabs.findIndex(tab => tab.key === menu.value.key))
 const hasRight = computed(() => tabsStore.tabs.slice(menuIndex.value + 1).some(tab => tab.key !== HOME_KEY))
+const hasLeft = computed(() => menuIndex.value > 0 && tabsStore.tabs.slice(0, menuIndex.value).some(tab => tab.closable))
 const hasOthers = computed(() => tabsStore.tabs.some(tab => tab.key !== HOME_KEY && tab.key !== menu.value.key))
+const hasClosable = computed(() => tabsStore.tabs.some(tab => tab.closable))
 
 async function act(action: () => Promise<boolean>) {
   const pending = action()
@@ -203,7 +205,7 @@ useEventListener('scroll', (event) => {
     const anchor = tabEls.value?.find(element => element.dataset.tabKey === menu.value.key)
     const rect = anchor?.getBoundingClientRect()
     if (rect)
-      menu.value = { ...menu.value, x: Math.max(0, Math.min(rect.left, window.innerWidth - 148)), y: Math.min(rect.bottom, window.innerHeight - 166) }
+      menu.value = { ...menu.value, x: Math.max(0, Math.min(rect.left, window.innerWidth - 148)), y: Math.min(rect.bottom, window.innerHeight - 198) }
     return
   }
   closeMenu(!!menuEl.value?.contains(document.activeElement))
@@ -342,13 +344,23 @@ onKeyStroke('Escape', () => closeMenu(true))
       >
         关闭右侧
       </button>
+      <button
+        type="button"
+        role="menuitem"
+        tabindex="-1"
+        class="tab-menu-item"
+        :disabled="!hasLeft"
+        @click="act(() => tabsStore.requestCloseToLeft(menu.key))"
+      >
+        关闭左侧
+      </button>
       <div class="my-1 h-px bg-line" role="separator" />
       <button
         type="button"
         role="menuitem"
         tabindex="-1"
         class="tab-menu-item"
-        :disabled="!hasOthers"
+        :disabled="!hasClosable"
         @click="act(() => tabsStore.requestCloseEvery())"
       >
         关闭全部
