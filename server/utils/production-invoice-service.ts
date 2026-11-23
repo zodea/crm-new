@@ -1,5 +1,5 @@
 import type { TransactionDb } from '../../app/lib/db/coordinator'
-import type { CentralInvoiceCommand, CentralInvoiceCommandResult, CentralInvoiceFields, CentralInvoiceItem, CentralInvoiceOriginalInput, CentralInvoicePrintCommand, CentralInvoicePrintResult, CentralInvoiceRecord, InvoiceContractReference } from '../../app/lib/invoice/central-contract'
+import type { CentralInvoiceCommand, CentralInvoiceCommandResult, CentralInvoiceFields, CentralInvoiceImportSource, CentralInvoiceItem, CentralInvoiceOriginalInput, CentralInvoicePrintCommand, CentralInvoicePrintResult, CentralInvoiceRecord, InvoiceContractReference } from '../../app/lib/invoice/central-contract'
 import type { InvoiceCorrectionContent, InvoiceCorrectionDraft, InvoiceCorrectionSubmitCommand } from '../../app/lib/invoice/correction-contract'
 import type { BusinessSession } from './business-session'
 import type { ProductionStorage } from './production-storage'
@@ -14,6 +14,7 @@ import { assertInvoiceContractBuyer, invoiceContractCapability, verifyInvoiceCom
 import { requireInvoiceCorrectionEligibility } from './production-invoice-correction-eligibility'
 import { validateInvoiceCorrections } from './production-invoice-correction-service'
 import { normalizeLegacyInvoiceItems } from './production-invoice-migration-plan'
+import { assertInvoiceWorkbookImport, bindInvoiceWorkbook, prepareInvoiceWorkbook, validateInvoiceWorkbooks } from './production-invoice-workbook'
 import { createReadMeta, withReadMeta } from './read-meta'
 
 type Session = () => BusinessSession
@@ -127,7 +128,7 @@ export function contractReference(value: unknown): value is InvoiceContractRefer
     && typeof value.version === 'string' && /^[1-9]\d*$/.test(value.version) && Number.isSafeInteger(Number(value.version)))
 }
 
-function importSource(input: unknown) {
+export function importSource(input: unknown): CentralInvoiceImportSource {
   if (!object(input) || !exactKeys(input, ['fileName', 'fileDigest', 'sheetName', 'rowNumber', 'rawSnapshot'])
     || typeof input.fileName !== 'string' || !input.fileName.trim() || input.fileName.length > 240 || /[/\\]/.test(input.fileName)
     || typeof input.fileDigest !== 'string' || !/^[a-f0-9]{64}$/.test(input.fileDigest)
@@ -138,7 +139,7 @@ function importSource(input: unknown) {
       || (typeof value === 'number' && Number.isFinite(value) && (!Number.isInteger(value) || Number.isSafeInteger(value)))))) {
     return fail('validation-failed', '发票导入的文件、工作表、行号或原始快照无效。')
   }
-  return input
+  return input as unknown as CentralInvoiceImportSource
 }
 
 function command(value: unknown): CentralInvoiceCommand {
@@ -436,7 +437,7 @@ export async function listProductionInvoiceReferences(tx: TransactionDb, actor: 
   if (invoiceId !== undefined && !idPattern.test(invoiceId))
     fail('validation-failed', '发票身份无效。')
   const [participant] = await tx.select<{ schema_version: number }>('SELECT schema_version FROM production_participants WHERE domain=?', ['invoices'])
-  if (![1, 2, 3].includes(participant?.schema_version ?? 0))
+  if (![1, 2, 3, 4].includes(participant?.schema_version ?? 0))
     fail('unavailable', '发票正式来源尚未接通。')
   const rows = await tx.select<Row>(`${SELECT_RECORD} WHERE i.deleted_at IS NULL AND i.account_status='archived' AND i.dup_status='normal'${invoiceId === undefined ? '' : ' AND i.id=?'} ORDER BY i.id`, invoiceId === undefined ? [] : [invoiceId])
   const references: Record<string, unknown>[] = []
@@ -567,7 +568,7 @@ export async function validateProductionInvoiceJournal(tx: TransactionDb, identi
   for (const row of receipts) {
     if (row.workspace_id !== identity.workspaceId || row.actor_id !== identity.actorId || typeof row.invoice_id !== 'string'
       || typeof row.command_id !== 'string' || typeof row.fingerprint !== 'string' || !/^[a-f0-9]{64}$/.test(row.fingerprint)
-      || !['upload', 'manual', 'import', 'import-replace', 'attach-original', 'link-contract', 'confirm-legacy', 'recognize', 'rerecognize', 'edit', 'review', 'archive', 'edit-archived', 'correct', 'discard', 'restore', 'legacy-adopt', 'legacy-retire'].includes(String(row.action))
+      || !['upload', 'manual', 'import', 'import-workbook', 'import-replace', 'attach-original', 'link-contract', 'confirm-legacy', 'recognize', 'rerecognize', 'edit', 'review', 'archive', 'edit-archived', 'correct', 'discard', 'restore', 'legacy-adopt', 'legacy-retire'].includes(String(row.action))
       || !headIds.has(row.invoice_id)) {
       return invalid()
     }
@@ -616,7 +617,7 @@ export async function validateProductionInvoiceJournal(tx: TransactionDb, identi
       printing: item,
     }))
     const history = [...ordinary, ...printing].sort((a, b) => Number(a.result.version) - Number(b.result.version))
-    if (history.length !== Number(head.version) || history[0]?.row.action !== (head.sourceKind === 'scan' ? 'upload' : head.sourceKind === 'excel' ? 'import' : head.sourceKind === 'legacy' ? 'legacy-adopt' : 'manual'))
+    if (history.length !== Number(head.version) || (head.sourceKind === 'excel' ? !['import', 'import-workbook'].includes(String(history[0]?.row.action)) : history[0]?.row.action !== (head.sourceKind === 'scan' ? 'upload' : head.sourceKind === 'legacy' ? 'legacy-adopt' : 'manual')))
       return invalid()
     let prior: unknown = null
     let verifiedPageCount: number | null = null
@@ -777,7 +778,7 @@ export async function validateProductionInvoiceJournal(tx: TransactionDb, identi
         }
       }
       const archives = await tx.select<Row>('SELECT * FROM invoice_archive_evidence WHERE command_id=?', [entry.row.command_id])
-      const expectedArchive = entry.row.action === 'archive' || entry.row.action === 'edit-archived' || entry.row.action === 'import' || entry.row.action === 'import-replace' || entry.row.action === 'correct'
+      const expectedArchive = entry.row.action === 'archive' || entry.row.action === 'edit-archived' || entry.row.action === 'import' || entry.row.action === 'import-workbook' || entry.row.action === 'import-replace' || entry.row.action === 'correct'
       if (archives.length !== (expectedArchive ? 1 : 0))
         return invalid()
       for (const archive of archives) {
@@ -855,7 +856,7 @@ export async function validateProductionInvoiceJournal(tx: TransactionDb, identi
           return invalid()
       }
       const imports = await tx.select<Row>('SELECT * FROM invoice_import_sources WHERE command_id=?', [entry.row.command_id])
-      if (imports.length !== (entry.row.action === 'import' || entry.row.action === 'import-replace' ? 1 : 0))
+      if (imports.length !== (entry.row.action === 'import' || entry.row.action === 'import-workbook' || entry.row.action === 'import-replace' ? 1 : 0))
         return invalid()
       for (const imported of imports) {
         const source = importSource(parse(imported.source_json))
@@ -868,8 +869,10 @@ export async function validateProductionInvoiceJournal(tx: TransactionDb, identi
         const buyer = proof && object(proof.buyer) ? proof.buyer : null
         const supplier = proof && object(proof.supplier) ? proof.supplier : null
         const common = { workspaceId: identity.workspaceId, actorId: identity.actorId, commandId: entry.row.command_id, requiredCapability: INVOICE_WRITE_CAPABILITY, fields: after.fields, items: after.items, ownerKind: after.ownerKind, projectId: after.projectId, supplierId: after.supplierId, source, confirmed: true, ...(object(archiveEvidence) && archiveEvidence.taxNumbersConfirmed === true && buyer && supplier ? { taxNumbersConfirmed: true, taxVerification: { buyerId: buyer.id, buyerVersion: buyer.version, supplierVersion: supplier.version } } : {}) }
-        const request = entry.row.action === 'import' ? { ...common, action: 'import', baseVersion: null } : object(before) ? { ...common, action: 'import-replace', invoiceId: head.id, baseVersion: before.version } : null
-        if (digest(canonical(request)) !== entry.row.fingerprint)
+        const request = entry.row.action === 'import' || entry.row.action === 'import-workbook' ? { ...common, action: 'import', baseVersion: null } : object(before) ? { ...common, action: 'import-replace', invoiceId: head.id, baseVersion: before.version } : null
+        const [binding] = entry.row.action === 'import-workbook' ? await tx.select<Row>('SELECT mapping_json FROM invoice_import_workbook_rows WHERE command_id=? AND command_kind=\'import\'', [entry.row.command_id]) : []
+        const commandProof = entry.row.action === 'import-workbook' && binding && request ? { ...request, workbookMapping: parse(binding.mapping_json) } : request
+        if ((entry.row.action === 'import-workbook' && !binding) || digest(canonical(commandProof)) !== entry.row.fingerprint)
           return invalid()
       }
     }
@@ -878,10 +881,11 @@ export async function validateProductionInvoiceJournal(tx: TransactionDb, identi
   }
   const hasCorrections = (await tx.select('SELECT name FROM sqlite_schema WHERE type=\'table\' AND name=\'invoice_corrections\'')).length > 0
   const [invoiceParticipant] = await tx.select<{ schema_version: number }>('SELECT schema_version FROM production_participants WHERE domain=\'invoices\'')
-  if (hasCorrections !== (invoiceParticipant?.schema_version === 3))
+  if (hasCorrections !== [3, 4].includes(invoiceParticipant?.schema_version ?? 0))
     return invalid()
   if (hasCorrections)
     await validateInvoiceCorrections(tx, identity)
+  await validateInvoiceWorkbooks(tx)
 }
 
 export function createProductionInvoiceService(storage: ProductionStorage, options: { verifyContract?: typeof verifyInvoiceContractReference } = {}) {
@@ -1155,12 +1159,49 @@ export function createProductionInvoiceService(storage: ProductionStorage, optio
         return { ...owner.original, bytes: new Uint8Array(row.content) }
       })
     },
-    async execute(value: unknown, session: Session): Promise<CentralInvoiceCommandResult> {
+    workbook(workbookId: string, session: Session) {
+      if (!idPattern.test(workbookId))
+        return Promise.reject(new CentralInvoiceProblem('validation-failed', '工作簿身份无效。'))
+      return run(session, false, async (tx) => {
+        await validateInvoiceWorkbooks(tx)
+        const [row] = await tx.select<Row>('SELECT w.sha256,f.file_name,f.file_size,p.content FROM invoice_import_workbooks w JOIN file_refs f ON f.id=w.file_ref_id JOIN file_payloads p ON p.file_ref_id=f.id WHERE w.id=?', [workbookId])
+        if (!row || typeof row.file_name !== 'string' || typeof row.sha256 !== 'string' || !(row.content instanceof Uint8Array) || row.file_size !== row.content.length || digest(row.content) !== row.sha256)
+          fail('not-found', '工作簿不存在或正文不可用。')
+        return { fileName: row.file_name, sha256: row.sha256, bytes: new Uint8Array(row.content) }
+      })
+    },
+    workbooksForInvoice(invoiceId: string, session: Session) {
+      if (!idPattern.test(invoiceId))
+        return Promise.reject(new CentralInvoiceProblem('validation-failed', '发票身份无效。'))
+      return run(session, false, async (tx) => {
+        await validateInvoiceWorkbooks(tx)
+        const rows = await tx.select<Row>('SELECT w.id,w.sha256,r.source_json FROM invoice_import_workbook_rows r JOIN invoice_import_workbooks w ON w.id=r.workbook_id WHERE r.invoice_id=? ORDER BY r.rowid', [invoiceId])
+        return rows.map((row) => {
+          let source: CentralInvoiceImportSource
+          try {
+            source = importSource(JSON.parse(String(row.source_json)))
+          }
+          catch { return fail('unavailable', '工作簿来源行损坏。') }
+          return { id: row.id, sha256: row.sha256, fileName: source.fileName, sheetName: source.sheetName, rowNumber: source.rowNumber }
+        })
+      })
+    },
+    async execute(value: unknown, session: Session, workbookInput?: unknown, workbookMapping?: unknown): Promise<CentralInvoiceCommandResult> {
       const request = command(value)
+      const initialActor = authorize(session, true)
+      if (workbookInput !== undefined && request.action !== 'import')
+        fail('validation-failed', '工作簿只能随 Excel 导入命令提交。')
+      if (workbookInput !== undefined && !initialActor.capabilities.includes('finance-invoice:import'))
+        fail('forbidden', '当前身份没有发票导入权限。')
+      if (workbookInput === undefined && workbookMapping !== undefined)
+        fail('validation-failed', '字段映射必须随原工作簿提交。')
+      const workbook = request.action === 'import' && workbookInput !== undefined ? await prepareInvoiceWorkbook(workbookInput, request.source) : null
+      if (request.action === 'import' && workbook)
+        assertInvoiceWorkbookImport(request.fields, request.items, workbookMapping, workbook.row, workbook.columns, workbook.unsafeFormulaColumns)
       return run(session, true, async (tx, actor) => {
         if (request.workspaceId !== actor.workspaceId || request.actorId !== actor.actorId)
           fail('forbidden', '发票命令身份与当前可信会话不一致。')
-        const fingerprint = digest(canonical(request))
+        const fingerprint = digest(canonical(workbook ? { ...request, workbookMapping } : request))
         const [sealed] = await tx.select<Row>('SELECT * FROM invoice_command_resolutions WHERE command_id=?', [request.commandId])
         if (sealed)
           fail('conflict', '原提交已封存为未应用，迟到请求不能写入。')
@@ -1172,12 +1213,23 @@ export function createProductionInvoiceService(storage: ProductionStorage, optio
             fail('forbidden', '原发票提交不属于当前身份。')
           if (prior.fingerprint !== fingerprint || typeof prior.invoice_id !== 'string')
             fail('conflict', '原发票提交编号不能用于不同内容。')
+          if (workbook && !(await tx.select('SELECT r.command_id FROM invoice_import_workbook_rows r JOIN invoice_import_workbooks w ON w.id=r.workbook_id WHERE r.command_id=? AND r.invoice_id=? AND w.sha256=?', [request.commandId, prior.invoice_id, workbook.sha256])).length)
+            fail('conflict', '原提交没有此工作簿正文绑定，不能事后补造。')
           return parsedReceipt(prior.result_json, request.commandId, prior.invoice_id)
         }
         if (await correctionCommandOccupied(tx, request.commandId))
           fail('conflict', '该编号属于更正单，请按更正单核对。')
         if (['edit-archived', 'import-replace', 'link-contract'].includes(request.action))
           fail('conflict', '已归档发票须通过独立更正单修改；该流程尚未开放，请保留原票并稍后处理。')
+        if (request.action === 'import') {
+          const [participant] = await tx.select<{ schema_version: number }>('SELECT schema_version FROM production_participants WHERE domain=\'invoices\'')
+          if (![1, 2, 3, 4].includes(participant?.schema_version ?? 0))
+            fail('unavailable', '发票来源版本不可用。')
+          if (participant?.schema_version === 4 && (!workbook || !actor.capabilities.includes('finance-invoice:import')))
+            fail('forbidden', '导入发票需要导入权限和原工作簿正文。')
+          if (participant?.schema_version !== 4 && workbook)
+            fail('unavailable', '当前发票存储尚不支持工作簿原件。')
+        }
         if (request.action === 'upload' && !(('ownerKind' in request && request.ownerKind === 'company' && request.projectId === null) || (typeof request.projectId === 'string' && idPattern.test(request.projectId))))
           fail('validation-failed', '上传发票前请选择真实项目。')
         if (['archive', 'import', 'import-replace'].includes(request.action) && (!('taxNumbersConfirmed' in request) || request.taxNumbersConfirmed !== true || !('taxVerification' in request) || !request.taxVerification))
@@ -1387,9 +1439,12 @@ export function createProductionInvoiceService(storage: ProductionStorage, optio
           }
         }
         const result: CentralInvoiceCommandResult = { invoiceId, commandId: request.commandId, version: String(version), updatedAt: now, originalId }
-        await tx.execute('INSERT INTO invoice_command_receipts VALUES(?,?,?,?,?,?,?,?)', [request.commandId, actor.workspaceId, actor.actorId, invoiceId, request.action, fingerprint, JSON.stringify(result), now])
+        const receiptAction = request.action === 'import' && workbook ? 'import-workbook' : request.action
+        await tx.execute('INSERT INTO invoice_command_receipts VALUES(?,?,?,?,?,?,?,?)', [request.commandId, actor.workspaceId, actor.actorId, invoiceId, receiptAction, fingerprint, JSON.stringify(result), now])
         if (imported)
           await tx.execute('INSERT INTO invoice_import_sources VALUES(?,?,?,?,?,?)', [request.commandId, invoiceId, imported.source.fileDigest, imported.source.sheetName, imported.source.rowNumber, JSON.stringify(imported.source)])
+        if (imported && workbook)
+          await bindInvoiceWorkbook(tx, { workbook, source: imported.source, mapping: workbookMapping, commandId: request.commandId, invoiceId, kind: 'import', actorId: actor.actorId, now })
         if (recognition)
           await tx.execute('INSERT INTO invoice_recognitions VALUES(?,?,?,?,?,?)', [randomUUID(), invoiceId, request.commandId, actor.actorId, JSON.stringify(recognition), now])
         if (archiveEvidence)
@@ -1397,7 +1452,7 @@ export function createProductionInvoiceService(storage: ProductionStorage, optio
         const after = await record(tx, invoiceId, true, actor)
         if (recognitionIntermediate)
           await tx.execute('INSERT INTO invoice_audits VALUES(?,?,?,?,?,?,?,?)', [randomUUID(), invoiceId, request.commandId, actor.actorId, request.action, before ? JSON.stringify(before) : null, JSON.stringify(recognitionIntermediate), now])
-        await tx.execute('INSERT INTO invoice_audits VALUES(?,?,?,?,?,?,?,?)', [randomUUID(), invoiceId, request.commandId, actor.actorId, recognitionIntermediate ? 'edit' : request.action, recognitionIntermediate ? JSON.stringify(recognitionIntermediate) : before ? JSON.stringify(before) : null, JSON.stringify(after), now])
+        await tx.execute('INSERT INTO invoice_audits VALUES(?,?,?,?,?,?,?,?)', [randomUUID(), invoiceId, request.commandId, actor.actorId, recognitionIntermediate ? 'edit' : receiptAction, recognitionIntermediate ? JSON.stringify(recognitionIntermediate) : before ? JSON.stringify(before) : null, JSON.stringify(after), now])
         await tx.execute('UPDATE invoice_revision SET revision=revision+1 WHERE singleton=1')
         return result
       })

@@ -12,7 +12,8 @@ import { contractOriginalBytes, contractOriginalDigest } from './contract-origin
 import { financeCommandFingerprint } from './production-finance-request'
 import { invoiceContractCapability } from './production-invoice-contracts'
 import { readCorrectionBaselineIdentity, readInvoiceCorrectionStart } from './production-invoice-correction-start'
-import { contractReference, invoiceFields, invoiceItems, readProductionInvoiceFact, validateProductionInvoiceJournal, validOwner } from './production-invoice-service'
+import { contractReference, importSource, invoiceFields, invoiceItems, readProductionInvoiceFact, validateProductionInvoiceJournal, validOwner } from './production-invoice-service'
+import { assertInvoiceWorkbookFill, bindInvoiceWorkbook, prepareInvoiceWorkbook } from './production-invoice-workbook'
 import { createReadMeta, withReadMeta } from './read-meta'
 
 type Row = Record<string, unknown>
@@ -90,10 +91,19 @@ function normalized(input: unknown) {
   return { proof, files }
 }
 function submitCommand(input: unknown): InvoiceCorrectionSubmitCommand {
-  if (!object(input) || !exact(input, ['action', 'workspaceId', 'actorId', 'commandId', 'requiredCapability', 'invoiceId', 'baseInvoiceVersion', 'correctionId', 'baseCorrectionVersion', 'confirmed'])
+  const keys = ['action', 'workspaceId', 'actorId', 'commandId', 'requiredCapability', 'invoiceId', 'baseInvoiceVersion', 'correctionId', 'baseCorrectionVersion', 'confirmed']
+  if (!object(input) || !(exact(input, keys) || exact(input, [...keys, 'workbookSource']))
     || input.action !== 'submit' || input.requiredCapability !== INVOICE_WRITE_CAPABILITY || input.confirmed !== true || !id(input.workspaceId) || !id(input.actorId) || !id(input.commandId) || !id(input.invoiceId)
     || !version(input.baseInvoiceVersion) || !id(input.correctionId) || !version(input.baseCorrectionVersion)) {
     return fail('validation-failed', '更正提交身份、版本或明确确认无效。')
+  }
+  if (Object.hasOwn(input, 'workbookSource')) {
+    if (!object(input.workbookSource) || !exact(input.workbookSource, ['source', 'mapping']) || !object(input.workbookSource.mapping))
+      return fail('validation-failed', '工作簿补空来源或映射无效。')
+    importSource(input.workbookSource.source)
+    const fields = ['invoiceNumber', 'invoiceDate', 'invoiceType', 'buyer', 'buyerTaxNo', 'seller', 'sellerTaxNo', 'amount', 'taxAmount', 'totalAmount', 'taxRate', 'remark']
+    if (!Object.keys(input.workbookSource.mapping).length || Object.entries(input.workbookSource.mapping).some(([key, column]) => !fields.includes(key) || typeof column !== 'string' || !column))
+      return fail('validation-failed', '工作簿补空字段映射无效。')
   }
   return input as unknown as InvoiceCorrectionSubmitCommand
 }
@@ -142,7 +152,7 @@ export async function validateInvoiceCorrections(tx: TransactionDb, actor: Pick<
       const result = parse(receipt.result_json)
       const submitting = receipt.action === 'submit'
       const commonKeys = ['action', 'workspaceId', 'actorId', 'commandId', 'requiredCapability', 'invoiceId', 'baseInvoiceVersion', 'correctionId', 'baseCorrectionVersion']
-      if (!object(proof) || !object(result) || !exact(proof, [...commonKeys, ...(submitting ? ['confirmed'] : ['reason', 'proposed', 'keepFileIds', 'addFiles'])])
+      if (!object(proof) || !object(result) || !exact(proof, [...commonKeys, ...(submitting ? ['confirmed', ...(Object.hasOwn(proof, 'workbookSource') ? ['workbookSource'] : [])] : ['reason', 'proposed', 'keepFileIds', 'addFiles'])])
         || !exact(result, ['commandId', 'correctionId', 'invoiceId', 'version', 'updatedAt', ...(submitting ? ['invoiceVersion'] : [])]) || !['save-draft', 'submit'].includes(String(receipt.action))
         || receipt.fingerprint !== financeCommandFingerprint(proof) || proof.workspaceId !== actor.workspaceId || proof.actorId !== actor.actorId || proof.requiredCapability !== INVOICE_WRITE_CAPABILITY
         || proof.commandId !== receipt.command_id || proof.action !== receipt.action || proof.invoiceId !== current.invoiceId || proof.baseInvoiceVersion !== current.baseInvoiceVersion
@@ -334,8 +344,14 @@ export function createProductionInvoiceCorrectionService(storage: ProductionStor
         return result
       })
     },
-    submit(input: unknown, session: Session): Promise<InvoiceCorrectionSubmitResult> {
+    async submit(input: unknown, session: Session, workbookInput?: unknown): Promise<InvoiceCorrectionSubmitResult> {
       const request = submitCommand(input)
+      const initialActor = authorize(session, true)
+      if (workbookInput !== undefined && !request.workbookSource)
+        return fail('validation-failed', '工作簿缺少补空来源证明。')
+      if (workbookInput !== undefined && !initialActor.capabilities.includes('finance-invoice:import'))
+        return fail('forbidden', '当前身份没有发票导入权限。')
+      const workbook = request.workbookSource && workbookInput !== undefined ? await prepareInvoiceWorkbook(workbookInput, request.workbookSource.source) : null
       return run(session, true, async (tx, actor) => {
         if (request.workspaceId !== actor.workspaceId || request.actorId !== actor.actorId)
           return fail('forbidden', '更正提交与当前身份不一致。')
@@ -345,8 +361,12 @@ export function createProductionInvoiceCorrectionService(storage: ProductionStor
         if (receipt) {
           if (receipt.fingerprint !== financeCommandFingerprint(request))
             return fail('conflict', '原更正编号不能用于不同内容。')
+          if (workbook && !(await tx.select('SELECT r.command_id FROM invoice_import_workbook_rows r JOIN invoice_import_workbooks w ON w.id=r.workbook_id WHERE r.command_id=? AND w.sha256=?', [request.commandId, workbook.sha256])).length)
+            return fail('conflict', '原更正没有此工作簿绑定，不能事后补造。')
           return parse(receipt.result_json) as InvoiceCorrectionSubmitResult
         }
+        if (request.workbookSource && (!workbook || !actor.capabilities.includes('finance-invoice:import')))
+          return fail('forbidden', '工作簿补空需要导入权限和原工作簿正文。')
         for (const table of ['invoice_command_receipts', 'invoice_command_resolutions', 'invoice_print_receipts']) {
           if ((await tx.select(`SELECT command_id FROM ${table} WHERE command_id=?`, [request.commandId])).length)
             return fail('conflict', '该编号已用于其他发票操作。')
@@ -359,6 +379,9 @@ export function createProductionInvoiceCorrectionService(storage: ProductionStor
           return fail('conflict', '更正草稿或原票版本已变化。')
         if (!previous.reason.trim() || !invoiceCorrectionChanges(previous.baseline, previous.proposed).length)
           return fail('validation-failed', '请填写更正原因并核对实际变动。')
+        if (request.workbookSource && workbook) {
+          assertInvoiceWorkbookFill(previous.baseline, previous.proposed, request.workbookSource.mapping, workbook.row, workbook.columns, workbook.unsafeFormulaColumns)
+        }
         if (!previous.proposed.buyer || !previous.proposed.supplierId || !previous.proposed.supplierVersion)
           return fail('validation-failed', '请明确选择我方主体和已有分供方并核对来源版本。')
         await assertReadSources(tx, actor, previous.invoiceId, previous)
@@ -377,6 +400,8 @@ export function createProductionInvoiceCorrectionService(storage: ProductionStor
         const result: InvoiceCorrectionSubmitResult = { commandId: request.commandId, correctionId: record.id, invoiceId: record.invoiceId, version: record.version, invoiceVersion: nextInvoiceVersion, updatedAt: now }
         await tx.execute('INSERT INTO invoice_correction_receipts VALUES(?,?,?,?,?,?,?,?,?)', [request.commandId, actor.workspaceId, actor.actorId, record.id, 'submit', financeCommandFingerprint(request), JSON.stringify(request), JSON.stringify(result), now])
         await tx.execute('INSERT INTO invoice_correction_versions VALUES(?,?,?,?,?,?)', [record.id, Number(record.version), request.commandId, actor.actorId, JSON.stringify(record), now])
+        if (request.workbookSource && workbook)
+          await bindInvoiceWorkbook(tx, { workbook, source: request.workbookSource.source, mapping: request.workbookSource.mapping, commandId: request.commandId, invoiceId: record.invoiceId, kind: 'correction', actorId: actor.actorId, now })
         await tx.execute('UPDATE invoice_correction_revision SET revision=revision+1 WHERE singleton=1')
         return result
       })

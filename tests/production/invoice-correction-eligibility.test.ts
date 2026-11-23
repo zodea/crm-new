@@ -15,9 +15,11 @@ import { PRODUCTION_INVOICE_CORRECTION_SCHEMA } from '../../server/utils/product
 import { createProductionInvoiceCorrectionService } from '../../server/utils/production-invoice-correction-service'
 import { correctionBaselineIdentity, readInvoiceCorrectionStart } from '../../server/utils/production-invoice-correction-start'
 import { createProductionInvoiceMigration } from '../../server/utils/production-invoice-migration'
-import { createProductionInvoiceService } from '../../server/utils/production-invoice-service'
+import { createProductionInvoiceService, validateProductionInvoiceJournal } from '../../server/utils/production-invoice-service'
+import { assertInvoiceWorkbookFill, assertInvoiceWorkbookImport, prepareInvoiceWorkbook, unsafeInvoiceFormulaColumns, validateInvoiceWorkbooks } from '../../server/utils/production-invoice-workbook'
 import { createProductionStorage } from '../../server/utils/production-storage'
 import { createProductionSupplierService } from '../../server/utils/production-supplier-service'
+import { syntheticInvoiceWorkbook } from '../helpers/invoice-workbook-fixture'
 import { createMigratedMemoryDb } from '../helpers/memory-db'
 import { createSubcontractFixture } from '../helpers/production-subcontract-fixture'
 import { cleanupTestTempRoot, testTempRoot } from '../helpers/test-temp-root'
@@ -39,7 +41,7 @@ function pdf() {
 
 async function fixture() {
   const f = await createSubcontractFixture()
-  f.setActor({ ...f.session(), capabilities: [...f.session().capabilities, INVOICE_READ_CAPABILITY, INVOICE_WRITE_CAPABILITY, 'finance-payment-application:read', 'finance-payment-application:write', 'finance-payment-record:read', 'auxiliary-contract:read', 'auxiliary-contract:write'] })
+  f.setActor({ ...f.session(), capabilities: [...f.session().capabilities, INVOICE_READ_CAPABILITY, INVOICE_WRITE_CAPABILITY, 'finance-invoice:import', 'finance-payment-application:read', 'finance-payment-application:write', 'finance-payment-record:read', 'auxiliary-contract:read', 'auxiliary-contract:write'] })
   const supplierDraft = JSON.parse((await f.storage.select<{ draft_json: string }>('SELECT draft_json FROM suppliers WHERE id=?', [f.supplier.id]))[0]!.draft_json)
   const supplier = await createProductionSupplierService(f.storage).execute({ workspaceId: f.session().workspaceId, actorId: f.session().actorId, requiredCapability: 'supplier:write', commandId: 'correction-supplier-tax', id: f.supplier.id, baseVersion: f.supplier.version, action: 'save', attachments: {}, draft: { ...supplierDraft, taxNo: 'CORRECTION-SELLER' } }, f.session, f.supplier.id)
   const service = createProductionInvoiceService(f.storage)
@@ -196,7 +198,7 @@ it('明确提交更正单原子更新原票和双重回执，原件、历史及�
     const restored = await restoreBackupIsolated(backupDirectory, backup.id, restoreDirectory, 'correction-restore')
     const recovered = createProductionStorage({ ...f.options, directory: restored.directory })
     try {
-      expect((await recovered.status()).schemaVersion).toBe(32)
+      expect((await recovered.status()).schemaVersion).toBe(33)
       const recoveredInvoice = createProductionInvoiceService(recovered)
       const recoveredCorrections = createProductionInvoiceCorrectionService(recovered, { invoice: recoveredInvoice.correctionPort })
       expect(await recoveredCorrections.get(draft.correctionId, f.session)).toEqual(correction)
@@ -213,7 +215,7 @@ it('明确提交更正单原子更新原票和双重回执，原件、历史及�
   finally { await f.storage.close() }
 })
 
-it('项目和公司票可主动互转，历史个人票仅在用户明确提交更正后转换', async () => {
+it('项目和公司票可主动互转，历史个人票仅在用户明确提交更正后转换', { timeout: 120_000 }, async () => {
   const f = await fixture()
   try {
     const auxiliary = createProductionAuxiliaryContractService(f.storage)
@@ -226,13 +228,141 @@ it('项目和公司票可主动互转，历史个人票仅在用户明确提交�
     }
     const companyResult = await change(f.archived.invoiceId, f.archived.version, 'to-company', before => ({ ...before, ownerKind: 'company', projectId: null, contract: { domain: 'company', id: company.id, version: company.version } }))
     expect(await f.service.get(f.archived.invoiceId, f.session)).toMatchObject({ ownerKind: 'company', projectId: null, contract: { domain: 'company', id: company.id } })
-    await change(f.archived.invoiceId, companyResult.invoiceVersion, 'to-project', before => ({ ...before, ownerKind: 'project', projectId: f.project.id, contract: null }))
+    const projectAgain = await change(f.archived.invoiceId, companyResult.invoiceVersion, 'to-project', before => ({ ...before, ownerKind: 'project', projectId: f.project.id, contract: null }))
     expect(await f.service.get(f.archived.invoiceId, f.session)).toMatchObject({ ownerKind: 'project', projectId: f.project.id, contract: null })
     const fields = { invoiceNumber: 'SYN-PERSONAL', invoiceDate: '2026-10-07', invoiceType: '', buyer: '合成主体', buyerTaxNo: 'SUBCONTRACT-VERIFICATION', seller: '合成分供方', sellerTaxNo: 'CORRECTION-SELLER', amount: null, taxAmount: 0, totalAmount: 100, taxRate: '', remark: '' }
-    const personal = await f.service.execute({ ...f.common, action: 'import', commandId: 'correction-personal-import', baseVersion: null, fields, items: [], ownerKind: 'personal', projectId: null, supplierId: f.supplier.id, source: { fileName: '历史.xlsx', fileDigest: 'b'.repeat(64), sheetName: '历史', rowNumber: 1, rawSnapshot: {} }, confirmed: true, taxNumbersConfirmed: true, taxVerification: { buyerId: f.signatory.id, buyerVersion: f.signatory.version, supplierVersion: f.supplier.version } }, f.session)
+    const workbook = await syntheticInvoiceWorkbook(fields.invoiceNumber, 12)
+    const importMapping = { ...Object.fromEntries(Object.entries(workbook.mapping).filter(([key]) => key !== 'amount')), taxAmount: { column: '负零', confidence: 'confirmed' } }
+    const parsed = await prepareInvoiceWorkbook(workbook.workbook, workbook.source)
+    expect(parsed.columns).toContain('__importSource')
+    expect(parsed.unsafeFormulaColumns).toContain('公式问题')
+    expect(Object.hasOwn(workbook.source.rawSnapshot, '__proto__')).toBe(true)
+    expect(Object.getOwnPropertyDescriptor(workbook.source.rawSnapshot, '__proto__')?.value).toBe('真实特殊键')
+    const ambiguous = await syntheticInvoiceWorkbook('SYN-AMBIGUOUS', null, true)
+    await expect(prepareInvoiceWorkbook(ambiguous.workbook, ambiguous.source)).rejects.toMatchObject({ problem: { code: 'validation-failed' } })
+    for (const formulaStatus of ['invalid', 'missing-cache'] as const) {
+      const unsafe = unsafeInvoiceFormulaColumns([{ columnName: '价税合计', formulaStatus }])
+      expect(() => assertInvoiceWorkbookImport(fields, [], importMapping, parsed.row, parsed.columns, unsafe)).toThrow('来源行存在无法核验的公式缓存')
+    }
+    const command = { ...f.common, action: 'import', commandId: 'correction-personal-import', baseVersion: null, fields, items: [], ownerKind: 'personal', projectId: null, supplierId: f.supplier.id, source: workbook.source, confirmed: true, taxNumbersConfirmed: true, taxVerification: { buyerId: f.signatory.id, buyerVersion: f.signatory.version, supplierVersion: f.supplier.version } }
+    await expect(f.service.execute(command, f.session)).rejects.toMatchObject({ problem: { code: 'forbidden' } })
+    expect(await f.storage.select('SELECT id FROM invoice_import_workbooks')).toEqual([])
+    await expect(f.service.execute({ ...command, fields: { ...fields, totalAmount: 200 } }, f.session, workbook.workbook, importMapping)).rejects.toMatchObject({ problem: { code: 'conflict' } })
+    for (const column of ['__importSource', '公式问题', '不存在的列']) {
+      const mapping = { ...importMapping, remark: { column, confidence: 'confirmed' } }
+      await expect(f.service.execute(command, f.session, workbook.workbook, mapping)).rejects.toMatchObject({ problem: { code: 'validation-failed' } })
+    }
+    expect(await f.storage.select('SELECT id FROM invoice_import_workbooks')).toEqual([])
+    const personal = await f.service.execute(command, f.session, workbook.workbook, importMapping)
+    expect(await f.service.execute(command, f.session, workbook.workbook, importMapping)).toEqual(personal)
+    const links = await f.service.workbooksForInvoice(personal.invoiceId, () => ({ ...f.actor, capabilities: [INVOICE_READ_CAPABILITY] }))
+    expect(Buffer.from((await f.service.workbook(String(links[0]!.id), () => ({ ...f.actor, capabilities: [INVOICE_READ_CAPABILITY] }))).bytes)).toEqual(workbook.bytes)
     expect((await f.service.get(personal.invoiceId, f.session)).ownerKind).toBe('personal')
-    await change(personal.invoiceId, personal.version, 'personal-to-project', before => ({ ...before, ownerKind: 'project', projectId: f.project.id }))
+    const personalStart = await f.storage.withTransaction(tx => readInvoiceCorrectionStart(tx, f.actor, personal.invoiceId, personal.version))
+    for (const formulaStatus of ['invalid', 'missing-cache'] as const) {
+      const unsafe = unsafeInvoiceFormulaColumns([{ columnName: '金额', formulaStatus }])
+      expect(() => assertInvoiceWorkbookFill(personalStart.baseline, { ...personalStart.baseline, fields: { ...personalStart.baseline.fields, amount: 12 } }, { amount: '金额' }, parsed.row, parsed.columns, unsafe)).toThrow('来源行存在无法核验的公式缓存')
+    }
+    const fillDraft = await corrections.saveDraft({ action: 'save-draft', ...f.common, commandId: 'same-source-fill-draft', invoiceId: personal.invoiceId, baseInvoiceVersion: personal.version, correctionId: null, baseCorrectionVersion: null, reason: '补充原表金额', proposed: { ...personalStart.baseline, fields: { ...personalStart.baseline.fields, amount: 12 } }, keepFileIds: [], addFiles: [] }, f.session)
+    const fill = { action: 'submit' as const, ...f.common, commandId: 'same-source-fill-submit', invoiceId: personal.invoiceId, baseInvoiceVersion: personal.version, correctionId: fillDraft.correctionId, baseCorrectionVersion: fillDraft.version, confirmed: true as const, workbookSource: { source: workbook.source, mapping: { amount: '金额' } } }
+    for (const column of ['__importSource', '公式问题', '不存在的列'])
+      await expect(corrections.submit({ ...fill, workbookSource: { source: workbook.source, mapping: { amount: '金额', remark: column } } }, f.session, workbook.workbook)).rejects.toMatchObject({ problem: { code: 'validation-failed' } })
+    const filled = await corrections.submit(fill, f.session, workbook.workbook)
+    expect(await corrections.submit(fill, f.session, workbook.workbook)).toEqual(filled)
+    expect(await f.storage.select('SELECT command_id FROM invoice_import_workbook_rows WHERE invoice_id=?', [personal.invoiceId])).toHaveLength(2)
+    const otherStart = await f.storage.withTransaction(tx => readInvoiceCorrectionStart(tx, f.actor, f.archived.invoiceId, projectAgain.invoiceVersion))
+    const otherDraft = await corrections.saveDraft({ action: 'save-draft', ...f.common, commandId: 'cross-source-fill-draft', invoiceId: f.archived.invoiceId, baseInvoiceVersion: projectAgain.invoiceVersion, correctionId: null, baseCorrectionVersion: null, reason: '检查跨票来源', proposed: { ...otherStart.baseline, fields: { ...otherStart.baseline.fields, amount: 12 } }, keepFileIds: [], addFiles: [] }, f.session)
+    await expect(corrections.submit({ ...fill, commandId: 'cross-source-fill-submit', invoiceId: f.archived.invoiceId, baseInvoiceVersion: projectAgain.invoiceVersion, correctionId: otherDraft.correctionId, baseCorrectionVersion: otherDraft.version }, f.session, workbook.workbook)).rejects.toMatchObject({ problem: { code: 'conflict' } })
+    expect((await f.service.get(f.archived.invoiceId, f.session)).fields.amount).toBeNull()
+    expect(await f.storage.select('SELECT command_id FROM invoice_import_workbook_rows')).toHaveLength(2)
+    await change(personal.invoiceId, filled.invoiceVersion, 'personal-to-project', before => ({ ...before, ownerKind: 'project', projectId: f.project.id }))
     expect((await f.service.get(personal.invoiceId, f.session)).ownerKind).toBe('project')
+    const base = testTempRoot('invoice-same-source-backup')
+    await mkdir(base, { recursive: true })
+    const backupDirectory = await mkdtemp(`${base}/backup-`)
+    const restoreDirectory = await mkdtemp(`${base}/restore-`)
+    const backup = await createLocalBackup(f.storage, backupDirectory, `backup-${randomUUID()}`, () => new Date().toISOString())
+    const restored = await restoreBackupIsolated(backupDirectory, backup.id, restoreDirectory, 'same-source-restore')
+    const recovered = createProductionStorage({ ...f.options, directory: restored.directory })
+    try {
+      const books = await createProductionInvoiceService(recovered).workbooksForInvoice(personal.invoiceId, () => ({ ...f.actor, capabilities: [INVOICE_READ_CAPABILITY] }))
+      expect(books).toHaveLength(2)
+      expect(books[0]!.id).toBe(books[1]!.id)
+      await recovered.execute('PRAGMA recursive_triggers=OFF')
+      expect(await recovered.select('PRAGMA recursive_triggers')).toEqual([{ recursive_triggers: 0 }])
+      for (const [table, where, value] of [
+        ['invoice_import_workbooks', 'id', books[0]!.id],
+        ['invoice_import_workbook_rows', 'command_id', command.commandId],
+        ['invoice_import_sources', 'command_id', command.commandId],
+        ['file_refs', 'id', (await recovered.select<{ file_ref_id: string }>('SELECT file_ref_id FROM invoice_import_workbooks WHERE id=?', [books[0]!.id]))[0]!.file_ref_id],
+        ['file_payloads', 'file_ref_id', (await recovered.select<{ file_ref_id: string }>('SELECT file_ref_id FROM invoice_import_workbooks WHERE id=?', [books[0]!.id]))[0]!.file_ref_id],
+      ] as const) {
+        await expect(recovered.execute(`INSERT OR REPLACE INTO ${table} SELECT * FROM ${table} WHERE ${where}=?`, [value])).rejects.toThrow('immutable')
+      }
+      // 仅破坏隔离恢复副本，直接检验恢复使用的来源校验器。
+      await recovered.execute('DROP TRIGGER invoice_import_workbook_rows_no_update')
+      for (const column of ['__importSource', '公式问题', '不存在的列']) {
+        const invalid = { ...importMapping, remark: { column, confidence: 'confirmed' } }
+        await recovered.execute('UPDATE invoice_import_workbook_rows SET mapping_json=? WHERE command_id=?', [JSON.stringify(invalid), command.commandId])
+        await expect(recovered.withTransaction(tx => validateInvoiceWorkbooks(tx))).rejects.toMatchObject({ problem: { code: 'unavailable' } })
+      }
+      await recovered.execute('UPDATE invoice_import_workbook_rows SET mapping_json=? WHERE command_id=?', [JSON.stringify(importMapping), command.commandId])
+      await recovered.execute('DROP TRIGGER invoice_correction_receipts_no_update')
+      for (const column of ['__importSource', '公式问题', '不存在的列']) {
+        const mapping = { amount: '金额', remark: column }
+        const proof = { ...fill, workbookSource: { source: workbook.source, mapping } }
+        await recovered.execute('UPDATE invoice_import_workbook_rows SET mapping_json=? WHERE command_id=?', [JSON.stringify(mapping), fill.commandId])
+        await recovered.execute('UPDATE invoice_correction_receipts SET request_json=? WHERE command_id=?', [JSON.stringify(proof), fill.commandId])
+        await expect(recovered.withTransaction(tx => validateInvoiceWorkbooks(tx))).rejects.toMatchObject({ problem: { code: 'unavailable' } })
+      }
+    }
+    finally { await recovered.close() }
+  }
+  finally { await f.storage.close() }
+})
+
+it('工作簿补空只在更正成功时原样保存，发票读取权限可下载并可从备份恢复', { timeout: 120_000 }, async () => {
+  const f = await fixture()
+  try {
+    const workbook = await syntheticInvoiceWorkbook('SYN-CORRECTION', 12)
+    const start = await f.storage.withTransaction(tx => readInvoiceCorrectionStart(tx, f.actor, f.archived.invoiceId, f.archived.version))
+    const corrections = createProductionInvoiceCorrectionService(f.storage, { invoice: f.service.correctionPort })
+    const rejected = await corrections.saveDraft({ action: 'save-draft', ...f.common, commandId: 'workbook-overwrite-draft', invoiceId: f.archived.invoiceId, baseInvoiceVersion: f.archived.version, correctionId: null, baseCorrectionVersion: null, reason: '错误覆盖', proposed: { ...start.baseline, fields: { ...start.baseline.fields, taxAmount: 1 } }, keepFileIds: [], addFiles: [] }, f.session)
+    await expect(corrections.submit({ action: 'submit', ...f.common, commandId: 'workbook-overwrite-submit', invoiceId: f.archived.invoiceId, baseInvoiceVersion: f.archived.version, correctionId: rejected.correctionId, baseCorrectionVersion: rejected.version, confirmed: true, workbookSource: { source: workbook.source, mapping: { taxAmount: '税额' } } }, f.session, workbook.workbook)).rejects.toMatchObject({ problem: { code: 'conflict' } })
+    const saved = await corrections.saveDraft({ action: 'save-draft', ...f.common, commandId: 'workbook-fill-draft', invoiceId: f.archived.invoiceId, baseInvoiceVersion: f.archived.version, correctionId: null, baseCorrectionVersion: null, reason: '补充金额', proposed: { ...start.baseline, fields: { ...start.baseline.fields, amount: 12 } }, keepFileIds: [], addFiles: [] }, f.session)
+    const command = { action: 'submit' as const, ...f.common, commandId: 'workbook-fill-submit', invoiceId: f.archived.invoiceId, baseInvoiceVersion: f.archived.version, correctionId: saved.correctionId, baseCorrectionVersion: saved.version, confirmed: true as const, workbookSource: { source: workbook.source, mapping: { amount: '金额', taxAmount: '税额' } } }
+    await expect(corrections.submit(command, f.session)).rejects.toMatchObject({ problem: { code: 'forbidden' } })
+    await expect(corrections.submit(command, f.session, { ...workbook.workbook, payloadBase64: Buffer.from('wrong').toString('base64') })).rejects.toMatchObject({ problem: { code: 'validation-failed' } })
+    expect(await f.storage.select('SELECT id FROM invoice_import_workbooks')).toEqual([])
+    const result = await corrections.submit(command, f.session, workbook.workbook)
+    expect(await corrections.submit(command, f.session, workbook.workbook)).toEqual(result)
+    expect(await f.service.get(f.archived.invoiceId, f.session)).toMatchObject({ fields: { amount: 12, taxAmount: 0 } })
+    const readOnly = () => ({ ...f.actor, capabilities: [INVOICE_READ_CAPABILITY] })
+    const books = await f.service.workbooksForInvoice(f.archived.invoiceId, readOnly)
+    expect(books).toHaveLength(1)
+    const id = String(books[0]!.id)
+    expect(Buffer.from((await f.service.workbook(id, readOnly)).bytes)).toEqual(workbook.bytes)
+    await expect(f.service.workbook(id, () => ({ ...f.actor, capabilities: [] }))).rejects.toMatchObject({ problem: { code: 'forbidden' } })
+    const base = testTempRoot('invoice-workbook-backup')
+    await mkdir(base, { recursive: true })
+    const backupDirectory = await mkdtemp(`${base}/backup-`)
+    const restoreDirectory = await mkdtemp(`${base}/restore-`)
+    const backup = await createLocalBackup(f.storage, backupDirectory, `backup-${randomUUID()}`, () => new Date().toISOString())
+    const restored = await restoreBackupIsolated(backupDirectory, backup.id, restoreDirectory, 'workbook-restore')
+    const recovered = createProductionStorage({ ...f.options, directory: restored.directory })
+    try {
+      expect(Buffer.from((await createProductionInvoiceService(recovered).workbook(id, readOnly)).bytes)).toEqual(workbook.bytes)
+      await expect(recovered.execute('UPDATE file_payloads SET content=? WHERE file_ref_id=(SELECT file_ref_id FROM invoice_import_workbooks WHERE id=?)', [Buffer.from('damaged'), id])).rejects.toThrow('invoice workbook bytes are immutable')
+      await expect(recovered.execute('DELETE FROM file_payloads WHERE file_ref_id=(SELECT file_ref_id FROM invoice_import_workbooks WHERE id=?)', [id])).rejects.toThrow('invoice workbook bytes are immutable')
+      await expect(recovered.execute('UPDATE file_refs SET file_name=? WHERE id=(SELECT file_ref_id FROM invoice_import_workbooks WHERE id=?)', ['damaged.xlsx', id])).rejects.toThrow('invoice workbook metadata is immutable')
+      await expect(recovered.execute('DELETE FROM file_refs WHERE id=(SELECT file_ref_id FROM invoice_import_workbooks WHERE id=?)', [id])).rejects.toThrow('invoice workbook metadata is immutable')
+      // 故意损坏合成恢复副本，验证缺少触发器后的纵深校验。
+      await recovered.execute('DROP TRIGGER invoice_workbook_payload_no_update')
+      await recovered.execute('UPDATE file_payloads SET content=? WHERE file_ref_id=(SELECT file_ref_id FROM invoice_import_workbooks WHERE id=?)', [Buffer.from('damaged'), id])
+      await expect(recovered.withTransaction(tx => validateProductionInvoiceJournal(tx, f.actor))).rejects.toMatchObject({ problem: { code: 'unavailable' } })
+      await expect(createLocalBackup(recovered, backupDirectory, `backup-${randomUUID()}`, () => new Date().toISOString())).rejects.toThrow('发票备份的原回执、版本、识别记录或审计历史不完整。')
+    }
+    finally { await recovered.close() }
   }
   finally { await f.storage.close() }
 })

@@ -169,7 +169,7 @@ it('有合同需票付款在确认前核对真实发票并冻结证据，草稿�
     expect(await finance.execute(failedPayment, session)).toEqual(retriedPayment)
     await storage.close()
     storage = createProductionStorage({ directory, workspaceId: actor.workspaceId, ownerId: actor.actorId, purpose: 'verification' })
-    expect((await storage.status()).schemaVersion).toBe(32)
+    expect((await storage.status()).schemaVersion).toBe(33)
     finance = createProductionFinanceService(storage, { references: productionFinanceOwners })
     expect(await finance.resolve('payment_record', payment.commandId, session)).toEqual({ outcome: 'applied', result: confirmed })
     await expect(validateFinanceJournal(storage, actor)).resolves.toBeDefined()

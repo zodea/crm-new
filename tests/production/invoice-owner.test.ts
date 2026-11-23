@@ -121,6 +121,8 @@ describe('发票中央原件 owner（隔离内存）', () => {
     await f.storage.execute('UPDATE production_participants SET schema_version=3 WHERE domain=?', ['invoices'])
     expect(await listProductionInvoiceReferences(f.storage, f.actor)).toEqual([])
     await f.storage.execute('UPDATE production_participants SET schema_version=4 WHERE domain=?', ['invoices'])
+    expect(await listProductionInvoiceReferences(f.storage, f.actor)).toEqual([])
+    await f.storage.execute('UPDATE production_participants SET schema_version=5 WHERE domain=?', ['invoices'])
     await expect(listProductionInvoiceReferences(f.storage, f.actor)).rejects.toMatchObject({ problem: { code: 'unavailable' } })
   })
 

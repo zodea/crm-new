@@ -9,6 +9,7 @@ import { validateMaterialContractIdentities } from '../../server/utils/contract-
 import { PRODUCTION_CONSTRUCTION_SCOPE_TABLES } from '../../server/utils/production-construction-scope-schema'
 import { PRODUCTION_INVOICE_CORRECTION_TABLES } from '../../server/utils/production-invoice-correction-schema'
 import { PRODUCTION_INVOICE_TABLES } from '../../server/utils/production-invoice-schema'
+import { PRODUCTION_INVOICE_WORKBOOK_TABLES } from '../../server/utils/production-invoice-workbook-schema'
 import { createProductionStorage } from '../../server/utils/production-storage'
 import { PRODUCTION_STORAGE_SCHEMA, PRODUCTION_STORAGE_UPGRADES, PRODUCTION_STORAGE_VERSION, productionStorageManifest } from '../../server/utils/production-storage-schema'
 import { cleanupTestTempRoot, testTempRoot } from '../helpers/test-temp-root'
@@ -17,7 +18,7 @@ afterAll(cleanupTestTempRoot)
 
 // Independent expected release scope: checking only the version would miss a partial owner registration.
 const expectedParticipants = ['auxiliary-contract', 'backup', 'boq', 'construction-contracts', 'construction-scope', 'contract-number-registry', 'crew-worker', 'customer', 'finance', 'invoices', 'material-contracts', 'material-quotations', 'notifications', 'other-settlements', 'our-signatories', 'payroll', 'process-library', 'project', 'quantity', 'subcontract-contracts', 'supplier', 'target-cost', 'wbs']
-const appendedOpt02Participants = ['target-cost', 'quantity', 'payroll', 'wbs', 'construction-contracts', 'boq', 'construction-scope', 'subcontract-contracts', 'auxiliary-contract', 'invoices'].map(domain => ({ domain, schema_version: domain === 'invoices' ? 3 : domain === 'construction-scope' ? 2 : 1 }))
+const appendedOpt02Participants = ['target-cost', 'quantity', 'payroll', 'wbs', 'construction-contracts', 'boq', 'construction-scope', 'subcontract-contracts', 'auxiliary-contract', 'invoices'].map(domain => ({ domain, schema_version: domain === 'invoices' ? 4 : domain === 'construction-scope' ? 2 : 1 }))
 
 it('发票v28升级保全原事实和旧清单，冲突时整批回滚并保留原库', async () => {
   const root = testTempRoot('invoice-v28-upgrade')
@@ -29,6 +30,7 @@ it('发票v28升级保全原事实和旧清单，冲突时整批回滚并保留�
   expect(productionStorageManifest(29).participants.invoices.schemaVersion).toBe(1)
   expect(productionStorageManifest(30).participants.invoices.schemaVersion).toBe(2)
   expect(productionStorageManifest(32).participants.invoices).toEqual({ schemaVersion: 3, tables: [...PRODUCTION_INVOICE_TABLES, ...PRODUCTION_INVOICE_CORRECTION_TABLES] })
+  expect(productionStorageManifest(33).participants.invoices).toEqual({ schemaVersion: 4, tables: [...PRODUCTION_INVOICE_TABLES, ...PRODUCTION_INVOICE_CORRECTION_TABLES, ...PRODUCTION_INVOICE_WORKBOOK_TABLES] })
   for (const conflict of [false, true]) {
     const directory = await mkdtemp(`${root}/synthetic-`)
     const file = join(directory, 'ruihang.sqlite')
@@ -59,7 +61,7 @@ it('发票v28升级保全原事实和旧清单，冲突时整批回滚并保留�
       try {
         expect((await storage.status()).schemaVersion).toBe(PRODUCTION_STORAGE_VERSION)
         expect(await storage.select('SELECT revision FROM customer_revision')).toEqual([{ revision: 7 }])
-        expect(await storage.select('SELECT domain,schema_version FROM production_participants WHERE domain=?', ['invoices'])).toEqual([{ domain: 'invoices', schema_version: 3 }])
+        expect(await storage.select('SELECT domain,schema_version FROM production_participants WHERE domain=?', ['invoices'])).toEqual([{ domain: 'invoices', schema_version: 4 }])
         expect(await storage.select('PRAGMA foreign_key_check')).toEqual([])
         await storage.close()
         expect((await storage.status()).schemaVersion).toBe(PRODUCTION_STORAGE_VERSION)
@@ -330,7 +332,7 @@ const newOwnerTables = [
 async function assertCurrentOwnerStructure(storage: ReturnType<typeof createProductionStorage>) {
   expect((await storage.status()).schemaVersion).toBe(PRODUCTION_STORAGE_VERSION)
   expect((await storage.status()).participants.slice().sort()).toEqual(expectedParticipants)
-  expect(await storage.select('SELECT * FROM production_participants ORDER BY domain')).toEqual(expectedParticipants.map(domain => ({ domain, schema_version: domain === 'invoices' ? 3 : ['construction-scope', 'finance'].includes(domain) ? 2 : 1 })))
+  expect(await storage.select('SELECT * FROM production_participants ORDER BY domain')).toEqual(expectedParticipants.map(domain => ({ domain, schema_version: domain === 'invoices' ? 4 : ['construction-scope', 'finance'].includes(domain) ? 2 : 1 })))
   for (const table of newOwnerTables) {
     expect(await storage.select(`SELECT * FROM ${table}`)).toEqual(table.endsWith('_revision') ? [{ singleton: 1, revision: 0 }] : [])
   }

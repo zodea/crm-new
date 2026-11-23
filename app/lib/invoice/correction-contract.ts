@@ -1,4 +1,4 @@
-import type { CentralInvoiceFields, CentralInvoiceItem, InvoiceContractReference } from './central-contract'
+import type { CentralInvoiceFields, CentralInvoiceImportSource, CentralInvoiceItem, InvoiceContractReference } from './central-contract'
 
 /** 历史无已核实主体身份时保留 null，不能从票面名称倒推。 */
 export interface InvoiceCorrectionBuyer { id: string, version: string }
@@ -73,6 +73,7 @@ export interface InvoiceCorrectionSubmitCommand {
   correctionId: string
   baseCorrectionVersion: string
   confirmed: true
+  workbookSource?: { source: CentralInvoiceImportSource, mapping: Partial<Record<keyof CentralInvoiceFields, string>> }
 }
 export interface InvoiceCorrectionSubmitResult extends InvoiceCorrectionResult { invoiceVersion: string }
 export interface InvoiceCorrectionResolutionRequest {

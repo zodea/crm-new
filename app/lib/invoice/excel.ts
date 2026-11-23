@@ -85,6 +85,7 @@ export interface InvoiceSourceCell {
   formula: string | null
   cachedValue: unknown
   formulaStatus: InvoiceFormulaStatus
+  inheritedFormulaIssue: { anchor: string, status: 'missing-cache' | 'invalid' } | null
   styleId: number | null
   style: InvoiceCellStyleSnapshot | null
 }
@@ -879,6 +880,7 @@ function parseWorksheetStyle(
  */
 export async function readInvoiceWorkbookStyleReadback(
   file: ArrayBuffer | Uint8Array,
+  onlySheetIndex?: number,
 ): Promise<InvoiceWorkbookStyleReadback> {
   try {
     const entries = await readXlsxZipEntries(file)
@@ -893,6 +895,8 @@ export async function readInvoiceWorkbookStyleReadback(
       const sheetXml = entryMap.get(`xl/worksheets/sheet${index + 1}.xml`)
       if (!sheetXml)
         break
+      if (onlySheetIndex !== undefined && onlySheetIndex !== index)
+        continue
       const sheetName = `sheet${index + 1}`
       sheets.push(parseWorksheetStyle(sheetName, new TextDecoder().decode(sheetXml), definitions))
     }
@@ -1071,6 +1075,7 @@ function readInvoiceSheet(
         formula: cell?.f ?? null,
         cachedValue: cell?.f && !isUnverifiedFormulaStub(cell) ? cell.v : undefined,
         formulaStatus: formulaStatus(cell, displayValue),
+        inheritedFormulaIssue: inheritedFormulaIssues.get(address) ?? null,
         styleId: cellStyle?.styleId ?? null,
         style: cellStyle,
       } satisfies InvoiceSourceCell
@@ -1082,7 +1087,7 @@ function readInvoiceSheet(
       .filter(cell => cell.formulaStatus === 'missing-cache' || cell.formulaStatus === 'invalid')
       .map(cell => `${cell.columnName}（${cell.address}）：${cell.formulaStatus === 'missing-cache' ? '缺少缓存值' : '缓存值异常'}`)
     for (const cell of cells) {
-      const inherited = inheritedFormulaIssues.get(cell.address)
+      const inherited = cell.inheritedFormulaIssue
       if (inherited)
         formulaIssues.push(`${cell.columnName}（${cell.address}）：合并来源 ${inherited.anchor} 的公式${inherited.status === 'missing-cache' ? '缺少缓存值' : '缓存值异常'}`)
     }
@@ -1174,25 +1179,31 @@ async function invoiceArrayBuffer(file: File | ArrayBuffer): Promise<ArrayBuffer
 export async function parseInvoiceWorkbookForMapping(
   file: File | ArrayBuffer,
   sourceFileName = typeof File !== 'undefined' && file instanceof File ? file.name : 'invoice-workbook.xlsx',
+  options?: { workbook?: XLSX.WorkBook, selectedSheet?: string },
 ): Promise<InvoiceImportWorkbook> {
   const buffer = await invoiceArrayBuffer(file)
-  const workbook = XLSX.read(buffer, {
+  const workbook = options?.workbook ?? XLSX.read(buffer, {
     type: 'array',
     codepage: 65001,
     cellFormula: true,
     cellNF: true,
     cellStyles: true,
   })
-  const styleReadback = await readInvoiceWorkbookStyleReadback(buffer)
+  const selectedIndex = options?.selectedSheet === undefined ? undefined : workbook.SheetNames.indexOf(options.selectedSheet)
+  if (selectedIndex === -1)
+    throw new Error('工作表不存在。')
+  const styleReadback = await readInvoiceWorkbookStyleReadback(buffer, selectedIndex)
   return {
-    sheets: workbook.SheetNames.map((sheetName, index) => {
-      const style = styleReadback.sheets[index]
+    sheets: workbook.SheetNames.flatMap((sheetName, index) => {
+      if (selectedIndex !== undefined && index !== selectedIndex)
+        return []
+      const style = styleReadback.sheets[selectedIndex === undefined ? index : 0]
       const sheetIssues = styleReadback.issues
         .filter(issue => issue.sheetName === '*' || issue.sheetName === `sheet${index + 1}`)
         .map(issue => issue.sheetName === '*' ? { ...issue, sheetName } : issue)
       if (style)
         style.sheetName = sheetName
-      return readInvoiceSheet(workbook, sheetName, sourceFileName, style ?? null, sheetIssues)
+      return [readInvoiceSheet(workbook, sheetName, sourceFileName, style ?? null, sheetIssues)]
     }),
   }
 }
