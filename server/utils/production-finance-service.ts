@@ -180,7 +180,7 @@ async function envelope<T extends object>(tx: TransactionDb, actor: BusinessSess
   for (const [key, domain, capability, table] of referenceSources) {
     let state: SourceEvidenceDTO['state'] = actor.capabilities.includes(capability) ? 'unavailable' : 'forbidden'
     let sourceVersion: string | null = null
-    if (state !== 'forbidden' && participants.some(row => row.domain === domain && (row.schema_version === 1 || (domain === 'invoices' && [2, 3, 4].includes(row.schema_version)) || (domain === 'owner-documents' && [2, 3].includes(row.schema_version)) || (domain === 'other-settlements' && row.schema_version === 2))) && tables.some(row => row.name === table)) {
+    if (state !== 'forbidden' && participants.some(row => row.domain === domain && (row.schema_version === 1 || (domain === 'invoices' && [2, 3, 4, 5].includes(row.schema_version)) || (domain === 'owner-documents' && [2, 3].includes(row.schema_version)) || (domain === 'other-settlements' && row.schema_version === 2))) && tables.some(row => row.name === table)) {
       const revision = (await tx.select<{ revision: number }>(`SELECT revision FROM ${table} WHERE singleton=1`))[0]
       if (!revision || !Number.isSafeInteger(revision.revision) || revision.revision < 0)
         fail('unavailable', '财务关联来源版本损坏，不能继续使用旧结果。')

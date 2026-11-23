@@ -64,6 +64,11 @@ function historicalFixtureSchema(db: DatabaseSync, version: 12 | 13) {
     // v32 installs attachment guards on the older shared tables; remove only those synthetic later-version guards before dropping their empty owner tables.
     for (const trigger of ['invoice_correction_file_metadata', 'invoice_correction_file_no_delete', 'invoice_correction_payload_no_update', 'invoice_correction_payload_no_delete'])
       db.exec(`DROP TRIGGER ${trigger}`)
+    // v37 的工作簿原件触发器也挂在共享表上。还原旧夹具时先移除这些后增触发器。
+    if (currentVersion >= 37) {
+      for (const trigger of ['invoice_workbook_file_no_update', 'invoice_workbook_file_no_delete', 'invoice_workbook_file_no_replace', 'invoice_workbook_payload_no_update', 'invoice_workbook_payload_no_delete', 'invoice_workbook_payload_no_replace'])
+        db.exec(`DROP TRIGGER ${trigger}`)
+    }
     if (currentVersion >= 34) {
       for (const trigger of ['production_owner_document_bytes_update', 'production_owner_document_bytes_delete', 'production_owner_document_file_metadata', 'production_owner_document_file_no_delete'])
         db.exec(`DROP TRIGGER ${trigger}`)

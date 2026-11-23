@@ -119,7 +119,7 @@ async function showMenu(key: string, x: number, y: number) {
   menu.value = {
     open: true,
     x: Math.min(x, window.innerWidth - 148),
-    y: Math.min(y, window.innerHeight - 166),
+    y: Math.min(y, window.innerHeight - 198),
     key,
   }
   await nextTick()
@@ -205,7 +205,7 @@ useEventListener('scroll', (event) => {
     const anchor = tabEls.value?.find(element => element.dataset.tabKey === menu.value.key)
     const rect = anchor?.getBoundingClientRect()
     if (rect)
-      menu.value = { ...menu.value, x: Math.max(0, Math.min(rect.left, window.innerWidth - 148)), y: Math.min(rect.bottom, window.innerHeight - 166) }
+      menu.value = { ...menu.value, x: Math.max(0, Math.min(rect.left, window.innerWidth - 148)), y: Math.min(rect.bottom, window.innerHeight - 198) }
     return
   }
   closeMenu(!!menuEl.value?.contains(document.activeElement))

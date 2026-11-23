@@ -21,7 +21,7 @@ export async function captureFinanceInvoiceAdoptions(tx: TransactionDb, actor: B
   const [participant] = await tx.select<{ schema_version: number }>('SELECT schema_version FROM production_participants WHERE domain=?', ['invoices'])
   if (!participant)
     return undefined
-  if (![1, 2, 3, 4].includes(participant.schema_version))
+  if (![1, 2, 3, 4, 5].includes(participant.schema_version))
     return invalid()
   const allocations = await tx.select<{ id: string, invoice_id: string }>('SELECT id,invoice_id FROM payment_application_invoice_allocations WHERE payment_application_id=? AND deleted_at IS NULL ORDER BY id', [applicationId])
   const adoptions: FinanceInvoiceAdoption[] = []

@@ -8,6 +8,13 @@
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
+| [central-workbook-security.test.ts](../../../tests/invoice/central-workbook-security.test.ts) | 单元 | 安全能力不可用、伪装文件、取消以及核验失败后禁止查询 |
+| [central-workbook-headers.test.ts](../../../tests/invoice/central-workbook-headers.test.ts) | 单元 | 原始表头和列位置证据，缺失或碰撞时拒绝映射 |
+| [central-import-preview.test.ts](../../../tests/invoice/central-import-preview.test.ts) | 单元 | 映射、原行号、查重差异、失权及来源变化 |
+| [invoice-workbook-fail-closed.test.ts](../../../tests/production/invoice-workbook-fail-closed.test.ts) | 服务 | 非法 XML、超限或核验异常在 SheetJS 之前拒绝，旧清单与恢复门禁 |
+| [invoice-workbook-merged.test.ts](../../../tests/production/invoice-workbook-merged.test.ts) | 真实合成 XLSX／服务 | 合并起点、缺失及错误公式缓存，导入、更正和恢复规则 |
+| [invoice-workbook-session-expiry.test.ts](../../../tests/production/invoice-workbook-session-expiry.test.ts) | 隔离 HTTP | 导入和更正请求体读取期间会话过期或撤权，失败不进事务 |
+| [invoice-workbook-limits.test.ts](../../../tests/production/invoice-workbook-limits.test.ts) · [ZIP 文件名](../../../tests/production/invoice-workbook-zip-names.test.ts) · [ZIP 描述符](../../../tests/production/invoice-workbook-descriptor.test.ts) | 服务 | 限额、CRC、文件名、范围与重包 |
 | [tests/invoice/central-workspace.test.ts](../../../tests/invoice/central-workspace.test.ts) | 单元／状态 | 原件字节与识别权限核对，归档核验提交原件摘要及 OCR 页，取消后拒绝迟到结果 |
 | [tests/invoice/central-upload-file-authority-race.test.ts](../../../tests/invoice/central-upload-file-authority-race.test.ts) | 单元／合成传输 | 原件读取和末次授权等待时来源失效、正常上传与原编号；不访问真实服务 |
 | [tests/invoice/central-pending-discovery.test.ts](../../../tests/invoice/central-pending-discovery.test.ts) | 单元／状态 | 原编号发现与身份隔离 |
@@ -63,6 +70,8 @@
 | [tests/stores/invoice-recognition.test.ts](../../../tests/stores/invoice-recognition.test.ts) | 单元／服务／状态 | invoice store 真实识别管线；重新识别只返回草稿不写库、失败不产生草稿、守卫保持；保存草稿后归档审计保留首次识别与完整修订链路；识别区域随原文件留在会话中（不入库不进日志，撤回窗口结束、刷新即失效），保存草稿后改用新区域 |
 
 ## 组件（jsdom）
+
+工作簿预览组件覆盖[映射与焦点](../../../tests/components/CentralInvoiceImportPreview.test.ts)、[身份变化](../../../tests/components/CentralInvoiceImportPreviewAuthority.test.ts)和[入口安全阻断](../../../tests/components/CentralInvoiceImportPreviewEntrySecurity.test.ts)。
 
 本机 OCR 几何的浏览器解码验证见 [InvoiceLocalGeometry.test.ts](../../../tests/browser/InvoiceLocalGeometry.test.ts)：合成图片、EXIF 方向和旋转 PDF 采用模拟 OCR 结果，真实 OCR 模型尚未验收。
 
@@ -121,6 +130,8 @@
 
 ## 真实浏览器（Vitest／Chromium）
 
+工作簿浏览器验证涵盖[安全阻断](../../../tests/browser/CentralInvoiceImportPreviewSecurity.test.ts)及[有界 ZIP 核验](../../../tests/browser/CentralInvoiceWorkbookZip.test.ts)。
+
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |
 | [tests/browser/CentralInvoiceArchive.test.ts](../../../tests/browser/CentralInvoiceArchive.test.ts) | 真实组件／模拟来源 | 归档来源及主要视口 |
@@ -163,6 +174,8 @@
 | [tests/browser/InvoiceMigrationFileLifetime.test.ts](../../../tests/browser/InvoiceMigrationFileLifetime.test.ts) | 浏览器组件／合成来源 | 快照选择、失效停止后续校验、键盘及两视口 |
 
 ## Playwright E2E
+
+[中央发票工作簿预览](../../../e2e/production-invoice-import-preview.spec.ts)在独立构建和合成数据库上检查原行、真零、查重、权限变化，以及预览前后数据库未写入。
 
 | 文件 | 运行层／用途 | 场景或关联说明（定位用） |
 | --- | --- | --- |

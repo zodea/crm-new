@@ -46,6 +46,22 @@ describe('页签缓存失效', () => {
     setActivePinia(createPinia())
   })
 
+  it('关闭左侧仅处理目标左边的业务页签，取消时整批保留', async () => {
+    const store = useTabsStore()
+    store.open({ fullPath: '/a', title: 'A' })
+    store.open({ fullPath: '/b', title: 'B' })
+    store.open({ fullPath: '/c', title: 'C' })
+    const guard = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true)
+    store.registerCloseGuard('/b', guard)
+    expect(await store.requestCloseToLeft('/c')).toBe(false)
+    expect(store.tabs.map(tab => tab.key)).toEqual(['home', '/a', '/b', '/c'])
+    expect(store.invalidatedKeys).toEqual([])
+    expect(await store.requestCloseToLeft('/c')).toBe(true)
+    expect(store.tabs.map(tab => tab.key)).toEqual(['home', '/c'])
+    expect(store.activeKey).toBe('/c')
+    expect(store.invalidatedKeys).toEqual(['/a', '/b'])
+  })
+
   it('关闭其他确认成功后激活保留页签，取消不改变页签或缓存', async () => {
     const store = useTabsStore()
     store.open({ fullPath: '/a', title: '保留 A' })

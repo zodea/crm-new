@@ -10,6 +10,7 @@ import { PRODUCTION_CONSTRUCTION_SCOPE_TABLES } from '../../server/utils/product
 import { PRODUCTION_INVOICE_CORRECTION_TABLES } from '../../server/utils/production-invoice-correction-schema'
 import { INVOICE_ORIGINAL_VERIFICATION_TABLES } from '../../server/utils/production-invoice-original-verification-schema'
 import { PRODUCTION_INVOICE_TABLES } from '../../server/utils/production-invoice-schema'
+import { PRODUCTION_INVOICE_WORKBOOK_TABLES } from '../../server/utils/production-invoice-workbook-schema'
 import { createProductionStorage } from '../../server/utils/production-storage'
 import { PRODUCTION_STORAGE_SCHEMA, PRODUCTION_STORAGE_UPGRADES, PRODUCTION_STORAGE_VERSION, productionStorageManifest } from '../../server/utils/production-storage-schema'
 import { cleanupTestTempRoot, testTempRoot } from '../helpers/test-temp-root'
@@ -17,8 +18,8 @@ import { cleanupTestTempRoot, testTempRoot } from '../helpers/test-temp-root'
 afterAll(cleanupTestTempRoot)
 
 // Independent expected release scope: checking only the version would miss a partial owner registration.
-const expectedSchemaVersion = 36
-const expectedParticipantVersions: Record<string, number> = { 'construction-scope': 2, 'finance': 2, 'invoices': 4, 'other-settlements': 2, 'owner-documents': 3 }
+const expectedSchemaVersion = 37
+const expectedParticipantVersions: Record<string, number> = { 'construction-scope': 2, 'finance': 2, 'invoices': 5, 'other-settlements': 2, 'owner-documents': 3 }
 const expectedParticipants = ['auxiliary-contract', 'backup', 'boq', 'construction-contracts', 'construction-scope', 'contract-number-registry', 'crew-worker', 'customer', 'finance', 'invoices', 'material-contracts', 'material-quotations', 'notifications', 'other-settlements', 'our-signatories', 'owner-documents', 'payroll', 'process-library', 'project', 'quantity', 'subcontract-contracts', 'supplier', 'target-cost', 'wbs']
 const appendedOpt02Participants = ['target-cost', 'quantity', 'payroll', 'wbs', 'construction-contracts', 'boq', 'construction-scope', 'subcontract-contracts', 'auxiliary-contract', 'invoices', 'owner-documents'].map(domain => ({ domain, schema_version: expectedParticipantVersions[domain] ?? 1 }))
 
@@ -38,6 +39,8 @@ it('发票v28升级保全原事实和旧清单，冲突时整批回滚并保留�
   expect(productionStorageManifest(35).participants['other-settlements']?.schemaVersion).toBe(2)
   expect(productionStorageManifest(36).participants['owner-documents']?.schemaVersion).toBe(3)
   expect(productionStorageManifest(33).participants.invoices).toEqual({ schemaVersion: 4, tables: [...PRODUCTION_INVOICE_TABLES, ...PRODUCTION_INVOICE_CORRECTION_TABLES, ...INVOICE_ORIGINAL_VERIFICATION_TABLES] })
+  expect(productionStorageManifest(36).participants.invoices).toEqual(productionStorageManifest(33).participants.invoices)
+  expect(productionStorageManifest(37).participants.invoices).toEqual({ schemaVersion: 5, tables: [...PRODUCTION_INVOICE_TABLES, ...PRODUCTION_INVOICE_CORRECTION_TABLES, ...INVOICE_ORIGINAL_VERIFICATION_TABLES, ...PRODUCTION_INVOICE_WORKBOOK_TABLES] })
   for (const conflict of [false, true]) {
     const directory = await mkdtemp(`${root}/synthetic-`)
     const file = join(directory, 'ruihang.sqlite')
@@ -68,7 +71,7 @@ it('发票v28升级保全原事实和旧清单，冲突时整批回滚并保留�
       try {
         expect((await storage.status()).schemaVersion).toBe(PRODUCTION_STORAGE_VERSION)
         expect(await storage.select('SELECT revision FROM customer_revision')).toEqual([{ revision: 7 }])
-        expect(await storage.select('SELECT domain,schema_version FROM production_participants WHERE domain=?', ['invoices'])).toEqual([{ domain: 'invoices', schema_version: 4 }])
+        expect(await storage.select('SELECT domain,schema_version FROM production_participants WHERE domain=?', ['invoices'])).toEqual([{ domain: 'invoices', schema_version: 5 }])
         expect(await storage.select('PRAGMA foreign_key_check')).toEqual([])
         await storage.close()
         expect((await storage.status()).schemaVersion).toBe(PRODUCTION_STORAGE_VERSION)

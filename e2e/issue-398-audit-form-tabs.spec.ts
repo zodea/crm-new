@@ -54,6 +54,31 @@ test('从首页关闭后台表单的其他页签后激活该表单并保留输�
   await expect(page.locator('[data-shell-tab][data-tab-key="/base/supplier"]')).toHaveCount(0)
 })
 
+test('关闭左侧遇到未保存草稿时取消保留，确认后才关闭', async ({ page }, testInfo) => {
+  await page.setExtraHTTPHeaders({ 'x-ruihang-test-session': `audit-close-left-${testInfo.workerIndex}` })
+  await page.goto('/project/form')
+  const name = page.getByLabel('项目名称', { exact: false }).first()
+  await expect(name).toBeVisible({ timeout: 30_000 })
+  await name.fill('关闭左侧前保留的草稿')
+  await page.getByRole('searchbox', { name: '搜索菜单' }).fill('分供方')
+  await page.locator('[data-sidebar="sidebar"] a[href="/base/supplier"]').click()
+  await expect(page).toHaveURL(/\/base\/supplier$/)
+  const formTab = page.locator('[data-shell-tab][data-tab-key="/project/form"]')
+  const supplierTab = page.locator('[data-shell-tab][data-tab-key="/base/supplier"]')
+  await supplierTab.click({ button: 'right' })
+  await page.getByRole('menuitem', { name: '关闭左侧', exact: true }).click()
+  await expect(page.getByRole('dialog')).toContainText('未保存')
+  await page.getByRole('dialog').getByRole('button', { name: '取消', exact: true }).click()
+  await formTab.locator('[data-tab-trigger]').click()
+  await expect(name).toHaveValue('关闭左侧前保留的草稿')
+  await supplierTab.locator('[data-tab-trigger]').click()
+  await supplierTab.click({ button: 'right' })
+  await page.getByRole('menuitem', { name: '关闭左侧', exact: true }).click()
+  await page.getByRole('dialog').getByRole('button', { name: '放弃修改', exact: true }).click()
+  await expect(formTab).toHaveCount(0)
+  await expect(supplierTab.locator('[data-tab-trigger]')).toHaveAttribute('aria-current', 'page')
+})
+
 for (const kind of ['construction', 'material', 'subcontract'] as const) {
   test(`${kind} 保存并新建连续两次创建独立合同并清空表单`, async ({ page }) => {
     const id = `audit-new-${kind}-${randomUUID()}`

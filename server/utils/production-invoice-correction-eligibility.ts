@@ -17,7 +17,7 @@ export async function requireInvoiceCorrectionEligibility(tx: TransactionDb, act
     return fail('forbidden', '没有发票或付款来源读取权限，不能核对更正资格。')
   }
   const participants = await tx.select<{ domain: string, schema_version: number }>('SELECT domain,schema_version FROM production_participants WHERE domain IN (\'invoices\',\'finance\')')
-  if (!participants.some(row => row.domain === 'invoices' && [1, 2, 3, 4].includes(row.schema_version)) || !participants.some(row => row.domain === 'finance' && [1, 2].includes(row.schema_version)))
+  if (!participants.some(row => row.domain === 'invoices' && [1, 2, 3, 4, 5].includes(row.schema_version)) || !participants.some(row => row.domain === 'finance' && [1, 2].includes(row.schema_version)))
     return fail('unavailable', '发票或付款正式来源不可核实，不能更正。')
   await validateProductionInvoiceJournal(tx, actor)
   await validateFinanceJournal(tx, actor)
